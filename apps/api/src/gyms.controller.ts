@@ -6,11 +6,15 @@ import {
   ForbiddenException,
   Get,
   InternalServerErrorException,
+  NotFoundException,
+  Param,
+  Patch,
   Post,
   Req,
   UseGuards,
 } from '@nestjs/common';
 import { z } from 'zod';
+import { DatabaseService } from './database.service.js';
 import { Prisma } from './generated/tenant/client.js';
 import { GymAccessGuard, type GymRequest } from './gym-access.guard.js';
 import { TenantDatabaseService } from './tenant-database.service.js';
@@ -20,9 +24,72 @@ const createMemberInput = z.strictObject({
   email: z.string().trim().toLowerCase().pipe(z.email()).optional(),
 });
 
+const updateThemeInput = z
+  .strictObject({
+    primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    logoUrl: z
+      .string()
+      .trim()
+      .max(2048)
+      .url()
+      .refine((url) => url.startsWith('https://'))
+      .nullable()
+      .optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0);
+
 @Controller('gyms')
 export class GymsController {
-  constructor(private readonly tenants: TenantDatabaseService) {}
+  constructor(
+    private readonly tenants: TenantDatabaseService,
+    private readonly database: DatabaseService,
+  ) {}
+
+  @Get(':slug/theme')
+  async theme(@Param('slug') slug: string) {
+    const gym = await this.database.master.gym.findUnique({
+      where: { slug },
+      include: { theme: true },
+    });
+    if (!gym || gym.status !== 'ACTIVE') {
+      throw new NotFoundException('Gym not found');
+    }
+
+    return {
+      slug: gym.slug,
+      name: gym.name,
+      theme: {
+        primaryColor: gym.theme?.primaryColor ?? '#2563EB',
+        logoUrl: gym.theme?.logoUrl ?? null,
+      },
+    };
+  }
+
+  @Patch(':slug/theme')
+  @UseGuards(GymAccessGuard)
+  async updateTheme(@Req() request: GymRequest, @Body() body: unknown) {
+    const access = request.gymAccess;
+    if (!access) {
+      throw new InternalServerErrorException('Gym context missing');
+    }
+    if (access.role !== 'OWNER') {
+      throw new ForbiddenException('Only gym owners can update themes');
+    }
+
+    const parsed = updateThemeInput.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException('Enter a valid theme color or logo URL');
+    }
+
+    const theme = await this.database.master.theme.upsert({
+      where: { gymId: access.gymId },
+      create: { gymId: access.gymId, ...parsed.data },
+      update: parsed.data,
+      select: { primaryColor: true, logoUrl: true },
+    });
+
+    return { slug: access.slug, theme };
+  }
 
   @Get(':slug/access')
   @UseGuards(GymAccessGuard)
