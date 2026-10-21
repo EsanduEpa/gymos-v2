@@ -1,0 +1,70 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../../../apps/api/src/generated/master"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum GlobalRole {
+  USER
+  SUPER_ADMIN
+}
+
+enum GymRole {
+  OWNER
+  TRAINER
+  MEMBER
+}
+
+enum GymStatus {
+  PROVISIONING
+  ACTIVE
+  FAILED
+  SUSPENDED
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  passwordHash String
+  globalRole   GlobalRole   @default(USER)
+  gymAccesses  GymAccess[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Gym {
+  id           String      @id @default(cuid())
+  slug         String      @unique
+  name         String
+  databaseName String      @unique
+  status       GymStatus   @default(PROVISIONING)
+  gymAccesses  GymAccess[]
+  theme        Theme?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
+
+model GymAccess {
+  userId    String
+  gymId     String
+  role      GymRole
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gym       Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, gymId])
+  @@index([gymId, role])
+}
+
+model Theme {
+  id           String   @id @default(cuid())
+  gymId        String   @unique
+  gym          Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  primaryColor String   @default("#2563EB")
+  logoUrl      String?
+  updatedAt    DateTime @updatedAt
+}
