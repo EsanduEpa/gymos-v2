@@ -59,6 +59,7 @@ export class AuthController {
       accessToken,
       tokenType: 'Bearer',
       expiresIn: 900,
+      globalRole: user.globalRole,
       gyms: user.gymAccesses
         .filter((access) => access.gym.status === 'ACTIVE')
         .map((access) => ({
