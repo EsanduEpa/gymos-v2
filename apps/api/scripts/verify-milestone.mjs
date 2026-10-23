@@ -1,3 +1,4 @@
+import { normalizeIdentityEmail } from '../dist/identity/email.js';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -163,7 +164,7 @@ try {
   await waitReady(webBase + '/', webProcess);
 
   await master.user.create({
-    data: { email: adminEmail, passwordHash: await argon2.hash(adminPassword), globalRole: 'SUPER_ADMIN' },
+    data: { email: normalizeIdentityEmail(adminEmail), passwordHash: await argon2.hash(adminPassword), globalRole: 'SUPER_ADMIN' },
   });
   const adminCookie = await webLogin(webBase, adminEmail, adminPassword, '/admin');
   const adminToken = adminCookie.split('=')[1];

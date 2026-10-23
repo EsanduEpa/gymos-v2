@@ -9,10 +9,11 @@ import { Throttle } from '@nestjs/throttler';
 import argon2 from 'argon2';
 import { SignJWT } from 'jose';
 import { z } from 'zod';
+import { identityEmailSchema } from './identity/email.js';
 import { DatabaseService } from './database.service.js';
 
 const loginInput = z.strictObject({
-  email: z.email(),
+  email: identityEmailSchema,
   password: z.string().min(1).max(1024),
 });
 
@@ -28,7 +29,7 @@ export class AuthController {
       throw new BadRequestException('Enter a valid email and password');
     }
 
-    const email = parsed.data.email.trim().toLowerCase();
+    const email = parsed.data.email;
     const user = await this.database.master.user.findUnique({
       where: { email },
       include: { gymAccesses: { include: { gym: true } } },
@@ -61,7 +62,7 @@ export class AuthController {
       expiresIn: 900,
       globalRole: user.globalRole,
       gyms: user.gymAccesses
-        .filter((access) => access.gym.status === 'ACTIVE')
+        .filter((access) => access.gym.status === 'ACTIVE' && access.linkStatus === 'ACTIVE' && access.role === 'OWNER')
         .map((access) => ({
           id: access.gym.id,
           slug: access.gym.slug,

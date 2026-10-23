@@ -7,6 +7,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { z } from 'zod';
+import { identityEmailSchema } from './identity/email.js';
 import { DatabaseService } from './database.service.js';
 import { GymProvisioningService } from './gym-provisioning.service.js';
 import { SuperAdminGuard } from './super-admin.guard.js';
@@ -14,7 +15,7 @@ import { SuperAdminGuard } from './super-admin.guard.js';
 const createGymInput = z.strictObject({
   name: z.string().trim().min(2).max(100),
   slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-  ownerEmail: z.string().trim().toLowerCase().pipe(z.email()),
+  ownerEmail: identityEmailSchema,
   ownerPassword: z.string().min(12).max(1024),
 });
 

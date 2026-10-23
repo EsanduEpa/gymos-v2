@@ -13,6 +13,7 @@ import argon2 from 'argon2';
 import pg from 'pg';
 import { DatabaseService } from './database.service.js';
 import { Prisma } from './generated/master/client.js';
+import { normalizeIdentityEmail } from './identity/email.js';
 
 const execFileAsync = promisify(execFile);
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
@@ -32,10 +33,11 @@ export class GymProvisioningService {
 
   async create(input: CreateGymInput) {
     const master = this.database.master;
+    const ownerEmail = normalizeIdentityEmail(input.ownerEmail);
     const [existingGym, existingOwner] = await Promise.all([
       master.gym.findUnique({ where: { slug: input.slug }, select: { id: true } }),
       master.user.findUnique({
-        where: { email: input.ownerEmail },
+        where: { email: ownerEmail },
         select: { id: true },
       }),
     ]);
@@ -89,10 +91,10 @@ export class GymProvisioningService {
 
       await master.$transaction(async (tx) => {
         const owner = await tx.user.create({
-          data: { email: input.ownerEmail, passwordHash },
+          data: { email: ownerEmail, passwordHash },
         });
         await tx.gymAccess.create({
-          data: { userId: owner.id, gymId: gym.id, role: 'OWNER' },
+          data: { userId: owner.id, gymId: gym.id, role: 'OWNER', linkStatus: 'ACTIVE' },
         });
         await tx.theme.create({ data: { gymId: gym.id } });
         await tx.gym.update({

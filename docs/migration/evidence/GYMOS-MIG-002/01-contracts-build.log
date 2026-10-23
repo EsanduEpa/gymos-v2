@@ -1,0 +1,4 @@
+
+> @gymos/contracts@0.0.0 build /Users/esanduepa/Desktop/Projects/gymos-v2/packages/contracts
+> tsc -p tsconfig.json
+

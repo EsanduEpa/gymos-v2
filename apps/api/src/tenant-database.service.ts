@@ -24,6 +24,13 @@ export class TenantDatabaseService implements OnModuleDestroy {
     return client;
   }
 
+  async withDatabase<Result>(
+    databaseName: string,
+    work: (client: PrismaClient) => Promise<Result>,
+  ): Promise<Result> {
+    return work(this.forDatabase(databaseName));
+  }
+
   async onModuleDestroy() {
     await Promise.all(
       [...this.clients.values()].map((client) => client.$disconnect()),

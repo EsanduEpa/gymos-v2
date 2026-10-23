@@ -1,0 +1,86 @@
+[
+  {
+    "name": "api-unit",
+    "command": [
+      "pnpm",
+      "--dir",
+      "apps/api",
+      "test"
+    ],
+    "exit_code": 0,
+    "duration_seconds": 3.048,
+    "log": "api-unit.log"
+  },
+  {
+    "name": "api-lint",
+    "command": [
+      "pnpm",
+      "--dir",
+      "apps/api",
+      "lint"
+    ],
+    "exit_code": 0,
+    "duration_seconds": 1.371,
+    "log": "api-lint.log"
+  },
+  {
+    "name": "api-noemit",
+    "command": [
+      "pnpm",
+      "--dir",
+      "apps/api",
+      "exec",
+      "tsc",
+      "--noEmit",
+      "--incremental",
+      "false",
+      "--pretty",
+      "false"
+    ],
+    "exit_code": 0,
+    "duration_seconds": 3.705,
+    "log": "api-noemit.log"
+  },
+  {
+    "name": "web-noemit",
+    "command": [
+      "pnpm",
+      "--dir",
+      "apps/web",
+      "exec",
+      "tsc",
+      "--noEmit",
+      "--incremental",
+      "false",
+      "--pretty",
+      "false"
+    ],
+    "exit_code": 0,
+    "duration_seconds": 4.901,
+    "log": "web-noemit.log"
+  },
+  {
+    "name": "web-lint",
+    "command": [
+      "pnpm",
+      "--dir",
+      "apps/web",
+      "lint"
+    ],
+    "exit_code": 0,
+    "duration_seconds": 6.518,
+    "log": "web-lint.log"
+  },
+  {
+    "name": "api-build",
+    "command": [
+      "pnpm",
+      "--dir",
+      "apps/api",
+      "build"
+    ],
+    "exit_code": 0,
+    "duration_seconds": 5.243,
+    "log": "api-build.log"
+  }
+]

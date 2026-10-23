@@ -1,0 +1,8 @@
+$ pnpm --dir apps/web lint
+
+> web@0.1.0 lint /Users/esanduepa/Desktop/Projects/gymos-v2/apps/web
+> eslint
+
+
+
+Exit code: 0

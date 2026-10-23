@@ -1,0 +1,60 @@
+{
+  "runId": "a2bc895def4c9956",
+  "migrationEvidence": [
+    {
+      "database": "gymos_test_a2bc895def4c9956_master",
+      "migrations": [
+        {
+          "migration_name": "20261021100256_init_master",
+          "checksum": "940ad033a98c3b09b34e7026c5bc04921e29482fe458de400ad8ad3c17208470",
+          "completed": true,
+          "sourceChecksumMatches": true
+        },
+        {
+          "migration_name": "20261023090000_identity_foundation",
+          "checksum": "20fddb8f42bdfd8d6710b9510c854937b1eb176681ec8d7921a7ddd1d5929750",
+          "completed": true,
+          "sourceChecksumMatches": true
+        }
+      ]
+    },
+    {
+      "database": "gymos_test_a2bc895def4c9956_tenant_a",
+      "migrations": [
+        {
+          "migration_name": "20261021100258_init_tenant",
+          "checksum": "7ccdcd9d66e9079b885af6c9b61ef8b7992ad14656d2792b5418df682d854579",
+          "completed": true,
+          "sourceChecksumMatches": true
+        },
+        {
+          "migration_name": "20261023090001_actor_foundation",
+          "checksum": "83aa8d8365e616ff60e169f876dd7e90135404a26bce7574118c64f601babb50",
+          "completed": true,
+          "sourceChecksumMatches": true
+        }
+      ]
+    },
+    {
+      "database": "gymos_test_a2bc895def4c9956_tenant_b",
+      "migrations": [
+        {
+          "migration_name": "20261021100258_init_tenant",
+          "checksum": "7ccdcd9d66e9079b885af6c9b61ef8b7992ad14656d2792b5418df682d854579",
+          "completed": true,
+          "sourceChecksumMatches": true
+        },
+        {
+          "migration_name": "20261023090001_actor_foundation",
+          "checksum": "83aa8d8365e616ff60e169f876dd7e90135404a26bce7574118c64f601babb50",
+          "completed": true,
+          "sourceChecksumMatches": true
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "droppedDatabases": 4,
+    "containerRemoved": true
+  }
+}

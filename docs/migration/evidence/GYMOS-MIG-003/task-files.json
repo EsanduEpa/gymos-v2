@@ -1,0 +1,21 @@
+{
+  "packages/database-master/prisma/schema.prisma": "2eca9baa9335bf54b9f640c049909afdaf3839fac6f7a1020f215e95f4f744d6",
+  "packages/database-tenant/prisma/schema.prisma": "5ab49738ae002fd67f06be90e9b9ee18e44b39da8223a5493a97c2f1832cfe9a",
+  "packages/database-master/prisma/migrations/20261023090000_identity_foundation/migration.sql": "20fddb8f42bdfd8d6710b9510c854937b1eb176681ec8d7921a7ddd1d5929750",
+  "packages/database-tenant/prisma/migrations/20261023090001_actor_foundation/migration.sql": "83aa8d8365e616ff60e169f876dd7e90135404a26bce7574118c64f601babb50",
+  "apps/api/src/admin.controller.ts": "fec803b2e9c464325b84e8c8b791a3c4c7de348a4033aa0f7dcbb7bcff48fc95",
+  "apps/api/src/auth.controller.ts": "f27f25ba8db3af79e62df6e42629bc634d3bb63196b766df37d9a6f85fc43afb",
+  "apps/api/src/gym-access.guard.ts": "1a0d6a1595068b0c0c6c20a0810b07dd7e35e65fe5f18e4ea88134e94c6386c7",
+  "apps/api/src/gym-provisioning.service.ts": "02b9dd92d08945ed6f4362abe6cfa178e9d289b4f842508cad5c7caaf8eb7546",
+  "apps/api/scripts/create-owner.mjs": "065a502f4d0c2cf33a20b541ba4384b11d9dbea73b8d631ae0ee3b53377a9548",
+  "apps/api/scripts/create-super-admin.mjs": "99d668f9f4ba71eb580f812d514a6ec1ed7e55e6b32bd7a53f7c29233f1c280f",
+  "apps/api/scripts/verify-milestone.mjs": "00f22784b1224e34f72b6baad38638e2e6d83f90e98bae8bec68bb4394dd1cee",
+  "apps/api/scripts/inspect-identity-canonical.sql": "252563143c7582697180afb452d4b4ad54c8b71f0158004859d193e919f5cfc0",
+  "apps/api/vitest.config.identity.ts": "626c5fc46de8ec56f33c7a8ae3f06d8f7dbef4a7bedc2a1c500395d67ec0806d",
+  "apps/api/src/identity/email.spec.ts": "c3ba2e7134f5c57bb7078e47ba520a79426d01fadf2c444dea1f19efca2b1647",
+  "apps/api/src/identity/email.ts": "f649135cfdb8b711b23467b0106835f05deaff94a789873bf988b44b8f8b84a1",
+  "apps/api/src/identity/publication-policy.ts": "d5e1a1e82dbd3f54a67085595bbb1a430ca7f78a9cc14d9051156caffa131f0c",
+  "apps/api/src/identity/identity.service.ts": "557e91b797c27bc605b88585992753608de8112ed1d69470123901210452cf40",
+  "apps/api/test/identity/identity.integration.test.ts": "99fbd10bd325afd48b2b54d225ef15f3db482d7bce28bb7e480a5b2eb2d9ab2e",
+  "apps/api/test/support/disposable-postgres.ts": "99bdedae00dc8b87292b6e79c54b6db32b769befa6cac61f9a2e2b9d75cea914"
+}

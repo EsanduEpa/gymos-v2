@@ -17,7 +17,7 @@ import { z } from 'zod';
 import { DatabaseService } from './database.service.js';
 import { Prisma } from './generated/tenant/client.js';
 import { GymAccessGuard, type GymRequest } from './gym-access.guard.js';
-import { TenantDatabaseService } from './tenant-database.service.js';
+import { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js';
 
 const createMemberInput = z.strictObject({
   fullName: z.string().trim().min(2).max(120),
@@ -41,8 +41,8 @@ const updateThemeInput = z
 @Controller('gyms')
 export class GymsController {
   constructor(
-    private readonly tenants: TenantDatabaseService,
     private readonly database: DatabaseService,
+    private readonly tenantGate: TenantSchemaGateService,
   ) {}
 
   @Get(':slug/theme')
@@ -114,16 +114,17 @@ export class GymsController {
       throw new ForbiddenException('Member list access denied');
     }
 
-    return this.tenants.forDatabase(access.databaseName).member.findMany({
-      select: {
-        id: true,
-        fullName: true,
-        email: true,
-        status: true,
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    });
+    return this.tenantGate.withVerifiedTenant(access, (tenant) =>
+      tenant.member.findMany({
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          status: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      }));
   }
 
   @Post(':slug/members')
@@ -143,16 +144,17 @@ export class GymsController {
     }
 
     try {
-      return await this.tenants.forDatabase(access.databaseName).member.create({
-        data: parsed.data,
-        select: {
-          id: true,
-          fullName: true,
-          email: true,
-          status: true,
-          createdAt: true,
-        },
-      });
+      return await this.tenantGate.withVerifiedTenant(access, (tenant) =>
+        tenant.member.create({
+          data: parsed.data,
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            status: true,
+            createdAt: true,
+          },
+        }));
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&

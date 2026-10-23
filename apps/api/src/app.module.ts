@@ -11,6 +11,8 @@ import { GymProvisioningService } from './gym-provisioning.service.js';
 import { GymsController } from './gyms.controller.js';
 import { SuperAdminGuard } from './super-admin.guard.js';
 import { TenantDatabaseService } from './tenant-database.service.js';
+import { TenantRegistryService } from './tenancy/tenant-registry.service.js';
+import { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { TenantDatabaseService } from './tenant-database.service.js';
     GymProvisioningService,
     SuperAdminGuard,
     TenantDatabaseService,
+    TenantRegistryService,
+    TenantSchemaGateService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })

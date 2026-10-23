@@ -26,45 +26,198 @@ enum GymStatus {
   SUSPENDED
 }
 
+enum AccessLinkStatus {
+  PENDING
+  ACTIVE
+  FAILED
+  REVOKED
+}
+
+enum ActorKind {
+  MEMBER
+  TRAINER
+}
+
 model User {
-  id           String       @id @default(cuid())
-  email        String       @unique
-  passwordHash String
-  globalRole   GlobalRole   @default(USER)
-  gymAccesses  GymAccess[]
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  originalPlatformAudits PlatformAuditLog[] @relation("PlatformAuditOriginalActor")
+  initiatedOperations    Operation[]        @relation("OperationActor")
+  subjectOperations      Operation[]        @relation("OperationSubject")
+  platformAudits         PlatformAuditLog[] @relation("PlatformAuditActor")
+  id                     String             @id @default(cuid())
+  email                  String             @unique
+  passwordHash           String
+  globalRole             GlobalRole         @default(USER)
+  displayName            String?
+  mustChangePassword     Boolean            @default(false)
+  authVersion            Int                @default(0)
+  version                Int                @default(0)
+  passwordChangedAt      DateTime?          @db.Timestamptz(3)
+  credentialExpiresAt    DateTime?          @db.Timestamptz(3)
+  gymAccesses            GymAccess[]
+  enrollmentProofs       EnrollmentProof[]
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
 }
 
 model Gym {
-  id           String      @id @default(cuid())
-  slug         String      @unique
-  name         String
-  databaseName String      @unique
-  status       GymStatus   @default(PROVISIONING)
-  gymAccesses  GymAccess[]
-  theme        Theme?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  platformAudits               PlatformAuditLog[]
+  operations                   Operation[]        @relation("OperationGym")
+  expectedTenantOperationId    String?            @unique
+  expectedTenantOperation      Operation?         @relation("GymExpectedTenantOperation", fields: [expectedTenantOperationId], references: [id], onDelete: Restrict)
+  id                           String             @id @default(cuid())
+  slug                         String             @unique
+  name                         String
+  databaseName                 String             @unique
+  status                       GymStatus          @default(PROVISIONING)
+  version                      Int                @default(0)
+  expectedTenantSchemaVersion  String?
+  expectedTenantManifestDigest String?
+  gymAccesses                  GymAccess[]
+  theme                        Theme?
+  enrollmentProofs             EnrollmentProof[]
+  createdAt                    DateTime           @default(now())
+  updatedAt                    DateTime           @updatedAt
 }
 
 model GymAccess {
-  userId    String
-  gymId     String
-  role      GymRole
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  gym       Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
+  userId                String
+  gymId                 String
+  role                  GymRole
+  linkStatus            AccessLinkStatus @default(PENDING)
+  actorKind             ActorKind?
+  tenantActorId         String?
+  enrollmentOperationId String?
+  version               Int              @default(0)
+  user                  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gym                   Gym              @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  createdAt             DateTime         @default(now())
 
   @@id([userId, gymId])
+  @@unique([gymId, actorKind, tenantActorId])
   @@index([gymId, role])
 }
 
+// Internal consent evidence only. No public enrollment endpoint is introduced.
+// operationId is a scalar until task004 establishes durable Operation ownership.
+model EnrollmentProof {
+  id                    String    @id @default(cuid())
+  identityId            String
+  gymId                 String
+  role                  GymRole
+  enrollmentOperationId String
+  tokenHash             String    @unique
+  authVersion           Int
+  issuedAt              DateTime  @default(now()) @db.Timestamptz(3)
+  expiresAt             DateTime  @db.Timestamptz(3)
+  consumedAt            DateTime? @db.Timestamptz(3)
+  identity              User      @relation(fields: [identityId], references: [id], onDelete: Restrict)
+  gym                   Gym       @relation(fields: [gymId], references: [id], onDelete: Restrict)
+
+  @@unique([identityId, gymId, role, enrollmentOperationId])
+  @@index([expiresAt])
+}
+
 model Theme {
-  id           String   @id @default(cuid())
-  gymId        String   @unique
-  gym          Gym      @relation(fields: [gymId], references: [id], onDelete: Cascade)
-  primaryColor String   @default("#2563EB")
-  logoUrl      String?
-  updatedAt    DateTime @updatedAt
+  ownerOperations Operation[]
+  id              String      @id @default(cuid())
+  gymId           String      @unique
+  gym             Gym         @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  primaryColor    String      @default("#2563EB")
+  logoUrl         String?
+  updatedAt       DateTime    @updatedAt
+}
+
+// Add relations to existing models:
+// User: initiatedOperations Operation[] @relation("OperationActor")
+//       subjectOperations Operation[] @relation("OperationSubject")
+//       platformAudits PlatformAuditLog[] @relation("PlatformAuditActor")
+// Gym: operations Operation[]
+// Theme: ownerOperations Operation[]
+
+enum OperationKind {
+  PROVISION_GYM
+  REGISTER_MEMBER
+  REGISTER_TRAINER
+  UPDATE_GYM_PROFILE
+  CHANGE_ACCESS
+}
+
+enum OperationState {
+  PENDING
+  MASTER_PREPARED
+  TENANT_COMMITTED
+  COMPLETE
+  FAILED_RETRYABLE
+  FAILED_FINAL
+  REPAIR_REQUIRED
+}
+
+model Operation {
+  id                            String             @id @default(cuid())
+  kind                          OperationKind
+  actorIdentityId               String
+  actor                         User               @relation("OperationActor", fields: [actorIdentityId], references: [id], onDelete: Restrict)
+  scopeKey                      String
+  idempotencyKey                String
+  requestDigest                 String
+  requestedSlug                 String?
+  supportContextId              String? // Local SupportSession FK added by024; not cross-DB.
+  gymId                         String?
+  gym                           Gym?               @relation("OperationGym", fields: [gymId], references: [id], onDelete: Restrict)
+  expectedForGym                Gym?               @relation("GymExpectedTenantOperation")
+  subjectIdentityId             String?
+  subject                       User?              @relation("OperationSubject", fields: [subjectIdentityId], references: [id], onDelete: Restrict)
+  ownerThemeId                  String?
+  ownerTheme                    Theme?             @relation(fields: [ownerThemeId], references: [id], onDelete: Restrict)
+  databaseName                  String?            @unique
+  intendedTenantTemplateVersion String?
+  intendedTenantManifestDigest  String?
+  appliedTenantTemplateVersion  String?
+  appliedTenantManifestDigest   String?
+  tenantSchemaVerifiedAt        DateTime?          @db.Timestamptz(3)
+  tenantActorId                 String?
+  tenantCommandReceiptId        String?
+  tenantMembershipId            String?
+  // tenantRegistrationRevenueId deliberately omitted: approved MVP creates no
+  // registration cash/upfront full earned record; stale map field withdrawn.
+  completedSteps                Json               @default("{}")
+  state                         OperationState     @default(PENDING)
+  step                          String             @default("PENDING")
+  version                       Int                @default(0)
+  attemptCount                  Int                @default(0)
+  leaseToken                    String?
+  leaseExpiresAt                DateTime?          @db.Timestamptz(3)
+  leaseRequiresReconciliation   Boolean            @default(false)
+  safeResult                    Json?
+  errorCode                     String?
+  createdAt                     DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt                     DateTime           @updatedAt @db.Timestamptz(3)
+  lastAttemptAt                 DateTime?          @db.Timestamptz(3)
+  audits                        PlatformAuditLog[]
+
+  @@unique([actorIdentityId, scopeKey, kind, idempotencyKey])
+  @@index([state, leaseExpiresAt])
+  @@index([gymId, createdAt])
+}
+
+model PlatformAuditLog {
+  id                      String     @id @default(cuid())
+  eventKey                String     @unique
+  contentDigest           String
+  actorIdentityId         String
+  actor                   User       @relation("PlatformAuditActor", fields: [actorIdentityId], references: [id], onDelete: Restrict)
+  originalActorIdentityId String?
+  originalActor           User?      @relation("PlatformAuditOriginalActor", fields: [originalActorIdentityId], references: [id], onDelete: Restrict)
+  gymId                   String?
+  gym                     Gym?       @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  operationId             String?
+  operation               Operation? @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  eventCode               String
+  resourceType            String
+  resourceId              String
+  transition              Json
+  createdAt               DateTime   @default(now()) @db.Timestamptz(3)
+
+  @@index([gymId, createdAt, id])
+  @@index([actorIdentityId, createdAt])
 }
