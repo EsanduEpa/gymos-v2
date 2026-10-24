@@ -776,7 +776,7 @@ Per-gym databases remove redundant gymId prefixes from many domain indexes, **no
 
 ## 12. Dependency-ordered schema migration plan — fresh development environment
 
-**Plan only; none of these steps has been executed or authorized as an operation by this document.** Old V1/V2 development records are disposable and will be discarded; new databases/fixtures will be created later under an implementation task. Do not plan exports, source-to-target row jobs, imported accounts/password hashes, ID-preservation maps, historical event reconstruction or a production-data cutover. Multi-gym links in this design refer to identities created within the new V2 environment, not imported old users.
+**Plan only; none of these steps has been executed or authorized as an operation by this document.** V1 remains hosted on Vercel for function testing while V2 is developed; this plan does not decommission V1 or delete its current test database. V2 will use separate new databases and credentials. Do not plan exports, source-to-target row jobs, imported accounts/password hashes, ID-preservation maps, historical event reconstruction or a production-data cutover. Multi-gym links in this design refer to identities created within the new V2 environment, not imported old users.
 
 `S` stages below are **schema** stages, distinct from functionality implementation stages. Keep existing committed migrations as reviewed source history; normally add reviewed new migration files for the new design rather than silently rewrite previously shared migration history. A squashed fresh baseline is an explicit repository/team decision (DB14), not a consequence of disposable records. No migration file is created/edited in this task.
 

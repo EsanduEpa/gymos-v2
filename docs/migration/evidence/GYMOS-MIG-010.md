@@ -151,3 +151,7 @@ The V1 file containing the exposed literal remains in the current V1 checkout. L
 When asked on 25 October 2026 whether the exposed V1 database login had been revoked or rotated, Esandu answered **“No.”** Treat the credential and associated access as exposed and not yet contained. No provider change, replacement, access-log review, reuse inventory, or incident ticket reference has been supplied. **GYMOS-MIG-010 and risk R18 remain Blocked/Open and are release blockers.** No credential is claimed remediated.
 
 Asked on 25 October 2026 whether the old login or demo passwords had been checked for reuse in V2 or other accounts, Esandu answered **“No, not checked.”** The private reuse review remains outstanding; the local exact V1 URL/password source-and-history comparison above does not cover generated seed values or other accounts.
+
+## V1 availability clarification — 25 October 2026
+
+Esandu clarified that V1 remains hosted on Vercel for function testing and must continue running alongside V2. This supersedes the 24 October interpretation that the V1 database was no longer needed. Preserve V1 and its current testing setup; do not remove or alter it as part of Task 10. V2 continues against a separate new database and new credentials. Keeping V1 available does not resolve the exposed-login rotation or reuse review.
