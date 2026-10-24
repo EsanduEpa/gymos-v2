@@ -63,6 +63,19 @@ export class TenantDatabaseService implements OnModuleDestroy {
     }
   }
 
+  async suspendAndDrain(databaseName: string): Promise<void> {
+    try { await this.leases.suspendDatabase(databaseName); }
+    catch (error) {
+      if (error instanceof AdmissionUnavailable || availabilityFailure(error)) throw new ServiceUnavailableException('Tenant database is temporarily unavailable');
+      throw error;
+    }
+  }
+
+  resumeDatabase(databaseName: string): void {
+    try { this.leases.resumeDatabase(databaseName); }
+    catch { throw new ServiceUnavailableException('Tenant database is temporarily unavailable'); }
+  }
+
   capacity() {
     return {
       ...this.leases.snapshot(),

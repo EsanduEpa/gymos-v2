@@ -101,3 +101,17 @@ test('close failure quarantines counted slot instead of making replacement overf
   assert.equal(s.closeErrors.length, 1); assert.equal(s.manager.snapshot().closing, 1); await s.clock.advance(3000); await check; assert.equal(calls, 1); assert.equal(s.manager.snapshot().resident, 1);
 });
 test('invalid identifier fails closed with no resource allocation', async () => { const s = setup(); await assert.rejects(s.manager.withDatabase('../other', async () => 1), (error) => error.reason === 'INVALID_TARGET'); assert.equal(s.created.length, 0); await s.manager.drain(); });
+test('per-tenant suspension blocks new leases, drains active work and requires explicit resume', async () => {
+  const s = setup(), hold = deferred();
+  const active = s.manager.withDatabase('gym_a', async (client) => { await hold.promise; return client.name; });
+  await flush();
+  const suspension = s.manager.suspendDatabase('gym_a');
+  await assert.rejects(s.manager.withDatabase('gym_a', async () => 'unsafe'), (error) => error.reason === 'DRAINING');
+  assert.equal(s.manager.snapshot().activeLeases, 1);
+  assert.deepEqual(s.closed, []);
+  hold.resolve(); assert.equal(await active, 'gym_a'); await suspension;
+  assert.deepEqual(s.closed, ['gym_a']); assert.equal(s.manager.snapshot().resident, 0);
+  await assert.rejects(s.manager.withDatabase('gym_a', async () => 'still-suspended'), (error) => error.reason === 'DRAINING');
+  s.manager.resumeDatabase('gym_a'); assert.equal(await s.manager.withDatabase('gym_a', async (client) => client.name), 'gym_a');
+  await s.manager.drain(); assert.deepEqual(s.closed, ['gym_a', 'gym_a']);
+});

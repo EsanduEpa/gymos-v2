@@ -14,6 +14,8 @@ export class BoundedTenantLeases<T> {
   private readonly options: LeaseOptions;
   #entries = new Map<string, Entry<T>>();
   #waiters: Waiter<T>[] = [];
+  #suspended = new Set<string>();
+  #suspendWaiters = new Map<string, { promise: Promise<void>; resolve: () => void; reject: (error: Error) => void }>();
   #draining = false;
   #drainPromise: Promise<void> | undefined;
   #drainResolve: (() => void) | undefined;
@@ -32,6 +34,36 @@ export class BoundedTenantLeases<T> {
     try { return await work(entry.resource.client); }
     finally { this.#release(entry); }
   }
+  async suspendDatabase(name: string): Promise<void> {
+    if (!/^[a-z][a-z0-9_]{0,62}$/.test(name)) throw new AdmissionUnavailable('INVALID_TARGET');
+    this.#suspended.add(name);
+    for (let index = this.#waiters.length - 1; index >= 0; index -= 1) {
+      const waiter = this.#waiters[index];
+      if (waiter.name !== name) continue;
+      this.#waiters.splice(index, 1);
+      this.options.clearTimer(waiter.timer);
+      waiter.reject(new AdmissionUnavailable('DRAINING'));
+    }
+    const entry = this.#entries.get(name);
+    if (!entry) return;
+    let pending = this.#suspendWaiters.get(name);
+    if (!pending) {
+      let resolve!: () => void;
+      let reject!: (error: Error) => void;
+      const promise = new Promise<void>((yes, no) => { resolve = yes; reject = no; });
+      pending = { promise, resolve, reject };
+      this.#suspendWaiters.set(name, pending);
+    }
+    if (entry.refs === 0) this.#close(entry);
+    await pending.promise;
+  }
+  resumeDatabase(name: string): void {
+    const entry = this.#entries.get(name);
+    if (entry?.state === 'CLOSING') throw new AdmissionUnavailable('POOL_CLOSE_FAILED');
+    this.#suspended.delete(name);
+    this.#suspendWaiters.delete(name);
+    this.#pump();
+  }
   #timer(fn: () => void, ms: number): Timer {
     const timer = this.options.setTimer(fn, ms);
     timer?.unref?.();
@@ -40,6 +72,7 @@ export class BoundedTenantLeases<T> {
   #acquire(name: string): Promise<Entry<T>> {
     if (!/^[a-z][a-z0-9_]{0,62}$/.test(name)) return Promise.reject(new AdmissionUnavailable('INVALID_TARGET'));
     if (this.#draining) return Promise.reject(new AdmissionUnavailable('DRAINING'));
+    if (this.#suspended.has(name)) return Promise.reject(new AdmissionUnavailable('DRAINING'));
     if (this.#waiters.length >= this.options.maxQueued) return Promise.reject(new AdmissionUnavailable('QUEUE_FULL'));
     return new Promise<Entry<T>>((resolve, reject) => {
       const waiter: Waiter<T> = { name, resolve, reject, deadline: this.options.now() + this.options.admissionMs };
@@ -95,7 +128,7 @@ export class BoundedTenantLeases<T> {
     entry.refs--;
     if (entry.refs === 0) {
       entry.lastReleasedAt = this.options.now();
-      if (this.#draining) this.#close(entry);
+      if (this.#draining || this.#suspended.has(entry.name)) this.#close(entry);
       else entry.idleTimer = this.#timer(() => { entry.idleTimer = undefined; if (entry.refs === 0 && entry.state === 'OPEN') this.#close(entry); }, this.options.idleMs);
     }
     this.#pump();
@@ -109,11 +142,14 @@ export class BoundedTenantLeases<T> {
     // Slot stays occupied until physical close succeeds. Never close refs>0.
     entry.closePromise = Promise.resolve().then(() => entry.resource.close()).then(() => {
       if (this.#entries.get(entry.name) === entry) this.#entries.delete(entry.name);
+      this.#suspendWaiters.get(entry.name)?.resolve();
+      this.#suspendWaiters.delete(entry.name);
       this.#pump();
       this.#finishDrain();
     }, () => {
       // Quarantine until explicit recovery: no capacity overflow or unsafe retry.
       this.options.onCloseError({ reason: 'POOL_CLOSE_FAILED' });
+      this.#suspendWaiters.get(entry.name)?.reject(new AdmissionUnavailable('POOL_CLOSE_FAILED'));
       this.#finishDrain();
     });
   }

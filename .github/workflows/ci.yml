@@ -159,6 +159,37 @@ jobs:
           path: safe-evidence/result.txt
           retention-days: 7
 
+  isolated-recovery:
+    name: Encrypted backup and isolated restore
+    runs-on: ubuntu-24.04
+    env:
+      GYMOS_TEST_ALLOW_DOCKER: "1"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.22.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:recovery:owned
+      - if: always()
+        run: |
+          mkdir -p safe-evidence
+          printf 'GYMOS-MIG-009 recovery job: %s\n' '${{ job.status }}' > safe-evidence/result.txt
+          printf 'Revision: %s\n' '${{ github.sha }}' >> safe-evidence/result.txt
+          printf 'Only synthetic fixture counts and elapsed times are emitted.\n' >> safe-evidence/result.txt
+          printf 'No backup, plaintext archive, key, database URL or raw output is uploaded.\n' >> safe-evidence/result.txt
+      - if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: recovery-summary
+          path: safe-evidence/result.txt
+          retention-days: 7
+
   secret-scan:
     name: Secret scan
     runs-on: ubuntu-24.04

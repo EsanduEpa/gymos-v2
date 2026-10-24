@@ -32,7 +32,7 @@ The detailed remaining implementation sequence, responsibilities, integration li
 | GYMOS-MIG-006 | Completed | Preserve bounded-pool and safe-shutdown evidence; reuse the lifecycle in task007. |
 | GYMOS-MIG-007 | Completed | Preserve the owned database/browser harness and evidence; task008 adds it to CI. |
 | GYMOS-MIG-008 | In progress | Local checks pass; hosted PR scanner/review awaits a configured Git remote. See task008 evidence. |
-| GYMOS-MIG-009 | Prototype complete under `/tmp`; repository integration/drill pending | Integrate after tasks005 and007. |
+| GYMOS-MIG-009 | Completed for local disposable recovery drill | See [GYMOS-MIG-009 evidence](evidence/GYMOS-MIG-009.md) and [backup/restore runbook](runbooks/backup-restore.md). Managed/staging drill remains under Task 070; restored Master is intentionally unactivated pending repair. |
 | GYMOS-MIG-010 | Blocked on external remediation | Esandu is recorded as owner; obtain rotation/revocation and reuse/access-investigation confirmation without recording the credential. |
 
 Required order:
@@ -231,7 +231,7 @@ Task008 completion gate: ordinary CI builds cannot change a database, while isol
 
 ## GYMOS-MIG-009 — encrypted backup and isolated restore
 
-Status: 14-test prototype complete under `/tmp/gymos-task009-prototype`; repository integration and real drill wait for tasks005 and007.
+Status: Completed for the local disposable recovery drill. Runbook: [backup-restore.md](runbooks/backup-restore.md). Evidence: [GYMOS-MIG-009.md](evidence/GYMOS-MIG-009.md). The staged Master is repair-required and never autoactivated; managed-provider recovery remains GYMOS-MIG-070.
 
 Required completion steps:
 
@@ -248,7 +248,7 @@ Required completion steps:
 11. Test corrupt/truncated artifact, wrong key, wrong gym, missing manifest, unsafe path/name, stale registry version, schema mismatch and restore-command failure. All must refuse cutover.
 12. Implement at least seven verified daily-generation retention semantics without deleting the last known-good generation. Do not claim an actual seven-day history until scheduling has produced it.
 13. Measure backup age and restore elapsed time. Report whether the proposed development RPO ≤24h and RTO ≤60m were actually achieved in the isolated drill.
-14. Write `evidence/GYMOS-MIG-009.md`, preserve redacted drill artifacts, prove cleanup and synchronize status.
+14. Write `evidence/GYMOS-MIG-009.md`, preserve only redacted drill measurements, prove cleanup and synchronize status. Completed locally; repeat provider-specific recovery in GYMOS-MIG-070.
 
 Task009 completion gate: tenant A and Master backups are authenticated and restorable to new targets, A can switch and roll back through CAS, B remains unchanged, and corrupt/wrong-binding artifacts cannot reach restore or cutover.
 

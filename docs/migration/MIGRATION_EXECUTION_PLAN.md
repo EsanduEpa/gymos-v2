@@ -178,7 +178,7 @@ Phase0 decision tasks077–086 are focused review records, not permission to imp
 | [GYMOS-MIG-006](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-006) | 0 | Bound tenant pools and implement safe shutdown | GYMOS-MIG-001, GYMOS-MIG-005, GYMOS-MIG-081 | High | Completed |
 | [GYMOS-MIG-007](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-007) | 0 | Build disposable two-gym database and browser harness | GYMOS-MIG-002, GYMOS-MIG-004, GYMOS-MIG-005, GYMOS-MIG-006 | High | Completed |
 | [GYMOS-MIG-008](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-008) | 0 | Add workspace checks and isolated CI | GYMOS-MIG-001, GYMOS-MIG-002, GYMOS-MIG-007 | Medium | In Progress |
-| [GYMOS-MIG-009](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-009) | 0 | Prove local/staging tenant backup and isolated restore | GYMOS-MIG-005, GYMOS-MIG-007, GYMOS-MIG-081 | High | Not Started |
+| [GYMOS-MIG-009](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-009) | 0 | Prove local/staging tenant backup and isolated restore | GYMOS-MIG-005, GYMOS-MIG-007, GYMOS-MIG-081 | High | Completed |
 | [GYMOS-MIG-010](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-010) | 0 | Track exposed V1 credential remediation and V2 secret hygiene | GYMOS-MIG-001 | Medium | Blocked |
 | [GYMOS-MIG-011](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-011) | 1 | Create V1 Classic semantic tokens | GYMOS-MIG-001, GYMOS-MIG-002, GYMOS-MIG-086 | Medium | Not Started |
 | [GYMOS-MIG-012](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-012) | 1 | Extract accessible shared UI primitives | GYMOS-MIG-011 | Medium | Not Started |

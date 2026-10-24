@@ -158,7 +158,7 @@ Record and test that safe rejection. The complete durable provisioning lifecycle
 - Real authenticated Master/A backups restore to new owned targets; A switch/rollback succeeds and B's counts/digest remain unchanged.
 - Negative cases deny restore/cutover as appropriate; staged Master reconciliation is explicit.
 - Tooling, tenant/Master runbooks, retention policy and measured drill evidence in `docs/migration/evidence/GYMOS-MIG-009.md`.
-- No staging/production/provider recovery guarantee is claimed from the local drill; synchronize status and commit.
+- Local disposable gate completed and recorded in the evidence file; the restored Master remains staged for repair and is never autoactivated. No staging/production/provider guarantee is claimed; managed-provider rehearsal remains GYMOS-MIG-070.
 
 ## 8. Task 010 — credential remediation and final secret hygiene
 

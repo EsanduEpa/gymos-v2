@@ -794,7 +794,7 @@ High
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+Completed for the local disposable recovery drill; managed/staging recovery remains a separate GYMOS-MIG-070 gate. Evidence: [GYMOS-MIG-009.md](evidence/GYMOS-MIG-009.md).
 
 ## Task ID: GYMOS-MIG-010
 

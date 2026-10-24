@@ -1,8 +1,11 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
+import { createReadStream } from 'node:fs';
+import { pipeline } from 'node:stream/promises';
+import type { Readable } from 'node:stream';
 import pg from 'pg';
 
 const execute = promisify(execFile);
@@ -142,6 +145,71 @@ export async function createDisposablePostgresRun() {
   const removeContainer = async (requirePort = true) => {
     await verifyContainer(requirePort);
     await docker(['rm', '--force', container]);
+  };
+  const runPgTool = async (
+    name: string,
+    tool: 'pg_dump' | 'pg_restore' | 'pg_dump_version',
+    snapshot?: string,
+  ) => {
+    await verifyContainer();
+    if (tool !== 'pg_dump_version') await verifyOwnership(name);
+    const passwordValue = decodeURIComponent(new URL(urlFor(names[0])).password);
+    const args = tool === 'pg_dump_version'
+      ? ['exec', containerId, 'pg_dump', '--version']
+      : tool === 'pg_dump'
+        ? [
+            'exec', '--env', 'PGPASSWORD', containerId, 'pg_dump',
+            '--host=/var/run/postgresql', '--username=postgres', `--dbname=${name}`,
+            '--format=custom', '--no-owner', '--no-acl', '--exclude-schema=__gymos_test',
+            '--lock-wait-timeout=3000ms', ...(snapshot ? [`--snapshot=${snapshot}`] : []),
+          ]
+        : [
+            'exec', '--interactive', '--env', 'PGPASSWORD', containerId, 'pg_restore',
+            '--host=/var/run/postgresql', '--username=postgres', `--dbname=${name}`,
+            '--exit-on-error', '--single-transaction', '--no-owner', '--no-acl',
+          ];
+    const child = spawn('docker', args, {
+      env: { ...process.env, PGPASSWORD: passwordValue },
+      stdio: tool === 'pg_restore' ? ['pipe', 'ignore', 'pipe'] : ['ignore', 'pipe', 'pipe'],
+    });
+    child.stderr?.resume();
+    const completion = new Promise<void>((resolve, reject) => {
+      child.once('error', () => reject(new Error('Owned PostgreSQL tool could not start')));
+      child.once('close', (code, signal) => {
+        if (code === 0) resolve();
+        else reject(new Error(`Owned PostgreSQL tool failed (${signal ?? `exit ${code ?? 'unknown'}`})`));
+      });
+    });
+    if (tool === 'pg_dump_version') {
+      const chunks: Buffer[] = [];
+      child.stdout?.on('data', (chunk: Buffer) => chunks.push(chunk));
+      await completion;
+      const version = Buffer.concat(chunks).toString('utf8').trim();
+      const matchedVersion = version.match(/^pg_dump \(PostgreSQL\) (17\.[0-9]+)/);
+      if (!matchedVersion) throw new Error('Owned PostgreSQL tool version is unsupported');
+      return `PostgreSQL ${matchedVersion[1]}`;
+    }
+    if (tool === 'pg_dump') {
+      return {
+        readable: child.stdout!,
+        completion,
+        async cancel() {
+          if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+          await completion.catch(() => undefined);
+        },
+      };
+    }
+    return {
+      async restore(archivePath: string) {
+        try {
+          await Promise.all([pipeline(createReadStream(archivePath), child.stdin!), completion]);
+        } catch {
+          if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+          await completion.catch(() => undefined);
+          throw new Error('Owned PostgreSQL restore failed; source and registry remain unchanged');
+        }
+      },
+    };
   };
   try {
     containerId = await docker(
@@ -320,6 +388,18 @@ export async function createDisposablePostgresRun() {
       await removeContainer();
       created.clear();
       return { droppedDatabases, containerRemoved: true };
+    },
+    verifyContainer,
+    pgDump(name: string, snapshot: string) {
+      if (!/^[A-Za-z0-9-]{1,128}$/.test(snapshot)) throw new Error('Invalid exported database snapshot');
+      return runPgTool(name, 'pg_dump', snapshot) as Promise<{ readable: Readable; completion: Promise<void>; cancel(): Promise<void> }>;
+    },
+    async pgRestore(name: string, archivePath: string) {
+      const process = await runPgTool(name, 'pg_restore') as { restore(archivePath: string): Promise<void> };
+      await process.restore(archivePath);
+    },
+    async pgDumpVersion() {
+      return runPgTool('', 'pg_dump_version') as Promise<string>;
     },
   };
 }
