@@ -33,7 +33,7 @@ The detailed remaining implementation sequence, responsibilities, integration li
 | GYMOS-MIG-007 | Completed | Preserve the owned database/browser harness and evidence; task008 adds it to CI. |
 | GYMOS-MIG-008 | In progress | Local checks pass; hosted PR scanner/review awaits a configured Git remote. See task008 evidence. |
 | GYMOS-MIG-009 | Completed for local disposable recovery drill | See [GYMOS-MIG-009 evidence](evidence/GYMOS-MIG-009.md) and [backup/restore runbook](runbooks/backup-restore.md). Managed/staging drill remains under Task 070; restored Master is intentionally unactivated pending repair. |
-| GYMOS-MIG-010 | Blocked on external remediation | Esandu is recorded as owner; obtain rotation/revocation and reuse/access-investigation confirmation without recording the credential. |
+| GYMOS-MIG-010 | Blocked on external remediation | Esandu confirmed on 25 October that rotation/revocation has not happened. Treat the V1 login as exposed; obtain provider containment and reuse/access-investigation evidence without recording the credential. Refreshed V2 source scan is in the evidence file. |
 
 Required order:
 
