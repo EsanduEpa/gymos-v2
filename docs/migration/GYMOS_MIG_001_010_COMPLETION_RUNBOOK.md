@@ -5,6 +5,8 @@ Working branch: `codex/gymos-mig-001-010`
 
 This is the continuation checklist for completing tasks GYMOS-MIG-001 through GYMOS-MIG-010. The authoritative requirements remain [MIGRATION_TASK_SPECS.md](MIGRATION_TASK_SPECS.md), the four migration maps and approved [DEC-02](decisions/DEC-02.md), [DEC-04](decisions/DEC-04.md) and [DEC-05](decisions/DEC-05.md). This runbook records the current implementation state and the remaining execution order; it does not broaden product scope or authorize production/shared-database operations.
 
+The detailed remaining implementation sequence, responsibilities, integration limitations and acceptance gates after checkpoint `4105398` are in [GYMOS_MIG_005_010_REMAINING_WORK_PLAN.md](GYMOS_MIG_005_010_REMAINING_WORK_PLAN.md).
+
 ## Non-negotiable execution rules
 
 - Modify GymOS V2 only. Do not change or execute GymOS V1.
@@ -26,8 +28,8 @@ This is the continuation checklist for completing tasks GYMOS-MIG-001 through GY
 | GYMOS-MIG-002 | Completed | Preserve shared contracts and API client behavior. |
 | GYMOS-MIG-003 | Completed | Preserve frozen identity migrations and evidence. |
 | GYMOS-MIG-004 | Completed | Final evidence linked and all status views synchronized. |
-| GYMOS-MIG-005 | In progress | Finish isolated schema/binding tests, review, evidence and status synchronization. |
-| GYMOS-MIG-006 | Prototype complete under `/tmp`; repository integration pending | Integrate only after task005 is completed. |
+| GYMOS-MIG-005 | Completed | Preserve verifier/gate evidence; rerun affected cases after task006 changes database leasing. |
+| GYMOS-MIG-006 | Completed | Preserve bounded-pool and safe-shutdown evidence; reuse the lifecycle in task007. |
 | GYMOS-MIG-007 | Not started | Build after tasks005 and006. |
 | GYMOS-MIG-008 | Not started | Build after task007. |
 | GYMOS-MIG-009 | Prototype complete under `/tmp`; repository integration/drill pending | Integrate after tasks005 and007. |
@@ -113,7 +115,7 @@ Do not edit the frozen task004 migration SQL. Task005 and later changes use late
 
 ## GYMOS-MIG-005 — tenant binding and installed-schema verification
 
-Status: in progress.
+Status: completed. Evidence: [GYMOS-MIG-005.md](evidence/GYMOS-MIG-005.md).
 
 Already implemented in the working tree:
 
@@ -153,7 +155,7 @@ Task005 completion gate: no ordinary tenant read or command can run when physica
 
 ## GYMOS-MIG-006 — bounded pools and safe shutdown
 
-Status: implementation prototype complete under `/tmp/gymos-task006-prototype`; repository integration waits for task005.
+Status: completed on 24 October 2026. Repository implementation and verification are recorded in `evidence/GYMOS-MIG-006.md`.
 
 Required completion steps:
 

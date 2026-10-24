@@ -159,9 +159,9 @@
       "decisions": "DEC-04 DEC-05",
       "complexity": "High",
       "out": "No new product functionality beyond the named contracts.",
-      "status": "In Progress",
+      "status": "Completed",
       "owner": "Codex",
-      "evidence": "docs/migration/evidence/GYMOS-MIG-005.md; partial implementation, dedicated integration validation pending",
+      "evidence": "docs/migration/evidence/GYMOS-MIG-005.md",
       "statusDate": "2026-10-24"
     },
     {
@@ -185,7 +185,10 @@
       "decisions": "DEC-05",
       "complexity": "High",
       "out": "No new product functionality beyond the named contracts.",
-      "status": "Not Started"
+      "status": "Completed",
+      "owner": "Codex",
+      "evidence": "docs/migration/evidence/GYMOS-MIG-006.md",
+      "statusDate": "2026-10-24"
     },
     {
       "n": 7,

@@ -135,3 +135,5 @@ These are the three loopback template examples and README prompt false positive 
 ## Owner update
 
 The project owner answered “Esandu” to the credential-owner question on23 October2026. No revocation/rotation/access-investigation result was provided. This identifies the responsible person; it does not establish remediation or authorize remote rotation/V1 edits. Task010 remains Blocked for that evidence.
+
+On 24 October 2026, Esandu stated that the V1 database is no longer needed and directed GymOS V2 to use a new database. This confirms the V2 non-reuse decision. It does not confirm that the exposed V1 credential or its account/database access was revoked, so the external containment and investigation checklist remains open. All V2 implementation and verification must continue against newly created isolated databases.

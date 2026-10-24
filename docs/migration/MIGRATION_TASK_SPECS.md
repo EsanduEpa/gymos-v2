@@ -457,7 +457,7 @@ High
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-In Progress. Partial evidence: [GYMOS-MIG-005](evidence/GYMOS-MIG-005.md). Dedicated verifier/gate integration validation remains pending.
+Completed. Evidence: [GYMOS-MIG-005](evidence/GYMOS-MIG-005.md). Completion recorded 24 October 2026.
 
 ## Task ID: GYMOS-MIG-006
 
@@ -541,7 +541,7 @@ High
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+Completed. Evidence: [evidence/GYMOS-MIG-006.md](evidence/GYMOS-MIG-006.md).
 
 ## Task ID: GYMOS-MIG-007
 
