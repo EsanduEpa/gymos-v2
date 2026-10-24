@@ -11,7 +11,6 @@ export default defineConfig({
   outputDir: 'test-results',
   use: {
     browserName: 'chromium',
-    channel: 'chrome',
     headless: true,
     locale: 'en-US',
     timezoneId: 'UTC',

@@ -31,7 +31,7 @@ The detailed remaining implementation sequence, responsibilities, integration li
 | GYMOS-MIG-005 | Completed | Preserve verifier/gate evidence; rerun affected cases after task006 changes database leasing. |
 | GYMOS-MIG-006 | Completed | Preserve bounded-pool and safe-shutdown evidence; reuse the lifecycle in task007. |
 | GYMOS-MIG-007 | Completed | Preserve the owned database/browser harness and evidence; task008 adds it to CI. |
-| GYMOS-MIG-008 | Not started | Build after task007. |
+| GYMOS-MIG-008 | In progress | Local checks pass; hosted PR scanner/review awaits a configured Git remote. See task008 evidence. |
 | GYMOS-MIG-009 | Prototype complete under `/tmp`; repository integration/drill pending | Integrate after tasks005 and007. |
 | GYMOS-MIG-010 | Blocked on external remediation | Esandu is recorded as owner; obtain rotation/revocation and reuse/access-investigation confirmation without recording the credential. |
 
@@ -205,7 +205,7 @@ Task007 completion gate: a failed or parallel run cannot touch any resource it d
 
 ## GYMOS-MIG-008 — workspace checks and isolated CI
 
-Status: not started; depends on task007.
+Status: in progress; local implementation verified on 25 October 2026. Hosted pull-request scan/review remains pending because this checkout has no Git remote. See `evidence/GYMOS-MIG-008.md` and `runbooks/ci.md`.
 
 Required completion steps:
 

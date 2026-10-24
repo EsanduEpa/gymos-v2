@@ -16,7 +16,7 @@ This plan covers the work remaining after tasks 001–004. It refines the [compl
 | 005 | Completed on 24 October 2026 | Preserve evidence and rerun affected gate cases through task 006's bounded leases. |
 | 006 | Completed on 24 October 2026 | Preserve the measured pool limits, timeout, eviction and shutdown evidence. |
 | 007 | Completed on 24 October 2026 | Preserve the owned database/browser harness and evidence. |
-| 008 | Not started | Add workspace checks, isolated CI jobs, secret scanning and reproducibility evidence. |
+| 008 | In progress; local implementation and checks complete | Run the hosted pull-request workflow when the repository remote is configured; capture secret/dependency job results. |
 | 009 | Not integrated | Review and port the temporary recovery prototype; run real encrypted backup/restore drills. |
 | 010 | Blocked on external evidence | Esandu must confirm credential remediation and investigation; finish the V2/CI scan. |
 

@@ -5,9 +5,23 @@
     "dev:web": "pnpm --dir apps/web dev",
     "dev:api": "pnpm --dir apps/api start:dev",
     "verify:milestone": "node apps/api/scripts/verify-milestone.mjs",
-    "test:isolated": "node apps/api/scripts/verify-milestone.mjs"
+    "test:isolated": "node apps/api/scripts/verify-milestone.mjs",
+    "check:workspace": "node infrastructure/scripts/check-workspace.mjs",
+    "build:workspace": "pnpm --recursive --if-present build",
+    "lint:workspace": "pnpm --dir apps/api lint && pnpm --dir apps/web lint",
+    "typecheck:workspace": "pnpm --dir packages/contracts typecheck && pnpm --dir packages/api-client typecheck && pnpm --dir apps/api exec tsc --noEmit --incremental false --pretty false && pnpm --dir apps/web exec tsc --noEmit --incremental false --pretty false",
+    "test:unit": "pnpm --dir packages/contracts test && pnpm --dir packages/api-client test && pnpm --dir apps/api exec vitest run src",
+    "test:database:owned": "pnpm --dir apps/api exec vitest run --config vitest.config.environment-integration.ts --disableConsoleIntercept"
   },
   "packageManager": "pnpm@9.15.0+sha512.76e2379760a4328ec4415815bcd6628dee727af3779aaa4c914e3944156c4299921a89f976381ee107d41f12cfa4b66681ca9c718f0668fa0831ed4c6d8ba56c",
+  "pnpm": {
+    "overrides": {
+      "body-parser": "2.4.0",
+      "multer": "2.5.0",
+      "tmp": "0.2.7",
+      "undici": "6.29.1"
+    }
+  },
   "devDependencies": {
     "dotenv": "^18.0.8",
     "prisma": "^7.10.1"
