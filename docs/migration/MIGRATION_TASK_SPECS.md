@@ -1035,7 +1035,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+Completed 25 October 2026. Shared accessible controls, their use on current V2 screens, and focused keyboard/error/pending/narrow-width browser evidence are recorded in [GYMOS-MIG-012.md](evidence/GYMOS-MIG-012.md). Implementation revision: `76db2ac`.
 
 ## Task ID: GYMOS-MIG-013
 
