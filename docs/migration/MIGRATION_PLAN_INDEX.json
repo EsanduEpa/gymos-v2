@@ -320,7 +320,7 @@
       "decisions": "DEC-10",
       "complexity": "Medium",
       "out": "No new product functionality beyond the named contracts.",
-      "status": "In Progress",
+      "status": "Completed",
       "owner": "Codex",
       "evidence": "evidence/GYMOS-MIG-011.md",
       "statusDate": "2026-10-25"

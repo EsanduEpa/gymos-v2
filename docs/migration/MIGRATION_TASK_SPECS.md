@@ -955,7 +955,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+Completed 25 October 2026. V1 Classic tokens, safe gym-color fallback, contrast-aware foregrounds, visible focus, and two-gym responsive browser evidence are recorded in [GYMOS-MIG-011.md](evidence/GYMOS-MIG-011.md). Implementation revision: `06b8207`.
 
 ## Task ID: GYMOS-MIG-012
 
