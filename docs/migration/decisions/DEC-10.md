@@ -1,10 +1,10 @@
 # DEC-10 — Routes, Classic baseline and branding projection
 
-Status: **Proposed; awaiting Product and Design/Frontend approval.** This record is a concrete review proposal for GYMOS-MIG-086. No option below is approved until the accountable owners record their decision.
+Status: **Approved as written by the project owner/Product approver.** The approved outcome is recorded below for GYMOS-MIG-086. Visual acceptance and browser evidence remain part of Task 065.
 
 Date prepared: 25 October 2026  
 Author: Codex  
-Accountable reviewers: Product owner and Design/Frontend lead  
+Accountable reviewers: Product owner and Design/Frontend lead; project owner/Product approval recorded below. No separate named Design/Frontend reviewer was supplied.
 Sources: UI migration map §§9, 11, 18; Functionality migration map D09/D20; Database migration map DB13; Task GYMOS-MIG-086.
 
 ## Settled scope this proposal preserves
@@ -71,11 +71,11 @@ Use the migration map's matched capture sizes: desktop 1440×1000, tablet 768×1
 
 No schema change is proposed. The theme endpoint already returns the minimal name/slug/primary/logo shape and validates HTTPS on owner updates; actual public-data behavior should be covered by API tests when the consuming page work begins. Current V2's root is a marketing scaffold, sign-in chooses the first gym, the gym page mixes role handling, and logo failure has no fallback. These are source observations, not runtime verification.
 
-If approved, Task 011 implements Classic tokens; Task 019 implements the role-aware shell and chooser; Task 015 implements the scoped primary/logo editor. Task 065 records visual and accessibility evidence. No implementation task may broaden the MVP theme editor or weaken server-side access checks based on this decision.
+Task 011 implements Classic tokens; Task 019 implements the role-aware shell and chooser; Task 015 implements the scoped primary/logo editor. Task 065 records visual and accessibility evidence. No implementation task may broaden the MVP theme editor or weaken server-side access checks based on this decision.
 
 ## Approval record
 
-- Product owner: **Pending**
-- Design/Frontend reviewer: **Pending**
-- Decision date: **Pending**
-- Selected changes or exceptions: **Pending**
+- Product owner: **Esandu (project owner); approved as written in the Codex task conversation**
+- Design/Frontend reviewer: **No separate named reviewer recorded; visual review remains in Task 065**
+- Decision date: **25 October 2026**
+- Selected changes or exceptions: **None; approved as written**
