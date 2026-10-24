@@ -6,6 +6,7 @@ import { notFound, redirect } from 'next/navigation';
 import { resolveGymBrandColors } from '@gymos/theme-tokens';
 import { createMember, signOut } from '../../actions';
 import { apiUrl, type GymTheme, type Member, SESSION_COOKIE } from '@/lib/gymos';
+import { Button, Card, CardHeader, EmptyState, Feedback, Field, LoadingState, StatusBadge } from '@/components/ui';
 
 const messages: Record<string, string> = {
   'member-input': 'Enter a member name and a valid email address.',
@@ -40,7 +41,7 @@ async function GymContent({
       }),
     ]);
   } catch {
-    return <main className="page-loading">The API is unavailable. Please try again shortly.</main>;
+    return <LoadingState label="The API is unavailable. Please try again shortly." page />;
   }
 
   if (accessResponse.status === 401 || membersResponse.status === 401) redirect('/login');
@@ -65,7 +66,7 @@ async function GymContent({
       <header className="dashboard-header">
         <Link href="/" className="brand-lockup"><span className="brand-mark">G</span> GymOS</Link>
         <span className="header-label">{theme.name}</span>
-        <form action={signOut}><button className="text-button" type="submit">Sign out</button></form>
+        <form action={signOut}><Button variant="secondary" type="submit">Sign out</Button></form>
       </header>
       <div className="dashboard-content">
         <div className="gym-banner">
@@ -78,29 +79,29 @@ async function GymContent({
           <div><span className="eyebrow">YOUR GYM WORKSPACE</span><h1>{theme.name}</h1><p>Members, all in one place.</p></div>
           <span className="role-pill">{access.role}</span>
         </div>
-        {created ? <p className="notice success" role="status">Member added to {theme.name}.</p> : null}
-        {error && messages[error] ? <p className="notice error" role="alert">{messages[error]}</p> : null}
+        {created ? <Feedback tone="success">Member added to {theme.name}.</Feedback> : null}
+        {error && messages[error] ? <Feedback tone="error">{messages[error]}</Feedback> : null}
         <div className="dashboard-grid">
-          <section className="panel">
-            <div className="panel-heading"><div><span className="eyebrow dark">MEMBERSHIP</span><h2>Members</h2></div><span className="count-badge">{members.length}</span></div>
-            {members.length === 0 ? <p className="empty-state">No members yet. Add the first member to this gym.</p> : (
+          <Card>
+            <CardHeader eyebrow="MEMBERSHIP" title="Members" action={<span className="count-badge">{members.length}</span>} />
+            {members.length === 0 ? <EmptyState title="No members yet." hint="Add the first member to this gym." /> : (
               <div className="member-list">
                 {members.map((member) => <div className="member-row" key={member.id}>
                   <span className="member-avatar">{member.fullName.slice(0, 1).toUpperCase()}</span>
                   <div><strong>{member.fullName}</strong><small>{member.email ?? 'No email added'}</small></div>
-                  <span className="status-pill active">{member.status}</span>
+                  <StatusBadge status={member.status} className="member-status" />
                 </div>)}
               </div>
             )}
-          </section>
-          {access.role === 'OWNER' ? <section className="panel">
-            <div className="panel-heading"><div><span className="eyebrow dark">GROW YOUR COMMUNITY</span><h2>Add a member</h2></div><span className="panel-icon">＋</span></div>
+          </Card>
+          {access.role === 'OWNER' ? <Card>
+            <CardHeader eyebrow="GROW YOUR COMMUNITY" title="Add a member" action={<span className="panel-icon">＋</span>} />
             <form action={createMemberForGym} className="stack-form">
-              <label>Full name<input name="fullName" placeholder="Alex Morgan" minLength={2} maxLength={120} required /></label>
-              <label>Email address <span className="optional">optional</span><input type="email" name="email" placeholder="alex@example.com" /></label>
-              <button className="primary-button full gym-button" type="submit">Add member <span>→</span></button>
+              <Field label="Full name" name="fullName" placeholder="Alex Morgan" minLength={2} maxLength={120} required />
+              <Field label="Email address" optional type="email" name="email" placeholder="alex@example.com" />
+              <Button className="gym-button" fullWidth type="submit">Add member <span>→</span></Button>
             </form>
-          </section> : null}
+          </Card> : null}
         </div>
       </div>
     </main>
@@ -114,5 +115,5 @@ export default function GymPage({
   params: Promise<{ slug: string }>;
   searchParams: Promise<{ error?: string; created?: string }>;
 }) {
-  return <Suspense fallback={<main className="page-loading">Loading gym…</main>}><GymContent params={params} searchParams={searchParams} /></Suspense>;
+  return <Suspense fallback={<LoadingState label="Loading gym…" page />}><GymContent params={params} searchParams={searchParams} /></Suspense>;
 }

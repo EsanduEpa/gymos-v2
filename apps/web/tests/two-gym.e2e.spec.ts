@@ -12,6 +12,7 @@ const root = fileURLToPath(new URL('../../../', import.meta.url));
 const apiDirectory = join(root, 'apps/api');
 const webDirectory = join(root, 'apps/web');
 const classicEvidenceDirectory = join(root, 'docs/migration/evidence/GYMOS-MIG-011');
+const primitiveEvidenceDirectory = join(root, 'docs/migration/evidence/GYMOS-MIG-012');
 
 type ProcessState = { child: ChildProcess; errors: () => string };
 let environment: Awaited<ReturnType<typeof createDisposableEnvironment>>;
@@ -115,7 +116,7 @@ async function expectResponsivePage(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect(await contrastRatio(page, '.gym-banner')).toBeGreaterThanOrEqual(4.5);
-  expect(await contrastRatio(page, '.status-pill.active')).toBeGreaterThanOrEqual(4.5);
+  expect(await contrastRatio(page, '.ui-badge-success')).toBeGreaterThanOrEqual(4.5);
   await page.getByRole('button', { name: 'Add member' }).focus();
   await expect(page.getByRole('button', { name: 'Add member' })).toBeFocused();
   expect(await page.getByRole('button', { name: 'Add member' }).evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe('none');
@@ -149,8 +150,53 @@ test.beforeAll(async () => {
   web = start(process.execPath, [join(webDirectory, 'node_modules/next/dist/bin/next'), 'start', '-H', '127.0.0.1', '-p', String(webPort)], webDirectory, {
     ...cleanEnvironment,
     GYMOS_API_URL: apiBase,
+    GYMOS_UI_TEST_HARNESS: '1',
   });
   await waitReady(`${webBase}/login`, web);
+});
+
+test('shared controls support keyboard use, failure recovery, and narrow screens', async ({ page }) => {
+  await mkdir(primitiveEvidenceDirectory, { recursive: true });
+  await page.setViewportSize({ width: 320, height: 700 });
+  await page.goto(`${webBase}/test-ui`);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  const membersTab = page.getByRole('tab', { name: 'Members' });
+  await membersTab.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('tab', { name: 'Activity' })).toBeFocused();
+  await expect(page.getByRole('tab', { name: 'Activity' })).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('Home');
+  await expect(membersTab).toBeFocused();
+
+  await expect(page.getByText('Alex Morgan')).toBeVisible();
+  await page.getByRole('button', { name: 'Next page' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('Jordan Silva')).toBeVisible();
+  await expect(page.getByText('Showing 3–3 of 3')).toBeVisible();
+
+  const opener = page.getByRole('button', { name: 'Open confirmation' });
+  await opener.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Shift+Tab');
+  expect(await page.evaluate(() => {
+    const dialog = document.querySelector('dialog');
+    return dialog === document.activeElement || dialog?.contains(document.activeElement);
+  })).toBe(true);
+  await page.getByLabel('Member name').fill('Unsaved draft');
+  await page.getByRole('button', { name: 'Save change' }).click();
+  await expect(page.getByRole('button', { name: 'Processing…' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Processing…' }).click({ force: true });
+  await expect(page.getByText('Confirm attempts: 1')).toBeVisible();
+  await expect(page.locator('.ui-dialog .ui-feedback[role="alert"]')).toContainText('could not be saved');
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByLabel('Member name')).toHaveValue('Unsaved draft');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await expect(opener).toBeFocused();
+
+  await page.screenshot({ path: join(primitiveEvidenceDirectory, 'mobile-320-shared-controls.png'), animations: 'disabled', fullPage: true });
 });
 
 test.afterAll(async () => {
@@ -201,7 +247,7 @@ test('real browser and HTTP requests preserve two-gym isolation and pure reads',
   await page.context().clearCookies();
   await login(page, fixture.users.trainerUser.email);
   await expect(page).toHaveURL(/\/login\?error=access$/);
-  await expect(page.locator('p[role="alert"]')).toContainText('does not have access');
+  await expect(page.locator('.ui-feedback[role="alert"]')).toContainText('does not have access');
   const trainerLogin = await request.post(`${apiBase}/auth/login`, { data: { email: fixture.users.trainerUser.email, password: fixture.password } });
   const trainerToken = (await trainerLogin.json()).accessToken as string;
   expect((await request.get(`${apiBase}/gyms/${fixture.gyms[0].slug}/members`, { headers: { authorization: `Bearer ${trainerToken}` } })).status()).toBe(403);

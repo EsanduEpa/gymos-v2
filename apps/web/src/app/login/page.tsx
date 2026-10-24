@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { login } from '../actions';
+import { Button, Feedback, Field, LoadingState } from '@/components/ui';
 
 const messages: Record<string, string> = {
   invalid: 'Check your email and password, then try again.',
@@ -31,11 +32,11 @@ async function LoginContent({
           <div className="eyebrow dark">WELCOME BACK</div>
           <h2>Sign in</h2>
           <p className="muted">Use your GymOS owner or Super Admin account.</p>
-          {error && messages[error] ? <p className="notice error" role="alert">{messages[error]}</p> : null}
+          {error && messages[error] ? <Feedback tone="error">{messages[error]}</Feedback> : null}
           <form action={login} className="stack-form">
-            <label>Email address<input type="email" name="email" autoComplete="email" required /></label>
-            <label>Password<input type="password" name="password" autoComplete="current-password" required /></label>
-            <button className="primary-button full" type="submit">Sign in <span>→</span></button>
+            <Field label="Email address" type="email" name="email" autoComplete="email" required />
+            <Field label="Password" type="password" name="password" autoComplete="current-password" required />
+            <Button fullWidth type="submit">Sign in <span>→</span></Button>
           </form>
           <p className="form-note">Your session lasts 15 minutes. Sign in again when it expires.</p>
         </div>
@@ -49,5 +50,5 @@ export default function LoginPage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  return <Suspense fallback={<main className="page-loading">Loading sign in…</main>}><LoginContent searchParams={searchParams} /></Suspense>;
+  return <Suspense fallback={<LoadingState label="Loading sign in…" page />}><LoginContent searchParams={searchParams} /></Suspense>;
 }
