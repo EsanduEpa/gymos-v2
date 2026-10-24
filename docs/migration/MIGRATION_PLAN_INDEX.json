@@ -2487,7 +2487,10 @@
       "decisions": "",
       "complexity": "Medium",
       "out": "No application code, database operation or external approval implied by this planning task.",
-      "status": "Not Started"
+      "status": "In Progress",
+      "owner": "Codex",
+      "evidence": "evidence/GYMOS-MIG-086.md",
+      "statusDate": "2026-10-25"
     },
     {
       "n": 87,

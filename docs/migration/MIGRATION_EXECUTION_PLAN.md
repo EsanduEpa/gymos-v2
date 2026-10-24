@@ -255,7 +255,7 @@ Phase0 decision tasks077–086 are focused review records, not permission to imp
 | [GYMOS-MIG-083](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-083) | 0 | Resolve Gym time, term boundaries and scheduling input bounds | GYMOS-MIG-001 | Medium | Not Started |
 | [GYMOS-MIG-084](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-084) | 0 | Resolve Settlement locking, payroll periods and correction policy | GYMOS-MIG-001 | Medium | Not Started |
 | [GYMOS-MIG-085](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-085) | 0 | Resolve Coaching privacy, metrics, exports and refresh guarantees | GYMOS-MIG-001 | Medium | Not Started |
-| [GYMOS-MIG-086](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-086) | 0 | Resolve Routes, Classic baseline and branding projection | GYMOS-MIG-001 | Medium | Not Started |
+| [GYMOS-MIG-086](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-086) | 0 | Resolve Routes, Classic baseline and branding projection | GYMOS-MIG-001 | Medium | In Progress |
 | [GYMOS-MIG-087](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-087) | 12 | Resolve Provider capacity, release approvals and environment policy | GYMOS-MIG-001 | Medium | Not Started |
 | [GYMOS-MIG-088](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-088) | 13 | Resolve Mobile scope, token lifecycle and optional push | GYMOS-MIG-048 | Medium | Not Started |
 

@@ -154,4 +154,4 @@ Asked on 25 October 2026 whether the old login or demo passwords had been checke
 
 ## V1 availability clarification — 25 October 2026
 
-Esandu clarified that V1 remains hosted on Vercel for function testing and must continue running alongside V2. This supersedes the 24 October interpretation that the V1 database was no longer needed. Preserve V1 and its current testing setup; do not remove or alter it as part of Task 10. V2 continues against a separate new database and new credentials. Keeping V1 available does not resolve the exposed-login rotation or reuse review.
+Esandu clarified that V1 remains hosted on Vercel for function testing and must continue running alongside V2. This supersedes the 24 October interpretation that the V1 database was no longer needed. Preserve V1 and its current testing setup; do not remove or alter it as part of Task 10. V2 must use a separate new database and new credentials. Actual V2 local/hosted database settings have not been inspected or verified. Keeping V1 available does not resolve the exposed-login rotation or reuse review.
