@@ -11,6 +11,7 @@
     "test:e2e": "playwright test --config playwright.config.ts"
   },
   "dependencies": {
+    "@gymos/theme-tokens": "workspace:*",
     "next": "16.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0"
