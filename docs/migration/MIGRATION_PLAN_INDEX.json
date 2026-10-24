@@ -224,7 +224,10 @@
       "decisions": "",
       "complexity": "High",
       "out": "No new product functionality beyond the named contracts.",
-      "status": "Not Started"
+      "status": "Completed",
+      "owner": "Codex",
+      "evidence": "docs/migration/evidence/GYMOS-MIG-007.md",
+      "statusDate": "2026-10-24"
     },
     {
       "n": 8,

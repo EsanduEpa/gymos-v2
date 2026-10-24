@@ -30,7 +30,7 @@ The detailed remaining implementation sequence, responsibilities, integration li
 | GYMOS-MIG-004 | Completed | Final evidence linked and all status views synchronized. |
 | GYMOS-MIG-005 | Completed | Preserve verifier/gate evidence; rerun affected cases after task006 changes database leasing. |
 | GYMOS-MIG-006 | Completed | Preserve bounded-pool and safe-shutdown evidence; reuse the lifecycle in task007. |
-| GYMOS-MIG-007 | Not started | Build after tasks005 and006. |
+| GYMOS-MIG-007 | Completed | Preserve the owned database/browser harness and evidence; task008 adds it to CI. |
 | GYMOS-MIG-008 | Not started | Build after task007. |
 | GYMOS-MIG-009 | Prototype complete under `/tmp`; repository integration/drill pending | Integrate after tasks005 and007. |
 | GYMOS-MIG-010 | Blocked on external remediation | Esandu is recorded as owner; obtain rotation/revocation and reuse/access-investigation confirmation without recording the credential. |
@@ -181,7 +181,7 @@ Task006 completion gate: the ninth busy tenant cannot create an overflow client,
 
 ## GYMOS-MIG-007 — disposable two-gym database and browser harness
 
-Status: not started. Design notes exist at `/tmp/gymos-007-009-design.md`.
+Status: completed on 24 October 2026. See `evidence/GYMOS-MIG-007.md` and `../../infrastructure/testing/README.md` for results and commands.
 
 Required completion steps:
 

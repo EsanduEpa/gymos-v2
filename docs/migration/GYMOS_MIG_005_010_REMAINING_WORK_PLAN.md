@@ -15,7 +15,7 @@ This plan covers the work remaining after tasks 001–004. It refines the [compl
 | 001–004 | Completed, evidence linked and status views synchronized | Preserve migrations, contracts, identity and operation invariants. |
 | 005 | Completed on 24 October 2026 | Preserve evidence and rerun affected gate cases through task 006's bounded leases. |
 | 006 | Completed on 24 October 2026 | Preserve the measured pool limits, timeout, eviction and shutdown evidence. |
-| 007 | Not started as a complete harness | Harden the existing disposable helper and replace the unsafe milestone execution path; add HTTP/browser checks. |
+| 007 | Completed on 24 October 2026 | Preserve the owned database/browser harness and evidence. |
 | 008 | Not started | Add workspace checks, isolated CI jobs, secret scanning and reproducibility evidence. |
 | 009 | Not integrated | Review and port the temporary recovery prototype; run real encrypted backup/restore drills. |
 | 010 | Blocked on external evidence | Esandu must confirm credential remediation and investigation; finish the V2/CI scan. |
@@ -199,7 +199,7 @@ The range is complete only when:
 - [ ] Tasks 001–010 have consistent Completed statuses and linked evidence.
 - [ ] Tenant verification rejects all specified mismatches before domain access; valid fixtures retain member behavior.
 - [x] Actual pool limits, backpressure, timeout and shutdown behavior meet task 006's measured requirements.
-- [ ] The owned harness passes HTTP/browser, concurrent isolation and failed-run cleanup checks.
+- [x] The owned harness passes HTTP/browser, concurrent isolation and failed-run cleanup checks.
 - [ ] A clean CI run covers builds/checks, isolated integration/browser, secret/dependency review and recovery.
 - [ ] Master/A recovery, A switch/rollback, B preservation, authentication failure cases and RPO/RTO evidence pass.
 - [ ] Esandu's external remediation and investigation evidence closes task 010.
