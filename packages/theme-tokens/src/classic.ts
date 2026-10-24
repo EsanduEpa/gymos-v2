@@ -39,10 +39,36 @@ export const classicTokens = {
 
 export type ClassicTokens = typeof classicTokens;
 export type GymPrimaryColor = `#${string}`;
+export type GymBrandColors = Readonly<{
+  primary: GymPrimaryColor;
+  onPrimary: typeof classicTokens.brand.onPrimary | typeof classicTokens.text.primary;
+}>;
 
 /** Accept only the public API's six-digit hex form before using a gym accent. */
 export function resolveGymPrimaryColor(value: string | null | undefined): GymPrimaryColor {
   return value && /^#[0-9A-Fa-f]{6}$/.test(value) ? value.toUpperCase() as GymPrimaryColor : classicTokens.brand.primary;
+}
+
+function relativeLuminance(color: GymPrimaryColor): number {
+  const channels = color.slice(1).match(/.{2}/g)?.map((part) => Number.parseInt(part, 16) / 255) ?? [];
+  const linear = channels.map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * (linear[0] ?? 0) + 0.7152 * (linear[1] ?? 0) + 0.0722 * (linear[2] ?? 0);
+}
+
+function contrastRatio(first: GymPrimaryColor, second: GymPrimaryColor): number {
+  const values = [relativeLuminance(first), relativeLuminance(second)].sort((a, b) => b - a);
+  return ((values[0] ?? 0) + 0.05) / ((values[1] ?? 0) + 0.05);
+}
+
+/** Keep the gym accent while selecting a foreground with WCAG AA normal-text contrast. */
+export function resolveGymBrandColors(value: string | null | undefined): GymBrandColors {
+  const primary = resolveGymPrimaryColor(value);
+  const light = classicTokens.brand.onPrimary;
+  const dark = classicTokens.text.primary;
+  return {
+    primary,
+    onPrimary: contrastRatio(primary, light) >= contrastRatio(primary, dark) ? light : dark,
+  };
 }
 
 export const classicFontStack = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';

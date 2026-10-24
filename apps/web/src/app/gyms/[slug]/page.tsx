@@ -3,7 +3,7 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
-import { resolveGymPrimaryColor } from '@gymos/theme-tokens';
+import { resolveGymBrandColors } from '@gymos/theme-tokens';
 import { createMember, signOut } from '../../actions';
 import { apiUrl, type GymTheme, type Member, SESSION_COOKIE } from '@/lib/gymos';
 
@@ -53,7 +53,11 @@ async function GymContent({
   const access = (await accessResponse.json()) as { role: string };
   const members = (await membersResponse.json()) as Member[];
   const { error, created } = await searchParams;
-  const style = { '--gym-color': resolveGymPrimaryColor(theme.theme.primaryColor) } as CSSProperties;
+  const brand = resolveGymBrandColors(theme.theme.primaryColor);
+  const style = {
+    '--gym-color': brand.primary,
+    '--gym-on-color': brand.onPrimary,
+  } as CSSProperties;
   const createMemberForGym = createMember.bind(null, slug);
 
   return (

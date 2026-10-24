@@ -10,7 +10,7 @@
     "build:workspace": "pnpm --recursive --if-present build",
     "lint:workspace": "pnpm --dir apps/api lint && pnpm --dir apps/web lint",
     "typecheck:workspace": "pnpm --dir packages/contracts typecheck && pnpm --dir packages/api-client typecheck && pnpm --dir apps/api exec tsc --noEmit --incremental false --pretty false && pnpm --dir apps/web exec tsc --noEmit --incremental false --pretty false",
-    "test:unit": "pnpm --dir packages/contracts test && pnpm --dir packages/api-client test && pnpm --dir apps/api exec vitest run src && pnpm --dir apps/api exec vitest run test/pools/bounded-tenant-leases.test.mjs",
+    "test:unit": "pnpm --dir packages/contracts test && pnpm --dir packages/api-client test && pnpm --dir packages/theme-tokens test && pnpm --dir apps/api exec vitest run src && pnpm --dir apps/api exec vitest run --config vitest.config.pools.ts",
     "test:database:owned": "pnpm --dir apps/api exec vitest run --config vitest.config.environment-integration.ts --disableConsoleIntercept",
     "test:recovery:owned": "pnpm --dir apps/api exec vitest run --config vitest.config.recovery.ts --disableConsoleIntercept"
   },

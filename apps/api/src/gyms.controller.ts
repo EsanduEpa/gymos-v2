@@ -59,7 +59,7 @@ export class GymsController {
       slug: gym.slug,
       name: gym.name,
       theme: {
-        primaryColor: gym.theme?.primaryColor ?? '#2563EB',
+        primaryColor: gym.theme?.primaryColor ?? '#007A35',
         logoUrl: gym.theme?.logoUrl ?? null,
       },
     };

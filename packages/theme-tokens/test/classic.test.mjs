@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { classicTokens, resolveGymPrimaryColor } from "../dist/classic.js";
+import { classicTokens, resolveGymBrandColors, resolveGymPrimaryColor } from "../dist/classic.js";
 
 test("Classic keeps product status meanings separate from the gym brand", () => {
   assert.equal(classicTokens.brand.primary, "#007A35");
@@ -33,4 +33,10 @@ test("status text has readable contrast on its matching background", () => {
     const values = [luminance(status.foreground), luminance(status.background)].sort((a, b) => b - a);
     assert.ok((values[0] + 0.05) / (values[1] + 0.05) >= 4.5);
   }
+});
+
+test("gym accents receive a readable foreground, including very light colors", () => {
+  assert.deepEqual(resolveGymBrandColors("#FFFFFF"), { primary: "#FFFFFF", onPrimary: "#171B28" });
+  assert.deepEqual(resolveGymBrandColors("#000000"), { primary: "#000000", onPrimary: "#FFFFFF" });
+  assert.deepEqual(resolveGymBrandColors("invalid"), { primary: "#007A35", onPrimary: "#FFFFFF" });
 });

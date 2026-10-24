@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
+import { mkdir } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +11,7 @@ import { createDisposableEnvironment } from '../../api/test/support/disposable-e
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const apiDirectory = join(root, 'apps/api');
 const webDirectory = join(root, 'apps/web');
+const classicEvidenceDirectory = join(root, 'docs/migration/evidence/GYMOS-MIG-011');
 
 type ProcessState = { child: ChildProcess; errors: () => string };
 let environment: Awaited<ReturnType<typeof createDisposableEnvironment>>;
@@ -18,6 +20,7 @@ let api: ProcessState | undefined;
 let web: ProcessState | undefined;
 let apiBase = '';
 let webBase = '';
+let testJwtSecret = '';
 
 async function freePort(): Promise<number> {
   const server = createServer();
@@ -62,6 +65,63 @@ async function login(page: Page, email: string): Promise<void> {
   await page.getByRole('button', { name: 'Sign in' }).click();
 }
 
+async function openGymWithTestSession(page: Page, userId: string, slug: string): Promise<void> {
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256' })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify({
+    sub: userId,
+    iss: 'gymos-v2',
+    aud: 'gymos-api',
+    iat: issuedAt,
+    exp: issuedAt + 900,
+  })).toString('base64url');
+  const signature = createHmac('sha256', testJwtSecret).update(`${header}.${payload}`).digest('base64url');
+  const token = `${header}.${payload}.${signature}`;
+  await page.context().clearCookies();
+  await page.context().addCookies([{
+    name: 'gymos_access_token',
+    value: token,
+    url: webBase,
+    httpOnly: true,
+    sameSite: 'Lax',
+  }]);
+  await page.goto(`${webBase}/gyms/${slug}`);
+}
+
+async function contrastRatio(page: Page, selector: string): Promise<number> {
+  return page.locator(selector).first().evaluate((element) => {
+    const parse = (value: string) => value.match(/[\d.]+/g)?.slice(0, 3).map(Number) ?? [];
+    const luminance = (value: string) => {
+      const linear = parse(value).map((channel) => {
+        const normalized = channel / 255;
+        return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * (linear[0] ?? 0) + 0.7152 * (linear[1] ?? 0) + 0.0722 * (linear[2] ?? 0);
+    };
+    const style = getComputedStyle(element);
+    const values = [luminance(style.color), luminance(style.backgroundColor)].sort((a, b) => b - a);
+    return ((values[0] ?? 0) + 0.05) / ((values[1] ?? 0) + 0.05);
+  });
+}
+
+async function renderedGeometry(page: Page) {
+  return page.locator('.gym-banner').evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return { x: box.x, y: box.y, width: box.width, height: box.height };
+  });
+}
+
+async function expectResponsivePage(page: Page): Promise<void> {
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(await contrastRatio(page, '.gym-banner')).toBeGreaterThanOrEqual(4.5);
+  expect(await contrastRatio(page, '.status-pill.active')).toBeGreaterThanOrEqual(4.5);
+  await page.getByRole('button', { name: 'Add member' }).focus();
+  await expect(page.getByRole('button', { name: 'Add member' })).toBeFocused();
+  expect(await page.getByRole('button', { name: 'Add member' }).evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe('none');
+  await page.evaluate(() => window.scrollTo(0, 0));
+}
+
 test.beforeAll(async () => {
   test.setTimeout(120_000);
   if (process.env.GYMOS_TEST_ALLOW_DOCKER !== '1') throw new Error('Explicit GYMOS_TEST_ALLOW_DOCKER=1 is required');
@@ -70,7 +130,7 @@ test.beforeAll(async () => {
   const [apiPort, webPort] = await Promise.all([freePort(), freePort()]);
   apiBase = `http://127.0.0.1:${apiPort}`;
   webBase = `http://127.0.0.1:${webPort}`;
-  const jwtSecret = randomBytes(32).toString('hex');
+  testJwtSecret = randomBytes(32).toString('hex');
   const cleanEnvironment: NodeJS.ProcessEnv = {
     PATH: process.env.PATH,
     HOME: process.env.HOME,
@@ -83,7 +143,7 @@ test.beforeAll(async () => {
     MASTER_DATABASE_URL: environment.masterUrl,
     TENANT_DATABASE_URL: environment.masterUrl,
     PROVISION_DATABASE_URL: environment.masterUrl,
-    JWT_SECRET: jwtSecret,
+    JWT_SECRET: testJwtSecret,
   });
   await waitReady(`${apiBase}/`, api);
   web = start(process.execPath, [join(webDirectory, 'node_modules/next/dist/bin/next'), 'start', '-H', '127.0.0.1', '-p', String(webPort)], webDirectory, {
@@ -163,4 +223,53 @@ test('real browser and HTTP requests preserve two-gym isolation and pure reads',
   expect(mismatchedActor.identityId).not.toBe(fixture.users.mismatchUser.id);
   expect((await fixture.tenants[0].gymConfiguration.findUniqueOrThrow({ where: { id: 'current' } })).masterGymId).toBe(fixture.gyms[0].id);
   expect((await fixture.tenants[1].gymConfiguration.findUniqueOrThrow({ where: { id: 'current' } })).masterGymId).toBe(fixture.gyms[1].id);
+});
+
+test('V1 Classic branding stays readable and keeps identical geometry at approved widths', async ({ page }) => {
+  test.setTimeout(120_000);
+  await mkdir(classicEvidenceDirectory, { recursive: true });
+  const viewports = [
+    { name: 'desktop-1440', width: 1440, height: 1000 },
+    { name: 'tablet-768', width: 768, height: 1024 },
+    { name: 'mobile-390', width: 390, height: 844 },
+    { name: 'stress-320', width: 320, height: 700 },
+  ] as const;
+
+  for (const viewport of viewports) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await openGymWithTestSession(page, fixture.users.ownerA.id, fixture.gyms[0].slug);
+    await expect(page.locator('.gym-dashboard')).toHaveCSS('--gym-color', '#0F766E');
+    await expectResponsivePage(page);
+    const alphaGeometry = await renderedGeometry(page);
+    await page.screenshot({ path: join(classicEvidenceDirectory, `${viewport.name}-alpha.png`), animations: 'disabled' });
+
+    await openGymWithTestSession(page, fixture.users.ownerB.id, fixture.gyms[1].slug);
+    await expect(page.locator('.gym-dashboard')).toHaveCSS('--gym-color', '#7C3AED');
+    await expectResponsivePage(page);
+    const betaGeometry = await renderedGeometry(page);
+    await page.screenshot({ path: join(classicEvidenceDirectory, `${viewport.name}-beta.png`), animations: 'disabled' });
+
+    expect(betaGeometry).toEqual(alphaGeometry);
+  }
+
+  const alphaTheme = await fixture.master.theme.findUniqueOrThrow({ where: { gymId: fixture.gyms[0].id } });
+  try {
+    await fixture.master.theme.delete({ where: { gymId: fixture.gyms[0].id } });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openGymWithTestSession(page, fixture.users.ownerA.id, fixture.gyms[0].slug);
+    await expect(page.locator('.gym-dashboard')).toHaveCSS('--gym-color', '#007A35');
+    await expectResponsivePage(page);
+
+    await fixture.master.theme.create({ data: { gymId: fixture.gyms[0].id, primaryColor: 'not-a-color' } });
+    await page.reload();
+    await expect(page.locator('.gym-dashboard')).toHaveCSS('--gym-color', '#007A35');
+    await expectResponsivePage(page);
+    await page.screenshot({ path: join(classicEvidenceDirectory, 'mobile-390-safe-fallback.png'), animations: 'disabled' });
+  } finally {
+    await fixture.master.theme.upsert({
+      where: { gymId: fixture.gyms[0].id },
+      create: { gymId: fixture.gyms[0].id, primaryColor: alphaTheme.primaryColor, logoUrl: alphaTheme.logoUrl },
+      update: { primaryColor: alphaTheme.primaryColor, logoUrl: alphaTheme.logoUrl },
+    });
+  }
 });
