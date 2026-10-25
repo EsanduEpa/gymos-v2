@@ -429,7 +429,10 @@
       "decisions": "",
       "complexity": "Medium",
       "out": "No server startup, build output, seed or database mutation in original V1; no invented screenshots.",
-      "status": "Not Started"
+      "status": "Completed",
+      "owner": "Codex",
+      "evidence": "evidence/GYMOS-MIG-014.md",
+      "statusDate": "2026-10-25"
     },
     {
       "n": 15,

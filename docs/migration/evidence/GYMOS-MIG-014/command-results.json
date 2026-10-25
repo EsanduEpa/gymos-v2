@@ -1,0 +1,28 @@
+{
+  "task": "GYMOS-MIG-014",
+  "acceptedRun": {
+    "command": "GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web exec playwright test --config playwright.config.v1-visual.ts",
+    "exitCode": 0,
+    "result": "1 passed",
+    "duration": "9.1m"
+  },
+  "evidenceVerification": {
+    "command": "node apps/web/tests/visual/verify-v1-evidence.mjs",
+    "exitCode": 0,
+    "result": "allChecksPassed=true; 369 images; 104 baseline images; 168 states; 120 assertions"
+  },
+  "sourcePreservation": {
+    "revision": "058aa8532741c4cb84289589fd2cf89282882988",
+    "gitStatus": "clean",
+    "unchanged": true,
+    "preservedSourceFiles": 148,
+    "containerRemoved": true,
+    "disposableCopyRemoved": true
+  },
+  "repositoryChecks": {
+    "typecheck": "passed: pnpm --dir apps/web exec tsc --noEmit --incremental false --pretty false",
+    "lint": "passed: pnpm --dir apps/web lint",
+    "diffCheck": "passed: git diff --check",
+    "syntheticSecretFieldScan": "passed"
+  }
+}

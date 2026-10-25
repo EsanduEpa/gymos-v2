@@ -3,7 +3,7 @@
 Part of [Master Plan §8](MIGRATION_EXECUTION_PLAN.md#8-unified-v1-to-v2-feature-traceability-matrix); not an independent requirement source. Source paths link to exact inspected files. All proposed routes/DTO names are future definitions, not existing APIs. Every feature uses UI+API+domain+database+auth+tests acceptance, with shared constraints inherited from Master Plan §§7,17–21 and task specifications.
 ## Feature traceability matrix
 
-One record per discovered page-route responsibility; complete component/control/action/model/API inventories follow. R00/T00/M00 redirect; O14 is deferred. Completion status for every task is Not Started. “Implemented” V2 below describes only source existence, never runtime verification.
+One record per discovered page-route responsibility; complete component/control/action/model/API inventories follow. R00/T00/M00 redirect; O14 is deferred. Task-specific status remains authoritative in the tracker; GYMOS-MIG-014 completed the synthetic V1 visual baseline while V2 parity tasks remain pending. “Implemented” V2 below describes only source existence, never runtime verification.
 
 ### R00 — Role entry redirect
 

@@ -1241,7 +1241,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+Completed 25 October 2026. The disposable synthetic V1 fixture, 369-image manifest, 104 required baseline images, conditional-state gallery, independent verifier and original-checkout preservation proof are recorded in [GYMOS-MIG-014.md](evidence/GYMOS-MIG-014.md).
 
 ## Task ID: GYMOS-MIG-015
 

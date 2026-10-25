@@ -1,0 +1,16 @@
+{
+  "capturedImages": 369,
+  "baselineScreens": 26,
+  "baselineImages": 104,
+  "states": 168,
+  "widths": [
+    1440,
+    768,
+    390,
+    320
+  ],
+  "preservedSourceFiles": 148,
+  "horizontalOverflowImages": 0,
+  "assertions": 120,
+  "allChecksPassed": true
+}

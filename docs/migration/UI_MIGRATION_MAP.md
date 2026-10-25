@@ -642,40 +642,40 @@ Many page loaders directly read Prisma rather than calling one of these actions:
 
 ## 11. Visual Reference/Screenshot Inventory
 
-**Actual captures: none. Browser visual inspection: not performed.** No supplied deployed V1 URL was available, and the local listener inspection found no node/3000–3003 server to inspect. Starting Next could write build/generated files in V1, and authenticated page views may create records. No server was started, database queried, credentials used, or mutation invoked. This section is a future capture manifest, not evidence of rendered parity.
+**Actual V1 captures completed by GYMOS-MIG-014.** The [verified evidence](evidence/GYMOS-MIG-014.md) contains 369 synthetic references, including all 26 rendered screens and 104 required baselines at the four target widths. Capture ran from a disposable copy and owned database; preservation evidence proves the original V1 checkout remained unchanged. These are V1 references for later comparison, not V2 parity evidence.
 
 Suggested capture standard: desktop1440×1000, tablet768×1024, mobile390×844, plus320px stress width. Capture selected states at the same viewport/browser/font/device scale/timezone and deterministic fixture time in both versions. Include full-page and focused overlay/chart crops; name by `<ID>-<state>-<width>.png`. Use redacted fixture identities and placeholder credentials. Freeze/mask refresh indicators, timers and chart animation consistently; do not mask content differences. URLs containing IDs use fixture IDs. Store images only when actually captured.
 
 | Capture ID / route | Desktop + mobile required reference states | Capture status |
 |---|---|---|
-| A01 `/login` | Empty form, invalid credentials, inactive/rate feedback, submitting, platform/gym fallback branding | Pending |
-| A02 `/change-password` | Required and optional variants, validation, pending, updated confirmation | Pending; use disposable identity |
-| S01 `/admin` | Registry, none/selected gym, stop view, narrow table, selected context banner/nav | Pending; selection changes context |
-| O01 `/owner` | Four stats/chart/alerts/table/trainer cards; active session; low-credit/no-show/normal; zeros | Pending |
-| O02 `/owner/members` | Populated/empty/filtered/no matches, pagination >25, long names | Pending |
-| O03 `/owner/members/new` | Full form, invalid, pending, one-time handoff + Copy | Pending; fixture-only mutation |
-| O04 `/owner/members/[id]` | Overview with/without pack, all3 tabs, status confirm, pack form/error, desk payment, receipt alert | Pending; fixture-only actions |
-| O05 `/owner/trainers` | Both levels/statuses/specialisation chips, search/empty/pagination | Pending |
-| O06 `/owner/trainers/new` | Full form, error, pending, one-time credentials | Pending; fixture-only mutation |
-| O07 `/owner/trainers/[id]` | Banner/stats/bio/shift form, status confirm, success/failure | Pending |
-| O08 `/owner/sessions` | Daily filters/all statuses/empty/pagination, override dialog; monthly balances/More overlay | Pending |
-| O09 `/owner/sessions/book` | Eligible selectors, no packs, validation/collision, submitting | Pending |
-| O10 `/owner/financials` | **All6 tabs**, chart tooltips/empty, expense/budget dialogs/errors, payroll OPEN/CLOSED/APPROVED/native confirm | Pending; even view may create period |
-| O11 `/owner/analytics` | Three charts, legends/tooltips, empty/zero and long trainer labels | Pending |
-| O12 `/owner/gym-config` | **All5 tabs**, inline add-plan, error/success, checkbox state | Pending; do not run expiry on live data |
-| O13 `/owner/audit-log` | Filter, loading, populated/empty, pages, truncated details | Pending |
-| O14 `/owner/subscription` | Current plan/status/last4, all4 cards, current/popular badges, alert-only controls | Pending; view may create default subscription |
-| T01 `/trainer/schedule` | Pending requests, decline modal, SCHEDULED/ACTIVE/COMPLETED/DECLINED/CANCELLED, timer, notes, empty | Pending |
-| T02 `/trainer/clients` | Balance0/1–2/>2, search/pagination/empty | Pending |
-| T03 `/trainer/clients/[id]` | Banner/stats + **all4 tabs**, empty plans/history, long health text | Pending |
-| T04 `/trainer/plans/workout/new` | Prefilled client, default examples, add/remove, empty validation, mobile row stacking | Pending |
-| T05 `/trainer/plans/meal/new` | Default examples, totals after edits/add/remove, numeric/empty validation, narrow4-column rows | Pending |
-| T06 `/trainer/earnings` | Stats/table/zero/commission fallback/pagination | Pending |
-| M01 `/member/trainers` | Active cards, both levels, long bio/search/empty | Pending |
-| M02 `/member/trainers/[id]/book` | Credits/no credits, form/collision/pending; missing trainer/no gym messages | Pending |
-| M03 `/member/sessions` | All statuses, notes, withdrawal/cancellation warning variants, empty | Pending |
-| R00/T00/M00 redirects | Record destination + role/nav after redirect; no standalone screen image | Pending |
-| L01/L02 and X01–03 | Desktop/mobile drawer open/closed, bell open/empty/unread, admin/subscription banners, loading skeleton, error/retry, missing resource/return | Pending |
+| A01 `/login` | Empty form, invalid credentials, inactive/rate feedback, submitting, platform/gym fallback branding | Captured |
+| A02 `/change-password` | Required and optional variants, validation, pending, updated confirmation | Captured with disposable identity |
+| S01 `/admin` | Registry, none/selected gym, stop view, narrow table, selected context banner/nav | Captured |
+| O01 `/owner` | Four stats/chart/alerts/table/trainer cards; active session; low-credit/no-show/normal; zeros | Captured |
+| O02 `/owner/members` | Populated/empty/filtered/no matches, pagination >25, long names | Captured |
+| O03 `/owner/members/new` | Full form, invalid, pending, one-time handoff + Copy | Captured; credential masked |
+| O04 `/owner/members/[id]` | Overview with/without pack, all3 tabs, status confirm, pack form/error, desk payment, receipt alert | Captured; payment reference only |
+| O05 `/owner/trainers` | Both levels/statuses/specialisation chips, search/empty/pagination | Captured |
+| O06 `/owner/trainers/new` | Full form, error, pending, one-time credentials | Captured; credential masked |
+| O07 `/owner/trainers/[id]` | Banner/stats/bio/shift form, status confirm, success/failure | Captured |
+| O08 `/owner/sessions` | Daily filters/all statuses/empty/pagination, override dialog; monthly balances/More overlay | Captured |
+| O09 `/owner/sessions/book` | Eligible selectors, no packs, validation/collision, submitting | Captured |
+| O10 `/owner/financials` | **All6 tabs**, chart tooltips/empty, expense/budget dialogs/errors, payroll OPEN/CLOSED/APPROVED/native confirm | Captured |
+| O11 `/owner/analytics` | Three charts, legends/tooltips, empty/zero and long trainer labels | Captured |
+| O12 `/owner/gym-config` | **All5 tabs**, inline add-plan, error/success, checkbox state | Captured |
+| O13 `/owner/audit-log` | Filter, loading, populated/empty, pages, truncated details | Captured |
+| O14 `/owner/subscription` | Current plan/status/last4, all4 cards, current/popular badges, alert-only controls | Captured; reference only |
+| T01 `/trainer/schedule` | Pending requests, decline modal, SCHEDULED/ACTIVE/COMPLETED/DECLINED/CANCELLED, timer, notes, empty | Captured |
+| T02 `/trainer/clients` | Balance0/1–2/>2, search/pagination/empty | Captured |
+| T03 `/trainer/clients/[id]` | Banner/stats + **all4 tabs**, empty plans/history, long health text | Captured |
+| T04 `/trainer/plans/workout/new` | Prefilled client, default examples, add/remove, empty validation, mobile row stacking | Captured |
+| T05 `/trainer/plans/meal/new` | Default examples, totals after edits/add/remove, numeric/empty validation, narrow4-column rows | Captured |
+| T06 `/trainer/earnings` | Stats/table/zero/commission fallback/pagination | Captured |
+| M01 `/member/trainers` | Active cards, both levels, long bio/search/empty | Captured |
+| M02 `/member/trainers/[id]/book` | Credits/no credits, form/collision/pending; missing trainer/no gym messages | Captured |
+| M03 `/member/sessions` | All statuses, notes, withdrawal/cancellation warning variants, empty | Captured |
+| R00/T00/M00 redirects | Record destination + role/nav after redirect; no standalone screen image | Verified in manifest; no image by design |
+| L01/L02 and X01–03 | Desktop/mobile drawer open/closed, bell open/empty/unread, admin/subscription banners, loading skeleton, error/retry, missing resource/return | Captured |
 
 Before captures, use a disposable non-production fixture environment with all4 roles, two gyms/themes, ≥26 list rows, ≥21 audit rows, representative plan/session/payroll states, and precreated subscription/pay period. Avoid live-data state changes. Opening bell is read-only until a row/read-all is clicked; those clicks write read state. Credential screenshots must contain fixture secrets only. Capture states through safe test fixtures or mocked frontend adapters; do not force production mutations for screenshots.
 

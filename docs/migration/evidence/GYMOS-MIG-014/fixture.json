@@ -1,0 +1,66 @@
+{
+  "clock": "2026-10-24T12:00:00.000Z",
+  "locale": "en-US",
+  "timezone": "UTC",
+  "currency": "V1 source $ formatting (reference only; V2 DEC-06 applies)",
+  "gyms": [
+    "visual-alpha",
+    "visual-beta"
+  ],
+  "roles": {
+    "admin": {
+      "id": "visual-admin",
+      "role": "SUPER_ADMIN",
+      "gymId": null,
+      "fullName": "Synthetic Platform Admin"
+    },
+    "owner": {
+      "id": "visual-owner",
+      "role": "GYM_OWNER",
+      "gymId": "visual-alpha",
+      "fullName": "Synthetic Alpha Owner"
+    },
+    "trainer": {
+      "id": "visual-trainer-00",
+      "role": "PERSONAL_TRAINER",
+      "gymId": "visual-alpha",
+      "fullName": "Synthetic Trainer 00"
+    },
+    "member": {
+      "id": "visual-member-00",
+      "role": "GYM_MEMBER",
+      "gymId": "visual-alpha",
+      "fullName": "Synthetic Member 00"
+    },
+    "beta": {
+      "id": "visual-beta-owner",
+      "role": "GYM_OWNER",
+      "gymId": "visual-beta",
+      "fullName": "Synthetic Beta Owner"
+    }
+  },
+  "counts": {
+    "gym": 2,
+    "user": 60,
+    "membership": 28,
+    "sessionPack": 27,
+    "pTSession": 52,
+    "revenueRecord": 24,
+    "expenseRecord": 7,
+    "auditLog": 28,
+    "payPeriod": 2,
+    "payRecord": 29,
+    "gymSubscription": 2,
+    "notification": 3
+  },
+  "source": "Programmatically generated synthetic values only; no original data or configuration read",
+  "readSideEffectsPrecreated": [
+    "GymSubscription for both gyms",
+    "Current PayPeriod for both gyms"
+  ],
+  "knownDifferences": [
+    "V1 has no per-gym theme; use two names and platform Classic colors",
+    "V1 monetary floats remain reference-only"
+  ],
+  "credentials": "Random runtime-only; excluded from output"
+}
