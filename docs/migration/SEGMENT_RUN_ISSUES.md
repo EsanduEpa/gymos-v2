@@ -41,3 +41,12 @@ Evidence: [GYMOS-MIG-008 evidence](evidence/GYMOS-MIG-008.md), [Segment 01 execu
 | Docker socket was denied for first task 019 E2E and API integration attempts; one API command also initially omitted required `GYMOS_TEST_ALLOW_DOCKER=1`. | The first runs stopped before useful integration coverage. | Re-ran with explicit opt-in and approved local Docker access. Final browser 3/3, identity 9/9, tenancy 20/20; owned disposable DBs/container reported cleanup. | Resolved |
 
 Evidence: [GYMOS-MIG-016](evidence/GYMOS-MIG-016.md), [GYMOS-MIG-017](evidence/GYMOS-MIG-017.md), [GYMOS-MIG-018](evidence/GYMOS-MIG-018.md), [GYMOS-MIG-019](evidence/GYMOS-MIG-019.md), [Segment 02 execution record](segments/02_IDENTITY_AUTH_AND_APPLICATION_SHELL.md). Remaining tasks: 013 and 020; DEC-11 remains the gate for final session/logout policy in task 020.
+
+## Segment 03 — 2026-10-26
+
+| Issue | Impact | Resolution / next action | Status |
+| --- | --- | --- | --- |
+| Segment 03 execution checkpoint requires approved DEC-03, but `MIGRATION_DECISIONS.md` still lists DEC-03 as open/resolution task GYMOS-MIG-079 and no `decisions/DEC-03.md` approval record exists. | Segment instructions require stopping before implementation; support scope, expiry, permitted read fields and lifecycle are not settled. | Obtain and record the DEC-03 decision through GYMOS-MIG-079, then resume Segment 03. No task implementation was started in this run. | Open |
+| GYMOS-MIG-021 requires provisioning currency and timezone, while DEC-01 (configuration ownership) and DEC-06 (supported currency rules) remain unresolved in the decision register. | Even after DEC-03, the required provisioning fields/defaults cannot be implemented without inventing product policy. | Resolve the required DEC-01/06 inputs or explicitly narrow/sequence GYMOS-MIG-021 through approved change control before claiming it complete. | Open |
+
+Evidence: [Segment 03 execution record](segments/03_PLATFORM_ADMIN_AND_TENANT_LIFECYCLE.md), [decision register](MIGRATION_DECISIONS.md), [GYMOS-MIG-021 specification](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-021). No Segment 03 implementation tasks were run; all six remain Not Started.

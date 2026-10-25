@@ -45,7 +45,7 @@ Statuses in this directory reflect linked evidence, not the existence of a plan.
 |---:|---|---|---:|---|---|
 | 1 | [01 — Platform Foundation and Decision Gates](01_PLATFORM_FOUNDATION_AND_DECISION_GATES.md) | Preserve verified infrastructure; finish CI, security containment, and product/technical decisions | 23 | IN PROGRESS / BLOCKED | None |
 | 2 | [02 — Identity, Authentication, and Application Shell](02_IDENTITY_AUTH_AND_APPLICATION_SHELL.md) | Login, forced password change, role/gym routing, protected chrome, logout | 6 | IN PROGRESS (4/6 tasks) | 01 |
-| 3 | [03 — Platform Administration and Tenant Lifecycle](03_PLATFORM_ADMIN_AND_TENANT_LIFECYCLE.md) | Gym registry, provisioning, activation, support, suspension, schema rollout | 6 | NOT STARTED | 01, 02 |
+| 3 | [03 — Platform Administration and Tenant Lifecycle](03_PLATFORM_ADMIN_AND_TENANT_LIFECYCLE.md) | Gym registry, provisioning, activation, support, suspension, schema rollout | 6 | BLOCKED before implementation (DEC-03) | 01, 02 |
 | 4 | [04 — Gym Configuration and Membership Rules](04_GYM_CONFIGURATION_AND_MEMBERSHIP_RULES.md) | Branding, profile, plans, rates, policies, membership eligibility | 5 | NOT STARTED | 01–03 |
 | 5 | [05 — Member Enrollment and Account Management](05_MEMBER_ENROLLMENT_AND_ACCOUNT_MANAGEMENT.md) | Full registration, list/profile, status, packs, recovery journey | 5 | NOT STARTED | 02–04; session base from 07 for status/pack invariants |
 | 6 | [06 — Trainer Management and Coaching](06_TRAINER_MANAGEMENT_AND_COACHING.md) | Trainer enrollment/roster/directory, client 360, workout and meal plans | 7 | NOT STARTED | 02–05; session reads from 07 for confirmed relationships |

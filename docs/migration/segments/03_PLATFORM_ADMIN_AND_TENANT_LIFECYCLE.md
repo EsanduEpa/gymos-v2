@@ -102,9 +102,9 @@ Stop if DEC-03 is unapproved, provider limits are needed for a production claim,
 
 ## 11. Progress and handoff
 
-- **Status:** NOT STARTED
+- **Status:** BLOCKED before implementation (26 October 2026)
 - **Completed:** none
 - **Remaining:** 021–026
-- **Files/tests/issues/blockers/decisions:** _fill during execution_
+- **Files/tests/issues/blockers/decisions:** Execution stopped at the segment checkpoint because DEC-03 remains open (GYMOS-MIG-079). GYMOS-MIG-021 also needs the unresolved DEC-01/DEC-06 currency and timezone policy inputs. No application files or task statuses were changed. Run issues are recorded in [SEGMENT_RUN_ISSUES.md](../SEGMENT_RUN_ISSUES.md).
 - **Next recommended task:** GYMOS-MIG-021 after segment 02 authorization prerequisites.
 
