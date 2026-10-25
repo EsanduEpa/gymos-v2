@@ -1,0 +1,8 @@
+$ pnpm --dir apps/api lint
+
+> api@0.0.1 lint /Users/esanduepa/Desktop/Projects/gymos-v2/apps/api
+> oxlint --type-aware src/ test/
+
+
+
+Exit code: 0

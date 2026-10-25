@@ -1,9 +1,12 @@
+import { normalizeIdentityEmail } from '../dist/identity/email.js';
 import argon2 from 'argon2';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../dist/generated/master/client.js';
 
 const [rawEmail, slug] = process.argv.slice(2);
-const email = rawEmail?.trim().toLowerCase();
+let email;
+try { email = normalizeIdentityEmail(rawEmail); }
+catch { console.error('Enter a valid ASCII identity email'); process.exit(1); }
 const password = process.env.OWNER_PASSWORD;
 const masterUrl = process.env.MASTER_DATABASE_URL;
 
@@ -34,14 +37,14 @@ try {
       email,
       passwordHash,
       gymAccesses: {
-        create: { gymId: gym.id, role: 'OWNER' },
+        create: { gymId: gym.id, role: 'OWNER', linkStatus: 'ACTIVE' },
       },
     },
   });
 
   console.log(`Created owner ${email} for ${gym.name}`);
 } catch (error) {
-  console.error(error);
+  console.error('Identity operation failed; inspect redacted server diagnostics');
   process.exitCode = 1;
 } finally {
   await master.$disconnect();

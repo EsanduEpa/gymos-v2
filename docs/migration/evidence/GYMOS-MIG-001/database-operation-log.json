@@ -1,0 +1,18 @@
+{
+  "task": "GYMOS-MIG-001",
+  "database_connections": 0,
+  "api_servers_started": 0,
+  "v1_runtime_executed": false,
+  "database_commands_executed": [],
+  "not_run": [
+    "verify:milestone",
+    "Prisma generate",
+    "Prisma validate",
+    "Prisma migrate",
+    "seeds",
+    "provisioning",
+    "builds",
+    "dependency install"
+  ],
+  "basis": "Recorded tool/subprocess command inventory; unit imports AppController and AppService only, not AppModule/DatabaseService. No environment file sourced or loaded by this task."
+}

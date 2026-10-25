@@ -1,0 +1,134 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { z } from 'zod';
+import {
+  actorLinkSchema, commandSchema, decimalStringSchema, failureSchema,
+  gymAccessKeySchema, gymRoleSchema, identitySummarySchema, idempotencyKeySchema, localDateSchema,
+  moneySchema, pageQuerySchema, pageSchema, readSchema, signedMoneySchema,
+} from '../dist/index.js';
+import { existingEndpointContracts } from '../dist/legacy.js';
+import { changePasswordInputSchema, credentialAcknowledgementInputSchema, credentialAcknowledgementResultSchema, credentialIssueInputSchema, credentialReissueInputSchema, credentialReissueResultSchema } from '../dist/credentials.js';
+
+const asOf = '2026-10-23T00:00:00.000Z';
+const identity = {
+  identityId: 'identity-1', displayName: 'Synthetic owner', email: 'owner@example.test',
+  globalRole: 'USER', mustChangePassword: false,
+};
+const gym = { id: 'gym-1', name: 'Synthetic Gym', slug: 'test-a', status: 'ACTIVE' };
+const theme = { primaryColor: '#123456', logoUrl: 'https://example.test/logo.svg' };
+const member = { id: 'member-1', fullName: 'Synthetic Member', email: null, status: 'ACTIVE' };
+const fixtures = {
+  E01: { accessToken: 'fixture-only-token', tokenType: 'Bearer', expiresIn: 900,
+    globalRole: 'USER', mustChangePassword: false, gyms: [{ id: gym.id, name: gym.name, slug: gym.slug, role: 'OWNER' }] },
+  E02: [gym], E03: gym, E04: { slug: gym.slug, name: gym.name, theme },
+  E05: { slug: gym.slug, theme }, E06: { gymId: gym.id, slug: gym.slug, role: 'OWNER' },
+  E07: [member], E08: { ...member, createdAt: asOf },
+};
+
+for (const [id, contract] of Object.entries(existingEndpointContracts)) {
+  test(`${id} preserves the existing unprefixed response shape`, () => {
+    assert.deepEqual(contract.response.parse(fixtures[id]), fixtures[id]);
+    assert.ok(contract.path.startsWith('/') && !contract.path.startsWith('/v1'));
+  });
+}
+test('legacy response schemas reject accidentally serialized database secrets', () => {
+  for (const [id, contract] of Object.entries(existingEndpointContracts)) {
+    const fixture = fixtures[id];
+    const injected = Array.isArray(fixture)
+      ? [{ ...fixture[0], passwordHash: 'not-a-real-hash' }]
+      : { ...fixture, databaseName: 'private-database' };
+    assert.equal(contract.response.safeParse(injected).success, false, id);
+  }
+});
+test('legacy parsers preserve currently valid slugs longer than the future common cap', () => {
+  const slug = 'a'.repeat(101);
+  assert.ok(existingEndpointContracts.E03.response.safeParse({ ...gym, slug }).success);
+  assert.ok(existingEndpointContracts.E06.response.safeParse({ gymId: gym.id, slug, role: 'OWNER' }).success);
+});
+test('identity projection rejects password, database and private health properties', () => {
+  assert.deepEqual(identitySummarySchema.parse(identity), identity);
+  for (const name of ['passwordHash', 'password', 'accessToken', 'databaseName', 'healthNotes']) {
+    assert.equal(identitySummarySchema.safeParse({ ...identity, [name]: 'private' }).success, false);
+  }
+});
+test('roles, actor kinds and composite access keys do not conflate identities and profiles', () => {
+  assert.equal(gymRoleSchema.safeParse('GYM_OWNER').success, false);
+  assert.deepEqual(actorLinkSchema.parse({ kind: 'MEMBER', memberId: 'member-1' }), { kind: 'MEMBER', memberId: 'member-1' });
+  assert.equal(actorLinkSchema.safeParse({ kind: 'TRAINER', memberId: 'member-1' }).success, false);
+  assert.equal(actorLinkSchema.safeParse({ kind: 'OWNER', trainerId: 'trainer-1' }).success, false);
+  assert.equal(gymAccessKeySchema.safeParse({ identityId: 'i', gymId: 'g', id: 'invented-access-id' }).success, false);
+});
+test('money uses exact strings and leaves precision/currency support to domain contracts', () => {
+  for (const amount of ['0', '0.00', '12345678901234567890.123456789']) {
+    assert.equal(moneySchema.parse({ amount, currency: 'LKR' }).amount, amount);
+  }
+  for (const amount of [10.1, NaN, Infinity, '1e3', '01.00', '+1', '.1', '-1', '-0.00', '1.']) {
+    assert.equal(moneySchema.safeParse({ amount, currency: 'LKR' }).success, false);
+  }
+  assert.equal(moneySchema.safeParse({ amount: '1', currency: 'lkr' }).success, false);
+  assert.equal(signedMoneySchema.parse({ amount: '-1.25', currency: 'LKR' }).amount, '-1.25');
+  assert.equal(decimalStringSchema.safeParse('-0').success, false);
+});
+test('date and metadata validation rejects malformed calendar dates and private fields', () => {
+  assert.equal(localDateSchema.safeParse('2026-02-30').success, false);
+  assert.equal(localDateSchema.parse('2024-02-29'), '2024-02-29');
+  const schema = readSchema(z.strictObject({ count: z.number().int() }));
+  const valid = { data: { count: 0 }, meta: { requestId: 'req-1', asOf, gymSlug: 'test-a', timeZone: 'Asia/Colombo' } };
+  assert.deepEqual(schema.parse(valid), valid);
+  assert.equal(schema.safeParse({ ...valid, meta: { ...valid.meta, timeZone: 'not/a-zone' } }).success, false);
+  assert.equal(schema.safeParse({ ...valid, meta: { ...valid.meta, databaseUrl: 'private' } }).success, false);
+});
+test('pagination preserves full-filter totals, zero rows and out-of-range pages', () => {
+  assert.deepEqual(pageQuerySchema.parse({}), { page: 1, pageSize: 25 });
+  assert.deepEqual(pageQuerySchema.parse({ page: '2', pageSize: '20' }), { page: 2, pageSize: 20 });
+  for (const query of [{ page: 0 }, { pageSize: 101 }, { page: 1.1 }, { page: 'NaN' }, { skip: 10 },
+    { page: true }, { page: [2] }, { page: '0x10' }, { page: '1e2' }, { page: ' 2' }]) {
+    assert.equal(pageQuerySchema.safeParse(query).success, false);
+  }
+  const schema = pageSchema(z.string());
+  assert.ok(schema.safeParse({ items: ['row'], page: 5, pageSize: 25, totalCount: 101, totalPages: 5, asOf }).success);
+  assert.ok(schema.safeParse({ items: [], page: 6, pageSize: 25, totalCount: 101, totalPages: 5, asOf }).success);
+  assert.ok(schema.safeParse({ items: [], page: 1, pageSize: 25, totalCount: 0, totalPages: 0, asOf }).success);
+  assert.equal(schema.safeParse({ items: [], page: 1, pageSize: 25, totalCount: 101, totalPages: 1, asOf }).success, false);
+});
+test('command results and errors have safe allowlisted envelopes', () => {
+  const schema = commandSchema(z.strictObject({ id: z.string() }));
+  const result = { ok: true, operationId: 'op-1', data: { id: 'member-1' }, replayed: true,
+    effects: { changedResourceIds: ['member-1'], refreshScopes: ['people:member-1'] } };
+  assert.deepEqual(schema.parse(result), result);
+  assert.equal(schema.safeParse({ ...result, temporaryPassword: 'private' }).success, false);
+  const failure = { ok: false, code: 'CONFLICT', message: 'State changed', requestId: 'r-1', retryable: false };
+  assert.deepEqual(failureSchema.parse(failure), failure);
+  assert.equal(failureSchema.safeParse({ ...failure, details: { passwordHash: 'private' } }).success, false);
+  assert.equal(failureSchema.safeParse({ ...failure, code: 'ARBITRARY_ERROR' }).success, false);
+  assert.ok(failureSchema.safeParse({ ...failure, code: 'PASSWORD_CHANGE_REQUIRED' }).success);
+});
+test('idempotency keys implement the approved16–128 printable nonwhitespace ASCII boundary', () => {
+  assert.equal(idempotencyKeySchema.parse('intent-0123456789/~'), 'intent-0123456789/~');
+  for (const key of ['short', 'x'.repeat(129), 'intent-0123456789\n', 'intent-0123456789 space', 'é'.repeat(16)]) {
+    assert.equal(idempotencyKeySchema.safeParse(key).success, false);
+  }
+});
+
+test('credential contracts enforce password policy and one-time reissue envelopes', () => {
+  const validChange = { currentPassword: 'Temporary-42', newPassword: 'New-password-42', confirmPassword: 'New-password-42' };
+  assert.deepEqual(changePasswordInputSchema.parse(validChange), validChange);
+  for (const invalid of [
+    { ...validChange, newPassword: 'LettersOnlyPassword', confirmPassword: 'LettersOnlyPassword' },
+    { ...validChange, newPassword: 'ÉléphantOnly', confirmPassword: 'ÉléphantOnly' },
+    { ...validChange, newPassword: ' New-password-42', confirmPassword: ' New-password-42' },
+    { ...validChange, newPassword: validChange.currentPassword, confirmPassword: validChange.currentPassword },
+    { ...validChange, extra: 'ignored fields are forbidden' },
+  ]) assert.equal(changePasswordInputSchema.safeParse(invalid).success, false);
+  const request = { reason: 'LOST_HANDOFF', expectedVersion: 0, idempotencyKey: 'request-0123456789' };
+  assert.deepEqual(credentialIssueInputSchema.parse({}), {});
+  assert.equal(credentialIssueInputSchema.safeParse({ identityId: 'must-be-derived-from-operation' }).success, false);
+  assert.deepEqual(credentialReissueInputSchema.parse(request), request);
+  assert.equal(credentialReissueInputSchema.safeParse({ ...request, idempotencyKey: 'short' }).success, false);
+  assert.equal(credentialReissueResultSchema.safeParse({ status: 'ALREADY_ISSUED', deliveryVersion: 1 }).success, true);
+  assert.equal(credentialReissueResultSchema.safeParse({ status: 'ISSUED', deliveryVersion: 1, temporaryPassword: 'one-time' }).success, true);
+  assert.equal(credentialReissueResultSchema.safeParse({ status: 'ISSUED', deliveryVersion: 1, passwordHash: 'private' }).success, false);
+  assert.deepEqual(credentialAcknowledgementInputSchema.parse({ deliveryVersion: 1 }), { deliveryVersion: 1 });
+  assert.equal(credentialAcknowledgementInputSchema.safeParse({ deliveryVersion: -1 }).success, false);
+  assert.deepEqual(credentialAcknowledgementResultSchema.parse({ status: 'ACKNOWLEDGED', deliveryVersion: 1 }), { status: 'ACKNOWLEDGED', deliveryVersion: 1 });
+});

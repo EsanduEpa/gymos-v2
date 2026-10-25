@@ -14,11 +14,120 @@ enum MemberStatus {
   SUSPENDED
 }
 
+enum MemberRegistrationState {
+  BASIC
+  PENDING
+  COMPLETE
+  FAILED
+}
+
+enum TrainerRegistrationState {
+  PENDING
+  COMPLETE
+  FAILED
+}
+
+enum TrainerStatus {
+  ACTIVE
+  DEACTIVATED
+}
+
 model Member {
-  id        String       @id @default(cuid())
-  fullName  String
-  email     String?      @unique
-  status    MemberStatus @default(ACTIVE)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  id                    String                  @id @default(cuid())
+  fullName              String
+  email                 String?                 @unique
+  status                MemberStatus            @default(ACTIVE)
+  identityId            String?                 @unique
+  registrationState     MemberRegistrationState @default(BASIC)
+  enrollmentOperationId String?                 @unique
+  version               Int                     @default(0)
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+}
+
+model Trainer {
+  id                    String                   @id @default(cuid())
+  fullName              String
+  identityId            String?                  @unique
+  registrationState     TrainerRegistrationState @default(PENDING)
+  enrollmentOperationId String?                  @unique
+  status                TrainerStatus            @default(ACTIVE)
+  version               Int                      @default(0)
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+}
+
+enum CommandReceiptState {
+  RUNNING
+  COMMITTED
+  REJECTED
+}
+
+enum SchemaVerificationState {
+  APPLYING
+  VERIFIED
+  FAILED
+  REPAIR_REQUIRED
+}
+
+// Physical database binding. Operational policy/config fields are added by
+// their owning migration tasks; schema version is deliberately separate.
+model GymConfiguration {
+  id          String   @id
+  masterGymId String   @unique
+  version     Int      @default(0)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model SchemaState {
+  id                     String                  @id
+  state                  SchemaVerificationState @default(APPLYING)
+  appliedTemplateVersion String?
+  appliedManifestDigest  String?
+  schemaEvidenceDigest   String?
+  verifiedMigrations     Json                    @default("[]")
+  appliedAt              DateTime?               @db.Timestamptz(3)
+  verifiedAt             DateTime?               @db.Timestamptz(3)
+  lastOperationId        String?
+  version                Int                     @default(0)
+  updatedAt              DateTime                @updatedAt @db.Timestamptz(3)
+}
+
+model CommandReceipt {
+  id                      String              @id @default(cuid())
+  actorIdentityId         String // External Master identity, no FK.
+  commandKind             String
+  idempotencyKey          String
+  requestDigest           String
+  resourceType            String?
+  resourceId              String?
+  sourceMasterOperationId String?             @unique // External Master operation, no FK.
+  state                   CommandReceiptState @default(RUNNING)
+  safeResult              Json?
+  createdAt               DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt               DateTime            @updatedAt @db.Timestamptz(3)
+  committedAt             DateTime?           @db.Timestamptz(3)
+  audits                  AuditLog[]
+
+  @@unique([actorIdentityId, commandKind, idempotencyKey])
+  @@index([state, createdAt])
+}
+
+model AuditLog {
+  id                      String         @id @default(cuid())
+  eventKey                String         @unique
+  contentDigest           String
+  receiptId               String
+  receipt                 CommandReceipt @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  actorIdentityId         String // External Master reference, no FK.
+  originalActorIdentityId String?
+  eventCode               String
+  resourceType            String
+  resourceId              String
+  transition              Json
+  createdAt               DateTime       @default(now()) @db.Timestamptz(3)
+
+  @@index([createdAt, id])
+  @@index([actorIdentityId, createdAt])
 }

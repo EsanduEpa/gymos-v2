@@ -1,9 +1,11 @@
 'use server';
 
+import { existingEndpointContracts } from '@gymos/contracts/legacy';
+import { changePasswordInputSchema, changePasswordResultSchema } from '@gymos/contracts/credentials';
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { apiUrl, SESSION_COOKIE } from '@/lib/gymos';
+import { apiUrl, gymRolePath, SESSION_COOKIE } from '@/lib/gymos';
 
 function field(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -34,23 +36,17 @@ export async function login(formData: FormData) {
   }
 
   if (!response.ok) {
-    redirect(`/login?error=${response.status === 429 ? 'rate' : 'invalid'}`);
+    const error = response.status === 429
+      ? 'rate'
+      : response.status >= 500
+        ? 'unavailable'
+        : 'invalid';
+    redirect(`/login?error=${error}`);
   }
 
-  const result = (await response.json()) as {
-    accessToken: string;
-    expiresIn: number;
-    globalRole: string;
-    gyms: { slug: string }[];
-  };
-  if (!result.accessToken) redirect('/login?error=unavailable');
-
-  const destination = result.globalRole === 'SUPER_ADMIN'
-    ? '/admin'
-    : result.gyms[0]
-      ? `/gyms/${encodeURIComponent(result.gyms[0].slug)}`
-      : null;
-  if (!destination) redirect('/login?error=access');
+  const parsed = existingEndpointContracts.E01.response.safeParse(await response.json().catch(() => null));
+  if (!parsed.success) redirect('/login?error=unavailable');
+  const result = parsed.data;
 
   (await cookies()).set(SESSION_COOKIE, result.accessToken, {
     httpOnly: true,
@@ -59,11 +55,53 @@ export async function login(formData: FormData) {
     path: '/',
     maxAge: result.expiresIn,
   });
+  if (result.mustChangePassword) redirect('/change-password');
 
-  redirect(destination);
+  const firstGym = result.gyms[0];
+  redirect(result.globalRole === 'SUPER_ADMIN' ? '/admin' : firstGym === undefined ? '/no-access'
+    : result.gyms.length === 1 ? `/gyms/${encodeURIComponent(firstGym.slug)}/${firstGym.role === 'OWNER' ? 'owner' : gymRolePath(firstGym.role)}` : '/gyms/select');
 }
 
 export async function signOut() {
+  (await cookies()).delete(SESSION_COOKIE);
+  redirect('/login');
+}
+
+export async function changePasswordAction(formData: FormData) {
+  const token = await sessionToken();
+  if (!token) return { error: 'Sign in again to change your password.' };
+
+  const parsed = changePasswordInputSchema.safeParse({
+    currentPassword: formData.get('currentPassword'),
+    newPassword: formData.get('newPassword'),
+    confirmPassword: formData.get('confirmPassword'),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Check the password fields.' };
+
+  let response: Response;
+  try {
+    response = await fetch(apiUrl('/auth/change-password'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify(parsed.data),
+      cache: 'no-store',
+    });
+  } catch {
+    return { error: 'GymOS is temporarily unavailable. Please try again.' };
+  }
+
+  if (response.status === 401) redirect('/login?error=invalid');
+  if (response.status === 400) return { error: 'Your current password is incorrect.' };
+  if (response.status === 429) return { error: 'Too many attempts. Please wait a minute and try again.' };
+  if (!response.ok) return { error: 'Could not update your password. Please try again.' };
+
+  const result = changePasswordResultSchema.safeParse(await response.json().catch(() => null));
+  if (!result.success) return { error: 'Could not confirm the password update. Sign in to check your account.' };
+
+  return { success: true as const };
+}
+
+export async function finishPasswordChangeAction() {
   (await cookies()).delete(SESSION_COOKIE);
   redirect('/login');
 }

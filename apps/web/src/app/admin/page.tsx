@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { createGym, signOut } from '../actions';
 import { apiUrl, SESSION_COOKIE } from '@/lib/gymos';
+import { Button, Card, CardHeader, EmptyState, Feedback, Field, LoadingState, PageHeader, StatCard, StatusBadge } from '@/components/ui';
 
 type GymRow = { id: string; name: string; slug: string; status: string };
 
@@ -29,7 +30,7 @@ async function AdminContent({
       cache: 'no-store',
     });
   } catch {
-    return <main className="page-loading">The API is unavailable. Please try again shortly.</main>;
+    return <LoadingState label="The API is unavailable. Please try again shortly." page />;
   }
   if (response.status === 401) redirect('/login');
   if (response.status === 403) {
@@ -45,38 +46,35 @@ async function AdminContent({
       <header className="dashboard-header">
         <Link href="/" className="brand-lockup"><span className="brand-mark">G</span> GymOS</Link>
         <span className="header-label">Super Admin</span>
-        <form action={signOut}><button className="text-button" type="submit">Sign out</button></form>
+        <form action={signOut}><Button variant="secondary" type="submit">Sign out</Button></form>
       </header>
       <div className="dashboard-content">
-        <div className="section-heading">
-          <div><div className="eyebrow dark">PLATFORM CONTROL</div><h1>Gym workspaces</h1><p>Create an isolated space for each gym and its owner.</p></div>
-          <div className="metric-card"><strong>{gyms.length}</strong><span>Total gyms</span></div>
-        </div>
-        {created ? <p className="notice success" role="status">{created} is ready. Its owner can sign in now.</p> : null}
-        {error && messages[error] ? <p className="notice error" role="alert">{messages[error]}</p> : null}
+        <PageHeader eyebrow="PLATFORM CONTROL" title="Gym workspaces" description="Create an isolated space for each gym and its owner." action={<StatCard label="Total gyms" value={gyms.length} />} />
+        {created ? <Feedback tone="success">{created} is ready. Its owner can sign in now.</Feedback> : null}
+        {error && messages[error] ? <Feedback tone="error">{messages[error]}</Feedback> : null}
         <div className="dashboard-grid">
-          <section className="panel">
-            <div className="panel-heading"><div><span className="eyebrow dark">NEW WORKSPACE</span><h2>Create a gym</h2></div><span className="panel-icon">＋</span></div>
+          <Card>
+            <CardHeader eyebrow="NEW WORKSPACE" title="Create a gym" action={<span className="panel-icon">＋</span>} />
             <form action={createGym} className="stack-form">
-              <label>Gym name<input name="name" placeholder="Harbor Fitness" minLength={2} maxLength={100} required /></label>
-              <label>Gym slug<input name="slug" placeholder="harbor-fitness" pattern="[a-z0-9]+(-[a-z0-9]+)*" required /><small>Used in the gym’s web address.</small></label>
-              <label>Owner email<input type="email" name="ownerEmail" placeholder="owner@example.com" required /></label>
-              <label>Owner password<input type="password" name="ownerPassword" minLength={12} autoComplete="new-password" required /><small>Give this password to the owner through a secure channel.</small></label>
-              <button className="primary-button full" type="submit">Create gym <span>→</span></button>
+              <Field label="Gym name" name="name" placeholder="Harbor Fitness" minLength={2} maxLength={100} required />
+              <Field label="Gym slug" name="slug" placeholder="harbor-fitness" pattern="[a-z0-9]+(-[a-z0-9]+)*" hint="Used in the gym’s web address." required />
+              <Field label="Owner email" type="email" name="ownerEmail" placeholder="owner@example.com" required />
+              <Field label="Owner password" type="password" name="ownerPassword" minLength={12} autoComplete="new-password" hint="Give this password to the owner through a secure channel." required />
+              <Button fullWidth type="submit">Create gym <span>→</span></Button>
             </form>
-          </section>
-          <section className="panel">
-            <div className="panel-heading"><div><span className="eyebrow dark">WORKSPACES</span><h2>Existing gyms</h2></div></div>
-            {gyms.length === 0 ? <p className="empty-state">No gyms yet. Create the first one using the form.</p> : (
+          </Card>
+          <Card>
+            <CardHeader eyebrow="WORKSPACES" title="Existing gyms" />
+            {gyms.length === 0 ? <EmptyState title="No gyms yet." hint="Create the first one using the form." /> : (
               <div className="gym-list">
                 {gyms.map((gym) => <div className="gym-list-row" key={gym.id}>
                   <span className="gym-avatar">{gym.name.slice(0, 1).toUpperCase()}</span>
                   <div><strong>{gym.name}</strong><small>{gym.slug}</small></div>
-                  <span className={`status-pill ${gym.status.toLowerCase()}`}>{gym.status}</span>
+                  <StatusBadge status={gym.status} />
                 </div>)}
               </div>
             )}
-          </section>
+          </Card>
         </div>
       </div>
     </main>
@@ -88,5 +86,5 @@ export default function AdminPage({
 }: {
   searchParams: Promise<{ error?: string; created?: string }>;
 }) {
-  return <Suspense fallback={<main className="page-loading">Loading gyms…</main>}><AdminContent searchParams={searchParams} /></Suspense>;
+  return <Suspense fallback={<LoadingState label="Loading gyms…" page />}><AdminContent searchParams={searchParams} /></Suspense>;
 }

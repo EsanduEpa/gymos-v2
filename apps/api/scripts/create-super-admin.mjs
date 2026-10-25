@@ -1,8 +1,12 @@
+import { normalizeIdentityEmail } from '../dist/identity/email.js';
 import argon2 from 'argon2';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../dist/generated/master/client.js';
 
-const email = process.argv[2]?.trim().toLowerCase();
+const rawEmail = process.argv[2];
+let email;
+try { email = normalizeIdentityEmail(rawEmail); }
+catch { console.error('Enter a valid ASCII identity email'); process.exit(1); }
 const password = process.env.SUPER_ADMIN_PASSWORD;
 const masterUrl = process.env.MASTER_DATABASE_URL;
 
@@ -24,7 +28,7 @@ try {
   });
   console.log(`Created Super Admin ${email}`);
 } catch (error) {
-  console.error(error);
+  console.error('Identity operation failed; inspect redacted server diagnostics');
   process.exitCode = 1;
 } finally {
   await master.$disconnect();

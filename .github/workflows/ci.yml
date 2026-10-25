@@ -1,0 +1,233 @@
+name: GYMOS V2 checks
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gymos-v2-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+  TZ: UTC
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+
+jobs:
+  workspace:
+    name: Install and validate workspace
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.22.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check:workspace
+      - run: pnpm list --recursive --depth -1
+
+  build:
+    name: Build packages and applications
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.22.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:workspace
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.22.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint:workspace
+
+  typecheck:
+    name: Type check
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.22.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck:workspace
+
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.22.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:unit
+
+  disposable-database:
+    name: Owned disposable database tests
+    runs-on: ubuntu-24.04
+    env:
+      GYMOS_TEST_ALLOW_DOCKER: "1"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.22.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:database:owned
+      - if: always()
+        run: |
+          mkdir -p safe-evidence
+          printf 'GYMOS-MIG-008 disposable database job: %s\n' '${{ job.status }}' > safe-evidence/result.txt
+          printf 'Revision: %s\n' '${{ github.sha }}' >> safe-evidence/result.txt
+          printf 'No service credentials or raw test output are included.\n' >> safe-evidence/result.txt
+      - if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: disposable-database-summary
+          path: safe-evidence/result.txt
+          retention-days: 7
+
+  browser:
+    name: Browser isolation test
+    runs-on: ubuntu-24.04
+    env:
+      GYMOS_TEST_ALLOW_DOCKER: "1"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.22.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --dir apps/web exec playwright install --with-deps chromium
+      - run: pnpm test:isolated
+      - if: always()
+        run: |
+          mkdir -p safe-evidence
+          printf 'GYMOS-MIG-008 browser job: %s\n' '${{ job.status }}' > safe-evidence/result.txt
+          printf 'Revision: %s\n' '${{ github.sha }}' >> safe-evidence/result.txt
+          printf 'No browser traces, screenshots, credentials or raw test output are included.\n' >> safe-evidence/result.txt
+      - if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: browser-summary
+          path: safe-evidence/result.txt
+          retention-days: 7
+
+  isolated-recovery:
+    name: Encrypted backup and isolated restore
+    runs-on: ubuntu-24.04
+    env:
+      GYMOS_TEST_ALLOW_DOCKER: "1"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.22.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:recovery:owned
+      - if: always()
+        run: |
+          mkdir -p safe-evidence
+          printf 'GYMOS-MIG-009 recovery job: %s\n' '${{ job.status }}' > safe-evidence/result.txt
+          printf 'Revision: %s\n' '${{ github.sha }}' >> safe-evidence/result.txt
+          printf 'Only synthetic fixture counts and elapsed times are emitted.\n' >> safe-evidence/result.txt
+          printf 'No backup, plaintext archive, key, database URL or raw output is uploaded.\n' >> safe-evidence/result.txt
+      - if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: recovery-summary
+          path: safe-evidence/result.txt
+          retention-days: 7
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_ENABLE_COMMENTS: "false"
+          GITLEAKS_ENABLE_SUMMARY: "false"
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+
+  dependency-review:
+    name: Dependency review
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: never
+
+  dependency-audit:
+    name: Lockfile vulnerability audit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.22.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --audit-level high

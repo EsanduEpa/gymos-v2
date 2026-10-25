@@ -1,0 +1,36 @@
+{
+  "node": "v24.22.0",
+  "pnpm": "9.15.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "packages": {
+    "root": {
+      "prisma": "7.10.1",
+      "dotenv": "18.0.8"
+    },
+    "apps/api": {
+      "@nestjs/common": "12.2.0",
+      "@nestjs/core": "12.2.0",
+      "@prisma/client": "7.10.1",
+      "@prisma/adapter-pg": "7.10.1",
+      "typescript": "6.0.3",
+      "vitest": "4.1.12",
+      "vite": "8.3.5",
+      "zod": "4.6.7",
+      "pg": "8.23.1",
+      "argon2": "0.45.1",
+      "jose": "6.2.13",
+      "oxlint": "1.89.0",
+      "oxlint-tsgolint": "7.0.2004"
+    },
+    "apps/web": {
+      "next": "16.4.2",
+      "react": "19.3.0",
+      "react-dom": "19.3.0",
+      "typescript": "5.9.3",
+      "tailwindcss": "4.3.3",
+      "eslint": "9.39.5",
+      "eslint-config-next": "16.4.2"
+    }
+  }
+}

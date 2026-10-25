@@ -1,0 +1,68 @@
+[
+  {
+    "command": [
+      "pnpm",
+      "--filter",
+      "@gymos/contracts",
+      "build"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 1.277,
+    "log": "01-contracts-build.log"
+  },
+  {
+    "command": [
+      "pnpm",
+      "--filter",
+      "@gymos/api-client",
+      "build"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 0.861,
+    "log": "02-api-client-build.log"
+  },
+  {
+    "command": [
+      "pnpm",
+      "--filter",
+      "@gymos/contracts",
+      "typecheck"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 0.911,
+    "log": "03-contracts-typecheck.log"
+  },
+  {
+    "command": [
+      "pnpm",
+      "--filter",
+      "@gymos/api-client",
+      "typecheck"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 0.849,
+    "log": "04-api-client-typecheck.log"
+  },
+  {
+    "command": [
+      "pnpm",
+      "--filter",
+      "@gymos/contracts",
+      "test"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 0.613,
+    "log": "05-contracts-test.log"
+  },
+  {
+    "command": [
+      "pnpm",
+      "--filter",
+      "@gymos/api-client",
+      "test"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 0.665,
+    "log": "06-api-client-test.log"
+  }
+]

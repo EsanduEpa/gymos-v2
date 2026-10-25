@@ -11,13 +11,14 @@ import {
   Patch,
   Post,
   Req,
+  ServiceUnavailableException,
   UseGuards,
 } from '@nestjs/common';
 import { z } from 'zod';
 import { DatabaseService } from './database.service.js';
 import { Prisma } from './generated/tenant/client.js';
 import { GymAccessGuard, type GymRequest } from './gym-access.guard.js';
-import { TenantDatabaseService } from './tenant-database.service.js';
+import { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js';
 
 const createMemberInput = z.strictObject({
   fullName: z.string().trim().min(2).max(120),
@@ -41,9 +42,35 @@ const updateThemeInput = z
 @Controller('gyms')
 export class GymsController {
   constructor(
-    private readonly tenants: TenantDatabaseService,
     private readonly database: DatabaseService,
+    private readonly tenantGate: TenantSchemaGateService,
   ) {}
+
+  private async assertCurrentOwnerAccess(access: NonNullable<GymRequest['gymAccess']>): Promise<void> {
+    let user;
+    let gymAccess;
+    let gym;
+    let now: Date;
+    try {
+      [user, gymAccess, gym] = await Promise.all([
+        this.database.master.user.findUnique({ where: { id: access.identityId },
+          select: { authVersion: true, mustChangePassword: true, credentialExpiresAt: true } }),
+        this.database.master.gymAccess.findUnique({ where: { userId_gymId: { userId: access.identityId, gymId: access.gymId } },
+          select: { role: true, linkStatus: true, version: true } }),
+        this.database.master.gym.findUnique({ where: { id: access.gymId }, select: { status: true } }),
+      ]);
+      const [clock] = await this.database.master.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS "now"`;
+      now = clock.now;
+    } catch {
+      throw new ServiceUnavailableException('Gym authorization is temporarily unavailable');
+    }
+    if (!user || user.authVersion !== access.identityVersion || user.mustChangePassword
+      || (user.credentialExpiresAt !== null && user.credentialExpiresAt <= now)
+      || gymAccess?.role !== 'OWNER' || gymAccess.linkStatus !== 'ACTIVE' || gymAccess.version !== access.accessVersion
+      || gym?.status !== 'ACTIVE') {
+      throw new ForbiddenException('Gym access changed; retry with current access');
+    }
+  }
 
   @Get(':slug/theme')
   async theme(@Param('slug') slug: string) {
@@ -59,7 +86,7 @@ export class GymsController {
       slug: gym.slug,
       name: gym.name,
       theme: {
-        primaryColor: gym.theme?.primaryColor ?? '#2563EB',
+        primaryColor: gym.theme?.primaryColor ?? '#007A35',
         logoUrl: gym.theme?.logoUrl ?? null,
       },
     };
@@ -110,20 +137,23 @@ export class GymsController {
       throw new InternalServerErrorException('Gym context missing');
     }
 
-    if (access.role !== 'OWNER' && access.role !== 'TRAINER') {
+    // This surface is the owner's BASIC contact/history projection. Trainers
+    // receive only relationship-scoped client endpoints when those exist.
+    if (access.role !== 'OWNER') {
       throw new ForbiddenException('Member list access denied');
     }
 
-    return this.tenants.forDatabase(access.databaseName).member.findMany({
-      select: {
-        id: true,
-        fullName: true,
-        email: true,
-        status: true,
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    });
+    return this.tenantGate.withVerifiedTenant(access, (tenant) =>
+      tenant.member.findMany({
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          status: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      }));
   }
 
   @Post(':slug/members')
@@ -143,16 +173,20 @@ export class GymsController {
     }
 
     try {
-      return await this.tenants.forDatabase(access.databaseName).member.create({
-        data: parsed.data,
-        select: {
-          id: true,
-          fullName: true,
-          email: true,
-          status: true,
-          createdAt: true,
-        },
-      });
+      return await this.tenantGate.withVerifiedTenant(access, (tenant) =>
+        tenant.$transaction(async (tx) => {
+          await this.assertCurrentOwnerAccess(access);
+          return tx.member.create({
+            data: parsed.data,
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              status: true,
+              createdAt: true,
+            },
+          });
+        }));
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&

@@ -1,9 +1,11 @@
 import { UnauthorizedException } from '@nestjs/common';
 import { jwtVerify } from 'jose';
 
-export async function userIdFromAuthorization(
+export type AccessTokenIdentity = { userId: string; authVersion: number };
+
+export async function identityFromAuthorization(
   authorization: string | undefined,
-): Promise<string> {
+): Promise<AccessTokenIdentity> {
   if (!authorization?.startsWith('Bearer ')) {
     throw new UnauthorizedException('Bearer token required');
   }
@@ -20,10 +22,13 @@ export async function userIdFromAuthorization(
       audience: 'gymos-api',
       algorithms: ['HS256'],
     });
-    if (typeof payload.sub !== 'string') {
-      throw new Error('Missing user ID');
+    if (typeof payload.sub !== 'string'
+      || typeof payload.authVersion !== 'number'
+      || !Number.isSafeInteger(payload.authVersion)
+      || payload.authVersion < 0) {
+      throw new Error('Invalid identity claims');
     }
-    return payload.sub;
+    return { userId: payload.sub, authVersion: payload.authVersion };
   } catch {
     throw new UnauthorizedException('Invalid or expired token');
   }
