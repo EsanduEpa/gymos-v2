@@ -39,44 +39,47 @@ enum ActorKind {
 }
 
 model User {
-  originalPlatformAudits PlatformAuditLog[] @relation("PlatformAuditOriginalActor")
-  initiatedOperations    Operation[]        @relation("OperationActor")
-  subjectOperations      Operation[]        @relation("OperationSubject")
-  platformAudits         PlatformAuditLog[] @relation("PlatformAuditActor")
-  id                     String             @id @default(cuid())
-  email                  String             @unique
+  originalPlatformAudits PlatformAuditLog[]   @relation("PlatformAuditOriginalActor")
+  initiatedOperations    Operation[]          @relation("OperationActor")
+  subjectOperations      Operation[]          @relation("OperationSubject")
+  platformAudits         PlatformAuditLog[]   @relation("PlatformAuditActor")
+  credentialDeliveries   CredentialDelivery[] @relation("CredentialSubject")
+  issuedCredentials      CredentialDelivery[] @relation("CredentialIssuer")
+  id                     String               @id @default(cuid())
+  email                  String               @unique
   passwordHash           String
-  globalRole             GlobalRole         @default(USER)
+  globalRole             GlobalRole           @default(USER)
   displayName            String?
-  mustChangePassword     Boolean            @default(false)
-  authVersion            Int                @default(0)
-  version                Int                @default(0)
-  passwordChangedAt      DateTime?          @db.Timestamptz(3)
-  credentialExpiresAt    DateTime?          @db.Timestamptz(3)
+  mustChangePassword     Boolean              @default(false)
+  authVersion            Int                  @default(0)
+  version                Int                  @default(0)
+  passwordChangedAt      DateTime?            @db.Timestamptz(3)
+  credentialExpiresAt    DateTime?            @db.Timestamptz(3)
   gymAccesses            GymAccess[]
   enrollmentProofs       EnrollmentProof[]
-  createdAt              DateTime           @default(now())
-  updatedAt              DateTime           @updatedAt
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
 }
 
 model Gym {
   platformAudits               PlatformAuditLog[]
-  operations                   Operation[]        @relation("OperationGym")
-  expectedTenantOperationId    String?            @unique
-  expectedTenantOperation      Operation?         @relation("GymExpectedTenantOperation", fields: [expectedTenantOperationId], references: [id], onDelete: Restrict)
-  id                           String             @id @default(cuid())
-  slug                         String             @unique
+  operations                   Operation[]          @relation("OperationGym")
+  expectedTenantOperationId    String?              @unique
+  expectedTenantOperation      Operation?           @relation("GymExpectedTenantOperation", fields: [expectedTenantOperationId], references: [id], onDelete: Restrict)
+  id                           String               @id @default(cuid())
+  slug                         String               @unique
   name                         String
-  databaseName                 String             @unique
-  status                       GymStatus          @default(PROVISIONING)
-  version                      Int                @default(0)
+  databaseName                 String               @unique
+  status                       GymStatus            @default(PROVISIONING)
+  version                      Int                  @default(0)
   expectedTenantSchemaVersion  String?
   expectedTenantManifestDigest String?
   gymAccesses                  GymAccess[]
   theme                        Theme?
   enrollmentProofs             EnrollmentProof[]
-  createdAt                    DateTime           @default(now())
-  updatedAt                    DateTime           @updatedAt
+  credentialDeliveries         CredentialDelivery[]
+  createdAt                    DateTime             @default(now())
+  updatedAt                    DateTime             @updatedAt
 }
 
 model GymAccess {
@@ -153,47 +156,48 @@ enum OperationState {
 }
 
 model Operation {
-  id                            String             @id @default(cuid())
+  id                            String              @id @default(cuid())
   kind                          OperationKind
   actorIdentityId               String
-  actor                         User               @relation("OperationActor", fields: [actorIdentityId], references: [id], onDelete: Restrict)
+  actor                         User                @relation("OperationActor", fields: [actorIdentityId], references: [id], onDelete: Restrict)
   scopeKey                      String
   idempotencyKey                String
   requestDigest                 String
   requestedSlug                 String?
   supportContextId              String? // Local SupportSession FK added by024; not cross-DB.
   gymId                         String?
-  gym                           Gym?               @relation("OperationGym", fields: [gymId], references: [id], onDelete: Restrict)
-  expectedForGym                Gym?               @relation("GymExpectedTenantOperation")
+  gym                           Gym?                @relation("OperationGym", fields: [gymId], references: [id], onDelete: Restrict)
+  expectedForGym                Gym?                @relation("GymExpectedTenantOperation")
   subjectIdentityId             String?
-  subject                       User?              @relation("OperationSubject", fields: [subjectIdentityId], references: [id], onDelete: Restrict)
+  subject                       User?               @relation("OperationSubject", fields: [subjectIdentityId], references: [id], onDelete: Restrict)
   ownerThemeId                  String?
-  ownerTheme                    Theme?             @relation(fields: [ownerThemeId], references: [id], onDelete: Restrict)
-  databaseName                  String?            @unique
+  ownerTheme                    Theme?              @relation(fields: [ownerThemeId], references: [id], onDelete: Restrict)
+  databaseName                  String?             @unique
   intendedTenantTemplateVersion String?
   intendedTenantManifestDigest  String?
   appliedTenantTemplateVersion  String?
   appliedTenantManifestDigest   String?
-  tenantSchemaVerifiedAt        DateTime?          @db.Timestamptz(3)
+  tenantSchemaVerifiedAt        DateTime?           @db.Timestamptz(3)
   tenantActorId                 String?
   tenantCommandReceiptId        String?
   tenantMembershipId            String?
   // tenantRegistrationRevenueId deliberately omitted: approved MVP creates no
   // registration cash/upfront full earned record; stale map field withdrawn.
-  completedSteps                Json               @default("{}")
-  state                         OperationState     @default(PENDING)
-  step                          String             @default("PENDING")
-  version                       Int                @default(0)
-  attemptCount                  Int                @default(0)
+  completedSteps                Json                @default("{}")
+  state                         OperationState      @default(PENDING)
+  step                          String              @default("PENDING")
+  version                       Int                 @default(0)
+  attemptCount                  Int                 @default(0)
   leaseToken                    String?
-  leaseExpiresAt                DateTime?          @db.Timestamptz(3)
-  leaseRequiresReconciliation   Boolean            @default(false)
+  leaseExpiresAt                DateTime?           @db.Timestamptz(3)
+  leaseRequiresReconciliation   Boolean             @default(false)
   safeResult                    Json?
   errorCode                     String?
-  createdAt                     DateTime           @default(now()) @db.Timestamptz(3)
-  updatedAt                     DateTime           @updatedAt @db.Timestamptz(3)
-  lastAttemptAt                 DateTime?          @db.Timestamptz(3)
+  createdAt                     DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt                     DateTime            @updatedAt @db.Timestamptz(3)
+  lastAttemptAt                 DateTime?           @db.Timestamptz(3)
   audits                        PlatformAuditLog[]
+  credentialDelivery            CredentialDelivery?
 
   @@unique([actorIdentityId, scopeKey, kind, idempotencyKey])
   @@index([state, leaseExpiresAt])
@@ -220,4 +224,28 @@ model PlatformAuditLog {
 
   @@index([gymId, createdAt, id])
   @@index([actorIdentityId, createdAt])
+}
+
+// Stores only one-time handoff metadata. The temporary secret exists only in
+// the issuing service response; it is never persisted in Master or Operation.
+model CredentialDelivery {
+  id                 String    @id @default(cuid())
+  operationId        String    @unique
+  operation          Operation @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  identityId         String
+  identity           User      @relation("CredentialSubject", fields: [identityId], references: [id], onDelete: Restrict)
+  issuedByIdentityId String
+  issuedBy           User      @relation("CredentialIssuer", fields: [issuedByIdentityId], references: [id], onDelete: Restrict)
+  gymId              String
+  gym                Gym       @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  authVersion        Int
+  version            Int       @default(0)
+  lastReissueKey     String?
+  lastReissueDigest  String?
+  issuedAt           DateTime  @default(now()) @db.Timestamptz(3)
+  expiresAt          DateTime  @db.Timestamptz(3)
+  acknowledgedAt     DateTime? @db.Timestamptz(3)
+
+  @@index([identityId, issuedAt])
+  @@index([gymId, issuedAt])
 }

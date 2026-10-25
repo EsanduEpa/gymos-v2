@@ -2,13 +2,14 @@ import { ServiceUnavailableException, type ExecutionContext } from '@nestjs/comm
 import { SignJWT } from 'jose';
 import type { DatabaseService } from './database.service.js';
 import { GymAccessGuard } from './gym-access.guard.js';
+import type { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js';
 
 describe('GymAccessGuard availability boundary', () => {
   it('returns a sanitized 503 when Master access resolution is unavailable', async () => {
     const previousSecret = process.env.JWT_SECRET;
     process.env.JWT_SECRET = 'task005-test-secret-at-least-32-bytes-long';
     try {
-      const token = await new SignJWT({})
+      const token = await new SignJWT({ authVersion: 0 })
         .setProtectedHeader({ alg: 'HS256' })
         .setSubject('task005-user')
         .setIssuer('gymos-v2')
@@ -16,9 +17,13 @@ describe('GymAccessGuard availability boundary', () => {
         .setExpirationTime('5m')
         .sign(new TextEncoder().encode(process.env.JWT_SECRET));
       const request = { headers: { authorization: `Bearer ${token}` }, params: { slug: 'task005-gym' } };
-      const guard = new GymAccessGuard({ master: { gymAccess: { findFirst: async () => {
-        throw new Error('postgresql://sensitive:details@remote.example.invalid/gym');
-      } } } } as unknown as DatabaseService);
+      const guard = new GymAccessGuard({ master: {
+        user: { findUnique: async () => ({ authVersion: 0, mustChangePassword: false, credentialExpiresAt: null }) },
+        $queryRaw: async () => [{ now: new Date() }],
+        gymAccess: { findFirst: async () => {
+          throw new Error('postgresql://sensitive:details@remote.example.invalid/gym');
+        } },
+      } } as unknown as DatabaseService, {} as TenantSchemaGateService);
       const execution = {
         switchToHttp: () => ({ getRequest: () => request }),
       } as ExecutionContext;

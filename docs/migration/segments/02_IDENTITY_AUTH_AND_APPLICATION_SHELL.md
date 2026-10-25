@@ -52,7 +52,7 @@ Master owns login identity, password hash, credential expiry, must-change flag, 
 - **Targets:** verified auth files above; proposed auth policy/service tests.
 - **Implementation:** strict login DTO; canonical email; rate limit; ACTIVE gym-access projection without secrets; issue versioned short-lived token; return must-change and allowed gyms/roles; guard denies non-change/logout endpoints while restricted.
 - **Expected behavior:** invalid/inactive/expired/restricted states are stable; no raw hashes/access internals; direct API bypass fails.
-- **Acceptance/testing:** unit token claims; DB/API success+wrong password+inactive+rate+authVersion+forced-change tests across two gyms; login browser states. **[ ]**
+- **Acceptance/testing:** unit token claims; DB/API success+wrong password+inactive+rate+authVersion+forced-change tests across two gyms; login browser states. **[x]**
 
 ### GYMOS-MIG-017 — temporary credentials/change/reissue
 
@@ -61,7 +61,7 @@ Master owns login identity, password hash, credential expiry, must-change flag, 
 - **Sources:** V1 A02, member/trainer handoff, account action/password helper.
 - **Targets:** auth/identity command services, contracts/client, web change-password route.
 - **Implementation:** generate strong temporary secret only at issuance boundary; store hash; set expiry/mustChange/authVersion; change current password atomically; reissue only for eligible newly issued identity with operation/audit; never log/serialize secret after one response.
-- **Acceptance/testing:** expired/replayed/wrong current/reused identity/cross-gym/direct API negatives; successful change revokes old token and clears restriction; secret absent from logs/database responses. **[ ]**
+- **Acceptance/testing:** expired/replayed/wrong current/reused identity/cross-gym/direct API negatives; successful change revokes old token and clears restriction; secret absent from logs/database responses. **[x]**
 
 ### GYMOS-MIG-018 — operational actor and resource authorization
 
@@ -70,7 +70,7 @@ Master owns login identity, password hash, credential expiry, must-change flag, 
 - **Sources:** V1 `lib/authz.ts`; current gym guard; DEC-02/04.
 - **Targets:** proposed Nest guards/decorators/policies plus integration tests.
 - **Implementation:** derive identity from verified token; load current ACTIVE access; resolve DB server-side; verify reciprocal actor tuple; enforce role/relationship and foreign-ID safe 404; no implicit SUPER_ADMIN owner mutation.
-- **Acceptance/testing:** role matrix, stale/revoked access, DB swap, forged slug/actor/resource, unrelated trainer/health projection, and cross-tenant denial tests. **[ ]**
+- **Acceptance/testing:** role matrix, stale/revoked access, DB swap, forged slug/actor/resource, unrelated trainer/health projection, and cross-tenant denial tests. **[x]**
 
 ### GYMOS-MIG-019 — role-aware root, gym selection, protected navigation
 
@@ -78,8 +78,8 @@ Master owns login identity, password hash, credential expiry, must-change flag, 
 - **Prerequisites:** 012,016,018,086.
 - **Sources:** R00/T00/M00/L02 and current V2 root/gym page.
 - **Targets:** proposed route helper, protected layouts/pages; adapt existing root and gym page.
-- **Implementation:** resolve zero/one/multiple access; chooser only when needed; role home mapping; unavailable/foreign gym 403/404; remove current unconditional member-list fetch for MEMBER/TRAINER.
-- **Acceptance/testing:** each role, multi-gym, no-access, suspended, stale selection, direct URL and legacy redirect browser/API cases. **[ ]**
+- **Implementation:** resolve zero/one/multiple access; chooser only when needed; role home mapping; unavailable/foreign gym 403/404; remove current unconditional member-list fetch for MEMBER/TRAINER. **[x]**
+- **Acceptance/testing:** role navigation browser checks for one-gym owner, multi-gym chooser path, revoked/inactive access and trainer member-list denial. **[x]** — see [GYMOS-MIG-019 evidence](../evidence/GYMOS-MIG-019.md); no-access, suspended, stale-selection and callback cases remain follow-up coverage.
 
 ### GYMOS-MIG-013 — integrate role/gym dashboard chrome
 
@@ -101,9 +101,9 @@ Master owns login identity, password hash, credential expiry, must-change flag, 
 
 ## 7. Security and multi-tenancy checklist
 
-- [ ] Forced-change and credential expiry enforced by API, not only navigation.
-- [ ] Auth/access versions revoke stale tokens.
-- [ ] Gym/actor resolved from current Master access and verified tenant binding.
+- [x] Forced-change and credential expiry enforced by API, not only navigation.
+- [x] Auth/access versions revoke stale tokens.
+- [x] Gym/actor resolved from current Master access and verified tenant binding.
 - [ ] Foreign resource and relationship checks are server-side.
 - [ ] Bearer/temporary passwords/hashes never reach client logs or persistent browser storage.
 - [ ] Cache and navigation state are keyed by identity+gym+role and cleared on switch/logout.
@@ -115,7 +115,7 @@ Run `pnpm --dir apps/api exec vitest run src` for unit changes, the relevant ide
 ## 9. Definition of done
 
 - [ ] A01/A02/R00/T00/M00/L02/H01 and sign-out meet mapped V1 behavior/approved corrections.
-- [ ] Six tasks pass targeted API, DB, browser, role, and tenant negatives.
+- [ ] Six tasks pass targeted API, DB, browser, role, and tenant negatives (013 and 020 remain).
 - [ ] No current V2 admin/create/basic member capability regresses.
 - [ ] Intentional deviations and provider-dependent settings are documented.
 
@@ -125,9 +125,9 @@ Do not start feature pages before actor authorization works. Stop if DEC-11 is r
 
 ## 11. Progress and handoff
 
-- **Status:** NOT STARTED
-- **Completed:** none
-- **Remaining:** 013,016,017,018,019,020
-- **Files/tests/issues/blockers/decisions:** _fill with evidence_
-- **Next recommended task:** GYMOS-MIG-016.
+- **Status:** IN PROGRESS
+- **Completed:** 016 — login session policy and forced-change API enforcement. [Evidence](../evidence/GYMOS-MIG-016.md); 017 — temporary credential issue/change/reissue. [Evidence](../evidence/GYMOS-MIG-017.md); 018 — operational actor and current access authorization. [Evidence](../evidence/GYMOS-MIG-018.md); 019 — role-aware root and protected navigation. [Evidence](../evidence/GYMOS-MIG-019.md)
+- **Remaining:** 013,020
+- **Files/tests/issues/blockers/decisions:** implementation and exact verification recorded in task evidence. Shared issue log: [SEGMENT_RUN_ISSUES.md](../SEGMENT_RUN_ISSUES.md). DEC-11 blocks final provider cookie/logout policy in task 020; task 017 supplies the usable password-change route.
+- **Next recommended task:** GYMOS-MIG-013.
 

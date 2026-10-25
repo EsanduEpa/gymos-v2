@@ -2,7 +2,10 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
+  Get,
   Post,
+  Req,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
@@ -11,6 +14,7 @@ import { SignJWT } from 'jose';
 import { z } from 'zod';
 import { identityEmailSchema } from './identity/email.js';
 import { DatabaseService } from './database.service.js';
+import { identityFromAuthorization } from './auth-token.js';
 
 const loginInput = z.strictObject({
   email: identityEmailSchema,
@@ -35,10 +39,18 @@ export class AuthController {
       include: { gymAccesses: { include: { gym: true } } },
     });
 
-    const passwordMatches =
-      user && (await argon2.verify(user.passwordHash, parsed.data.password));
+    // Spend password-hash work for unknown email addresses too, so a fast
+    // missing-user path does not become an account-discovery oracle.
+    const passwordMatches = user
+      ? await argon2.verify(user.passwordHash, parsed.data.password)
+      : (await argon2.hash(parsed.data.password, { type: argon2.argon2id }), false);
 
-    if (!passwordMatches) {
+    const [{ now }] = await this.database.master.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS "now"`;
+    const credentialExpired = Boolean(user && (user.mustChangePassword
+      ? !user.credentialExpiresAt || user.credentialExpiresAt <= now
+      : user.credentialExpiresAt && user.credentialExpiresAt <= now));
+
+    if (!user || !passwordMatches || credentialExpired) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
@@ -47,7 +59,7 @@ export class AuthController {
       throw new Error('JWT_SECRET is missing or too short');
     }
 
-    const accessToken = await new SignJWT({})
+    const accessToken = await new SignJWT({ authVersion: user.authVersion })
       .setProtectedHeader({ alg: 'HS256' })
       .setSubject(user.id)
       .setIssuer('gymos-v2')
@@ -61,14 +73,40 @@ export class AuthController {
       tokenType: 'Bearer',
       expiresIn: 900,
       globalRole: user.globalRole,
+      mustChangePassword: user.mustChangePassword,
       gyms: user.gymAccesses
-        .filter((access) => access.gym.status === 'ACTIVE' && access.linkStatus === 'ACTIVE' && access.role === 'OWNER')
+        .filter((access) => access.gym.status === 'ACTIVE' && access.linkStatus === 'ACTIVE')
         .map((access) => ({
           id: access.gym.id,
           slug: access.gym.slug,
           name: access.gym.name,
           role: access.role,
         })),
+    };
+  }
+
+  @Get('session')
+  async session(@Req() request: { headers: { authorization?: string } }) {
+    const identity = await identityFromAuthorization(request.headers.authorization);
+    const user = await this.database.master.user.findUnique({
+      where: { id: identity.userId },
+      include: { gymAccesses: { include: { gym: true } } },
+    });
+    const [{ now }] = await this.database.master.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS "now"`;
+    if (!user || user.authVersion !== identity.authVersion
+      || (user.credentialExpiresAt !== null && user.credentialExpiresAt <= now)) {
+      throw new UnauthorizedException('Invalid or expired session');
+    }
+    if (user.mustChangePassword) {
+      throw new ForbiddenException('Password change required');
+    }
+
+    return {
+      globalRole: user.globalRole,
+      mustChangePassword: false,
+      gyms: user.gymAccesses
+        .filter((access) => access.gym.status === 'ACTIVE' && access.linkStatus === 'ACTIVE')
+        .map((access) => ({ id: access.gym.id, slug: access.gym.slug, name: access.gym.name, role: access.role })),
     };
   }
 }

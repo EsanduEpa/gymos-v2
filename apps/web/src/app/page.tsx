@@ -1,31 +1,32 @@
-import Link from 'next/link';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
+import { LoadingState } from '@/components/ui';
+import { gymRolePath, SESSION_COOKIE, type GymAccessSummary } from '@/lib/gymos';
+import { resolveCurrentSession } from '@/lib/navigation';
+
+async function HomeContent() {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token) redirect('/login');
+
+  let response: Response;
+  try {
+    response = await resolveCurrentSession(token);
+  } catch {
+    return <main className="page-loading">GymOS is temporarily unavailable. Please try again shortly.</main>;
+  }
+  if (response.status === 401) redirect('/login');
+  if (response.status === 403) redirect('/change-password');
+  if (!response.ok) return <main className="page-loading">Could not load your account right now.</main>;
+  const session = await response.json() as { globalRole: string; mustChangePassword: boolean; gyms: GymAccessSummary[] };
+  if (session.mustChangePassword) redirect('/change-password');
+  if (session.globalRole === 'SUPER_ADMIN') redirect('/admin');
+  if (session.gyms.length === 0) redirect('/no-access');
+  const firstGym = session.gyms[0];
+  if (session.gyms.length === 1 && firstGym) redirect(`/gyms/${encodeURIComponent(firstGym.slug)}/${firstGym.role === 'OWNER' ? 'owner' : gymRolePath(firstGym.role)}`);
+  redirect('/gyms/select');
+}
 
 export default function Home() {
-  return (
-    <main className="landing-shell">
-      <div className="landing-glow" />
-      <nav className="topbar">
-        <span className="brand-mark">G</span>
-        <span className="brand-name">GymOS</span>
-        <span className="topbar-spacer" />
-        <Link className="topbar-link" href="/login">Sign in</Link>
-      </nav>
-
-      <section className="hero">
-        <div className="eyebrow">THE NEW GYMOS</div>
-        <h1>One clear place to run your gym.</h1>
-        <p>
-          Give your gym its own look and space, welcome new members,
-          and keep everyone’s records organized.
-        </p>
-        <Link className="primary-button" href="/login">Open your workspace <span>→</span></Link>
-      </section>
-
-      <section className="landing-features" aria-label="Platform foundations">
-        <article><span>01</span><h2>Your own space</h2><p>Each gym has its own identity and member records.</p></article>
-        <article><span>02</span><h2>Simple to start</h2><p>Owners can sign in and add their first members.</p></article>
-        <article><span>03</span><h2>Ready to grow</h2><p>A clear foundation for the tools your team will need next.</p></article>
-      </section>
-    </main>
-  );
+  return <Suspense fallback={<LoadingState label="Loading your workspace…" page />}><HomeContent /></Suspense>;
 }

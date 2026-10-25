@@ -59,11 +59,15 @@ async function stop(processState: ProcessState | undefined): Promise<void> {
   if (processState.child.exitCode === null) processState.child.kill('SIGKILL');
 }
 
-async function login(page: Page, email: string): Promise<void> {
+async function loginWithPassword(page: Page, email: string, password: string): Promise<void> {
   await page.goto(`${webBase}/login`);
   await page.getByLabel('Email address').fill(email);
-  await page.getByLabel('Password').fill(fixture.password);
+  await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
+}
+
+async function login(page: Page, email: string): Promise<void> {
+  await loginWithPassword(page, email, fixture.password);
 }
 
 async function openGymWithTestSession(page: Page, userId: string, slug: string): Promise<void> {
@@ -71,6 +75,7 @@ async function openGymWithTestSession(page: Page, userId: string, slug: string):
   const header = Buffer.from(JSON.stringify({ alg: 'HS256' })).toString('base64url');
   const payload = Buffer.from(JSON.stringify({
     sub: userId,
+    authVersion: (await fixture.master.user.findUniqueOrThrow({ where: { id: userId }, select: { authVersion: true } })).authVersion,
     iss: 'gymos-v2',
     aud: 'gymos-api',
     iat: issuedAt,
@@ -226,8 +231,44 @@ test('real browser and HTTP requests preserve two-gym isolation and pure reads',
   expect(await fixture.tenants[0].$transaction([fixture.tenants[0].member.count(), fixture.tenants[0].trainer.count(), fixture.tenants[0].auditLog.count()])).toEqual(alphaBefore);
   expect(await fixture.tenants[1].$transaction([fixture.tenants[1].member.count(), fixture.tenants[1].trainer.count(), fixture.tenants[1].auditLog.count()])).toEqual(betaBefore);
 
+  const forcedBefore = await fixture.master.user.findUniqueOrThrow({ where: { id: fixture.users.forcedUser.id }, select: { passwordHash: true } });
+  await login(page, fixture.users.forcedUser.email);
+  await expect(page).toHaveURL(/\/change-password$/);
+  const restrictedCookie = (await page.context().cookies()).find((cookie) => cookie.name === 'gymos_access_token');
+  expect(restrictedCookie?.httpOnly).toBe(true);
+  expect(await page.evaluate(() => document.cookie)).not.toContain('gymos_access_token');
+  const wrongCurrentPassword = await request.post(`${apiBase}/auth/change-password`, {
+    headers: { authorization: `Bearer ${restrictedCookie?.value}` },
+    data: { currentPassword: 'wrong-current-password', newPassword: 'GymOS-New-Password-42', confirmPassword: 'GymOS-New-Password-42' },
+  });
+  expect(wrongCurrentPassword.status()).toBe(400);
+  expect((await request.get(`${apiBase}/gyms/${fixture.gyms[0].slug}/access`, {
+    headers: { authorization: `Bearer ${restrictedCookie?.value}` },
+  })).status()).toBe(403);
+  const newPassword = 'GymOS-New-Password-42';
+  await page.getByLabel('Temporary password').fill(fixture.password);
+  await page.locator('#newPassword').fill(newPassword);
+  await page.getByLabel('Confirm new password').fill(newPassword);
+  await page.getByRole('button', { name: 'Update password' }).click();
+  await expect(page.locator('.ui-feedback-success')).toContainText('Password updated');
+  const forcedAfter = await fixture.master.user.findUniqueOrThrow({ where: { id: fixture.users.forcedUser.id } });
+  expect(forcedAfter.mustChangePassword).toBe(false);
+  expect(forcedAfter.credentialExpiresAt).toBeNull();
+  expect(forcedAfter.authVersion).toBe(1);
+  expect(forcedAfter.passwordHash).not.toBe(forcedBefore.passwordHash);
+  expect((await request.get(`${apiBase}/gyms/${fixture.gyms[0].slug}/access`, {
+    headers: { authorization: `Bearer ${restrictedCookie?.value}` },
+  })).status()).toBe(401);
+  expect((await page.context().cookies()).some((cookie) => cookie.name === 'gymos_access_token')).toBe(true);
+  await page.getByRole('button', { name: 'Continue to sign in' }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  expect((await page.context().cookies()).some((cookie) => cookie.name === 'gymos_access_token')).toBe(false);
+  await loginWithPassword(page, fixture.users.forcedUser.email, newPassword);
+  await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/owner$`));
+  await page.context().clearCookies();
+
   await login(page, fixture.users.ownerA.email);
-  await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}$`));
+  await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/owner$`));
   await expect(page.getByRole('heading', { name: 'Test Gym Alpha' })).toBeVisible();
   await expect(page.locator('.count-badge')).toHaveText('100');
   await expect(page.locator('.gym-dashboard')).toHaveCSS('--gym-color', '#0F766E');
@@ -237,19 +278,18 @@ test('real browser and HTTP requests preserve two-gym isolation and pure reads',
   await expect(page.getByRole('status')).toContainText('Member added');
   await expect(page.getByText('Browser Added Member')).toBeVisible();
 
-  const ownerLogin = await request.post(`${apiBase}/auth/login`, { data: { email: fixture.users.ownerA.email, password: fixture.password } });
-  expect(ownerLogin.ok()).toBeTruthy();
-  const ownerToken = (await ownerLogin.json()).accessToken as string;
+  const ownerCookie = (await page.context().cookies()).find((cookie) => cookie.name === 'gymos_access_token');
+  expect(ownerCookie?.httpOnly).toBe(true);
+  const ownerToken = ownerCookie?.value;
   expect((await request.get(`${apiBase}/gyms/${fixture.gyms[1].slug}/members`, { headers: { authorization: `Bearer ${ownerToken}` } })).status()).toBe(403);
   await page.goto(`${webBase}/gyms/${fixture.gyms[1].slug}`);
   await expect(page.getByText('This page could not be found')).toBeVisible();
 
-  await page.context().clearCookies();
-  await login(page, fixture.users.trainerUser.email);
-  await expect(page).toHaveURL(/\/login\?error=access$/);
-  await expect(page.locator('.ui-feedback[role="alert"]')).toContainText('does not have access');
   const trainerLogin = await request.post(`${apiBase}/auth/login`, { data: { email: fixture.users.trainerUser.email, password: fixture.password } });
-  const trainerToken = (await trainerLogin.json()).accessToken as string;
+  expect(trainerLogin.ok()).toBeTruthy();
+  const trainerResult = await trainerLogin.json();
+  expect(trainerResult.gyms).toContainEqual(expect.objectContaining({ role: 'TRAINER' }));
+  const trainerToken = trainerResult.accessToken as string;
   expect((await request.get(`${apiBase}/gyms/${fixture.gyms[0].slug}/members`, { headers: { authorization: `Bearer ${trainerToken}` } })).status()).toBe(403);
 
   await page.context().clearCookies();
@@ -262,7 +302,7 @@ test('real browser and HTTP requests preserve two-gym isolation and pure reads',
   expect(await fixture.tenants[1].member.count()).toBe(fixture.expected.betaMembers);
   expect(await fixture.master.gymAccess.count({ where: { userId: fixture.users.multiOwner.id, linkStatus: 'ACTIVE' } })).toBe(2);
   expect(await fixture.master.gymAccess.count({ where: { userId: fixture.users.pendingUser.id, linkStatus: 'PENDING' } })).toBe(1);
-  expect((await fixture.master.user.findUniqueOrThrow({ where: { id: fixture.users.forcedUser.id } })).mustChangePassword).toBe(true);
+  expect((await fixture.master.user.findUniqueOrThrow({ where: { id: fixture.users.forcedUser.id } })).mustChangePassword).toBe(false);
   expect(await fixture.master.gymAccess.count({ where: { userId: fixture.users.inactiveUser.id, linkStatus: 'REVOKED' } })).toBe(1);
   const mismatchedAccess = await fixture.master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: fixture.users.mismatchUser.id, gymId: fixture.gyms[0].id } } });
   const mismatchedActor = await fixture.tenants[0].member.findUniqueOrThrow({ where: { id: mismatchedAccess.tenantActorId! } });

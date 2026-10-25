@@ -1,24 +1,11 @@
-import type { CSSProperties } from 'react';
-import { Suspense } from 'react';
-import Link from 'next/link';
 import { cookies } from 'next/headers';
+import { Suspense } from 'react';
 import { notFound, redirect } from 'next/navigation';
-import { resolveGymBrandColors } from '@gymos/theme-tokens';
-import { createMember, signOut } from '../../actions';
-import { apiUrl, type GymTheme, type Member, SESSION_COOKIE } from '@/lib/gymos';
-import { Button, Card, CardHeader, EmptyState, Feedback, Field, LoadingState, StatusBadge } from '@/components/ui';
+import { apiUrl, gymRolePath, SESSION_COOKIE } from '@/lib/gymos';
+import { OwnerGymPage } from '@/components/navigation/owner-gym-page';
+import { LoadingState } from '@/components/ui';
 
-const messages: Record<string, string> = {
-  'member-input': 'Enter a member name and a valid email address.',
-  duplicate: 'A member with that email already exists in this gym.',
-  forbidden: 'Your account cannot add members to this gym.',
-  unavailable: 'Could not reach the API. Please try again.',
-};
-
-async function GymContent({
-  params,
-  searchParams,
-}: {
+async function GymPageContent({ params, searchParams }: {
   params: Promise<{ slug: string }>;
   searchParams: Promise<{ error?: string; created?: string }>;
 }) {
@@ -26,94 +13,29 @@ async function GymContent({
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) notFound();
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) redirect('/login');
-
-  let themeResponse: Response;
-  let accessResponse: Response;
-  let membersResponse: Response;
+  let response: Response;
   try {
-    [themeResponse, accessResponse, membersResponse] = await Promise.all([
-      fetch(apiUrl(`/gyms/${slug}/theme`), { cache: 'no-store' }),
-      fetch(apiUrl(`/gyms/${slug}/access`), {
-        headers: { authorization: `Bearer ${token}` }, cache: 'no-store',
-      }),
-      fetch(apiUrl(`/gyms/${slug}/members`), {
-        headers: { authorization: `Bearer ${token}` }, cache: 'no-store',
-      }),
-    ]);
+    response = await fetch(apiUrl(`/gyms/${slug}/access`), {
+      headers: { authorization: `Bearer ${token}` }, cache: 'no-store',
+    });
   } catch {
-    return <LoadingState label="The API is unavailable. Please try again shortly." page />;
+    return <main className="page-loading">The API is unavailable. Please try again shortly.</main>;
   }
-
-  if (accessResponse.status === 401 || membersResponse.status === 401) redirect('/login');
-  if (themeResponse.status === 404 || accessResponse.status === 403) notFound();
-  if (!themeResponse.ok || !accessResponse.ok || !membersResponse.ok) {
-    return <main className="page-loading">Could not load this gym right now.</main>;
+  if (response.status === 401) redirect('/login');
+  if (response.status === 403 || response.status === 404) notFound();
+  if (!response.ok) return <main className="page-loading">Could not load this gym right now.</main>;
+  const access = await response.json() as { role: string; slug: string };
+  if (access.slug !== slug) notFound();
+  if (access.role !== 'OWNER') {
+    if (access.role !== 'TRAINER' && access.role !== 'MEMBER') notFound();
+    redirect(`/gyms/${encodeURIComponent(slug)}/${gymRolePath(access.role)}`);
   }
-
-  const theme = (await themeResponse.json()) as GymTheme;
-  const access = (await accessResponse.json()) as { role: string };
-  const members = (await membersResponse.json()) as Member[];
-  const { error, created } = await searchParams;
-  const brand = resolveGymBrandColors(theme.theme.primaryColor);
-  const style = {
-    '--gym-color': brand.primary,
-    '--gym-on-color': brand.onPrimary,
-  } as CSSProperties;
-  const createMemberForGym = createMember.bind(null, slug);
-
-  return (
-    <main className="dashboard-shell gym-dashboard" style={style}>
-      <header className="dashboard-header">
-        <Link href="/" className="brand-lockup"><span className="brand-mark">G</span> GymOS</Link>
-        <span className="header-label">{theme.name}</span>
-        <form action={signOut}><Button variant="secondary" type="submit">Sign out</Button></form>
-      </header>
-      <div className="dashboard-content">
-        <div className="gym-banner">
-          <div className="gym-logo">
-            {theme.theme.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={theme.theme.logoUrl} alt={`${theme.name} logo`} />
-            ) : theme.name.slice(0, 1).toUpperCase()}
-          </div>
-          <div><span className="eyebrow">YOUR GYM WORKSPACE</span><h1>{theme.name}</h1><p>Members, all in one place.</p></div>
-          <span className="role-pill">{access.role}</span>
-        </div>
-        {created ? <Feedback tone="success">Member added to {theme.name}.</Feedback> : null}
-        {error && messages[error] ? <Feedback tone="error">{messages[error]}</Feedback> : null}
-        <div className="dashboard-grid">
-          <Card>
-            <CardHeader eyebrow="MEMBERSHIP" title="Members" action={<span className="count-badge">{members.length}</span>} />
-            {members.length === 0 ? <EmptyState title="No members yet." hint="Add the first member to this gym." /> : (
-              <div className="member-list">
-                {members.map((member) => <div className="member-row" key={member.id}>
-                  <span className="member-avatar">{member.fullName.slice(0, 1).toUpperCase()}</span>
-                  <div><strong>{member.fullName}</strong><small>{member.email ?? 'No email added'}</small></div>
-                  <StatusBadge status={member.status} className="member-status" />
-                </div>)}
-              </div>
-            )}
-          </Card>
-          {access.role === 'OWNER' ? <Card>
-            <CardHeader eyebrow="GROW YOUR COMMUNITY" title="Add a member" action={<span className="panel-icon">＋</span>} />
-            <form action={createMemberForGym} className="stack-form">
-              <Field label="Full name" name="fullName" placeholder="Alex Morgan" minLength={2} maxLength={120} required />
-              <Field label="Email address" optional type="email" name="email" placeholder="alex@example.com" />
-              <Button className="gym-button" fullWidth type="submit">Add member <span>→</span></Button>
-            </form>
-          </Card> : null}
-        </div>
-      </div>
-    </main>
-  );
+  return <OwnerGymPage params={Promise.resolve({ slug })} searchParams={searchParams} />;
 }
 
-export default function GymPage({
-  params,
-  searchParams,
-}: {
+export default function GymPage({ params, searchParams }: {
   params: Promise<{ slug: string }>;
   searchParams: Promise<{ error?: string; created?: string }>;
 }) {
-  return <Suspense fallback={<LoadingState label="Loading gym…" page />}><GymContent params={params} searchParams={searchParams} /></Suspense>;
+  return <Suspense fallback={<LoadingState label="Loading gym…" page />}><GymPageContent params={params} searchParams={searchParams} /></Suspense>;
 }

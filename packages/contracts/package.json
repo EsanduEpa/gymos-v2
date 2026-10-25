@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
-    "./legacy": { "types": "./dist/legacy.d.ts", "import": "./dist/legacy.js" }
+    "./legacy": { "types": "./dist/legacy.d.ts", "import": "./dist/legacy.js" },
+    "./credentials": { "types": "./dist/credentials.d.ts", "import": "./dist/credentials.js" }
   },
   "files": ["dist"],
   "scripts": {

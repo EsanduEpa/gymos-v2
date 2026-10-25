@@ -13,6 +13,7 @@ export const legacyLoginSchema = z.strictObject({
   tokenType: z.literal('Bearer'),
   expiresIn: z.number().int().positive(),
   globalRole: globalRoleSchema,
+  mustChangePassword: z.boolean(),
   gyms: z.array(z.strictObject({ id: idSchema, slug: legacyGymSlugSchema, name: z.string(), role: gymRoleSchema })),
 });
 export const legacyGymSchema = z.strictObject({

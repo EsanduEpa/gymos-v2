@@ -11,6 +11,7 @@ import {
   Patch,
   Post,
   Req,
+  ServiceUnavailableException,
   UseGuards,
 } from '@nestjs/common';
 import { z } from 'zod';
@@ -44,6 +45,32 @@ export class GymsController {
     private readonly database: DatabaseService,
     private readonly tenantGate: TenantSchemaGateService,
   ) {}
+
+  private async assertCurrentOwnerAccess(access: NonNullable<GymRequest['gymAccess']>): Promise<void> {
+    let user;
+    let gymAccess;
+    let gym;
+    let now: Date;
+    try {
+      [user, gymAccess, gym] = await Promise.all([
+        this.database.master.user.findUnique({ where: { id: access.identityId },
+          select: { authVersion: true, mustChangePassword: true, credentialExpiresAt: true } }),
+        this.database.master.gymAccess.findUnique({ where: { userId_gymId: { userId: access.identityId, gymId: access.gymId } },
+          select: { role: true, linkStatus: true, version: true } }),
+        this.database.master.gym.findUnique({ where: { id: access.gymId }, select: { status: true } }),
+      ]);
+      const [clock] = await this.database.master.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS "now"`;
+      now = clock.now;
+    } catch {
+      throw new ServiceUnavailableException('Gym authorization is temporarily unavailable');
+    }
+    if (!user || user.authVersion !== access.identityVersion || user.mustChangePassword
+      || (user.credentialExpiresAt !== null && user.credentialExpiresAt <= now)
+      || gymAccess?.role !== 'OWNER' || gymAccess.linkStatus !== 'ACTIVE' || gymAccess.version !== access.accessVersion
+      || gym?.status !== 'ACTIVE') {
+      throw new ForbiddenException('Gym access changed; retry with current access');
+    }
+  }
 
   @Get(':slug/theme')
   async theme(@Param('slug') slug: string) {
@@ -110,7 +137,9 @@ export class GymsController {
       throw new InternalServerErrorException('Gym context missing');
     }
 
-    if (access.role !== 'OWNER' && access.role !== 'TRAINER') {
+    // This surface is the owner's BASIC contact/history projection. Trainers
+    // receive only relationship-scoped client endpoints when those exist.
+    if (access.role !== 'OWNER') {
       throw new ForbiddenException('Member list access denied');
     }
 
@@ -145,15 +174,18 @@ export class GymsController {
 
     try {
       return await this.tenantGate.withVerifiedTenant(access, (tenant) =>
-        tenant.member.create({
-          data: parsed.data,
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-            status: true,
-            createdAt: true,
-          },
+        tenant.$transaction(async (tx) => {
+          await this.assertCurrentOwnerAccess(access);
+          return tx.member.create({
+            data: parsed.data,
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              status: true,
+              createdAt: true,
+            },
+          });
         }));
     } catch (error) {
       if (

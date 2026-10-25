@@ -7,6 +7,7 @@ import {
   moneySchema, pageQuerySchema, pageSchema, readSchema, signedMoneySchema,
 } from '../dist/index.js';
 import { existingEndpointContracts } from '../dist/legacy.js';
+import { changePasswordInputSchema, credentialAcknowledgementInputSchema, credentialAcknowledgementResultSchema, credentialIssueInputSchema, credentialReissueInputSchema, credentialReissueResultSchema } from '../dist/credentials.js';
 
 const asOf = '2026-10-23T00:00:00.000Z';
 const identity = {
@@ -18,7 +19,7 @@ const theme = { primaryColor: '#123456', logoUrl: 'https://example.test/logo.svg
 const member = { id: 'member-1', fullName: 'Synthetic Member', email: null, status: 'ACTIVE' };
 const fixtures = {
   E01: { accessToken: 'fixture-only-token', tokenType: 'Bearer', expiresIn: 900,
-    globalRole: 'USER', gyms: [{ id: gym.id, name: gym.name, slug: gym.slug, role: 'OWNER' }] },
+    globalRole: 'USER', mustChangePassword: false, gyms: [{ id: gym.id, name: gym.name, slug: gym.slug, role: 'OWNER' }] },
   E02: [gym], E03: gym, E04: { slug: gym.slug, name: gym.name, theme },
   E05: { slug: gym.slug, theme }, E06: { gymId: gym.id, slug: gym.slug, role: 'OWNER' },
   E07: [member], E08: { ...member, createdAt: asOf },
@@ -107,4 +108,27 @@ test('idempotency keys implement the approved16–128 printable nonwhitespace AS
   for (const key of ['short', 'x'.repeat(129), 'intent-0123456789\n', 'intent-0123456789 space', 'é'.repeat(16)]) {
     assert.equal(idempotencyKeySchema.safeParse(key).success, false);
   }
+});
+
+test('credential contracts enforce password policy and one-time reissue envelopes', () => {
+  const validChange = { currentPassword: 'Temporary-42', newPassword: 'New-password-42', confirmPassword: 'New-password-42' };
+  assert.deepEqual(changePasswordInputSchema.parse(validChange), validChange);
+  for (const invalid of [
+    { ...validChange, newPassword: 'LettersOnlyPassword', confirmPassword: 'LettersOnlyPassword' },
+    { ...validChange, newPassword: 'ÉléphantOnly', confirmPassword: 'ÉléphantOnly' },
+    { ...validChange, newPassword: ' New-password-42', confirmPassword: ' New-password-42' },
+    { ...validChange, newPassword: validChange.currentPassword, confirmPassword: validChange.currentPassword },
+    { ...validChange, extra: 'ignored fields are forbidden' },
+  ]) assert.equal(changePasswordInputSchema.safeParse(invalid).success, false);
+  const request = { reason: 'LOST_HANDOFF', expectedVersion: 0, idempotencyKey: 'request-0123456789' };
+  assert.deepEqual(credentialIssueInputSchema.parse({}), {});
+  assert.equal(credentialIssueInputSchema.safeParse({ identityId: 'must-be-derived-from-operation' }).success, false);
+  assert.deepEqual(credentialReissueInputSchema.parse(request), request);
+  assert.equal(credentialReissueInputSchema.safeParse({ ...request, idempotencyKey: 'short' }).success, false);
+  assert.equal(credentialReissueResultSchema.safeParse({ status: 'ALREADY_ISSUED', deliveryVersion: 1 }).success, true);
+  assert.equal(credentialReissueResultSchema.safeParse({ status: 'ISSUED', deliveryVersion: 1, temporaryPassword: 'one-time' }).success, true);
+  assert.equal(credentialReissueResultSchema.safeParse({ status: 'ISSUED', deliveryVersion: 1, passwordHash: 'private' }).success, false);
+  assert.deepEqual(credentialAcknowledgementInputSchema.parse({ deliveryVersion: 1 }), { deliveryVersion: 1 });
+  assert.equal(credentialAcknowledgementInputSchema.safeParse({ deliveryVersion: -1 }).success, false);
+  assert.deepEqual(credentialAcknowledgementResultSchema.parse({ status: 'ACKNOWLEDGED', deliveryVersion: 1 }), { status: 'ACKNOWLEDGED', deliveryVersion: 1 });
 });

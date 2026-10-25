@@ -10,10 +10,13 @@ import { SignJWT } from 'jose';
 import { PrismaClient as MasterClient } from '../../src/generated/master/client.js';
 import { PrismaClient as TenantClient } from '../../src/generated/tenant/client.js';
 import { IdentityFoundationService } from '../../src/identity/identity.service.js';
+import { CredentialService } from '../../src/identity/credential.service.js';
 import { normalizeIdentityEmail } from '../../src/identity/email.js';
 import { isOperationalActor } from '../../src/identity/publication-policy.js';
 import { GymAccessGuard, type GymRequest } from '../../src/gym-access.guard.js';
+import type { TenantSchemaGateService } from '../../src/tenancy/tenant-schema-gate.service.js';
 import { AuthController } from '../../src/auth.controller.js';
+import { SuperAdminGuard } from '../../src/super-admin.guard.js';
 import type { DatabaseService } from '../../src/database.service.js';
 import { assertOwnedTarget, createDisposablePostgresRun } from '../support/disposable-postgres.js';
 
@@ -217,14 +220,15 @@ it('retains login response compatibility and safe owner access while pending/unv
   await master.gymAccess.create({ data: { userId: user.id, gymId: gym.id, role: 'OWNER', linkStatus: 'ACTIVE' } });
   const database = { master } as DatabaseService;
   const result = await new AuthController(database).login({ email: ' LOGIN@Example.TEST ', password });
-  expect(Object.keys(result).sort()).toEqual(['accessToken', 'tokenType', 'expiresIn', 'globalRole', 'gyms'].sort());
+  expect(Object.keys(result).sort()).toEqual(['accessToken', 'tokenType', 'expiresIn', 'globalRole', 'mustChangePassword', 'gyms'].sort());
   expect(result.expiresIn).toBe(900);
+  expect(result.mustChangePassword).toBe(false);
   expect(result.gyms).toHaveLength(1);
   expect(JSON.stringify(result)).not.toContain(passwordHash);
   await expect(new AuthController(database).login({ email: 'login@example.test', password: 'wrong' })).rejects.toThrow('Invalid email or password');
-  const guard = new GymAccessGuard(database);
-  const requestFor = async (identityId: string, slug: string) => {
-    const token = await new SignJWT({}).setProtectedHeader({ alg: 'HS256' }).setSubject(identityId)
+  const guard = new GymAccessGuard(database, {} as TenantSchemaGateService);
+  const requestFor = async (identityId: string, slug: string, authVersion = 0) => {
+    const token = await new SignJWT({ authVersion }).setProtectedHeader({ alg: 'HS256' }).setSubject(identityId)
       .setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('15m').sign(new TextEncoder().encode(tokenSecret));
     const request = { headers: { authorization: `Bearer ${token}` }, params: { slug } } as unknown as GymRequest;
     const context = { switchToHttp: () => ({ getRequest: () => request }) } as ExecutionContext;
@@ -235,6 +239,30 @@ it('retains login response compatibility and safe owner access while pending/unv
   await expect(requestFor(user.id, gym.slug)).rejects.toThrow('Gym access denied');
   await expect(requestFor(user.id, 'foreign-gym')).rejects.toThrow('Gym access denied');
   expect((await new AuthController(database).login({ email: 'login@example.test', password })).gyms).toHaveLength(0);
+
+  const forced = await fixtureIdentity('forced-login@example.test');
+  await master.user.update({ where: { id: forced.id }, data: {
+    mustChangePassword: true,
+    credentialExpiresAt: new Date(Date.now() + 60 * 60_000),
+  } });
+  await master.gymAccess.create({ data: { userId: forced.id, gymId: gym.id, role: 'OWNER', linkStatus: 'ACTIVE' } });
+  const restricted = await new AuthController(database).login({ email: 'forced-login@example.test', password });
+  expect(restricted.mustChangePassword).toBe(true);
+  await expect(requestFor(forced.id, gym.slug)).rejects.toThrow('Password change required');
+  const adminRequest = { headers: { authorization: `Bearer ${restricted.accessToken}` } };
+  const adminContext = { switchToHttp: () => ({ getRequest: () => adminRequest }) } as ExecutionContext;
+  await expect(new SuperAdminGuard(database).canActivate(adminContext)).rejects.toThrow('Password change required');
+  await master.user.update({ where: { id: user.id }, data: { authVersion: { increment: 1 } } });
+  await expect(requestFor(user.id, gym.slug, 0)).rejects.toThrow('Invalid or revoked token');
+
+  const expired = await fixtureIdentity('expired-login@example.test');
+  await master.user.update({ where: { id: expired.id }, data: { credentialExpiresAt: new Date(0) } });
+  await expect(new AuthController(database).login({ email: 'expired-login@example.test', password }))
+    .rejects.toThrow('Invalid email or password');
+  const missingExpiry = await fixtureIdentity('missing-expiry@example.test');
+  await master.user.update({ where: { id: missingExpiry.id }, data: { mustChangePassword: true } });
+  await expect(new AuthController(database).login({ email: 'missing-expiry@example.test', password }))
+    .rejects.toThrow('Invalid email or password');
 });
 
 
@@ -258,4 +286,123 @@ it('CLI identity writers share canonicalization and preserve explicit ACTIVE own
     await expect(client.query('INSERT INTO "GymAccess"("userId","gymId",role,"linkStatus","tenantActorId","enrollmentOperationId") VALUES ($1,$2,$3,$4,$5,$6)',
       [admin.id, gym.id, 'MEMBER', 'ACTIVE', 'actor', 'operation'])).rejects.toMatchObject({ code: '23514' });
   } finally { await client.end(); }
+});
+
+it('issues a one-time credential, rotates it once, and atomically changes it without storing plaintext', async () => {
+  const owner = await fixtureIdentity('credential-owner@example.test');
+  const subject = await fixtureIdentity('credential-new-member@example.test');
+  const gym = await master.gym.findFirstOrThrow({ where: { databaseName: run.tenantNames[0], status: 'ACTIVE' } });
+  await master.gymAccess.create({ data: { userId: owner.id, gymId: gym.id, role: 'OWNER', linkStatus: 'ACTIVE' } });
+  const operationId = `register_${randomBytes(8).toString('hex')}`;
+  const member = await tenants[0].member.create({ data: {
+    fullName: 'Synthetic New Member', identityId: subject.id, registrationState: 'COMPLETE', enrollmentOperationId: operationId,
+  } });
+  await master.operation.create({ data: {
+    id: operationId, kind: 'REGISTER_MEMBER', actorIdentityId: owner.id, scopeKey: `gym:${gym.id}`,
+    idempotencyKey: `credential-${randomBytes(8).toString('hex')}`, requestDigest: `d1:${'a'.repeat(64)}`,
+    gymId: gym.id, subjectIdentityId: subject.id, tenantActorId: member.id, state: 'COMPLETE',
+    step: 'MASTER_ACTIVATED', safeResult: { operationId, identityId: subject.id, memberId: member.id },
+  } });
+  await master.gymAccess.create({ data: {
+    userId: subject.id, gymId: gym.id, role: 'MEMBER', linkStatus: 'ACTIVE', actorKind: 'MEMBER',
+    tenantActorId: member.id, enrollmentOperationId: operationId,
+  } });
+
+  const database = { master } as DatabaseService;
+  const credentials = new CredentialService(database);
+  const secondOwner = await fixtureIdentity('credential-second-owner@example.test');
+  await master.gymAccess.create({ data: { userId: secondOwner.id, gymId: gym.id, role: 'OWNER', linkStatus: 'ACTIVE' } });
+  const otherGym = await master.gym.findFirstOrThrow({ where: { databaseName: run.tenantNames[1], status: 'ACTIVE' } });
+  await expect(credentials.issueTemporaryCredential({ actorIdentityId: owner.id, gymId: otherGym.id, operationId }))
+    .rejects.toThrow('Credential operation unavailable');
+  const first = await credentials.issueTemporaryCredential({ actorIdentityId: owner.id, gymId: gym.id, operationId });
+  expect(first.status).toBe('ISSUED');
+  if (!first.temporaryPassword) throw new Error('Expected one-time temporary credential');
+  const firstSecret = first.temporaryPassword;
+  expect((await credentials.issueTemporaryCredential({ actorIdentityId: owner.id, gymId: gym.id, operationId })))
+    .toEqual({ status: 'ALREADY_ISSUED', deliveryVersion: 0 });
+  const issuedHash = (await master.user.findUniqueOrThrow({ where: { id: subject.id } })).passwordHash;
+  expect(await argon2.verify(issuedHash, firstSecret)).toBe(true);
+  await expect(new AuthController(database).login({ email: 'credential-new-member@example.test', password: firstSecret }))
+    .resolves.toMatchObject({ mustChangePassword: true });
+  expect((await master.credentialDelivery.findUniqueOrThrow({ where: { operationId } })).authVersion).toBe(1);
+  expect(JSON.stringify(await master.operation.findUniqueOrThrow({ where: { id: operationId } }))).not.toContain(firstSecret);
+  expect(JSON.stringify(await master.platformAuditLog.findMany({ where: { operationId } }))).not.toContain(firstSecret);
+
+  const reissueInput = { actorIdentityId: secondOwner.id, gymId: gym.id, operationId, expectedVersion: 0,
+    idempotencyKey: 'lost-handoff-request-01', reason: 'LOST_HANDOFF' as const };
+  await expect(credentials.reissueForOperation({ ...reissueInput, reason: 'EXPIRED_CREDENTIAL', idempotencyKey: 'incorrect-reason-01' }))
+    .rejects.toThrow('Credential state does not match the requested reissue reason');
+  const reissued = await credentials.reissueForOperation(reissueInput);
+  expect(reissued.status).toBe('ISSUED');
+  if (!reissued.temporaryPassword) throw new Error('Expected rotated temporary credential');
+  const secondSecret = reissued.temporaryPassword;
+  expect(reissued.deliveryVersion).toBe(1);
+  expect(await argon2.verify((await master.user.findUniqueOrThrow({ where: { id: subject.id } })).passwordHash, firstSecret)).toBe(false);
+  expect(await argon2.verify((await master.user.findUniqueOrThrow({ where: { id: subject.id } })).passwordHash, secondSecret)).toBe(true);
+  await expect(new AuthController(database).login({ email: 'credential-new-member@example.test', password: firstSecret }))
+    .rejects.toThrow('Invalid email or password');
+  await expect(new AuthController(database).login({ email: 'credential-new-member@example.test', password: secondSecret }))
+    .resolves.toMatchObject({ mustChangePassword: true });
+  expect(await credentials.reissueForOperation(reissueInput)).toEqual({ status: 'ALREADY_ISSUED', deliveryVersion: 1 });
+  await expect(credentials.reissueForOperation({ ...reissueInput, idempotencyKey: 'another-reissue-key-02' }))
+    .rejects.toThrow('Credential delivery version changed');
+
+  await credentials.acknowledgeTemporaryCredential({ actorIdentityId: owner.id, gymId: gym.id, operationId, deliveryVersion: 1 });
+  await expect(credentials.reissueForOperation({ ...reissueInput, expectedVersion: 1, idempotencyKey: 'after-ack-request-03' }))
+    .rejects.toThrow('Credential handoff was already acknowledged');
+  await expect(credentials.changePassword({ identityId: subject.id, authVersion: 1, currentPassword: secondSecret,
+    newPassword: 'New-member-password-42' })).rejects.toThrow('Invalid or revoked token');
+  await credentials.changePassword({ identityId: subject.id, authVersion: 2, currentPassword: secondSecret,
+    newPassword: 'New-member-password-42' });
+  const changed = await master.user.findUniqueOrThrow({ where: { id: subject.id } });
+  expect(changed.mustChangePassword).toBe(false);
+  expect(changed.credentialExpiresAt).toBeNull();
+  expect(changed.authVersion).toBe(3);
+  expect(changed.passwordChangedAt).toBeInstanceOf(Date);
+  expect(await argon2.verify(changed.passwordHash, secondSecret)).toBe(false);
+  expect(await argon2.verify(changed.passwordHash, 'New-member-password-42')).toBe(true);
+
+  const reused = await master.user.findUniqueOrThrow({ where: { email: 'multi@example.test' } });
+  const reusedHash = reused.passwordHash;
+  const reusedOperationId = `reused_${randomBytes(8).toString('hex')}`;
+  await master.operation.create({ data: {
+    id: reusedOperationId, kind: 'REGISTER_MEMBER', actorIdentityId: owner.id, scopeKey: `gym:${gym.id}`,
+    idempotencyKey: `reused-${randomBytes(8).toString('hex')}`, requestDigest: `d1:${'b'.repeat(64)}`,
+    gymId: gym.id, subjectIdentityId: reused.id, state: 'COMPLETE', step: 'MASTER_ACTIVATED',
+    safeResult: { operationId: reusedOperationId, identityId: reused.id },
+  } });
+  await expect(credentials.issueTemporaryCredential({ actorIdentityId: owner.id, gymId: gym.id, operationId: reusedOperationId }))
+    .rejects.toThrow('Credential issue is limited to a new identity for this operation');
+  expect((await master.user.findUniqueOrThrow({ where: { id: reused.id } })).passwordHash).toBe(reusedHash);
+
+  const expiredSubject = await fixtureIdentity('credential-expired-member@example.test');
+  const expiredOperationId = `expired_${randomBytes(8).toString('hex')}`;
+  const expiredMember = await tenants[0].member.create({ data: {
+    fullName: 'Synthetic Expired Member', identityId: expiredSubject.id,
+    registrationState: 'COMPLETE', enrollmentOperationId: expiredOperationId,
+  } });
+  await master.operation.create({ data: {
+    id: expiredOperationId, kind: 'REGISTER_MEMBER', actorIdentityId: owner.id, scopeKey: `gym:${gym.id}`,
+    idempotencyKey: `expired-${randomBytes(8).toString('hex')}`, requestDigest: `d1:${'c'.repeat(64)}`,
+    gymId: gym.id, subjectIdentityId: expiredSubject.id, tenantActorId: expiredMember.id,
+    state: 'COMPLETE', step: 'MASTER_ACTIVATED', safeResult: { operationId: expiredOperationId, memberId: expiredMember.id },
+  } });
+  await master.gymAccess.create({ data: {
+    userId: expiredSubject.id, gymId: gym.id, role: 'MEMBER', linkStatus: 'ACTIVE', actorKind: 'MEMBER',
+    tenantActorId: expiredMember.id, enrollmentOperationId: expiredOperationId,
+  } });
+  const oldExpiry = new Date(Date.now() - 60 * 60_000);
+  await master.user.update({ where: { id: expiredSubject.id }, data: {
+    mustChangePassword: true, authVersion: 1, credentialExpiresAt: oldExpiry,
+  } });
+  await master.credentialDelivery.create({ data: {
+    operationId: expiredOperationId, identityId: expiredSubject.id, issuedByIdentityId: owner.id,
+    gymId: gym.id, authVersion: 1, issuedAt: new Date(oldExpiry.getTime() - 24 * 60 * 60_000), expiresAt: oldExpiry,
+  } });
+  const expiredRotation = await credentials.reissueForOperation({ actorIdentityId: owner.id, gymId: gym.id,
+    operationId: expiredOperationId, expectedVersion: 0, idempotencyKey: 'expired-credential-reissue-01', reason: 'EXPIRED_CREDENTIAL' });
+  expect(expiredRotation.status).toBe('ISSUED');
+  expect(expiredRotation.deliveryVersion).toBe(1);
+  expect(await argon2.verify((await master.user.findUniqueOrThrow({ where: { id: expiredSubject.id } })).passwordHash, password)).toBe(false);
 });

@@ -155,8 +155,9 @@ Stop if a task needs provider/owner authority, a named decision lacks approval, 
 - **Status:** IN PROGRESS / BLOCKED
 - **Completed IDs:** 001–007, 009, 011, 012, 014, 078, 080, 081, 086
 - **Remaining IDs:** 008, 010, 077, 079, 082, 083, 084, 085
-- **Files changed:** _fill during execution_
-- **Tests/results:** linked evidence for completed IDs; _append new exact results_
-- **Known issues:** task 008 hosted evidence absent; task 010 externally uncontained.
-- **Next recommended task:** GYMOS-MIG-077 while external task 010 proceeds independently.
+- **Files changed:** `docs/migration/evidence/GYMOS-MIG-008.md`; this segment progress record; `docs/migration/SEGMENT_RUN_ISSUES.md`.
+- **Tests/results:** GYMOS-MIG-008 local workspace, build, lint, type-check, unit, owned database, browser, and recovery verification recorded in linked evidence. Local checks passed at `6f3358c`; hosted checks and online lockfile audit remain unverified.
+- **Known issues:** task 008 hosted evidence absent because no Git remote is configured; pnpm audit endpoint was unreachable and an escalated attempt was rejected by automatic approval review due to dependency metadata egress. Task 010 remains externally uncontained.
+- **Run issue log:** `docs/migration/SEGMENT_RUN_ISSUES.md`.
+- **Next recommended task:** GYMOS-MIG-008 after a Git remote/hosted PR is available and the lockfile audit can be run through an authorized route; task 010 still requires provider owner action.
 

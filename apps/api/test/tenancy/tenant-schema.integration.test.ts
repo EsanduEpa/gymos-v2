@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { ConflictException, ServiceUnavailableException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, ServiceUnavailableException, type ExecutionContext } from '@nestjs/common';
+import { SignJWT } from 'jose';
 import { PrismaClient as MasterClient } from '../../src/generated/master/client.js';
 import { PrismaClient as TenantClient } from '../../src/generated/tenant/client.js';
 import type { DatabaseService } from '../../src/database.service.js';
 import { GymsController } from '../../src/gyms.controller.js';
-import type { GymRequest } from '../../src/gym-access.guard.js';
+import { GymAccessGuard, type GymRequest } from '../../src/gym-access.guard.js';
 import { OperationConflictError } from '../../src/operations/primitives.js';
 import type { TenantDatabaseService } from '../../src/tenant-database.service.js';
 import { TenantRegistryService } from '../../src/tenancy/tenant-registry.service.js';
@@ -23,6 +24,8 @@ let actorId = '';
 const gymIds: string[] = [];
 const operationIds: string[] = [];
 const digest = tenantManifestDigest();
+const guardJwtSecret = 'task018-test-secret-at-least-32-bytes-long';
+let previousJwtSecret: string | undefined;
 
 function tenantClient(url: string): TenantClient {
   return new TenantClient({ adapter: new PrismaPg({ connectionString: url, max: 2 }) });
@@ -100,6 +103,8 @@ function gateFor(entries = new Map(databaseNames.map((name, index) => [name, ten
 }
 
 beforeAll(async () => {
+  previousJwtSecret = process.env.JWT_SECRET;
+  process.env.JWT_SECRET = guardJwtSecret;
   run = await createDisposablePostgresRun();
   await run.migrate(run.masterName, 'master');
   for (let index = 0; index < 2; index++) {
@@ -120,6 +125,8 @@ beforeAll(async () => {
 afterAll(async () => {
   await Promise.all([master?.$disconnect(), ...tenants.map((client) => client.$disconnect())]);
   if (run) console.info('[task005-owned-run-cleanup]', JSON.stringify(await run.cleanup()));
+  if (previousJwtSecret === undefined) delete process.env.JWT_SECRET;
+  else process.env.JWT_SECRET = previousJwtSecret;
 }, 120_000);
 
 it('verifies two distinct physical bindings and permits domain work only for the matching tenant', async () => {
@@ -289,15 +296,127 @@ it('preserves domain errors after metadata verification', async () => {
   await expect(gateFor().withVerifiedTenant(await context(0), async () => { throw domainError; })).rejects.toBe(domainError);
 });
 
+it('publishes only active actors with matching completed Master operation, tenant receipt, and reciprocal tuple', async () => {
+  const owner = await master.user.findUniqueOrThrow({ where: { id: actorId } });
+  const gym = await master.gym.findUniqueOrThrow({ where: { id: gymIds[0] } });
+  await master.gymAccess.create({ data: { userId: owner.id, gymId: gym.id, role: 'OWNER', linkStatus: 'ACTIVE' } });
+
+  const memberIdentity = await master.user.create({ data: {
+    email: `guard-member-${run.runId}@example.test`, passwordHash: 'fixture-not-a-login-hash',
+  } });
+  const registrationOperationId = `register_member_${run.runId}`;
+  const member = await tenants[0].member.create({ data: {
+    fullName: 'Verified Tenant Member', identityId: memberIdentity.id,
+    registrationState: 'COMPLETE', enrollmentOperationId: registrationOperationId,
+  } });
+  const receiptId = `receipt_member_${run.runId}`;
+  await tenants[0].commandReceipt.create({ data: {
+    id: receiptId, actorIdentityId: owner.id, commandKind: 'REGISTER_MEMBER',
+    idempotencyKey: `register-${randomUUID()}`, requestDigest: `d1:${'d'.repeat(64)}`,
+    resourceType: 'MEMBER', resourceId: member.id, sourceMasterOperationId: registrationOperationId,
+    state: 'COMMITTED', safeResult: { memberId: member.id }, committedAt: new Date(),
+  } });
+  await master.operation.create({ data: {
+    id: registrationOperationId, kind: 'REGISTER_MEMBER', actorIdentityId: owner.id,
+    scopeKey: `gym:${gym.id}`, idempotencyKey: `register-${randomUUID()}`,
+    requestDigest: `d1:${'e'.repeat(64)}`, gymId: gym.id, subjectIdentityId: memberIdentity.id,
+    tenantActorId: member.id, tenantCommandReceiptId: receiptId,
+    state: 'COMPLETE', step: 'MASTER_ACTIVATED', safeResult: { operationId: registrationOperationId, memberId: member.id },
+  } });
+  const access = await master.gymAccess.create({ data: {
+    userId: memberIdentity.id, gymId: gym.id, role: 'MEMBER', linkStatus: 'ACTIVE',
+    actorKind: 'MEMBER', tenantActorId: member.id, enrollmentOperationId: registrationOperationId,
+  } });
+
+  const guard = new GymAccessGuard({ master } as DatabaseService, gateFor());
+  async function requestFor(identityId: string, slug = gym.slug) {
+    const token = await new SignJWT({ authVersion: 0 }).setProtectedHeader({ alg: 'HS256' })
+      .setSubject(identityId).setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('5m')
+      .sign(new TextEncoder().encode(guardJwtSecret));
+    const request = { headers: { authorization: `Bearer ${token}` }, params: { slug } } as unknown as GymRequest;
+    const execution = { switchToHttp: () => ({ getRequest: () => request }) } as ExecutionContext;
+    await guard.canActivate(execution);
+    return request;
+  }
+
+  const authorized = await requestFor(memberIdentity.id);
+  expect(authorized.gymAccess).toMatchObject({
+    identityId: memberIdentity.id, gymId: gym.id, role: 'MEMBER',
+    accessVersion: access.version, actor: { kind: 'MEMBER', id: member.id, registrationOperationId },
+  });
+  await expect(requestFor(memberIdentity.id, `foreign-${gym.slug}`)).rejects.toThrow('Gym access denied');
+
+  await master.gymAccess.update({ where: { userId_gymId: { userId: memberIdentity.id, gymId: gym.id } }, data: {
+    tenantActorId: `unrelated-${member.id}`,
+  } });
+  await expect(requestFor(memberIdentity.id)).rejects.toThrow('Gym access denied');
+  await master.gymAccess.update({ where: { userId_gymId: { userId: memberIdentity.id, gymId: gym.id } }, data: {
+    tenantActorId: member.id,
+  } });
+
+  const pendingIdentity = await master.user.create({ data: {
+    email: `guard-pending-${run.runId}@example.test`, passwordHash: 'fixture-not-a-login-hash',
+  } });
+  const pendingOperationId = `pending_member_${run.runId}`;
+  const pendingMember = await tenants[0].member.create({ data: {
+    fullName: 'Tenant Complete but Master Pending', identityId: pendingIdentity.id,
+    registrationState: 'COMPLETE', enrollmentOperationId: pendingOperationId,
+  } });
+  const pendingReceiptId = `receipt_pending_${run.runId}`;
+  await tenants[0].commandReceipt.create({ data: {
+    id: pendingReceiptId, actorIdentityId: owner.id, commandKind: 'REGISTER_MEMBER',
+    idempotencyKey: `pending-${randomUUID()}`, requestDigest: `d1:${'f'.repeat(64)}`,
+    resourceType: 'MEMBER', resourceId: pendingMember.id, sourceMasterOperationId: pendingOperationId,
+    state: 'COMMITTED', safeResult: { memberId: pendingMember.id }, committedAt: new Date(),
+  } });
+  await master.operation.create({ data: {
+    id: pendingOperationId, kind: 'REGISTER_MEMBER', actorIdentityId: owner.id,
+    scopeKey: `gym:${gym.id}`, idempotencyKey: `pending-${randomUUID()}`,
+    requestDigest: `d1:${'1'.repeat(64)}`, gymId: gym.id, subjectIdentityId: pendingIdentity.id,
+    tenantActorId: pendingMember.id, tenantCommandReceiptId: pendingReceiptId,
+    state: 'TENANT_COMMITTED', step: 'TENANT_REGISTRATION_COMMITTED',
+  } });
+  await master.gymAccess.create({ data: {
+    userId: pendingIdentity.id, gymId: gym.id, role: 'MEMBER', linkStatus: 'ACTIVE',
+    actorKind: 'MEMBER', tenantActorId: pendingMember.id, enrollmentOperationId: pendingOperationId,
+  } });
+  await expect(requestFor(pendingIdentity.id)).rejects.toThrow('Gym access denied');
+
+  const ownerRequest = await requestFor(owner.id);
+  const ownerAccess = await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: owner.id, gymId: gym.id } } });
+  const countBeforeRevocation = await tenants[0].member.count();
+  await master.gymAccess.update({ where: { userId_gymId: { userId: owner.id, gymId: gym.id } }, data: {
+    linkStatus: 'REVOKED', version: { increment: 1 },
+  } });
+  const memberController = new GymsController({ master } as DatabaseService, gateFor());
+  await expect(memberController.createMember({ gymAccess: ownerRequest.gymAccess } as GymRequest, {
+    fullName: 'Must not commit after revocation', email: `revoked-${run.runId}@example.test`,
+  })).rejects.toThrow('Gym access changed');
+  expect(await tenants[0].member.count()).toBe(countBeforeRevocation);
+  await master.gymAccess.update({ where: { userId_gymId: { userId: owner.id, gymId: gym.id } }, data: {
+    linkStatus: 'ACTIVE', version: { increment: 1 },
+  } });
+  expect(ownerAccess.linkStatus).toBe('ACTIVE');
+
+  const superAdmin = await master.user.create({ data: {
+    email: `guard-platform-admin-${run.runId}@example.test`, passwordHash: 'fixture-not-a-login-hash', globalRole: 'SUPER_ADMIN',
+  } });
+  await expect(requestFor(superAdmin.id)).rejects.toThrow('Gym access denied');
+});
+
 it('preserves member list/create behavior and maps duplicate email to a safe conflict', async () => {
-  const access = { ...(await context(0)), slug: `schema-0-${run.runId}`, role: 'OWNER' };
+  const ownerAccess = await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: actorId, gymId: gymIds[0] } } });
+  const access = { ...(await context(0)), slug: `schema-0-${run.runId}`, role: 'OWNER',
+    identityId: actorId, identityVersion: 0, accessVersion: ownerAccess.version, actor: null };
   const request = { gymAccess: access } as GymRequest;
   const controller = new GymsController({ master } as DatabaseService, gateFor());
   const rows = await controller.members(request);
-  expect(rows).toHaveLength(1);
+  expect(rows).toHaveLength(3);
   await expect(controller.createMember(request, { fullName: 'Duplicate member', email: 'a@example.test' }))
     .rejects.toBeInstanceOf(ConflictException);
-  expect(await tenants[0].member.count()).toBe(1);
+  expect(await tenants[0].member.count()).toBe(3);
+  expect(() => controller.members({ gymAccess: { ...access, role: 'TRAINER' } } as GymRequest))
+    .toThrow(ForbiddenException);
 });
 
 it('recovers a lost Master observation by rereading actual tenant evidence', async () => {

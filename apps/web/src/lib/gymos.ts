@@ -17,3 +17,20 @@ export type Member = {
   email: string | null;
   status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
 };
+
+export type GymRole = 'OWNER' | 'TRAINER' | 'MEMBER';
+
+export type GymAccessSummary = {
+  id: string;
+  slug: string;
+  name: string;
+  role: GymRole;
+};
+
+export function gymRolePath(role: GymRole): string {
+  return role === 'OWNER' ? 'owner' : role === 'TRAINER' ? 'trainer' : 'member';
+}
+
+export function gymRoleUrl(gym: Pick<GymAccessSummary, 'slug' | 'role'>): string {
+  return `/gyms/${encodeURIComponent(gym.slug)}/${gym.role === 'OWNER' ? 'owner' : gymRolePath(gym.role)}`;
+}

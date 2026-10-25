@@ -107,7 +107,7 @@ export async function seedTwoGymFixture(environment: Environment) {
           passwordHash,
           displayName: 'Forced Change Owner',
           mustChangePassword: true,
-          credentialExpiresAt: new Date('2026-10-25T06:00:00.000Z'),
+          credentialExpiresAt: new Date(Date.now() + 24 * 60 * 60_000),
           createdAt: fixedNow,
           updatedAt: fixedNow,
         },

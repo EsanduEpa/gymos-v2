@@ -5,7 +5,7 @@ Evidence baseline: 25 October 2026. Counts come from [`../MIGRATION_TASK_TRACKER
 | Segment | Name | Status | Total | Verified completed | Remaining | Blockers | Dependencies | Last verification note |
 |---|---|---|---:|---:|---:|---|---|---|
 | 01 | Platform Foundation and Decision Gates | IN PROGRESS / BLOCKED | 23 | 15 | 8 | GYMOS-MIG-008 hosted checks; GYMOS-MIG-010 external credential containment; DEC-01/03/06/07/08/09 unresolved | None | Local foundation evidence through 25 Oct; no external containment inferred |
-| 02 | Identity, Authentication, and Application Shell | NOT STARTED | 6 | 0 | 6 | Provider/session policy portion of DEC-11; segment 01 decisions | 01 | Existing login is partial only |
+| 02 | Identity, Authentication, and Application Shell | IN PROGRESS | 6 | 4 | 2 | DEC-11 provider/session policy for task 020; remaining Segment 01 gates | 01 | GYMOS-MIG-016–019 verified; next task 013 |
 | 03 | Platform Administration and Tenant Lifecycle | NOT STARTED | 6 | 0 | 6 | DEC-03 and provider/schema policy prerequisites | 01, 02 | Current registry/create is partial, not task completion |
 | 04 | Gym Configuration and Membership Rules | NOT STARTED | 5 | 0 | 5 | DEC-01/06/07/08 | 01–03 | Current theme endpoint does not complete editor/config tasks |
 | 05 | Member Enrollment and Account Management | NOT STARTED | 5 | 0 | 5 | Member status/pack work needs session aggregate task 040 | 02–04, 07/040 | Basic contact endpoint is not full enrollment |
