@@ -6,6 +6,7 @@ import {
   Get,
   Post,
   Req,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
@@ -85,6 +86,24 @@ export class AuthController {
     };
   }
 
+  @Post('logout')
+  async logout(@Req() request: { headers: { authorization?: string } }) {
+    const identity = await identityFromAuthorization(request.headers.authorization);
+    try {
+      // Version CAS makes concurrent logout requests rotate exactly once and
+      // prevents a stale request from revoking a later replacement session.
+      const revoked = await this.database.master.$transaction(async (tx) => tx.user.updateMany({
+        where: { id: identity.userId, authVersion: identity.authVersion },
+        data: { authVersion: { increment: 1 } },
+      }));
+      if (revoked.count !== 1) throw new UnauthorizedException('Invalid or expired session');
+      return { revoked: true };
+    } catch (error) {
+      if (error instanceof UnauthorizedException) throw error;
+      throw new ServiceUnavailableException('Session revocation could not be confirmed');
+    }
+  }
+
   @Get('session')
   async session(@Req() request: { headers: { authorization?: string } }) {
     const identity = await identityFromAuthorization(request.headers.authorization);
@@ -104,6 +123,8 @@ export class AuthController {
     return {
       globalRole: user.globalRole,
       mustChangePassword: false,
+      identityId: user.id,
+      displayName: user.displayName?.slice(0, 200) ?? null,
       gyms: user.gymAccesses
         .filter((access) => access.gym.status === 'ACTIVE' && access.linkStatus === 'ACTIVE')
         .map((access) => ({ id: access.gym.id, slug: access.gym.slug, name: access.gym.name, role: access.role })),

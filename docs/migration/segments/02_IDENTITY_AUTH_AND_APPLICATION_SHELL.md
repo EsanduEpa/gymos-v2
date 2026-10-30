@@ -128,6 +128,14 @@ Do not start feature pages before actor authorization works. Stop if DEC-11 is r
 - **Status:** IN PROGRESS
 - **Completed:** 016 — login session policy and forced-change API enforcement. [Evidence](../evidence/GYMOS-MIG-016.md); 017 — temporary credential issue/change/reissue. [Evidence](../evidence/GYMOS-MIG-017.md); 018 — operational actor and current access authorization. [Evidence](../evidence/GYMOS-MIG-018.md); 019 — role-aware root and protected navigation. [Evidence](../evidence/GYMOS-MIG-019.md)
 - **Remaining:** 013,020
-- **Files/tests/issues/blockers/decisions:** implementation and exact verification recorded in task evidence. Shared issue log: [SEGMENT_RUN_ISSUES.md](../SEGMENT_RUN_ISSUES.md). DEC-11 blocks final provider cookie/logout policy in task 020; task 017 supplies the usable password-change route.
-- **Next recommended task:** GYMOS-MIG-013.
+- **Files/tests/issues/blockers/decisions:** implementation and exact verification recorded in task evidence. Shared issue log: [SEGMENT_RUN_ISSUES.md](../SEGMENT_RUN_ISSUES.md). DEC-11 web-session portion was approved by the owner on 30 October 2026; provider/release scope remains open in 087. Tasks 013/020 are implemented and locally verified; hosted checks remain before completion.
+- **Next recommended task:** verify all 11 hosted checks on the separate Segment 02 PR, then reconcile completion/handoff.
 
+
+## 30 October 2026 continuation
+
+- Reconciled 016–019 against source/evidence and preserved their authentication/authorization. Task 013 was implemented first and passed owned role/drawer/switching checks before task 020 implementation.
+- Owner approved only the limited web-session portion of [DEC-11](../decisions/DEC-11.md). Provider/release choices remain in 087; no additional policy was inferred.
+- [013 evidence](../evidence/GYMOS-MIG-013.md), [020 evidence](../evidence/GYMOS-MIG-020.md), [configuration/manual checks](../runbooks/web-sessions.md).
+- Separate branch `codex/segment-02-identity-shell` preserves local `87c1766`; stacked PR depends on unmerged draft foundation PR #1. No change was pushed to the foundation branch or main. Explicit owner merge authorization and all 11 checks on latest revision remain mandatory.
+- Current checkpoint: locally verified; hosted checks pending. Segment 02 is not yet marked complete.

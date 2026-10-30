@@ -406,3 +406,26 @@ it('issues a one-time credential, rotates it once, and atomically changes it wit
   expect(expiredRotation.deliveryVersion).toBe(1);
   expect(await argon2.verify((await master.user.findUniqueOrThrow({ where: { id: expiredSubject.id } })).passwordHash, password)).toBe(false);
 });
+
+it('logout atomically revokes every current identity session including restricted credentials', async () => {
+  const user = await fixtureIdentity('logout@example.test');
+  const database = { master } as DatabaseService;
+  const controller = new AuthController(database);
+  const first = await controller.login({ email: user.email, password });
+  const second = await controller.login({ email: user.email, password });
+  const auth = (token: string) => ({ headers: { authorization: `Bearer ${token}` } });
+  const before = await master.$transaction([master.user.count(), master.gymAccess.count(), master.operation.count()]);
+  const results = await Promise.allSettled([controller.logout(auth(first.accessToken)), controller.logout(auth(second.accessToken))]);
+  expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+  expect((await master.user.findUniqueOrThrow({ where: { id: user.id } })).authVersion).toBe(user.authVersion + 1);
+  await expect(controller.session(auth(first.accessToken))).rejects.toThrow('Invalid or expired session');
+  await expect(controller.session(auth(second.accessToken))).rejects.toThrow('Invalid or expired session');
+  const fresh = await controller.login({ email: user.email, password });
+  await expect(controller.logout(auth(first.accessToken))).rejects.toThrow('Invalid or expired session');
+  await expect(controller.session(auth(fresh.accessToken))).resolves.toMatchObject({ identityId: user.id, displayName: null });
+  await master.user.update({ where: { id: user.id }, data: { mustChangePassword: true, credentialExpiresAt: new Date(Date.now() + 60_000) } });
+  const restricted = await controller.login({ email: user.email, password });
+  await expect(controller.logout(auth(restricted.accessToken))).resolves.toEqual({ revoked: true });
+  expect((await master.user.findUniqueOrThrow({ where: { id: user.id } })).authVersion).toBe(user.authVersion + 2);
+  expect(await master.$transaction([master.user.count(), master.gymAccess.count(), master.operation.count()])).toEqual(before);
+});

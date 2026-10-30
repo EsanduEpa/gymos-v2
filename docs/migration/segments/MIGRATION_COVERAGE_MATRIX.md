@@ -20,14 +20,14 @@ This matrix assigns every authoritative task and every V1 route responsibility t
 | GYMOS-MIG-010 | Exposed credential containment | V1 `scripts/check-db.js` | external remediation evidence/V2 hygiene | 01 | GYMOS-MIG-010 | COMPLETED (owner-attested external; local scan verified) |
 | GYMOS-MIG-011 | Classic semantic tokens | `app/globals.css`, V1 UI | `packages/theme-tokens` | 01 | GYMOS-MIG-011 | COMPLETED |
 | GYMOS-MIG-012 | Shared accessible UI primitives | `components/shared`, layout patterns | `apps/web/src/components/ui` | 01 | GYMOS-MIG-012 | COMPLETED |
-| GYMOS-MIG-013 | Role/gym dashboard chrome | dashboard layout/sidebar/header | proposed web dashboard shell | 02 | GYMOS-MIG-013 | NOT STARTED |
+| GYMOS-MIG-013 | Role/gym dashboard chrome | dashboard layout/sidebar/header | proposed web dashboard shell | 02 | GYMOS-MIG-013 | LOCALLY VERIFIED; HOSTED PENDING |
 | GYMOS-MIG-014 | Safe V1 visual fixtures | all V1 rendered screens | `apps/web/tests/visual` | 01 | GYMOS-MIG-014 | COMPLETED |
 | GYMOS-MIG-015 | Branding editor/fallback | O12 plus V2 theme scaffold | gym config web/API/theme | 04 | GYMOS-MIG-015 | NOT STARTED |
 | GYMOS-MIG-016 | Login/session/forced-change enforcement | A01; `lib/auth.ts` | auth controller/service/policies | 02 | GYMOS-MIG-016 | COMPLETED |
 | GYMOS-MIG-017 | Temporary credential/change/reissue | A02; `actions/account.ts` | auth/identity credential commands | 02 | GYMOS-MIG-017 | COMPLETED |
 | GYMOS-MIG-018 | Actor/resource authorization | `lib/authz.ts` | Nest guards/policies | 02 | GYMOS-MIG-018 | COMPLETED |
 | GYMOS-MIG-019 | Role-aware root/navigation | R00/T00/M00/L02 | web route builder/guards | 02 | GYMOS-MIG-019 | COMPLETED |
-| GYMOS-MIG-020 | Session transport/logout | Auth.js/session/logout | web BFF actions + auth API | 02 | GYMOS-MIG-020 | NOT STARTED |
+| GYMOS-MIG-020 | Session transport/logout | Auth.js/session/logout | web BFF actions + auth API | 02 | GYMOS-MIG-020 | LOCALLY VERIFIED; HOSTED PENDING |
 | GYMOS-MIG-021 | Provisioning reservation | V1 admin/create assumptions | operations + admin provisioning service | 03 | GYMOS-MIG-021 | NOT STARTED |
 | GYMOS-MIG-022 | Recoverable physical provisioning | V2 current synchronous provisioner | provisioning worker/checkpoints | 03 | GYMOS-MIG-022 | NOT STARTED |
 | GYMOS-MIG-023 | Owner/theme/gym activation | S01 owner bootstrap | identity/access/theme activation | 03 | GYMOS-MIG-023 | NOT STARTED |

@@ -80,3 +80,18 @@ No application code, database, hosted workflow or V1 file was changed in this hi
 | Run 41013007595 failed the browser isolation test because a streamed unauthenticated redirect to `/login` overlapped the next login navigation. | Hosted browser verification was incomplete at that documentation revision. | Added an explicit URL wait after navigating to `/`; the focused owned browser test passed locally, and authenticated Chrome verified all 11 jobs passed at `d26beb4` in [run 41013926983](https://github.com/EsanduEpa/gymos-v2/actions/runs/41013926983). | Resolved |
 
 Evidence: [finalization](SEGMENT_01_FINALIZATION.md), [GYMOS-MIG-008](evidence/GYMOS-MIG-008.md), [GYMOS-MIG-010](evidence/GYMOS-MIG-010.md), [risk register](MIGRATION_RISK_REGISTER.md). The prior run 41011340034 at `49217dd` remains a historical passing checkpoint; run 41013926983 is the latest verified revision.
+
+## Segment 02 — 2026-10-30 continuation
+
+| Issue | Impact | Resolution / next action | Status |
+|---|---|---|---|
+| DEC-11 did not exist. | Final session transport policy was unavailable. | Owner approved the limited web-session proposal; recorded DEC-11. Provider/capacity/release decisions remain task 087. | Session policy resolved; provider scope open |
+| Bare owner gym route did not canonicalize. | Shell test remained on the legacy entry URL. | Redirect to the approved role route, preserving safe form feedback. | Resolved |
+| Browser trainer/member fixtures lacked committed registration operations/tenant receipts. | Role-entry tests correctly failed task 018 authorization; previous roster denial did not prove a usable trainer shell. | Completed only the owned fixtures; guard unchanged. Successful trainer/member shell entry now tested. | Resolved |
+| Initial integration/browser commands lacked Docker socket access. | Setup could not start. | Explicitly owned disposable runs passed with authorized access and cleanup. | Resolved |
+| Identity integration ran concurrently with a build replacing API dist files. | CLI test could not import its generated runtime module. | Completed build, then reran integration: 10/10 passed. No product assertion changed. | Resolved |
+| Chromium adjusted cookie Expires slightly past the signed JWT expiry using the HTTP Date header. | Strict cookie lifetime assertion failed by a fraction of a second. | Expire the cookie two seconds early; same assertion passes. Real authentication checks use the actual browser clock. | Resolved |
+| Concurrent session validation could race logout's cookie-deletion response; unrelated Next route announcer also matched generic alert test selectors. | Another tab could show an expiry message; logout response could be interrupted. | Suspend local checks on logout and discard stale results; use the actual feedback selector. Focus-during-logout test and cookie deletion pass. | Resolved |
+| Existing visual tests wrote task 011's historical PNGs. | New shell captures would overwrite old evidence. | Restored original task 011 artifacts and directed new branding captures into task 013. | Resolved |
+
+Local evidence: [013](evidence/GYMOS-MIG-013.md), [020](evidence/GYMOS-MIG-020.md). Hosted gate remains pending at this checkpoint. No V1 code/database was run or modified; no shared/production data used.

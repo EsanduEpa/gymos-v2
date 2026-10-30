@@ -132,3 +132,15 @@ test('credential contracts enforce password policy and one-time reissue envelope
   assert.equal(credentialAcknowledgementInputSchema.safeParse({ deliveryVersion: -1 }).success, false);
   assert.deepEqual(credentialAcknowledgementResultSchema.parse({ status: 'ACKNOWLEDGED', deliveryVersion: 1 }), { status: 'ACKNOWLEDGED', deliveryVersion: 1 });
 });
+
+test('shell session projection excludes credential and connection material', async () => {
+  const { currentSessionSchema, logoutResultSchema } = await import('../dist/legacy.js');
+  const session = { identityId: 'identity-1', displayName: 'Synthetic owner', globalRole: 'USER', mustChangePassword: false, gyms: fixtures.E01.gyms };
+  assert.deepEqual(currentSessionSchema.parse(session), session);
+  assert.deepEqual(logoutResultSchema.parse({ revoked: true }), { revoked: true });
+  assert.equal(logoutResultSchema.safeParse({ revoked: false }).success, false);
+  assert.equal(logoutResultSchema.safeParse({ revoked: true, accessToken: 'fixture-only' }).success, false);
+  for (const field of ['accessToken', 'passwordHash', 'databaseName', 'authVersion']) {
+    assert.equal(currentSessionSchema.safeParse({ ...session, [field]: 'fixture-only' }).success, false);
+  }
+});

@@ -2679,3 +2679,9 @@ These are required target responsibilities absent from E01–E08 and not new evi
 | GET /health/live; GET /health/ready | Process liveness vs aggregate dependency/worker/pool readiness; bounded safe response, no URLs/secrets/tenant list | Liveness minimally public; detailed diagnostics internal/authorized | GYMOS-MIG-067, GYMOS-MIG-069 |
 
 Future password recovery/email-reset, payment/refund/subscription commands, external push and global inbox require new commissioning; they are not implicit parity endpoints. Existing gym creation owner-password DTO is intentionally adapted to generated/verified identity target under tasks021/023; compatibility reviewed rather than silently broken.
+
+## Segment 02 implementation reconciliation — 30 October 2026
+
+The historical proposed rows above remain the wider feature-contract inventory. Current source/evidence for tasks 013/020 implements C01's safe shell subset at `GET /auth/session` (identityId/displayName/globalRole/mustChangePassword and active gym choices), and C02 at `POST /auth/logout` returning strict `{revoked:true}`. DEC-02 and the owner-approved limited DEC-11 require identity-wide security-version revocation. The web always clears its cookie and reports unconfirmed revocation; no refresh is implemented. Actor/tenant connection fields are not exposed by C01. The existing forced-change response behavior is preserved; task 017 owns the password-change route.
+
+V1 W02's historical cookie-only description is superseded for this implementation by [task 020 evidence](evidence/GYMOS-MIG-020.md). Notification/support/feature projections remain with their owning tasks; shell completion does not claim those endpoints. [Task 013 evidence](evidence/GYMOS-MIG-013.md) records implemented role links and visual boundaries.

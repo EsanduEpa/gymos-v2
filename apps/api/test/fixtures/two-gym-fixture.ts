@@ -278,6 +278,23 @@ export async function seedTwoGymFixture(environment: Environment) {
         updatedAt: fixedNow,
       },
     });
+    // Successful role-entry fixtures must satisfy the same durable publication
+    // boundary as real registrations. Mismatch fixture below stays incomplete.
+    for (const [actor, identity, kind] of [[trainer, trainerUser, 'TRAINER'], [member, memberUser, 'MEMBER']] as const) {
+      const receiptId = `receipt_${actor.enrollmentOperationId}`;
+      await tenants[0].commandReceipt.create({ data: {
+        id: receiptId, actorIdentityId: ownerA.id, commandKind: `REGISTER_${kind}`,
+        idempotencyKey: randomUUID(), requestDigest: `d1:${'d'.repeat(64)}`,
+        resourceType: kind, resourceId: actor.id, sourceMasterOperationId: actor.enrollmentOperationId,
+        state: 'COMMITTED', committedAt: fixedNow, safeResult: { resourceId: actor.id },
+      } });
+      await master.operation.create({ data: {
+        id: actor.enrollmentOperationId!, kind: kind === 'TRAINER' ? 'REGISTER_TRAINER' : 'REGISTER_MEMBER',
+        actorIdentityId: ownerA.id, scopeKey: `gym:${gyms[0].id}`, idempotencyKey: randomUUID(),
+        requestDigest: `d1:${'d'.repeat(64)}`, gymId: gyms[0].id, subjectIdentityId: identity.id,
+        tenantActorId: actor.id, tenantCommandReceiptId: receiptId, state: 'COMPLETE', step: 'MASTER_ACTIVATED', safeResult: { resourceId: actor.id },
+      } });
+    }
     const mismatchedActor = await tenants[0].member.create({
       data: {
         fullName: 'Different Identity',

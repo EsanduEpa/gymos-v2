@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { Suspense } from 'react';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
@@ -32,12 +31,12 @@ async function GymSelectionContent() {
     <h1 id="gym-selection-heading">Choose a gym</h1>
     <p className="muted">Select the gym workspace you want to open.</p>
     <div className="stack-form">
-      {session.gyms.map((gym) => <Link className="primary-button" key={gym.id}
+      {session.gyms.map((gym) => <a className="primary-button" key={gym.id}
         href={`/gyms/${encodeURIComponent(gym.slug)}/${gym.role === 'OWNER' ? 'owner' : gymRolePath(gym.role)}`}>
         {gym.name} <span>{gym.role.toLowerCase()} →</span>
-      </Link>)}
+      </a>)}
     </div>
-    <form action={signOut}><Button type="submit" variant="secondary">Sign out</Button></form>
+    <form action={signOut} data-session-exit><Button type="submit" variant="secondary">Sign out</Button></form>
   </section></main>;
 }
 

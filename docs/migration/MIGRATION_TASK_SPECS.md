@@ -1124,7 +1124,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+In Progress — implemented and locally verified; hosted checks pending. See [evidence](evidence/GYMOS-MIG-013.md).
 
 ## Task ID: GYMOS-MIG-014
 
@@ -1703,6 +1703,8 @@ V1 source behavior and deviations are enumerated for A01, A02, L02 in the Tracea
 ### Dependencies
 [GYMOS-MIG-016](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-016), [GYMOS-MIG-017](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-017), [GYMOS-MIG-019](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-019), [GYMOS-MIG-078](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-078), [GYMOS-MIG-087](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-087)
 
+**30 October policy reconciliation:** Dependency 087 is satisfied for this task only by the owner-approved limited web-session portion of [DEC-11](decisions/DEC-11.md). Provider/release scope remains open in 087 and is not a task-020 implementation gate. No task 087 completion or deployment approval is implied.
+
 ### Implementation Scope
 Keep HttpOnly Secure production SameSite cookie and server-only API adapters; validate responses at runtime rather than casts. Thin Server Actions perform transport/form mapping and authorized refresh, never business settlement. Implement approved logout/expiry behavior, origin/CSRF checks for same-origin mutations, safe error redaction and no-store private responses. Define backend/mobile token transport policy independently of browser cookie transport.
 
@@ -1764,7 +1766,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+In Progress — implemented and locally verified; hosted checks pending. See [evidence](evidence/GYMOS-MIG-020.md).
 
 ## Task ID: GYMOS-MIG-021
 

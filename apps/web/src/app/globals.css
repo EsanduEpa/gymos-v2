@@ -255,3 +255,31 @@ a { color: inherit; text-decoration: none; }
   .role-pill { margin-left: 0; }
   .auth-form-wrap { padding: 42px 22px; }
 }
+
+/* V1 Classic chrome: 224px desktop / 256px drawer, 52px header. */
+.application-shell { display: flex; min-height: 100vh; background: var(--classic-page); }
+.shell-sidebar, .shell-drawer-panel { display: flex; flex-direction: column; width: 224px; flex-shrink: 0; background: #171b28; color: #b5b8c2; }
+.shell-sidebar { position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.shell-brand { display: flex; align-items: center; gap: 10px; padding: 20px; border-bottom: 1px solid #232736; }
+.shell-brand strong { color: white; font-size: 18px; line-height: 1; }.shell-brand small { display: block; margin-top: 5px; font-size: 10px; text-transform: uppercase; letter-spacing: .07em; }
+.shell-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; color: white; background: var(--classic-primary); font-weight: 800; }
+.shell-sidebar nav, .shell-drawer nav { display: grid; gap: 4px; padding: 12px; }
+.shell-sidebar nav a, .shell-drawer nav a { padding: 10px 12px; border-radius: 6px; font-size: 14px; }
+.shell-sidebar nav a:hover, .shell-drawer nav a:hover { background: #202534; color: white; }
+.shell-sidebar nav a[aria-current], .shell-drawer nav a[aria-current] { background: var(--classic-primary); color: white; }
+.shell-sidebar-footer { display: grid; gap: 8px; margin-top: auto; padding: 20px 12px; border-top: 1px solid #232736; font-size: 12px; overflow-wrap: anywhere; }
+.shell-sidebar-footer small { font-size: 10px; }.shell-sidebar-footer .ui-button { width: 100%; }
+.shell-workspace { flex: 1; min-width: 0; }.shell-header { display: flex; align-items: center; gap: 12px; justify-content: space-between; height: 52px; padding: 0 24px; border-bottom: 1px solid var(--classic-border); background: var(--classic-surface); }
+.shell-gym-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--classic-text-secondary); }
+.shell-profile { display: flex; align-items: center; gap: 10px; min-width: 0; }.shell-profile strong { display: block; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }.shell-profile small { display: block; color: var(--classic-text-muted); font-size: 10px; }
+.shell-avatar { display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; background: var(--classic-primary-soft); color: var(--classic-primary); font-size: 12px; font-weight: 700; }
+.shell-content { min-width: 0; padding: 24px; }.shell-content .dashboard-grid { grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr); }
+.shell-menu { display: none; }.shell-drawer { position: fixed; inset: 0 auto 0 0; width: 256px; max-width: calc(100vw - 32px); height: 100dvh; max-height: 100dvh; margin: 0; padding: 0; border: 0; background: transparent; color: #b5b8c2; }.shell-drawer::backdrop { background: #0008; }.shell-drawer-panel { width: 100%; min-height: 100%; }.shell-brand button { margin-left: auto; border: 0; background: transparent; color: white; padding: 6px; font-size: 24px; }
+.skip-link { position: fixed; left: 12px; top: -60px; z-index: 100; padding: 10px; background: white; }.skip-link:focus { top: 8px; }
+.shell-state { display: grid; align-content: center; justify-items: center; min-height: 70vh; padding: 24px; text-align: center; }.shell-state > div { max-width: 480px; padding: 32px; border: 1px solid var(--classic-border); border-radius: 12px; background: var(--classic-surface); }.shell-state h1 { font-size: 24px; }.shell-state p { color: var(--classic-text-muted); line-height: 1.5; }
+@media (max-width: 767px) { .shell-sidebar { display: none; }.shell-menu { display: block; border: 0; padding: 8px; background: transparent; color: var(--classic-text); font-size: 20px; }.shell-header { padding: 0 16px; }.shell-content { padding: 16px; }.shell-content .dashboard-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 560px) { .shell-profile > div { display: none; }.shell-gym-name { flex: 1; }.shell-profile { flex-shrink: 0; } }
+
+.shell-sidebar nav a, .shell-drawer nav a { display: flex; align-items: center; gap: 12px; }
+.shell-sidebar-footer .ui-button { justify-content: start; min-height: 36px; border-color: transparent; background: transparent; color: #b5b8c2; font-size: 14px; font-weight: 500; }
+.shell-sidebar-footer .ui-button:hover { background: #202534; color: #fca5a5; }

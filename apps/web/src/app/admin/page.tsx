@@ -2,9 +2,13 @@ import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
-import { createGym, signOut } from '../actions';
+import { createGym } from '../actions';
 import { apiUrl, SESSION_COOKIE } from '@/lib/gymos';
 import { Button, Card, CardHeader, EmptyState, Feedback, Field, LoadingState, PageHeader, StatCard, StatusBadge } from '@/components/ui';
+
+import { DashboardChrome } from '@/components/navigation/dashboard-chrome';
+import { resolveCurrentSession } from '@/lib/navigation';
+import { currentSessionSchema, existingEndpointContracts } from '@gymos/contracts/legacy';
 
 type GymRow = { id: string; name: string; slug: string; status: string };
 
@@ -38,17 +42,16 @@ async function AdminContent({
   }
   if (!response.ok) return <main className="page-loading">Could not load gyms right now.</main>;
 
-  const gyms = (await response.json()) as GymRow[];
+  const gyms: GymRow[] = existingEndpointContracts.E02.response.parse(await response.json());
+  const current = await resolveCurrentSession(token);
+  if (current.status === 401) redirect('/login');
+  if (current.status === 403) redirect('/change-password');
+  if (!current.ok) throw new Error('Account unavailable');
+  const session = currentSessionSchema.parse(await current.json());
   const { error, created } = await searchParams;
 
   return (
-    <main className="dashboard-shell">
-      <header className="dashboard-header">
-        <Link href="/" className="brand-lockup"><span className="brand-mark">G</span> GymOS</Link>
-        <span className="header-label">Super Admin</span>
-        <form action={signOut}><Button variant="secondary" type="submit">Sign out</Button></form>
-      </header>
-      <div className="dashboard-content">
+    <DashboardChrome identityId={session.identityId} key={session.identityId} gyms={[]} displayName={session.displayName ?? 'Platform administrator'}>
         <PageHeader eyebrow="PLATFORM CONTROL" title="Gym workspaces" description="Create an isolated space for each gym and its owner." action={<StatCard label="Total gyms" value={gyms.length} />} />
         {created ? <Feedback tone="success">{created} is ready. Its owner can sign in now.</Feedback> : null}
         {error && messages[error] ? <Feedback tone="error">{messages[error]}</Feedback> : null}
@@ -76,8 +79,7 @@ async function AdminContent({
             )}
           </Card>
         </div>
-      </div>
-    </main>
+    </DashboardChrome>
   );
 }
 
