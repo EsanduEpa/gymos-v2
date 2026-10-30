@@ -2,9 +2,10 @@ import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
-import { createGym } from '../actions';
+import { randomUUID } from 'node:crypto';
+import { ProvisioningForm } from '@/components/platform/provisioning-form';
 import { apiUrl, SESSION_COOKIE } from '@/lib/gymos';
-import { Button, Card, CardHeader, EmptyState, Feedback, Field, LoadingState, PageHeader, StatCard, StatusBadge } from '@/components/ui';
+import { Card, CardHeader, EmptyState, Feedback, LoadingState, PageHeader, StatCard, StatusBadge } from '@/components/ui';
 
 import { DashboardChrome } from '@/components/navigation/dashboard-chrome';
 import { resolveCurrentSession } from '@/lib/navigation';
@@ -13,7 +14,7 @@ import { currentSessionSchema, existingEndpointContracts } from '@gymos/contract
 type GymRow = { id: string; name: string; slug: string; status: string };
 
 const messages: Record<string, string> = {
-  'gym-input': 'Check the gym details. Owner passwords need at least 12 characters.',
+  'gym-input': 'Check the gym details, currency and timezone.',
   duplicate: 'That gym slug or owner email is already in use.',
   forbidden: 'Your account does not have Super Admin access.',
   unavailable: 'Gym creation could not finish. Check the API and try again.',
@@ -58,13 +59,7 @@ async function AdminContent({
         <div className="dashboard-grid">
           <Card>
             <CardHeader eyebrow="NEW WORKSPACE" title="Create a gym" action={<span className="panel-icon">＋</span>} />
-            <form action={createGym} className="stack-form">
-              <Field label="Gym name" name="name" placeholder="Harbor Fitness" minLength={2} maxLength={100} required />
-              <Field label="Gym slug" name="slug" placeholder="harbor-fitness" pattern="[a-z0-9]+(-[a-z0-9]+)*" hint="Used in the gym’s web address." required />
-              <Field label="Owner email" type="email" name="ownerEmail" placeholder="owner@example.com" required />
-              <Field label="Owner password" type="password" name="ownerPassword" minLength={12} autoComplete="new-password" hint="Give this password to the owner through a secure channel." required />
-              <Button fullWidth type="submit">Create gym <span>→</span></Button>
-            </form>
+            <ProvisioningForm requestKey={randomUUID()} />
           </Card>
           <Card>
             <CardHeader eyebrow="WORKSPACES" title="Existing gyms" />

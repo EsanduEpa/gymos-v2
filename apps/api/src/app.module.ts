@@ -9,6 +9,7 @@ import { CredentialReissueController, CredentialsController } from './credential
 import { CredentialService } from './identity/credential.service.js';
 import { DatabaseService } from './database.service.js';
 import { GymAccessGuard } from './gym-access.guard.js';
+import { ProvisioningReservationService } from './platform/provisioning-reservation.service.js';
 import { GymProvisioningService } from './gym-provisioning.service.js';
 import { GymsController } from './gyms.controller.js';
 import { SuperAdminGuard } from './super-admin.guard.js';
@@ -27,6 +28,7 @@ import { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js
     CredentialService,
     GymAccessGuard,
     GymProvisioningService,
+    ProvisioningReservationService,
     SuperAdminGuard,
     TenantDatabaseService,
     TenantRegistryService,

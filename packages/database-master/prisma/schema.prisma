@@ -156,6 +156,7 @@ enum OperationState {
 }
 
 model Operation {
+  provisioningIntent ProvisioningIntent?
   id                            String              @id @default(cuid())
   kind                          OperationKind
   actorIdentityId               String
@@ -248,4 +249,18 @@ model CredentialDelivery {
 
   @@index([identityId, issuedAt])
   @@index([gymId, issuedAt])
+}
+
+// Private durable intent. Never serialize this model in status/registry DTOs.
+model ProvisioningIntent {
+  operationId String @id
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  name String
+  ownerEmail String
+  plannedOwnerIdentityId String
+  reuseIdentity Boolean
+  actorAuthVersion Int
+  currency String
+  timezone String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 }

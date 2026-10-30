@@ -108,3 +108,7 @@ Stop if DEC-03 is unapproved, provider limits are needed for a production claim,
 - **Files/tests/issues/blockers/decisions:** The 26 October checkpoint below is historical. Current prerequisites are Segment 02 shell/session work; policy decisions 077/079/082/083 are completed. Segment 03 implementation tasks remain Not Started. No Segment 03 application work was performed during Segment 01 closure. Run history is in [SEGMENT_RUN_ISSUES.md](../SEGMENT_RUN_ISSUES.md).
 - **Next recommended task:** GYMOS-MIG-021 after segment 02 authorization prerequisites.
 
+
+## Owner-authorized implementation — 30 October 2026
+
+Segment 03 is IN PROGRESS on `codex/segment-03-platform-lifecycle`, based on verified unmerged Segment 02 revision `0c969eb`. The owner explicitly authorizes independent Segment 03 work while Segment 02 manual acceptance remains PENDING. PRs #1/#2 remain draft/unmerged. Task 021's reservation boundary passed owned API/browser and operation regressions; [checkpoint](../evidence/GYMOS-MIG-021.md). Tasks 022–026 remain. Provider/environment/release choices remain task 087; no real provider resources or Segment 04 work are authorized here.

@@ -283,3 +283,5 @@ a { color: inherit; text-decoration: none; }
 .shell-sidebar nav a, .shell-drawer nav a { display: flex; align-items: center; gap: 12px; }
 .shell-sidebar-footer .ui-button { justify-content: start; min-height: 36px; border-color: transparent; background: transparent; color: #b5b8c2; font-size: 14px; font-weight: 500; }
 .shell-sidebar-footer .ui-button:hover { background: #202534; color: #fca5a5; }
+
+.platform-operation { overflow-wrap: anywhere; }

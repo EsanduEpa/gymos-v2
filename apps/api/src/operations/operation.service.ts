@@ -56,6 +56,7 @@ export class OperationFoundationService {
     intent: unknown; gymId?: string; requestedSlug?: string; supportContextId?: string;
     intendedTenantTemplateVersion?: string; intendedTenantManifestDigest?: string;
     protectedFingerprint?: string;
+    prepare?: (tx: Tx, operation: Operation) => Promise<void>;
   }) {
     reference(input.actorIdentityId); idempotencyKey(input.idempotencyKey);
     const scopeKey = input.kind === 'PROVISION_GYM' ? provisionScope(input.requestedSlug ?? '') : gymScope(input.gymId ?? '');
@@ -87,7 +88,9 @@ export class OperationFoundationService {
         intendedTenantTemplateVersion: input.intendedTenantTemplateVersion ?? null,
         intendedTenantManifestDigest: input.intendedTenantManifestDigest ?? null,
       } });
-      return { operation, replayed: false, result: null };
+      await input.prepare?.(tx, operation);
+      const prepared = input.prepare ? await tx.operation.findUniqueOrThrow({ where: { id: operation.id } }) : operation;
+      return { operation: prepared, replayed: false, result: null };
     });
   }
 

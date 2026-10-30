@@ -73,7 +73,7 @@ async function login(page: Page, email: string): Promise<void> {
   await loginWithPassword(page, email, fixture.password);
 }
 
-async function openGymWithTestSession(page: Page, userId: string, slug: string, expiresIn = 900): Promise<void> {
+async function openWithTestSession(page: Page, userId: string, path: string, expiresIn = 900): Promise<void> {
   const issuedAt = Math.floor(Date.now() / 1000);
   const header = Buffer.from(JSON.stringify({ alg: 'HS256' })).toString('base64url');
   const payload = Buffer.from(JSON.stringify({
@@ -94,7 +94,11 @@ async function openGymWithTestSession(page: Page, userId: string, slug: string, 
     httpOnly: true,
     sameSite: 'Lax',
   }]);
-  await page.goto(`${webBase}/gyms/${slug}`);
+  await page.goto(`${webBase}${path}`);
+}
+
+async function openGymWithTestSession(page: Page, userId: string, slug: string, expiresIn = 900): Promise<void> {
+  await openWithTestSession(page, userId, `/gyms/${slug}`, expiresIn);
 }
 
 async function contrastRatio(page: Page, selector: string): Promise<number> {
@@ -496,6 +500,37 @@ test('web sessions enforce cookie, origin, expiry, revocation and logout boundar
   await expect(page.locator('.shell-profile')).toContainText('Owner Beta');
   await expect(page.locator('main')).not.toContainText('Alpha Person');
   await page.screenshot({ path: join(evidence, 'fresh-identity.png'), animations: 'disabled' });
+});
+
+test('platform form reserves one pending gym with safe status and a stable retry key', async ({ page, request }) => {
+  await openWithTestSession(page, fixture.users.admin.id, '/admin');
+  const before = await fixture.master.gym.count();
+  const key = await page.locator('input[name="requestKey"]').inputValue();
+  const input = { name: 'Browser reserved gym', slug: `browser-reserved-${environment.runId}`, ownerEmail: `browser-owner-${environment.runId}@example.test`, currency: 'LKR', timezone: 'Asia/Colombo' };
+  await page.getByLabel('Gym name', { exact: true }).fill(input.name);
+  await page.getByRole('textbox', { name: /^Gym slug/ }).fill(input.slug);
+  await page.getByRole('textbox', { name: /^Owner email/ }).fill(input.ownerEmail);
+  await page.getByLabel('Currency', { exact: true }).fill(input.currency);
+  await page.getByRole('textbox', { name: /^Timezone/ }).fill(input.timezone);
+  await page.getByRole('button', { name: 'Create gym', exact: true }).click();
+  const status = page.getByRole('region', { name: 'Provisioning status' });
+  await expect(status).toContainText('PENDING');
+  await expect(status).toContainText('remains unavailable');
+  const cookie = (await page.context().cookies()).find(item => item.name === 'gymos_access_token')!;
+  const replay = await request.post(`${apiBase}/admin/gyms`, { headers: { authorization: `Bearer ${cookie.value}`, 'idempotency-key': key }, data: input });
+  expect(replay.status()).toBe(202);
+  const result = await replay.json();
+  await expect(status).toContainText(result.operationId);
+  expect(await fixture.master.gym.count()).toBe(before + 1);
+  expect(await fixture.master.user.count({ where: { email: input.ownerEmail } })).toBe(0);
+  const stored = await fixture.master.operation.findUniqueOrThrow({ where: { id: result.operationId } });
+  expect((await page.content()).includes(stored.databaseName!)).toBe(false);
+  await page.getByRole('button', { name: 'Refresh status' }).click();
+  await expect(status).toContainText(result.operationId);
+  await page.setViewportSize({ width: 320, height: 700 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await mkdir(join(root, 'docs/migration/evidence/GYMOS-MIG-021'), { recursive: true });
+  await page.screenshot({ path: join(root, 'docs/migration/evidence/GYMOS-MIG-021/pending-320.png'), fullPage: true, animations: 'disabled' });
 });
 
 test('logout clears the browser even when API revocation is unavailable', async ({ page }) => {
