@@ -54,3 +54,11 @@ All 23 Segment 01 tasks were recorded completed at this checkpoint. Run 41010929
 ## Browser verification follow-up — 30 October 2026
 
 Run [41013007595](https://github.com/EsanduEpa/gymos-v2/actions/runs/41013007595) exposed a browser-test navigation race: the unauthenticated home page's streamed server-component redirect to `/login` was still settling when the test began its next `/login` navigation. The test now explicitly waits for the `/login` URL after visiting `/`. The focused owned two-gym browser test passed locally; run 41013926983 then passed the full browser isolation job and all ten other hosted checks. No product route or behavior changed.
+
+## Owner-approved manual merge safeguard — 30 October 2026
+
+Esandu chose to keep the current GitHub plan after GitHub reported that the saved ruleset is not enforced for this private repository. The owner accepts manual enforcement in place of the Segment 01 requirement that failed checks mechanically block merging. The repository remains private. No paid upgrade, visibility change or enforcement capability is claimed.
+
+For every change to main: use a pull request, verify all 11 required checks pass on the exact latest proposed revision, resolve review conversations, and have the project owner explicitly authorize the merge. Do not push directly to main, force-push main, delete main, or merge with failed, pending, cancelled or skipped required checks. New commits require checking the new revision again. GitHub may technically permit bypassing this process; compliance depends on the owner and collaborators.
+
+Segment 01 remains completed with this explicit owner-approved exception for task 008, rather than a claim of platform-enforced branch protection. Revisit automated enforcement if the hosting plan changes. This exception does not authorize merging the current draft PR.

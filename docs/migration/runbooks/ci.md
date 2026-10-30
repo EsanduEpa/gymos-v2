@@ -45,3 +45,11 @@ Every code-consuming hosted job runs `pnpm prepare:checks` to generate both Pris
 ## Private-repository dependency review
 
 Owner approved replacing the unsupported GitHub Advanced Security dependency-review action with `infrastructure/scripts/review-dependencies.mjs`. On PRs it reads committed package.json/lockfiles for base and proposed full SHAs into private temporary directories, runs the online pnpm audit for each without installing or running revision code, and emits only revision/high/critical counts. Base counts establish context; any proposed high/critical finding or unavailable/malformed audit fails the job. The full head audit also runs separately. This preserves private visibility and the high-severity vulnerability gate; no GitHub license-policy feature is claimed.
+
+## Owner-approved manual merge safeguard — 30 October 2026
+
+Esandu chose to keep the current GitHub plan after GitHub reported that the saved ruleset is not enforced for this private repository. The owner accepts manual enforcement in place of the Segment 01 requirement that failed checks mechanically block merging. The repository remains private. No paid upgrade, visibility change or enforcement capability is claimed.
+
+For every change to main: use a pull request, verify all 11 required checks pass on the exact latest proposed revision, resolve review conversations, and have the project owner explicitly authorize the merge. Do not push directly to main, force-push main, delete main, or merge with failed, pending, cancelled or skipped required checks. New commits require checking the new revision again. GitHub may technically permit bypassing this process; compliance depends on the owner and collaborators.
+
+Segment 01 remains completed with this explicit owner-approved exception for task 008, rather than a claim of platform-enforced branch protection. Revisit automated enforcement if the hosting plan changes. This exception does not authorize merging the current draft PR.

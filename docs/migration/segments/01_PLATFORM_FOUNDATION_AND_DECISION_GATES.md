@@ -71,7 +71,7 @@ Completed foundations provide canonical email identity, typed gym access/actor l
 - **Sources:** root `package.json`, `infrastructure/scripts/check-workspace.mjs`, `docs/migration/runbooks/ci.md`, `evidence/GYMOS-MIG-008.md`.
 - **Targets:** verified existing workspace scripts; proposed CI workflow only after repository/provider is known.
 - **Instructions:** inspect existing local evidence; configure least-privilege hosted checks; ensure owned DB tests cannot target shared/production DBs; record skipped provider features honestly.
-- **Acceptance/test:** local lanes and hosted PR checks pass at one revision; secret scanner has no credential values in output; failure blocks merge. **[x]**
+- **Acceptance/test:** local lanes and hosted PR checks pass at one revision; secret scanner has no credential values in output; failure blocks merge through the owner-approved manual process; GitHub enforcement is unavailable on the current private-repository plan. **[x]**
 
 #### GYMOS-MIG-010 — contain exposed V1 credential
 
@@ -164,3 +164,7 @@ Stop if a task needs provider/owner authority, a named decision lacks approval, 
 - **Evidence boundary:** provider remediation/access review is owner-attested, not independently inspected; historical access uncertainty is retained. The legacy V1 diagnostic script still prints full records/raw errors and must not be run or published as evidence; safe-output cleanup is a separate legacy follow-up.
 - **Owner scope:** member read-only viewing of own assigned workout/meal plans is added to tasks 051/052; 90-day trainer privacy, completed-session-only pay, unchanged expiry and continued earning during suspension are recorded. See [finalization](../SEGMENT_01_FINALIZATION.md).
 - **Next dependency-satisfied task:** Segment 02 / GYMOS-MIG-013 dashboard shell (handoff only; not started here). Task 020 remains gated on DEC-11. Completion is not production-release approval.
+
+## Branch-protection exception — 30 October 2026
+
+The owner chose to retain the current plan and accepts manual PR/latest-revision/passing-check/owner-authorization safeguards instead of GitHub-enforced merge blocking. See [the recorded exception](../SEGMENT_01_FINALIZATION.md#owner-approved-manual-merge-safeguard--30-october-2026). Segment 01 is completed with this exception; the saved ruleset is not claimed active. No merge is authorized by this record.

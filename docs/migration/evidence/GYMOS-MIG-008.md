@@ -79,3 +79,11 @@ Authenticated Google Chrome showed [run 41011340034](https://github.com/EsanduEp
 ### Navigation-race follow-up — 30 October 2026
 
 Run [41013007595](https://github.com/EsanduEpa/gymos-v2/actions/runs/41013007595) failed only the browser isolation test when a streamed unauthenticated home redirect to `/login` overlapped the following login navigation. The test now waits for the redirected URL before continuing. The focused two-gym test passed locally using the explicit owned-fixture flag; cleanup reported six disposable databases, the container and manifest removed. Authenticated Chrome then verified [run 41013926983](https://github.com/EsanduEpa/gymos-v2/actions/runs/41013926983) passed all 11 jobs at `d26beb423ca979e05ca9950d42b12b10ee4550d7`, including browser isolation and secret scan. No product behavior changed.
+
+## Owner-approved manual merge safeguard — 30 October 2026
+
+Esandu chose to keep the current GitHub plan after GitHub reported that the saved ruleset is not enforced for this private repository. The owner accepts manual enforcement in place of the Segment 01 requirement that failed checks mechanically block merging. The repository remains private. No paid upgrade, visibility change or enforcement capability is claimed.
+
+For every change to main: use a pull request, verify all 11 required checks pass on the exact latest proposed revision, resolve review conversations, and have the project owner explicitly authorize the merge. Do not push directly to main, force-push main, delete main, or merge with failed, pending, cancelled or skipped required checks. New commits require checking the new revision again. GitHub may technically permit bypassing this process; compliance depends on the owner and collaborators.
+
+Segment 01 remains completed with this explicit owner-approved exception for task 008, rather than a claim of platform-enforced branch protection. Revisit automated enforcement if the hosting plan changes. This exception does not authorize merging the current draft PR.
