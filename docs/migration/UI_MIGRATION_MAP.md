@@ -1,5 +1,7 @@
 # GymOS V1 → V2: Complete UI Migration Map
 
+> **30 October 2026 owner scope update:** [Segment 01 finalization](SEGMENT_01_FINALIZATION.md) supersedes earlier member-plan-delivery exclusions and suspension-earning proposals. Tasks 051/052 include authenticated read-only member access to own assigned workout/meal plans; trainer health access expires after 90 days as specified in DEC-09. Original inventory counts are not re-estimated effort. Owner finalization is recorded; separate accountable review remains pending.
+
 ## 1. Executive Summary
 
 **Assessment and correction review date:** 22 October 2026. **Scope:** existing web interface, source analysis, and recommendations only. The entire report was reread and disputed behavior checked against current V1 source and V2 API/web source. No application implementation, dependency installation, database access, account creation, or migration was performed. Only this Markdown file is edited in this review.

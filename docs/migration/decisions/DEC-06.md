@@ -1,9 +1,9 @@
 # DEC-06 — Exact money and operational earning policy
 
-- Status: **Blocked — concrete proposal awaiting project-owner approval.**
+- Status: **Approved by project owner Esandu — 30 October 2026.**
 - Prepared: 26 October 2026, Asia/Colombo.
 - Resolution task: [GYMOS-MIG-082](../MIGRATION_TASK_SPECS.md#task-id-gymos-mig-082).
-- Accountable reviewer: project owner with Finance + Database.
+- Accountable reviewer: Esandu, project owner; owner explicitly accepts the decision-review responsibilities.
 - Authority: Master Plan; Database map DB06; Functionality map F-D07/F-D10.
 
 ## Preserved approved requirements
@@ -57,8 +57,16 @@ These are future implementation tests. No accounting compliance claim or applica
 
 ## Approval record
 
-Awaiting the project owner's explicit approval or requested changes. Until then DEC-06 and GYMOS-MIG-082 remain blocked.
+Project owner Esandu requested finalization on 30 October 2026 after discussing the proposals and confirming the business amendments. Record owner authorization to finalize these proposals with those amendments. No separate accountable reviewer approval is claimed; reviewer sign-off remains pending.
 
 ## Project-owner clarification — 30 October 2026
 
 The owner explicitly confirmed continued daily membership earning during suspension, original expiry without freezes/extensions, and no additional payment event. This supersedes the former suspension proposal. Other DEC-06 details and reviewer sign-off remain pending; this clarification is not blanket approval or implementation evidence.
+
+## Finalization boundary — 30 October 2026
+
+Owner authorization is recorded from this conversation. Historical proposal/preparation statements above describe earlier checkpoints. This document does not establish feature implementation or replace outstanding accountable review. See [finalization record](../SEGMENT_01_FINALIZATION.md) for current verification and scope.
+
+## Final owner review disposition — 30 October 2026
+
+Esandu explicitly stated that decision review will be performed by the project owner and that this is acceptable. This supersedes the separate-reviewer gate and historical pending-review statements above. DEC-06 is approved under owner review with the recorded amendments. No independent specialist review is claimed. This approves policy, not implementation or production release.

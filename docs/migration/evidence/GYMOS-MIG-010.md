@@ -155,3 +155,29 @@ Asked on 25 October 2026 whether the old login or demo passwords had been checke
 ## V1 availability clarification — 25 October 2026
 
 Esandu clarified that V1 remains hosted on Vercel for function testing and must continue running alongside V2. This supersedes the 24 October interpretation that the V1 database was no longer needed. Preserve V1 and its current testing setup; do not remove or alter it as part of Task 10. V2 must use a separate new database and new credentials. Actual V2 local/hosted database settings have not been inspected or verified. Keeping V1 available does not resolve the exposed-login rotation or reuse review.
+
+## Owner-reported containment update — 30 October 2026
+
+Esandu identified Neon PostgreSQL as the V1 database provider and reported rotating the password and redeploying V1 through Vercel. The owner reported that Vercel now displays the affected settings as updated, and subsequently confirmed successful V1 login and access to member records.
+
+This is owner-reported password rotation and application smoke verification; no provider dashboard, credential values, fresh old-password rejection test, session invalidation or provider audit evidence was independently inspected. This update supersedes the earlier owner report that rotation had not occurred, without erasing that history.
+
+Remaining: verify the exposed credential is the rotated role/branch and fails on a fresh connection; confirm existing-session handling and affected branches/consumers (including local settings); complete private reuse and available access-log review; record source/history/artifact treatment, integrated scan and reviewer sign-off. Task 010 remains open pending these checks; no secret values are required in evidence.
+
+### Owner-reported password non-reuse — 30 October 2026
+
+When asked whether the exposed database password had been used in V2 or any other project/account, Esandu answered “no i havent used.” Record this as the owner's explicit non-reuse confirmation for that password. It supersedes the earlier absence of an owner answer on reuse; it is not an independently inspected inventory of environment stores, historical/generated demo passwords, logs or backups. No secret values were requested or inspected. Fresh old-credential rejection, existing-session handling, available access-log review, source/history/artifact treatment and integrated scanning/reviewer evidence remain outstanding.
+
+### Owner-reported completion of remaining follow-up — 30 October 2026
+
+After receiving instructions for (1) fresh old-password rejection verification, (2) review of available Neon activity records and role/session follow-up, and (3) removal of the hardcoded V1 credential and review of older copies, Esandu stated “I solved them.” Record this as the owner's report that those follow-up items were addressed, alongside the prior rotation, successful V1 smoke check and password non-reuse confirmations.
+
+No detailed outcomes, log coverage/retention, session-handling result, provider evidence reference, cleanup revision or history-treatment result were supplied in that reply. Do not infer a clean access history or independently verified remediation from this statement. The next agent should inspect local cleanup and integrated scanner/CI evidence without printing secrets, then reconcile reviewer sign-off and any missing external evidence. Do not repeat requests for the already supplied owner confirmations. Task 010 remains pending evidence reconciliation rather than being marked Verified/Completed solely from this report.
+
+## Finalization reconciliation — 30 October 2026
+
+Metadata-only local inspection still finds a credential-bearing PostgreSQL URL literal in V1 scripts/check-db.js. No secret was printed, no connection was attempted and V1 was not edited. Owner-reported follow-up completion therefore does not establish local source cleanup. Whether this literal is now revoked was not independently tested. Preserve the rotation/non-reuse/smoke attestations and reconcile this discrepancy before verified closure. See [finalization record](../SEGMENT_01_FINALIZATION.md).
+
+## Local cleanup recheck — 30 October 2026
+
+Owner requested reinspection after cleanup. Local scripts/check-db.js now uses process.env.DATABASE_URL, validates presence and contains no credential-bearing PostgreSQL URL literal. Earlier local source discrepancy is resolved. The script still logs a full owner record and raw errors, so it was not executed; safe-output review is outstanding. No V1 edits or database connections were performed. External rotation, V1 smoke success, non-reuse and follow-up remain owner-attested.

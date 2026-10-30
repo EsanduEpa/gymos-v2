@@ -1,5 +1,9 @@
 # GymOS V2 — Migration Decisions
 
+> **Latest owner disposition — 30 October 2026:** Esandu accepts project-owner responsibility for all six decision reviews; tasks 077/079/082–085 are completed policy tasks. Segment 01 is 21/23 verified tasks (overall 25/88). Task 008 has an owner-reported failed hosted run awaiting diagnosis; task 010 remains pending final evidence/logging reconciliation. The local V1 hardcoded connection string is now removed. This supersedes earlier pending-review/count/credential-literal statements below. [Details](SEGMENT_01_FINALIZATION.md).
+
+> **30 October 2026 owner scope update:** [Segment 01 finalization](SEGMENT_01_FINALIZATION.md) supersedes earlier member-plan-delivery exclusions and suspension-earning proposals. Tasks 051/052 include authenticated read-only member access to own assigned workout/meal plans; trainer health access expires after 90 days as specified in DEC-09. Original inventory counts are not re-estimated effort. Owner finalization is recorded; separate accountable review remains pending.
+
 Supporting register for [Master Plan §28](MIGRATION_EXECUTION_PLAN.md#28-open-architectural-decisions). Master Plan/task specifications control scope. No decision here is implicitly approved by this new planning exercise. Existing approved decisions below are carried forward from the four supplied maps, especially Functionality/Database §14.1 and UI §18.
 
 ## Settled product constraints

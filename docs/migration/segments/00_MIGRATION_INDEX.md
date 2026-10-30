@@ -1,5 +1,9 @@
 # GymOS V1 → V2 Feature Migration Index
 
+> **Latest owner disposition — 30 October 2026:** Esandu accepts project-owner responsibility for all six decision reviews; tasks 077/079/082–085 are completed policy tasks. Segment 01 is 21/23 verified tasks (overall 25/88). Task 008 has an owner-reported failed hosted run awaiting diagnosis; task 010 remains pending final evidence/logging reconciliation. The local V1 hardcoded connection string is now removed. This supersedes earlier pending-review/count/credential-literal statements below. [Details](../SEGMENT_01_FINALIZATION.md).
+
+> **Current disposition — 30 October 2026:** [Finalization record](../SEGMENT_01_FINALIZATION.md) supersedes historical no-remote/unrotated reports and pending-owner-answer wording below. Owner finalization and credential remediation reports are recorded. Hosted verification, accountable review and local source-cleanup reconciliation remain open. Verified counts stay 15/23 for Segment 01 and 19/88 overall.
+
 > **Audit baseline:** 25 October 2026. **Purpose:** execution navigation, not implementation evidence. V1 remains the behavioral/UI reference; V2's approved Master/tenant architecture is the technical target. The authoritative task details remain in [`../MIGRATION_TASK_SPECS.md`](../MIGRATION_TASK_SPECS.md), and live evidence remains in [`../evidence/`](../evidence/).
 
 ## 1. Objective and authority

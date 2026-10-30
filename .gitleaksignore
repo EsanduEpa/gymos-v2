@@ -1,0 +1,34 @@
+# Reviewed historical false positives only; new findings remain blocking.
+# File-content preservation digests, policy prose and the upstream Nest README demo badge token.
+# See docs/migration/evidence/GYMOS-MIG-008.md for review scope.
+6f3358c0c7541ba72ff6a173166965182368313e:docs/migration/segments/MIGRATION_SEGMENTATION_QA.md:generic-api-key:31
+af64358fc80e7d5db2e4b51f42c603c8ccaa6fc2:docs/migration/evidence/GYMOS-MIG-014/preservation.json:generic-api-key:14
+af64358fc80e7d5db2e4b51f42c603c8ccaa6fc2:docs/migration/evidence/GYMOS-MIG-014/preservation.json:generic-api-key:105
+af64358fc80e7d5db2e4b51f42c603c8ccaa6fc2:docs/migration/evidence/GYMOS-MIG-014/preservation.json:generic-api-key:120
+af64358fc80e7d5db2e4b51f42c603c8ccaa6fc2:docs/migration/evidence/GYMOS-MIG-014/preservation.json:generic-api-key:125
+af64358fc80e7d5db2e4b51f42c603c8ccaa6fc2:docs/migration/evidence/GYMOS-MIG-014/preservation.json:generic-api-key:126
+af64358fc80e7d5db2e4b51f42c603c8ccaa6fc2:docs/migration/evidence/GYMOS-MIG-014/preservation.json:generic-api-key:130
+af64358fc80e7d5db2e4b51f42c603c8ccaa6fc2:docs/migration/evidence/GYMOS-MIG-014/preservation.json:generic-api-key:135
+af64358fc80e7d5db2e4b51f42c603c8ccaa6fc2:docs/migration/evidence/GYMOS-MIG-014/preservation.json:generic-api-key:173
+af64358fc80e7d5db2e4b51f42c603c8ccaa6fc2:docs/migration/evidence/GYMOS-MIG-014/preservation.json:generic-api-key:264
+af64358fc80e7d5db2e4b51f42c603c8ccaa6fc2:docs/migration/evidence/GYMOS-MIG-014/preservation.json:generic-api-key:279
+af64358fc80e7d5db2e4b51f42c603c8ccaa6fc2:docs/migration/evidence/GYMOS-MIG-014/preservation.json:generic-api-key:284
+af64358fc80e7d5db2e4b51f42c603c8ccaa6fc2:docs/migration/evidence/GYMOS-MIG-014/preservation.json:generic-api-key:285
+af64358fc80e7d5db2e4b51f42c603c8ccaa6fc2:docs/migration/evidence/GYMOS-MIG-014/preservation.json:generic-api-key:289
+af64358fc80e7d5db2e4b51f42c603c8ccaa6fc2:docs/migration/evidence/GYMOS-MIG-014/preservation.json:generic-api-key:294
+4105398b159e7ebc32e2702d0c5ce9d579bde531:docs/migration/MIGRATION_EXECUTION_PLAN.md:generic-api-key:151
+4105398b159e7ebc32e2702d0c5ce9d579bde531:docs/migration/MIGRATION_EXECUTION_PLAN.md:generic-api-key:408
+4105398b159e7ebc32e2702d0c5ce9d579bde531:docs/migration/evidence/GYMOS-MIG-003/task-files.json:generic-api-key:7
+4105398b159e7ebc32e2702d0c5ce9d579bde531:docs/migration/evidence/GYMOS-MIG-003/task-files.json:generic-api-key:8
+4105398b159e7ebc32e2702d0c5ce9d579bde531:docs/migration/evidence/GYMOS-MIG-010.md:generic-api-key:31
+4105398b159e7ebc32e2702d0c5ce9d579bde531:docs/migration/evidence/GYMOS-MIG-001/initial-state.json:generic-api-key:16
+4105398b159e7ebc32e2702d0c5ce9d579bde531:docs/migration/evidence/GYMOS-MIG-001/initial-state.json:generic-api-key:107
+4105398b159e7ebc32e2702d0c5ce9d579bde531:docs/migration/evidence/GYMOS-MIG-001/initial-state.json:generic-api-key:118
+4105398b159e7ebc32e2702d0c5ce9d579bde531:docs/migration/evidence/GYMOS-MIG-001/initial-state.json:generic-api-key:123
+4105398b159e7ebc32e2702d0c5ce9d579bde531:docs/migration/evidence/GYMOS-MIG-001/initial-state.json:generic-api-key:124
+4105398b159e7ebc32e2702d0c5ce9d579bde531:docs/migration/evidence/GYMOS-MIG-001/initial-state.json:generic-api-key:128
+4105398b159e7ebc32e2702d0c5ce9d579bde531:docs/migration/evidence/GYMOS-MIG-001/initial-state.json:generic-api-key:133
+4105398b159e7ebc32e2702d0c5ce9d579bde531:docs/migration/evidence/GYMOS-MIG-001/initial-state.json:generic-api-key:178
+4105398b159e7ebc32e2702d0c5ce9d579bde531:docs/migration/evidence/GYMOS-MIG-001/initial-state.json:generic-api-key:179
+4105398b159e7ebc32e2702d0c5ce9d579bde531:docs/migration/evidence/GYMOS-MIG-001/initial-state.json:generic-api-key:181
+a2df3629832075a787ebe50a8e12b100c96d3690:apps/api/README.md:generic-api-key:5

@@ -1,9 +1,9 @@
 # DEC-03 — Read-only support scope and expiry
 
-- Status: **Blocked — concrete proposal awaiting project-owner approval.**
+- Status: **Approved by project owner Esandu — 30 October 2026.**
 - Prepared: 26 October 2026, Asia/Colombo.
 - Resolution task: [GYMOS-MIG-079](../MIGRATION_TASK_SPECS.md#task-id-gymos-mig-079).
-- Accountable reviewer: project owner with Platform security + Product.
+- Accountable reviewer: Esandu, project owner; owner explicitly accepts the decision-review responsibilities.
 - Authority: Master Plan; Database map DB08; Functionality map F-D05.
 
 ## Preserved approved requirements
@@ -53,4 +53,12 @@ These are future implementation tests. No application behavior is claimed by thi
 
 ## Approval record
 
-Awaiting the project owner's explicit approval or requested changes. Until then DEC-03 and GYMOS-MIG-079 remain blocked.
+Project owner Esandu requested finalization on 30 October 2026 after discussing the proposals and confirming the business amendments. Record owner authorization to finalize these proposals with those amendments. No separate accountable reviewer approval is claimed; reviewer sign-off remains pending.
+
+## Finalization boundary — 30 October 2026
+
+Owner authorization is recorded from this conversation. Historical proposal/preparation statements above describe earlier checkpoints. This document does not establish feature implementation or replace outstanding accountable review. See [finalization record](../SEGMENT_01_FINALIZATION.md) for current verification and scope.
+
+## Final owner review disposition — 30 October 2026
+
+Esandu explicitly stated that decision review will be performed by the project owner and that this is acceptable. This supersedes the separate-reviewer gate and historical pending-review statements above. DEC-03 is approved under owner review with the recorded amendments. No independent specialist review is claimed. This approves policy, not implementation or production release.

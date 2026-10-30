@@ -11,3 +11,11 @@ Status: **Blocked awaiting project-owner and accountable reviewer approval.** A 
 - Not performed: application/schema change, export, notification poll, provider interaction, project-owner approval, deployment, V1 modification, or customer-data access.
 
 After explicit approval, record actual reviewers/date/result in DEC-09; update the decision register, task spec, tracker and affected segment handoffs together. Dependent implementation tasks may use only the approved result.
+
+## Finalization update — 30 October 2026
+
+Project owner Esandu requested finalization after the recorded business confirmations. Owner finalization is recorded in the associated decision. Separate accountable reviewer sign-off has not been supplied and is not invented. Task remains pending that review and consistency verification; no application implementation is claimed. See [current finalization record](../SEGMENT_01_FINALIZATION.md).
+
+## Completed decision disposition — 30 October 2026
+
+Project owner Esandu accepted responsibility for decision review and approved finalization with the recorded amendments. This explicitly supersedes the separate reviewer requirement and prior blocked status. Decision task 085 is Completed as a documentation/policy task; no application implementation is claimed. Linked decision and owner scope amendments are the acceptance authority. Static diff/link checks apply; application tests do not establish decision approval.

@@ -1,5 +1,7 @@
 # GymOS V1 → V2: Database, Schema and Data-Ownership Map
 
+> **30 October 2026 owner scope update:** [Segment 01 finalization](SEGMENT_01_FINALIZATION.md) supersedes earlier member-plan-delivery exclusions and suspension-earning proposals. Tasks 051/052 include authenticated read-only member access to own assigned workout/meal plans; trainer health access expires after 90 days as specified in DEC-09. Original inventory counts are not re-estimated effort. Owner finalization is recorded; separate accountable review remains pending.
+
 ## 1. Scope and evidence
 
 **23 October 2026. Documentation only; fresh development schemas.** Old development records will be discarded and **fresh fixtures created later** in a separately authorized task. **No V1-record transfer, ETL, account/user import, old-to-new ID translation, preservation of existing IDs, or record migration is required or planned.** Mapping a V1 field below means allocating its responsibility in a new design, not copying its values.

@@ -1,5 +1,7 @@
 # GymOS V2 — Authoritative Task Specifications
 
+> **30 October 2026 owner scope update:** [Segment 01 finalization](SEGMENT_01_FINALIZATION.md) supersedes earlier member-plan-delivery exclusions and suspension-earning proposals. Tasks 051/052 include authenticated read-only member access to own assigned workout/meal plans; trainer health access expires after 90 days as specified in DEC-09. Original inventory counts are not re-estimated effort. Owner finalization is recorded; separate accountable review remains pending.
+
 This is the task-detail appendix of [Master Plan §12](MIGRATION_EXECUTION_PLAN.md#12-complete-task-breakdown-with-unique-ids), not a second roadmap. IDs/dependencies/status below are the authoritative definitions; the Master Plan index and tracker are synchronized views. All target paths labeled proposed are future work. Initial planning statuses were **Not Started**; live task statuses and evidence are maintained below. Source inspected23 October2026; no implementation is claimed.
 
 ## Task ID: GYMOS-MIG-001

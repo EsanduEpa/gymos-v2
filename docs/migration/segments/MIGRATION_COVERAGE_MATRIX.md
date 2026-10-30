@@ -1,5 +1,9 @@
 # Migration Coverage Matrix
 
+> **Latest owner disposition — 30 October 2026:** Esandu accepts project-owner responsibility for all six decision reviews; tasks 077/079/082–085 are completed policy tasks. Segment 01 is 21/23 verified tasks (overall 25/88). Task 008 has an owner-reported failed hosted run awaiting diagnosis; task 010 remains pending final evidence/logging reconciliation. The local V1 hardcoded connection string is now removed. This supersedes earlier pending-review/count/credential-literal statements below. [Details](../SEGMENT_01_FINALIZATION.md).
+
+> **Current disposition — 30 October 2026:** [Finalization record](../SEGMENT_01_FINALIZATION.md) supersedes historical no-remote/unrotated reports and pending-owner-answer wording below. Owner finalization and credential remediation reports are recorded. Hosted verification, accountable review and local source-cleanup reconciliation remain open. Verified counts stay 15/23 for Segment 01 and 19/88 overall.
+
 This matrix assigns every authoritative task and every V1 route responsibility to one owning segment. A dependency may consume an outcome but must not duplicate ownership. Status is evidence-backed as of 25 October 2026.
 
 ## 1. Authoritative task coverage (88/88 assigned)
@@ -82,15 +86,15 @@ This matrix assigns every authoritative task and every V1 route responsibility t
 | GYMOS-MIG-074 | Member mobile flows | M01–M03 behavior | proposed member native screens | 11 | GYMOS-MIG-074 | NOT STARTED |
 | GYMOS-MIG-075 | Trainer mobile flows | T01/T02/T03/T06 behavior | proposed trainer native screens | 11 | GYMOS-MIG-075 | NOT STARTED |
 | GYMOS-MIG-076 | Mobile tests/releases | approved mobile scope | Android/iOS pipelines | 11 | GYMOS-MIG-076 | NOT STARTED |
-| GYMOS-MIG-077 | Decide config ownership | O12/data map | DEC-01 | 01 | GYMOS-MIG-077 | BLOCKED — approval |
+| GYMOS-MIG-077 | Decide config ownership | O12/data map | DEC-01 | 01 | GYMOS-MIG-077 | COMPLETED (owner-reviewed decision) |
 | GYMOS-MIG-078 | Decide identity policy | A01/A02 | DEC-02 | 01 | GYMOS-MIG-078 | COMPLETED |
-| GYMOS-MIG-079 | Decide support scope | S01 | DEC-03 | 01 | GYMOS-MIG-079 | BLOCKED — approval |
+| GYMOS-MIG-079 | Decide support scope | S01 | DEC-03 | 01 | GYMOS-MIG-079 | COMPLETED (owner-reviewed decision) |
 | GYMOS-MIG-080 | Decide operation protocol | multi-write actions | DEC-04 | 01 | GYMOS-MIG-080 | COMPLETED |
 | GYMOS-MIG-081 | Decide schema/pool/recovery | database architecture | DEC-05 | 01 | GYMOS-MIG-081 | COMPLETED |
-| GYMOS-MIG-082 | Decide money/earning | pricing/financials | DEC-06 | 01 | GYMOS-MIG-082 | BLOCKED — approval |
-| GYMOS-MIG-083 | Decide time/term/scheduling | sessions/memberships | DEC-07 | 01 | GYMOS-MIG-083 | BLOCKED — approval |
-| GYMOS-MIG-084 | Decide settlement/payroll | session/payroll actions | DEC-08 | 01 | GYMOS-MIG-084 | BLOCKED — approval |
-| GYMOS-MIG-085 | Decide coaching/privacy/export | plans/analytics/exports | DEC-09 | 01 | GYMOS-MIG-085 | BLOCKED — approval; proposal prepared 30 Oct |
+| GYMOS-MIG-082 | Decide money/earning | pricing/financials | DEC-06 | 01 | GYMOS-MIG-082 | COMPLETED (owner-reviewed decision) |
+| GYMOS-MIG-083 | Decide time/term/scheduling | sessions/memberships | DEC-07 | 01 | GYMOS-MIG-083 | COMPLETED (owner-reviewed decision) |
+| GYMOS-MIG-084 | Decide settlement/payroll | session/payroll actions | DEC-08 | 01 | GYMOS-MIG-084 | COMPLETED (owner-reviewed decision) |
+| GYMOS-MIG-085 | Decide coaching/privacy/export | plans/analytics/exports | DEC-09 | 01 | GYMOS-MIG-085 | COMPLETED (owner-reviewed decision) |
 | GYMOS-MIG-086 | Decide routes/Classic/brand | all web UI | DEC-10 | 01 | GYMOS-MIG-086 | COMPLETED |
 | GYMOS-MIG-087 | Decide provider/release | deployment unknowns | DEC-11 | 10 | GYMOS-MIG-087 | NOT STARTED |
 | GYMOS-MIG-088 | Decide mobile scope | no V1 mobile | DEC-12 | 11 | GYMOS-MIG-088 | NOT STARTED |

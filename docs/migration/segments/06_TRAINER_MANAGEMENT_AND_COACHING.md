@@ -12,7 +12,7 @@ Read O05–O07, M01, T02–T05 and DEC-07/09; verify identity/config/member/sess
 - **Priority / complexity:** High / Large.
 - **Dependencies:** segments 02–05; session booking/confirmation/read tasks 041/042/044; DEC-07/09.
 - **In scope:** GYMOS-MIG-036–039,050–052.
-- **Out of scope:** member plan-delivery UI, progress/community/ratings, global trainer marketplace, nutrition automation.
+- **Out of scope:** progress/community/ratings, global trainer marketplace, nutrition automation.
 
 ## 2. Current V1 implementation
 
@@ -65,7 +65,7 @@ Use contract tests, tenant DB service/integration tests, identity/operation fail
 
 ## 10. Agent checkpoints
 
-Stop until DEC-09 fixes relationship, privacy, metrics, limits and meal-day mapping. Do not create member plan delivery, progress, ratings, or community UI. Do not infer authorization from `clientId` query parameters.
+Stop until DEC-09 fixes relationship, privacy, metrics, limits and meal-day mapping. Include authenticated read-only member viewing of own assigned workout/meal plans under tasks 051/052 per the owner scope amendment. Do not create progress, ratings, or community UI. Do not infer authorization from `clientId` query parameters.
 
 ## 11. Progress and handoff
 
@@ -75,3 +75,7 @@ Stop until DEC-09 fixes relationship, privacy, metrics, limits and meal-day mapp
 - **Next recommended task:** GYMOS-MIG-036; execute 050 only after sessions establish confirmed relationships.
 - **Files/tests/issues/blockers/decisions:** _fill during execution_
 
+
+## Owner scope amendment — 30 October 2026
+
+Tasks 051/052 also own member read APIs/pages and assignment verification. Follow the [finalization acceptance requirements](../SEGMENT_01_FINALIZATION.md). Original seven task IDs are retained; scope and effort have increased. No member plan feature is implemented by this update.

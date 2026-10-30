@@ -1,9 +1,9 @@
 # DEC-09 — Coaching privacy, metrics, exports and refresh guarantees
 
-- Status: **Blocked — concrete proposal awaiting project-owner approval.**
+- Status: **Approved by project owner Esandu — 30 October 2026.**
 - Prepared: 30 October 2026, Asia/Colombo.
 - Resolution task: [GYMOS-MIG-085](../MIGRATION_TASK_SPECS.md#task-id-gymos-mig-085).
-- Accountable reviewer: project owner with Coaching/Privacy + Finance + Frontend.
+- Accountable reviewer: Esandu, project owner; owner explicitly accepts the decision-review responsibilities.
 - Authority: Master Plan; Database Map DB10/DB12; Functionality Map F-D12/D15/D17/D18/D19.
 
 ## Preserved approved requirements
@@ -16,7 +16,7 @@ Health notes remain tenant-owned and visible only to the owner and a trainer wit
 |---|---|
 | Confirmed trainer/member relationship | A trainer may read the member's T03 profile, health notes and plans only while the same-gym identity is linked to that trainer and member and either a same-gym session between them is `SCHEDULED` or `ACTIVE`, or their most recent completed session was within the last 90 days. Owner-confirmed 30 October 2026: completed-session-based access expires 90 days after the last completed session; a new confirmed booking can restore access. `PENDING_CONFIRMATION`, `DECLINED`, `CANCELLED` and `MISSED` alone do not grant access. Recheck this predicate on every request; a revoked/deactivated identity or tenant actor denies access even if old sessions remain. Owners retain gym-scoped access. Owner-confirmed first-release scope includes authenticated member pages/APIs to view only their own assigned workout and meal plans; builders remain trainer-only. Assignment, publication and historical visibility contracts must be reconciled in the migration tasks before implementation. |
 | Health and session notes | `healthNotes` is returned only in explicit owner and confirmed-related-trainer projections, never in directory/list/export/notification/audit/support-summary DTOs. Session notes remain visible to the member and the authorized owner/assigned trainer as in the V1 session cards; edit only by assigned trainer or owner while the session is `COMPLETED`, matching the rendered T01 control. Normalize line endings; maximum 4,000 Unicode code points; reject unknown fields and over-limit text with a field error. Empty string clears notes only when submitted intentionally. |
-| Relationship revocation | Losing all qualifying session states removes trainer read access immediately on the next request. Deactivation, gym suspension, revoked access or broken reciprocal actor binding denies access regardless of session history. Do not copy health text into Master, global audit, notification, search index or logs. |
+| Relationship revocation | Losing all qualifying scheduled/active sessions and reaching 90 days after the last completion removes trainer read access on the next request. At exactly completion time plus 90 elapsed days access expires; a confirmed booking restores eligibility. Use server UTC instants for this expiry. Deactivation, gym suspension, revoked access or broken reciprocal actor binding denies access regardless of session history. Do not copy health text into Master, global audit, notification, search index or logs. |
 | Workout plan bounds and units | Preserve the rendered fields: plan title 1–120 chars; 1–100 exercise rows; exercise name 1–120 chars; sets integer 1–100; reps nullable integer 1–1,000; weight nullable decimal 0–1,000 kg to at most 3 fractional digits; duration nullable integer 1–1,440 minutes; notes nullable up to 4,000 code points. `0` weight/reps is preserved only where the field permits it; null means omitted. Duration/notes may be stored if accepted by the existing action contract, but no new visible controls are invented. |
 | Meal plan day mapping | Store canonical ISO weekday `1=Monday … 7=Sunday` (not JavaScript's Sunday-zero convention). The V1 builder initializes rows to numeric `1` and offers no day selector; its persistence schema comment says `0..6`. The V2 form should display Monday as the preserved default and make day selection explicit only if the approved UI task accepts that necessary correction. Migration/API adapters must reject `0`, map no existing customer rows (fresh V2 only), and never silently reinterpret `1` as Sunday. |
 | Meal plan bounds | Plan title 1–120 chars; 1–100 entries; food description 1–500 chars; one of the six V1 values `Breakfast`, `Lunch`, `Dinner`, `Snack`, `Pre-Workout`, `Post-Workout`; calories nullable integer 0–100,000 kcal; protein/carbs/fats nullable decimal 0–10,000 g with at most 2 fractional digits. All values are nonnegative; explicit zero is distinct from null. Live totals are derived from the draft and recomputed/validated by the server on save. |
@@ -33,7 +33,7 @@ These numbers and semantics are **recommendations**, not approved policy. The ow
 
 | Alternative | Tradeoff versus proposal |
 |---|---|
-| Any historical trainer/member session grants indefinite relationship | Easier to retain access, but canceled/declined/stale relationships could expose health data indefinitely. The active/confirmed state set is narrower and rechecked per request. |
+| Any historical trainer/member session grants indefinite relationship (rejected) | Easier to retain access, but canceled/declined/stale relationships could expose health data indefinitely. The active/confirmed state set is narrower and rechecked per request. |
 | Persist zero-based meal days to match the schema comment | Avoids a migration rename, but V1 UI submits `1` as its default and has no selector; interpreting this as Sunday silently changes meaning. ISO weekday makes boundary semantics explicit. |
 | Unlimited profile/CSV results | Fewer paging controls, but unbounded health/report reads can exhaust the tenant DB or disclose more than the visible UI. Bounded windows/caps are explicit. |
 | Real-time cross-role push | Faster apparent synchronization, but requires device/subscription lifecycle and delivery guarantees beyond V1. Poll/revalidate gives bounded active-session freshness without new push scope. |
@@ -64,8 +64,16 @@ These are future tests. No app, DB, browser, export or push behavior is claimed 
 
 ## Approval record
 
-Awaiting the project owner's explicit approval or requested changes, with Coaching/Privacy, Finance and Frontend review. Until recorded, DEC-09 and GYMOS-MIG-085 remain **Blocked**.
+Project owner Esandu requested finalization on 30 October 2026 after discussing the proposals and confirming the business amendments. Record owner authorization to finalize these proposals with those amendments. No separate accountable reviewer approval is claimed; reviewer sign-off remains pending.
 
 ## Project-owner clarification — 30 October 2026
 
 The owner selected a 90-day completed-session privacy window and explicitly included member login/viewing of assigned workout and meal plans in the first release, together with PT sessions. These instructions supersede earlier member-delivery exclusions in migration documents. The remaining maps/task acceptance criteria require scope reconciliation before implementation; no new feature is claimed complete and the 88-task inventory has not been re-estimated. Other DEC-09 details and reviewer sign-off remain pending.
+
+## Finalization boundary — 30 October 2026
+
+Owner authorization is recorded from this conversation. Historical proposal/preparation statements above describe earlier checkpoints. This document does not establish feature implementation or replace outstanding accountable review. See [finalization record](../SEGMENT_01_FINALIZATION.md) for current verification and scope.
+
+## Final owner review disposition — 30 October 2026
+
+Esandu explicitly stated that decision review will be performed by the project owner and that this is acceptable. This supersedes the separate-reviewer gate and historical pending-review statements above. DEC-09 is approved under owner review with the recorded amendments. No independent specialist review is claimed. This approves policy, not implementation or production release.

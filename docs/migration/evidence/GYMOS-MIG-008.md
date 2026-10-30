@@ -37,3 +37,23 @@ The first Webpack-free build attempt hit the local sandbox's blocked helper port
 ## Hosted checks not run
 
 `git remote` returns no configured remote. No pull request or hosted workflow run exists, so GitHub secret scanning and its dependency-review action have not executed on this revision. The workflow is committed for the first pull request. Do not treat its hosted jobs as passed until that run succeeds. V1 credential revocation, reuse investigation and external access review remain Task 10 evidence and are not inferred from this local dependency audit. Task 008 remains open until hosted PR checks and the high-severity lockfile audit can be verified.
+
+## Remote verification update — 30 October 2026
+
+Origin is now configured for EsanduEpa/gymos-v2. Public GitHub workflow-run and pull-request API reads returned HTTP 404; this does not prove that no runs exist. Authenticated hosted evidence is still required. No workflow was triggered and no local test result was substituted for hosted checks.
+
+## Owner-reported hosted failure — 30 October 2026
+
+Owner reports Run workflow failed. Exact run URL, failed job and first error are requested because public API access returned 404 and no authenticated GitHub client is available locally. No cause or passing hosted result is inferred.
+
+Owner supplied run https://github.com/EsanduEpa/gymos-v2/actions/runs/41009603800. Opening it in the available browser displayed GitHub Page not found, consistent with unavailable repository access; no job logs were visible. Failed-job error text or authenticated access is needed to diagnose the run.
+
+## Authenticated Chrome diagnosis and local repair — 30 October 2026
+
+Authenticated Google Chrome exposed run https://github.com/EsanduEpa/gymos-v2/actions/runs/41009603800 at revision e72ccea32ad6f61ffa95c01b52e38a666f391b33. This supersedes the earlier inaccessible-run observation. Workspace install, lint and online lockfile audit passed; dependency review was skipped on manual dispatch. Build/type/unit/recovery lacked generated Prisma clients or built shared exports; disposable tests lacked the postgres:17 image; browser lacked built application artifacts.
+
+Repairs: `pnpm prepare:checks` generates both clients directly from schema without environment/database inputs and builds shared packages. Each consuming CI job runs it. Owned database/browser/recovery jobs pull postgres:17 explicitly; the harness still refuses automatic pulls and unowned targets. Browser CI builds applications before launching production servers.
+
+Gitleaks 8.30.1 reproduced all 31 historical findings locally with redaction. Review against each referenced commit classified 26 preservation-file SHA digests, four documentation-prose matches and one upstream Nest README badge demonstration token. Exact historical fingerprints are recorded in .gitleaksignore; no rule or file/path exclusion was added. The demo token query was removed from the current README. Reviewed-history scan reports zero remaining findings; new findings remain blocking.
+
+Local verification after repair (all exit 0): prepare:checks; build:workspace; typecheck:workspace; test:unit (18 contracts, 12 client, 5 theme, 19 API, 23 pool tests); lint:workspace; owned database tests (3); recovery drill (1, eight owned databases cleaned); browser isolation/accessibility/branding (3, six owned databases cleaned); redacted Gitleaks history scan; git diff --check. Docker suites ran only under explicit owned-fixture opt-in. These results do not substitute for a hosted PR run on the repaired revision. No real provider database, credential or V1 source was changed.

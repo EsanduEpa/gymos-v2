@@ -1,5 +1,7 @@
 # GymOS V1 → V2: Functionality Migration Map
 
+> **30 October 2026 owner scope update:** [Segment 01 finalization](SEGMENT_01_FINALIZATION.md) supersedes earlier member-plan-delivery exclusions and suspension-earning proposals. Tasks 051/052 include authenticated read-only member access to own assigned workout/meal plans; trainer health access expires after 90 days as specified in DEC-09. Original inventory counts are not re-estimated effort. Owner finalization is recorded; separate accountable review remains pending.
+
 ## 1. Scope, evidence and how to use this map
 
 **Assessment date: 23 October 2026. Documentation only.** The corrected [UI migration map](/Users/esanduepa/Desktop/Projects/gymos-v2/docs/migration/UI_MIGRATION_MAP.md) supplies route IDs, screens and interaction coverage. Behavior below was checked directly in V1 pages/components, all 14 action files (**44 exported async actions**), authorization/authentication/pricing/audit/notification helpers, CSV HTTP handler, and current V2 controllers/guards/web consumers. No application, schema, dependency or database changes were made. No server was started; no database, API or state-changing workflow was invoked. **Application/API runtime verification, screenshots and end-to-end tests: none.** The only executed check was the isolated, side-effect-free V1 session-rate validator/projection check EV01 (section 8.1), using installed Zod 3.25.76; it did not import or invoke a Server Action, Prisma or database. Acceptance tests in section 15 remain future requirements, not results.

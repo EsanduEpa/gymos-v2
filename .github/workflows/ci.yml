@@ -48,6 +48,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - run: pnpm prepare:checks
       - run: pnpm build:workspace
 
   lint:
@@ -64,6 +65,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - run: pnpm prepare:checks
       - run: pnpm lint:workspace
 
   typecheck:
@@ -80,6 +82,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - run: pnpm prepare:checks
       - run: pnpm typecheck:workspace
 
   unit:
@@ -96,6 +99,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - run: pnpm prepare:checks
       - run: pnpm test:unit
 
   disposable-database:
@@ -114,6 +118,8 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - run: pnpm prepare:checks
+      - run: docker pull postgres:17
       - run: pnpm test:database:owned
       - if: always()
         run: |
@@ -144,6 +150,9 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - run: pnpm prepare:checks
+      - run: docker pull postgres:17
+      - run: pnpm build:workspace
       - run: pnpm --dir apps/web exec playwright install --with-deps chromium
       - run: pnpm test:isolated
       - if: always()
@@ -175,6 +184,8 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - run: pnpm prepare:checks
+      - run: docker pull postgres:17
       - run: pnpm test:recovery:owned
       - if: always()
         run: |

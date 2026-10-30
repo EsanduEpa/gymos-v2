@@ -11,6 +11,7 @@ Run these commands from the repository root:
 ```sh
 pnpm install --frozen-lockfile
 pnpm check:workspace
+pnpm prepare:checks
 pnpm build:workspace
 pnpm lint:workspace
 pnpm typecheck:workspace
@@ -34,3 +35,9 @@ An unset required API setting fails with a sanitized configuration error when th
 ## Hosted verification
 
 The workflow runs on pull requests. A local run proves the same checked-in commands and disposable suites but does not replace a hosted pull-request run. Record the actual revision and CI run URL in `docs/migration/evidence/GYMOS-MIG-008.md` after the repository is connected to a Git remote and the workflow has run. A skipped or unavailable hosted job is not a passing result.
+
+## Clean-runner prerequisites
+
+Every code-consuming hosted job runs `pnpm prepare:checks` to generate both Prisma clients from schemas without database URLs and build shared package exports. Generated clients and package dist files are ignored outputs and are absent from a fresh checkout. Database/browser/recovery jobs explicitly pull `postgres:17` before the ownership-safe harness invokes `docker run --pull=never`. Browser jobs build both applications before starting production servers.
+
+`.gitleaksignore` lists only exact reviewed historical fingerprints for preservation-file SHA digests, policy prose, and the upstream Nest README demonstration badge token. It does not exclude files, disable rules or allow future credentials. The placeholder badge token was removed from the current README.
