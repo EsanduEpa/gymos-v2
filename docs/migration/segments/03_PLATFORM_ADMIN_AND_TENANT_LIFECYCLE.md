@@ -102,9 +102,9 @@ Stop if DEC-03 is unapproved, provider limits are needed for a production claim,
 
 ## 11. Progress and handoff
 
-- **Status:** BLOCKED before implementation (26 October 2026)
+- **Current status:** WAITING FOR PREREQUISITES (30 October 2026); decision gates DEC-01/03/06/07/08/09 applicable to this segment are approved.
 - **Completed:** none
 - **Remaining:** 021–026
-- **Files/tests/issues/blockers/decisions:** Execution stopped at the segment checkpoint because DEC-03 remains open (GYMOS-MIG-079). GYMOS-MIG-021 also needs the unresolved DEC-01/DEC-06 currency and timezone policy inputs. No application files or task statuses were changed. Run issues are recorded in [SEGMENT_RUN_ISSUES.md](../SEGMENT_RUN_ISSUES.md).
+- **Files/tests/issues/blockers/decisions:** The 26 October checkpoint below is historical. Current prerequisites are Segment 02 shell/session work; policy decisions 077/079/082/083 are completed. Segment 03 implementation tasks remain Not Started. No Segment 03 application work was performed during Segment 01 closure. Run history is in [SEGMENT_RUN_ISSUES.md](../SEGMENT_RUN_ISSUES.md).
 - **Next recommended task:** GYMOS-MIG-021 after segment 02 authorization prerequisites.
 

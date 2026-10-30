@@ -1,9 +1,9 @@
 # GymOS migration completion runbook — GYMOS-MIG-001 through GYMOS-MIG-010
 
-Last updated: 24 October 2026, Asia/Colombo
-Working branch: `codex/gymos-mig-001-010`
+Last updated: 30 October 2026, Asia/Colombo
+Current closure branch: `codex/segment-01-ci-finalization` (PR #1 remains draft/unmerged)
 
-This is the continuation checklist for completing tasks GYMOS-MIG-001 through GYMOS-MIG-010. The authoritative requirements remain [MIGRATION_TASK_SPECS.md](MIGRATION_TASK_SPECS.md), the four migration maps and approved [DEC-02](decisions/DEC-02.md), [DEC-04](decisions/DEC-04.md) and [DEC-05](decisions/DEC-05.md). This runbook records the current implementation state and the remaining execution order; it does not broaden product scope or authorize production/shared-database operations.
+This is the historical continuation checklist for tasks GYMOS-MIG-001 through GYMOS-MIG-010. Its early no-remote and open-credential entries are checkpoints, superseded by [Segment 01 finalization](SEGMENT_01_FINALIZATION.md). The current tracker/evidence are authoritative. It does not authorize production/shared-database operations.
 
 The detailed remaining implementation sequence, responsibilities, integration limitations and acceptance gates after checkpoint `4105398` are in [GYMOS_MIG_005_010_REMAINING_WORK_PLAN.md](GYMOS_MIG_005_010_REMAINING_WORK_PLAN.md).
 
@@ -31,9 +31,9 @@ The detailed remaining implementation sequence, responsibilities, integration li
 | GYMOS-MIG-005 | Completed | Preserve verifier/gate evidence; rerun affected cases after task006 changes database leasing. |
 | GYMOS-MIG-006 | Completed | Preserve bounded-pool and safe-shutdown evidence; reuse the lifecycle in task007. |
 | GYMOS-MIG-007 | Completed | Preserve the owned database/browser harness and evidence; task008 adds it to CI. |
-| GYMOS-MIG-008 | In progress | Local checks pass; hosted PR scanner/review awaits a configured Git remote. See task008 evidence. |
+| GYMOS-MIG-008 | Completed | All 11 hosted checks passed at `49217dd` in [run 41011340034](https://github.com/EsanduEpa/gymos-v2/actions/runs/41011340034). See task008 evidence. |
 | GYMOS-MIG-009 | Completed for local disposable recovery drill | See [GYMOS-MIG-009 evidence](evidence/GYMOS-MIG-009.md) and [backup/restore runbook](runbooks/backup-restore.md). Managed/staging drill remains under Task 070; restored Master is intentionally unactivated pending repair. |
-| GYMOS-MIG-010 | Blocked on external remediation | Esandu confirmed on 25 October that rotation/revocation has not happened and reuse has not been checked. Treat the V1 login as exposed; obtain provider containment and reuse/access-investigation evidence without recording the credential. Refreshed V2 source scan is in the evidence file. |
+| GYMOS-MIG-010 | Completed with evidence boundary | External remediation/follow-up is owner-attested; local hardcoded URL removal and V2 scanning are independently verified. Provider audit logs and historical access remain unverified. See task010 evidence and R18. |
 
 Required order:
 
@@ -204,6 +204,8 @@ Required completion steps:
 Task007 completion gate: a failed or parallel run cannot touch any resource it did not create and revalidate, and browser success is backed by physical two-tenant database evidence.
 
 ## GYMOS-MIG-008 — workspace checks and isolated CI
+
+Historical checkpoint — 25 October 2026; superseded by the hosted verification recorded in [current evidence](evidence/GYMOS-MIG-008.md).
 
 Status: in progress; local implementation verified on 25 October 2026. Hosted pull-request scan/review remains pending because this checkout has no Git remote. See `evidence/GYMOS-MIG-008.md` and `runbooks/ci.md`.
 

@@ -1,8 +1,8 @@
 # GYMOS-MIG-008 evidence
 
-Date: 25 October 2026
+Historical assessment date: 25 October 2026
 Latest local revision tested: `6f3358c` (working tree unchanged during verification)
-Status: CI implementation and local build/code/database/browser/recovery checks pass. Completion remains open: this checkout has no Git remote, and the npm audit endpoint was unavailable; hosted pull-request checks are also pending.
+Historical checkpoint: CI implementation and local checks passed, but remote, hosted verification and online audit access were then unavailable. This checkpoint is superseded by the authenticated hosted results recorded below.
 
 ## Implemented
 
@@ -71,3 +71,7 @@ Owner explicitly approved npm metadata transmission locally and on GitHub. The r
 ## Completed hosted verification — 30 October 2026
 
 Run https://github.com/EsanduEpa/gymos-v2/actions/runs/41010929511 at revision 9f1849a succeeded. All 11 jobs passed: workspace (32s), build (1m12s), lint (45s), type-check (53s), unit (45s), disposable databases (1m2s), browser (2m18s), encrypted recovery (56s), secret scan (8s), dependency review (21s), and lockfile audit (34s). Observed directly in authenticated Google Chrome. This supersedes prior failed/inaccessible checkpoints. Task 008 is Completed; PR https://github.com/EsanduEpa/gymos-v2/pull/1 remains unmerged. No required hosted check was skipped. Later closure edits contain documentation only; the successful run's exact code revision is retained here.
+
+## Final closure revision verification — 30 October 2026
+
+Authenticated Google Chrome showed [run 41011340034](https://github.com/EsanduEpa/gymos-v2/actions/runs/41011340034) succeeded for closure checkpoint commit `49217ddb8ff93256120317b6b1a3ad50e5046e93`. All 11 required jobs passed: workspace, build, lint, type check, unit tests, owned disposable database tests, browser isolation, encrypted backup/restore, secret scan, dependency review and lockfile vulnerability audit. The PR check view reports 11 successful checks and the PR remains draft/unmerged. This is documentation-only closure after the code-bearing `9f1849a` run; the latter's 11-job result remains recorded above. Later documentation-only reconciliation is verified by its own newer PR run.

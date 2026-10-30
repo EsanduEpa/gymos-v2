@@ -51,9 +51,9 @@ Support access is read-only. Every request preserves the original platform-admin
 
 These are future implementation tests. No application behavior is claimed by this proposal.
 
-## Approval record
+## Historical approval-request checkpoint — 30 October 2026 (superseded)
 
-Project owner Esandu requested finalization on 30 October 2026 after discussing the proposals and confirming the business amendments. Record owner authorization to finalize these proposals with those amendments. No separate accountable reviewer approval is claimed; reviewer sign-off remains pending.
+At that checkpoint, the owner had requested finalization but the owner-review disposition was not yet recorded. The later owner approval below supersedes the separate-reviewer requirement.
 
 ## Finalization boundary — 30 October 2026
 

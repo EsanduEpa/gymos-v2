@@ -1,6 +1,6 @@
 # GymOS V1 → V2 Feature Migration Index
 
-> **Final status — 30 October 2026:** Segment 01 is COMPLETED (23/23); overall 27/88 tasks completed. All 11 hosted checks passed at 9f1849a: [verified run](https://github.com/EsanduEpa/gymos-v2/actions/runs/41010929511). Decisions are owner-reviewed; external credential remediation is owner-attested with local cleanup/scanning verified. Historical checkpoints below are retained as history.
+> **Current status — 30 October 2026 at `49217dd`:** Segment 01 is COMPLETED (23/23); overall 27/88 tasks completed. All 11 hosted checks passed at [run 41011340034](https://github.com/EsanduEpa/gymos-v2/actions/runs/41011340034). Owner-approved decisions and owner-attested external remediation with independently verified local cleanup/scanning are reflected in current evidence. Older audit checkpoints are historical.
 
 > **Audit baseline:** 25 October 2026. **Purpose:** execution navigation, not implementation evidence. V1 remains the behavioral/UI reference; V2's approved Master/tenant architecture is the technical target. The authoritative task details remain in [`../MIGRATION_TASK_SPECS.md`](../MIGRATION_TASK_SPECS.md), and live evidence remains in [`../evidence/`](../evidence/).
 
@@ -31,15 +31,16 @@ No segment may modify V1, import customer data, preserve V1 IDs, invent deferred
 | UI | 29 route responsibilities, 26 rendered pages, role dashboard chrome | Preserve V1 hierarchy and interactions using shared accessible primitives and semantic theme tokens |
 | Delivery | Web-only V1 | Web MVP first; mobile is an explicitly gated later segment using the same APIs |
 
-## 3. Current verified state
+## 3. Current verified state — 30 October 2026
 
-- Completed foundations: GYMOS-MIG-001–007, 009, 011, 012, 014, 078, 080, 081, and 086.
-- In progress: GYMOS-MIG-008; local checks pass, hosted pull-request scanning/review lacks a configured remote.
-- Blocked external security work: GYMOS-MIG-010; the exposed V1 credential has not been confirmed rotated/revoked or checked for reuse.
+- Completed tasks include Segment 01 IDs 001–012, 014 and 077–086; overall 27/88. See tracker for the full current status.
+- GYMOS-MIG-008 completed; all 11 hosted checks passed at closure revision `49217dd` in run 41011340034.
+- GYMOS-MIG-010 completed based on owner-attested Neon rotation/redeployment, smoke checks, non-reuse and follow-up; local hardcoded URL removal and V2 scan were independently verified. Provider logs and historical access are not independently verified.
+- Decision tasks 077, 079, 082–085 are completed under project-owner review; independent specialist review is not claimed.
 - Implemented V2 code already includes identity/access schema, tenant schema verification, bounded tenant leases, durable operation/receipt/audit primitives, disposable two-gym tests, recovery tooling, shared contracts/client, Classic tokens, shared UI primitives, and V1 visual fixtures.
 - Most V1 business domains and role screens remain not started. Existing V2 member CRUD is a basic contact slice, not full enrollment.
 
-Statuses in this directory reflect linked evidence, not the existence of a plan.
+Statuses in this directory reflect linked evidence, not the existence of a plan. The next dependency-satisfied handoff is GYMOS-MIG-013; Segment 02 work was not started during Segment 01 closure.
 
 ## 4. Segment list and execution order
 
@@ -73,7 +74,7 @@ Segments express ownership, not permission to ignore task-level dependencies. Wh
  07–10 + DEC-12 ──> 11 Mobile
 ```
 
-Critical decision gates before feature implementation: DEC-01 (configuration ownership), DEC-03 (support), DEC-06 (money/earning), DEC-07 (time/term), DEC-08 (settlement/payroll), DEC-09 (coaching/privacy/export/refresh), DEC-11 (provider/release), and DEC-12 (mobile). Approved DEC-02/04/05/10 must be followed, not reopened without change control.
+DEC-01/03/06/07/08/09 are owner-approved and their decision-recording tasks are complete; their rules govern downstream feature implementation. DEC-11 (provider/release) and DEC-12 (mobile) remain open decision gates. Approved DEC-02/04/05/10 must be followed, not reopened without change control.
 
 ## 6. Agent execution rules
 

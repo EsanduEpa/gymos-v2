@@ -1,8 +1,8 @@
 # Migration Coverage Matrix
 
-> **Final status — 30 October 2026:** Segment 01 is COMPLETED (23/23); overall 27/88 tasks completed. All 11 hosted checks passed at 9f1849a: [verified run](https://github.com/EsanduEpa/gymos-v2/actions/runs/41010929511). Decisions are owner-reviewed; external credential remediation is owner-attested with local cleanup/scanning verified. Historical checkpoints below are retained as history.
+> **Current status — 30 October 2026 at `49217dd`:** Segment 01 is COMPLETED (23/23); overall 27/88 tasks completed. The matrix assigns each of the 88 original task IDs to one segment. All 11 hosted checks passed at [run 41011340034](https://github.com/EsanduEpa/gymos-v2/actions/runs/41011340034). Decision approvals and GYMOS-MIG-010 evidence limits are recorded in the linked records.
 
-This matrix assigns every authoritative task and every V1 route responsibility to one owning segment. A dependency may consume an outcome but must not duplicate ownership. Status is evidence-backed as of 25 October 2026.
+This matrix assigns every authoritative task and every V1 route responsibility to one owning segment. A dependency may consume an outcome but must not duplicate ownership. Task statuses reflect the tracker synchronized 30 October 2026.
 
 ## 1. Authoritative task coverage (88/88 assigned)
 
@@ -58,8 +58,8 @@ This matrix assigns every authoritative task and every V1 route responsibility t
 | GYMOS-MIG-048 | Session concurrency proof | known lifecycle defects | barrier integration/e2e tests | 07 | GYMOS-MIG-048 | NOT STARTED |
 | GYMOS-MIG-049 | Lifecycle earning baseline | V1 revenue/pay effects | operational value read model | 08 | GYMOS-MIG-049 | NOT STARTED |
 | GYMOS-MIG-050 | Confirmed clients/360 | T02/T03 | relationship query/profile | 06 | GYMOS-MIG-050 | NOT STARTED |
-| GYMOS-MIG-051 | Workout plans | T04; `saveWorkoutPlan` | coaching workout module/UI | 06 | GYMOS-MIG-051 | NOT STARTED |
-| GYMOS-MIG-052 | Meal plans/macros | T05; `saveMealPlan` | coaching meal module/UI | 06 | GYMOS-MIG-052 | NOT STARTED |
+| GYMOS-MIG-051 | Workout plans and assigned member view | T04; `saveWorkoutPlan` | trainer authoring/retrieval and authenticated member read-only own-assignment view | 06 | GYMOS-MIG-051 | NOT STARTED |
+| GYMOS-MIG-052 | Meal plans/macros and assigned member view | T05; `saveMealPlan` | trainer authoring/retrieval and authenticated member read-only own-assignment view | 06 | GYMOS-MIG-052 | NOT STARTED |
 | GYMOS-MIG-053 | Membership/pack earning | O10 Revenue/Deferred | finance earning reconciliation | 08 | GYMOS-MIG-053 | NOT STARTED |
 | GYMOS-MIG-054 | Expenses | O10; expense actions | expense module/dialog/list | 08 | GYMOS-MIG-054 | NOT STARTED |
 | GYMOS-MIG-055 | Budgets/variance | O10; budget actions | budget module/chart | 08 | GYMOS-MIG-055 | NOT STARTED |
@@ -131,13 +131,13 @@ This matrix assigns every authoritative task and every V1 route responsibility t
 | M02 | `/member/trainers/[id]/book` | 07 / 042 | Session request with authoritative eligibility |
 | M03 | `/member/sessions` | 07 / 044,047 | Own requests/history/cancel/withdraw |
 
-Additional interfaces: L01/L02/X01–X03 belong to segments 01/02/09; H01 belongs to 02; H02 belongs to 08. All 44 exported V1 Server Actions, 20 models, 14 enums, 39 workflow dossiers, 63 proposed contracts, and 8 existing V2 operations remain exhaustively mapped in [`../MIGRATION_TRACEABILITY.md`](../MIGRATION_TRACEABILITY.md).
+Additional interfaces: L01/L02/X01–X03 belong to segments 01/02/09; H01 belongs to 02; H02 belongs to 08. All 44 exported V1 Server Actions, 20 models, 14 enums, 39 workflow dossiers, 65 proposed contracts (63 source-derived plus C64/C65 for owner-approved new scope), and 8 existing V2 operations remain mapped in [`../MIGRATION_TRACEABILITY.md`](../MIGRATION_TRACEABILITY.md).
 
 ## 3. Audit findings
 
 - **Uncovered authoritative tasks:** none.
 - **Uncovered V1 routes:** none.
 - **Intentional overlap:** task dependencies only; ownership remains single. Session aggregate task 040 is a prerequisite for member/trainer status and pack invariants, but remains owned by segment 07.
-- **Ambiguous requirements:** isolated in GYMOS-MIG-077, 079, 082–085, 087, and 088; implementation must stop at the affected gate until approved.
+- **Decision gates:** 077, 079 and 082–085 are completed and approved; 087 and 088 remain open and gate their downstream deployment/mobile work. Task 013 is the next dependency-satisfied task, but Segment 02 work is not started by this record.
 - **Conflicts:** approved addenda override stale pre-start completion, fake DeskPayment/receipt/subscription billing, expanded theme, and meal-day assumptions. See `../MIGRATION_DECISIONS.md`.
-- **Coverage conclusion:** 88/88 tasks and 29/29 route responsibilities have a static owner. Runtime/visual/functional parity is not yet proven and must not be described as 100% migrated.
+- **Coverage conclusion:** all 88 original task IDs have one unique segment assignment; all 29/29 route responsibilities have a static owner. Runtime/visual/functional parity is not yet proven and must not be described as 100% migrated.

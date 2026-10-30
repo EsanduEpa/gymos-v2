@@ -55,13 +55,13 @@ All money is exact and belongs to one gym currency. Membership earning is term b
 
 These are future implementation tests. No accounting compliance claim or application behavior is made by this proposal.
 
-## Approval record
+## Historical approval-request checkpoint — 30 October 2026 (superseded)
 
-Project owner Esandu requested finalization on 30 October 2026 after discussing the proposals and confirming the business amendments. Record owner authorization to finalize these proposals with those amendments. No separate accountable reviewer approval is claimed; reviewer sign-off remains pending.
+At that checkpoint, the owner had requested finalization but the owner-review disposition was not yet recorded. The later owner approval below supersedes the separate-reviewer requirement.
 
 ## Project-owner clarification — 30 October 2026
 
-The owner explicitly confirmed continued daily membership earning during suspension, original expiry without freezes/extensions, and no additional payment event. This supersedes the former suspension proposal. Other DEC-06 details and reviewer sign-off remain pending; this clarification is not blanket approval or implementation evidence.
+The owner explicitly confirmed continued daily membership earning during suspension, original expiry without freezes/extensions, and no additional payment event. This superseded the former suspension proposal; the final disposition below approves the remaining DEC-06 policy under owner review.
 
 ## Finalization boundary — 30 October 2026
 

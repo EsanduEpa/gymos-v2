@@ -94,9 +94,9 @@ Do not create policy/schema fields before their ADR is approved. Do not add open
 
 ## 11. Progress and handoff
 
-- **Status:** BLOCKED before implementation (26 October 2026)
+- **Current status:** WAITING FOR PREREQUISITES (30 October 2026); DEC-01/06/07/08 are approved.
 - **Completed:** none
 - **Remaining:** 015,027–030
-- **Next recommended task:** GYMOS-MIG-077 (DEC-01), then the applicable DEC-06/07/08 resolution tasks and missing Segment 02/03 prerequisites; re-evaluate GYMOS-MIG-027 before implementing configuration fields.
-- **Files/tests/issues/blockers/decisions:** Run stopped before implementation. Segment 03 remains blocked by DEC-03; task 027 prerequisites 013,023,077,082,083 are incomplete; task 015 requires 024 and 027; DEC-01/06/07/08 remain open. Issues are recorded in [SEGMENT_RUN_ISSUES.md](../SEGMENT_RUN_ISSUES.md).
+- **Next prerequisite:** GYMOS-MIG-013 is the next dependency-satisfied overall task (Segment 02). Re-evaluate tasks 027–030 after the Segment 02/03 dependencies, including 023, 024 and 013, are completed.
+- **Files/tests/issues/blockers/decisions:** The 26 October checkpoint below is historical. Segment 04 implementation tasks remain Not Started; its policy gates 077/082/083/084 are completed. Segment 02/03 prerequisites and task 024 remain. Issues are recorded in [SEGMENT_RUN_ISSUES.md](../SEGMENT_RUN_ISSUES.md).
 

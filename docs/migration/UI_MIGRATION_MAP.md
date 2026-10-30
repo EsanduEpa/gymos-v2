@@ -1,6 +1,6 @@
 # GymOS V1 → V2: Complete UI Migration Map
 
-> **30 October 2026 owner scope update:** [Segment 01 finalization](SEGMENT_01_FINALIZATION.md) supersedes earlier member-plan-delivery exclusions and suspension-earning proposals. Tasks 051/052 include authenticated read-only member access to own assigned workout/meal plans; trainer health access expires after 90 days as specified in DEC-09. Original inventory counts are not re-estimated effort. Owner finalization is recorded; separate accountable review remains pending.
+> **30 October 2026 owner scope update:** [Segment 01 finalization](SEGMENT_01_FINALIZATION.md) supersedes earlier member-plan-delivery exclusions and suspension-earning proposals. Tasks 051/052 include authenticated read-only member access to own assigned workout/meal plans; trainer health access expires after 90 days as specified in DEC-09. Original inventory counts are not re-estimated effort. The project owner explicitly covers decision review; independent specialist review is not claimed.
 
 ## 1. Executive Summary
 
@@ -22,7 +22,7 @@ Verified inventory:
 | Theme system | Two global color variables; extensive fixed colors; no dark-mode implementation or theme editor |
 | V2 starting point | Existing login, platform gym creation/list, and slug-based basic member-record workspace; member list capped at100, without pagination/profile contracts or V1 registration/credential handoff |
 
-**Important distinctions:** Trainer and member “dashboards” are redirects. Payroll, P&L, exports, membership plans, rates, and policies are tabs, not independent routes. Workout and meal views exist inside the trainer's client profile, not a member portal. Community, gamification, member progress tracking, member membership self-service, and general gym check-in screens do not exist in the inspected web tree.
+**Important distinctions:** Trainer and member “dashboards” are redirects. Payroll, P&L, exports, membership plans, rates, and policies are tabs, not independent routes. In V1, workout and meal views exist inside the trainer's client profile, not a member portal. The project owner added authenticated read-only viewing of a member's own assigned workout/meal plans to V2 first-release scope on 30 October 2026; tasks 051/052 own that new V2 scope. Community, gamification, member progress tracking, member membership self-service, and general gym check-in screens remain out of scope.
 
 **Corrections and migration boundary:** V1's budget dialog already includes required category and amount fields; its optional action-level month defaults to the current month. Owner Mark Complete can complete a SCHEDULED session without starting it; only ACTIVE completion has a minimum-duration check. No-show action eligibility and repeat-call handling need functionality-map decisions. V2's unconditional member-list request is not compatible with every proposed role. This report guides UI reuse and visual/state coverage; the functionality map and approved decisions in its section 14.1 must settle lifecycle rules, financial side effects, role/access contracts, identity provisioning and API gaps before operational parity can be claimed.
 
@@ -372,7 +372,7 @@ Completed count is only within fetched recent sessions, not lifetime. “Active 
 
 | Category | Evidence-based status / migration consequence |
 |---|---|
-| Workouts and meal plans | No member routes or navigation. Trainer assigned-plan viewers/builders exist only under T03–T05. No parity page to copy |
+| Workouts and meal plans | V1 has no member routes or navigation; trainer assigned-plan viewers/builders exist only under T03–T05. V2 first release adds authenticated read-only views of own assigned plans under tasks 051/052; this is owner-approved new scope, not a page copied from V1. |
 | Progress tracking/body metrics/photos | No member UI; trainer client source comments explicitly defer body metrics/photos to mobile. Fetching a model does not constitute a web screen |
 | Membership information/payment self-service | No member screen. Owner profile shows membership/pack information; member request form shows only available pack balance |
 | Attendance | No member check-in/history interface. Owner Attendance History is recent PT sessions |

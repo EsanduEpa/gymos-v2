@@ -1,6 +1,6 @@
 # Segment 01 — Platform Foundation and Decision Gates
 
-> **Final status — 30 October 2026:** Segment 01 is COMPLETED (23/23); overall 27/88 tasks completed. All 11 hosted checks passed at 9f1849a: [verified run](https://github.com/EsanduEpa/gymos-v2/actions/runs/41010929511). Decisions are owner-reviewed; external credential remediation is owner-attested with local cleanup/scanning verified. Historical checkpoints below are retained as history.
+> **Verified closure checkpoint — 30 October 2026 at `49217dd`:** Segment 01 is COMPLETED (23/23); overall 27/88 migration tasks completed. All 11 hosted checks passed at [run 41011340034](https://github.com/EsanduEpa/gymos-v2/actions/runs/41011340034) for this revision. Decisions are owner-approved; external credential remediation is owner-attested with local cleanup and V2 scanning verified. Later documentation-only reconciliation is verified by the corresponding newer PR run. See [finalization](../SEGMENT_01_FINALIZATION.md) for evidence limits and handoff. Earlier status entries are historical checkpoints.
 
 ## Execution instructions for AI agents
 
@@ -11,7 +11,7 @@ Read this file completely; inspect linked evidence and current source; preserve 
 - **Business capability:** safe multi-tenant platform substrate and binding product/technical decisions.
 - **Objective:** preserve verified V2 foundations and close the remaining CI, credential, ownership, money, time, settlement, privacy, and refresh gates that block feature slices.
 - **Expected result:** downstream segments have stable contracts, isolation, recovery, test fixtures, UI primitives, visual references, and approved numeric/security behavior.
-- **Priority / complexity:** Critical / Large (mostly completed foundation plus eight open items).
+- **Priority / complexity:** Critical / Large (foundation and decision gates completed; feature implementation remains in later segments).
 - **Dependencies:** none.
 - **Prerequisites:** access to both repositories and current evidence; external credential owner for task 010; named approvers for open ADRs.
 - **In scope:** GYMOS-MIG-001–012, 014, 077–086; correction/synchronization of their evidence and derived status.
@@ -21,7 +21,7 @@ Read this file completely; inspect linked evidence and current source; preserve 
 
 V1 is a single Next.js/Prisma application. `lib/auth.ts`, `lib/authz.ts`, `lib/pricing.ts`, `lib/passwords.ts`, `lib/rate-limit.ts`, `lib/audit.ts`, and all `app/actions/*` combine infrastructure and business behavior over one database. `prisma/schema.prisma` contains 20 models/14 enums with floats and `gymId` filtering. Shared presentation lives under `components/shared` and `components/layout`; `app/globals.css` is the V1 Classic reference. V1 has useful password hashing, rate limiting, and role checks, but not the approved physical tenant isolation, durable cross-database command protocol, exact money policy, or forced-change enforcement.
 
-Important discrepancy: `/Users/esanduepa/Desktop/Projects/gymos/scripts/check-db.js` contains an exposed remote credential. Its value must never be read into evidence, executed, copied, or treated as remediated by a source scan.
+Historical finding: the V1 diagnostic once contained an exposed remote credential. Current V1 source inspection verified that the hardcoded URL was removed and the script now requires `process.env.DATABASE_URL`. Never print credential values, run this diagnostic, or treat source cleanup alone as provider remediation. See GYMOS-MIG-010 for current owner-attested and independently verified evidence.
 
 ## 3. Target V2 implementation
 
@@ -41,7 +41,7 @@ This segment owns UI foundations rather than feature screens. V1 `globals.css`, 
 
 ## 5. Backend and database migration
 
-Completed foundations provide canonical email identity, typed gym access/actor links, operation state/checkpoints, tenant receipts/audit, schema manifest verification, binding gates, bounded pools, disposable two-gym databases, and local isolated recovery. Ordinary API reads must remain pure. Commands use strict contracts, idempotency/request digests, local transactions, safe results, and explicit repair states. Open ADRs must decide configuration ownership, support context, exact decimal/currency/earning rules, gym time/date/DST rules, lock/payroll/correction policy, and coaching/privacy/export/refresh limits before dependent schema fields or APIs are created.
+Completed foundations provide canonical email identity, typed gym access/actor links, operation state/checkpoints, tenant receipts/audit, schema manifest verification, binding gates, bounded pools, disposable two-gym databases, and local isolated recovery. Ordinary API reads must remain pure. Commands use strict contracts, idempotency/request digests, local transactions, safe results, and explicit repair states. DEC-01/03/06/07/08/09 now record owner-approved configuration, support, money/earning, time/scheduling, settlement and coaching/privacy/export/refresh rules. Apply them only in dependency-ready feature tasks; approval does not claim implementation.
 
 ## 6. Detailed step-by-step implementation tasks
 
@@ -160,7 +160,7 @@ Stop if a task needs provider/owner authority, a named decision lacks approval, 
 - **Completed IDs:** 001–012, 014, 077–086 (23 owned tasks; task 013 belongs to Segment 02).
 - **Remaining IDs:** none.
 - **Evidence:** [CI repair and all 11 hosted results](../evidence/GYMOS-MIG-008.md), [owner-attested credential closure](../evidence/GYMOS-MIG-010.md), approved DEC-01/03/06/07/08/09 and linked evidence.
-- **Verification:** hosted [run](https://github.com/EsanduEpa/gymos-v2/actions/runs/41010929511) at 9f1849a passed workspace, build, lint, type-check, unit, owned-database, browser, recovery, secret-scan, base/proposed dependency review and lockfile audit. Local equivalents passed; no real database or V1 was changed.
+- **Verification:** authenticated hosted [run 41011340034](https://github.com/EsanduEpa/gymos-v2/actions/runs/41011340034) at `49217dd` passed all 11 required jobs: workspace, build, lint, type-check, unit, owned-database, browser, recovery, secret scan, dependency review and lockfile audit. Earlier run 41010929511 passed implementation revision `9f1849a`. No real database or V1 was changed.
 - **Evidence boundary:** provider remediation/access review is owner-attested, not independently inspected; historical access uncertainty is retained. The legacy V1 diagnostic script still prints full records/raw errors and must not be run or published as evidence; safe-output cleanup is a separate legacy follow-up.
 - **Owner scope:** member read-only viewing of own assigned workout/meal plans is added to tasks 051/052; 90-day trainer privacy, completed-session-only pay, unchanged expiry and continued earning during suspension are recorded. See [finalization](../SEGMENT_01_FINALIZATION.md).
-- **Next task:** Segment 02 / GYMOS-MIG-013 dashboard shell; task 020 still depends on DEC-11 provider/session policy. Completion is not production-release approval.
+- **Next dependency-satisfied task:** Segment 02 / GYMOS-MIG-013 dashboard shell (handoff only; not started here). Task 020 remains gated on DEC-11. Completion is not production-release approval.

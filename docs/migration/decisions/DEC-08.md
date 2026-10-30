@@ -54,13 +54,13 @@ Trainer pay is created only from completed sessions. Session rate, trainer level
 
 These are future implementation tests. No payout or application behavior is claimed by this proposal.
 
-## Approval record
+## Historical approval-request checkpoint — 30 October 2026 (superseded)
 
-Project owner Esandu requested finalization on 30 October 2026 after discussing the proposals and confirming the business amendments. Record owner authorization to finalize these proposals with those amendments. No separate accountable reviewer approval is claimed; reviewer sign-off remains pending.
+At that checkpoint, the owner had requested finalization but the owner-review disposition was not yet recorded. The later owner approval below supersedes the separate-reviewer requirement.
 
 ## Project-owner clarification — 30 October 2026
 
-The owner explicitly confirmed trainer pay only for completed sessions. Charged cancellations and no-shows do not generate trainer pay. Other DEC-08 details and reviewer sign-off remain pending.
+The owner explicitly confirmed trainer pay only for completed sessions. Charged cancellations and no-shows do not generate trainer pay. The final disposition below approves the remaining DEC-08 policy under owner review.
 
 ## Finalization boundary — 30 October 2026
 

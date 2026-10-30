@@ -1,5 +1,6 @@
 {
   "planning_date": "2026-10-23",
+  "last_synchronized": "2026-10-30",
   "authoritative": "MIGRATION_EXECUTION_PLAN.md + MIGRATION_TASK_SPECS.md",
   "tasks": [
     {
@@ -248,7 +249,7 @@
       "decisions": "",
       "complexity": "Medium",
       "out": "No new product functionality beyond the named contracts.",
-      "status": "In Progress"
+      "status": "Completed"
     },
     {
       "n": 9,
@@ -291,7 +292,7 @@
       "decisions": "",
       "complexity": "Medium",
       "out": "No V1 edit, remote database login or unapproved account/secret mutation.",
-      "status": "Blocked",
+      "status": "Completed",
       "owner": "Codex",
       "evidence": "evidence/GYMOS-MIG-010.md",
       "statusDate": "2026-10-25"
@@ -490,7 +491,7 @@
       "decisions": "DEC-02",
       "complexity": "High",
       "out": "No new product functionality beyond the named contracts.",
-      "status": "Not Started"
+      "status": "Completed"
     },
     {
       "n": 17,
@@ -519,7 +520,7 @@
       "decisions": "DEC-02",
       "complexity": "High",
       "out": "No new product functionality beyond the named contracts.",
-      "status": "Not Started"
+      "status": "Completed"
     },
     {
       "n": 18,
@@ -550,7 +551,7 @@
       "decisions": "DEC-02 DEC-04",
       "complexity": "High",
       "out": "No new product functionality beyond the named contracts.",
-      "status": "Not Started"
+      "status": "Completed"
     },
     {
       "n": 19,
@@ -581,7 +582,7 @@
       "decisions": "DEC-10",
       "complexity": "Medium",
       "out": "No new product functionality beyond the named contracts.",
-      "status": "Not Started"
+      "status": "Completed"
     },
     {
       "n": 20,
@@ -1537,7 +1538,7 @@
       "n": 51,
       "id": "GYMOS-MIG-051",
       "phase": 8,
-      "name": "Migrate workout builder and retrieval",
+      "name": "Migrate workout builder and assigned member view",
       "deps": [
         12,
         50,
@@ -1549,22 +1550,23 @@
       ],
       "contracts": [
         "C31",
-        "C32"
+        "C32",
+        "C64"
       ],
       "module": "coaching",
-      "scope": "Preserve client preselect, title/description and dynamic exercise rows, add/remove/edit, name/sets/reps/weight and save→client journey. Validate bounded nested DTO rows at runtime, positive counts, optional fields and relationship at commit. Store plan+children+audit/receipt in tenant transaction and expose through client profile history. Keep source seeded draft behavior until reviewed; never autosave sample content. Optional duration/notes are schema/action-supported but not rendered editor controls in V1; retain their contract disposition without inventing new UI. There is no V1 rest/instruction editor. Explicit zero weight must survive serialization.",
-      "tests": "Related trainer saves/retrieves exact exercise order/fields once; invalid/empty/oversized row set or changed relationship rejects with draft retained; foreign member cannot be assigned. Member web plan delivery is not silently added.",
+      "scope": "Preserve client preselect, title/description and dynamic exercise rows, add/remove/edit, name/sets/reps/weight and save→client journey. Validate bounded nested DTO rows at runtime, positive counts, optional fields and relationship at commit. Store plan+children+audit/receipt in tenant transaction and expose through trainer client profile history. First-release owner-approved scope also includes authenticated read-only viewing of the member's explicitly assigned workout through a member plan view; derive self from current identity/gym and omit trainer-private/internal fields. Assignment is explicit in the authorized trainer save. Never autosave sample content. Optional duration/notes are schema/action-supported but not rendered editor controls in V1. No V1 rest/instruction editor. Explicit zero weight must survive serialization.",
+      "tests": "Related trainer saves/retrieves exact exercise order/fields once; invalid/empty/oversized row set or changed relationship rejects with draft retained; foreign member cannot be assigned. Member reads only own assigned workout; other member/gym IDs, logout and revoked access deny, including after refresh. Member cannot edit or assign plans.",
       "db": "T.WorkoutPlan/WorkoutExercise local FKs, order/constraint/index and receipt/audit.",
       "decisions": "DEC-09",
       "complexity": "Medium",
-      "out": "No new product functionality beyond the named contracts.",
+      "out": "No member plan editing/assignment or additional functionality beyond the owner-approved read-only assigned-plan scope.",
       "status": "Not Started"
     },
     {
       "n": 52,
       "id": "GYMOS-MIG-052",
       "phase": 8,
-      "name": "Migrate meal builder and live macro totals",
+      "name": "Migrate meal builder, macros and assigned member view",
       "deps": [
         12,
         50,
@@ -1576,15 +1578,16 @@
       ],
       "contracts": [
         "C31",
-        "C33"
+        "C33",
+        "C65"
       ],
       "module": "coaching",
-      "scope": "Preserve client/title, dynamic food/meal rows and live calories/protein/carbs/fat totals. Resolve V1 day comment0..6 versus builder1/proposed1..7 before persistence; preserve actual one-day-oriented UI rather than invent weekly editor. Validate units, nonnegative finite macros and row bounds, recompute/validate aggregate server-side. Transactionally assign plan+children+audit/receipt and retrieve in client tab.",
-      "tests": "Add/remove/edit changes live totals accurately; server totals reject manipulated values/NaN/overflow; same intent stores one plan; invalid assignment retains rows. Correct day mapping and relationship/privacy regression pass.",
+      "scope": "Preserve client/title, dynamic food/meal rows and live calories/protein/carbs/fat totals. Resolve V1 day comment0..6 versus builder1/proposed1..7 before persistence; preserve actual one-day-oriented UI rather than invent weekly editor. Validate units, nonnegative finite macros and row bounds, recompute/validate aggregate server-side. Transactionally assign plan+children+audit/receipt and retrieve in trainer client tab. First-release owner-approved scope also includes authenticated read-only viewing of the member's explicitly assigned meal plan through the member plan view; derive self from current identity/gym and omit trainer-private/internal fields. Assignment is explicit in the authorized trainer save.",
+      "tests": "Add/remove/edit changes live totals accurately; server totals reject manipulated values/NaN/overflow; same intent stores one plan; invalid assignment retains rows. Correct day mapping and relationship/privacy regression pass. Member reads only own assigned meal; other member/gym IDs, logout and revoked access deny, including after refresh. Member cannot edit or assign plans.",
       "db": "T.MealPlan/MealPlanEntry with reviewed day/unit CHECKs and local parent/member/trainer FKs.",
       "decisions": "DEC-09",
       "complexity": "Medium",
-      "out": "No new product functionality beyond the named contracts.",
+      "out": "No member plan editing/assignment or additional functionality beyond the owner-approved read-only assigned-plan scope.",
       "status": "Not Started"
     },
     {
@@ -1912,8 +1915,8 @@
       "features": [],
       "contracts": [],
       "module": "parity",
-      "scope": "Regenerate source inventories and compare all29 routes/74 TSX/44 exports/20 models/14 enums and C/E/workflow/control registers to delivered commits. Classify each as Complete/Corrected/Deferred/Missing/Failed verification with evidence. A deferred O14/unused chart is an intentional disposition, never implemented parity. Any new route/action discovered gets a task or approved disposition before gate.",
-      "tests": "No source item lacks task/disposition; all released C contracts have tested implementation mapping and DTO version. Report fresh counts and limitations without invented percentage. Missing/failed critical items keep milestone open.",
+      "scope": "Regenerate the original V1 inventories (29 routes/74 TSX/44 exports/20 models/14 enums) and compare the 65 current C contracts, E operations and workflow/control registers to delivered commits. Account separately for the owner-approved V2-only member plan screen and C64/C65; do not inflate or alter the original 29-route V1 count. Classify each item Complete/Corrected/Deferred/Missing/Failed verification with evidence. A deferred O14/unused chart is intentional disposition, never implemented parity. Any additional route/action gets a task or approved disposition before gate.",
+      "tests": "No source item lacks task/disposition; all released C contracts, including C64/C65, have tested implementation mapping and DTO version. Report original V1 counts separately from owner-approved V2 additions and state limitations without invented percentage. Missing/failed critical items keep milestone open.",
       "db": "None",
       "decisions": "",
       "complexity": "Medium",
@@ -2310,13 +2313,13 @@
       "features": [],
       "contracts": [],
       "module": "decisions",
-      "scope": "Prepare one focused decision record for DEC-01, accountable to Architecture lead, using DB01; F-D07/D08/D16. Tenant config owns operational currency/zone/rates; choose staged C39 operation or separate saves; define safe pending projection. No cross-database atomic save. Record options, selected result, tradeoffs, schema/API impact and concrete expected test examples; do not treat a proposed default as approved. Request the responsible owner’s answer only after a concrete reviewable proposal exists. Update this plan through change control without reopening settled MVP scope.",
-      "tests": "ADR contains the actual reviewer/date/result or explicitly remains Blocked; each affected task links the signed result and has unambiguous expected outcomes. No implementation marked verified from decision prose.",
+      "scope": "DEC-01 is approved under project-owner review. Master owns routing/status/public brand fields; tenant configuration owns gym-local operations. Preserve the selected profile-save boundary, safe pending projection and recovery semantics in DEC-01. This decision task is complete; it does not implement downstream configuration features.",
+      "tests": "Owner-reviewed decision and linked task evidence identify the approval date, selected ownership and pending-operation behavior. No application implementation is claimed.",
       "db": "None",
       "decisions": "",
       "complexity": "Medium",
       "out": "No application code, database operation or external approval implied by this planning task.",
-      "status": "Not Started"
+      "status": "Completed"
     },
     {
       "n": 78,
@@ -2351,13 +2354,13 @@
       "features": [],
       "contracts": [],
       "module": "decisions",
-      "scope": "Prepare one focused decision record for DEC-03, accountable to Platform security + Product, using DB08; F-D05. Set reason/expiry, entry/exit invalidation, allowed summary fields and status handling. Support has original actor, no health notes and no tenant write; these are settled. Record options, selected result, tradeoffs, schema/API impact and concrete expected test examples; do not treat a proposed default as approved. Request the responsible owner’s answer only after a concrete reviewable proposal exists. Update this plan through change control without reopening settled MVP scope.",
-      "tests": "ADR contains the actual reviewer/date/result or explicitly remains Blocked; each affected task links the signed result and has unambiguous expected outcomes. No implementation marked verified from decision prose.",
+      "scope": "DEC-03 is approved under project-owner review. Preserve read-only support context, original actor audit, expiry/revocation and private health exclusions as recorded in DEC-03. This decision task is complete; it does not implement downstream support features.",
+      "tests": "Owner-reviewed decision and linked task evidence identify approval date and selected support scope. No application implementation is claimed.",
       "db": "None",
       "decisions": "",
       "complexity": "Medium",
       "out": "No application code, database operation or external approval implied by this planning task.",
-      "status": "Not Started"
+      "status": "Completed"
     },
     {
       "n": 80,
@@ -2414,13 +2417,13 @@
       "features": [],
       "contracts": [],
       "module": "decisions",
-      "scope": "Prepare one focused decision record for DEC-06, accountable to Finance + Database, using DB06; F-D07/D10. Approve currency set, Decimal precision (19,4 proposed only), minor-unit residual allocation, zero-budget semantics and reports. Early suspension earning/expired unused recognition must be approved or kept separate/unavailable; payments remain deferred. Record options, selected result, tradeoffs, schema/API impact and concrete expected test examples; do not treat a proposed default as approved. Request the responsible owner’s answer only after a concrete reviewable proposal exists. Update this plan through change control without reopening settled MVP scope.",
-      "tests": "ADR contains the actual reviewer/date/result or explicitly remains Blocked; each affected task links the signed result and has unambiguous expected outcomes. No implementation marked verified from decision prose.",
+      "scope": "DEC-06 is approved under project-owner review with the recorded amendments: daily membership operational earning continues on the original schedule during suspension without another charge/payment; memberships/packs retain original expiry and cannot freeze or extend. Preserve exact-money and allocation rules in DEC-06. This decision task does not implement downstream finance features.",
+      "tests": "Owner-reviewed decision and linked task evidence identify approval date, earning/expiry outcome and exact-money policy. No application implementation is claimed.",
       "db": "None",
       "decisions": "",
       "complexity": "Medium",
       "out": "No application code, database operation or external approval implied by this planning task.",
-      "status": "Not Started"
+      "status": "Completed"
     },
     {
       "n": 83,
@@ -2433,13 +2436,13 @@
       "features": [],
       "contracts": [],
       "module": "decisions",
-      "scope": "Prepare one focused decision record for DEC-07, accountable to Scheduling/Product + Database, using DB03/DB04/DB05; F-D01/D06/D08. Choose date inclusivity, DST ambiguity/gap rejection, overnight shifts, start tolerance/minimum duration precision, input maxima and pack order. Suggested earliest-expiry then stable ID is a proposal. Exact cancellation equality and15-minute no-show are settled. Record options, selected result, tradeoffs, schema/API impact and concrete expected test examples; do not treat a proposed default as approved. Request the responsible owner’s answer only after a concrete reviewable proposal exists. Update this plan through change control without reopening settled MVP scope.",
-      "tests": "ADR contains the actual reviewer/date/result or explicitly remains Blocked; each affected task links the signed result and has unambiguous expected outcomes. No implementation marked verified from decision prose.",
+      "scope": "DEC-07 is approved under project-owner review. Preserve original membership/pack expiry, half-open date bounds, DST rules, scheduling limits, stable pack selection and accepted cancellation/no-show boundaries as recorded in DEC-07. This decision task does not implement downstream scheduling features.",
+      "tests": "Owner-reviewed decision and linked task evidence identify approval date and accepted time/scheduling examples. No application implementation is claimed.",
       "db": "None",
       "decisions": "",
       "complexity": "Medium",
       "out": "No application code, database operation or external approval implied by this planning task.",
-      "status": "Not Started"
+      "status": "Completed"
     },
     {
       "n": 84,
@@ -2452,13 +2455,13 @@
       "features": [],
       "contracts": [],
       "module": "decisions",
-      "scope": "Prepare one focused decision record for DEC-08, accountable to Finance/Payroll + Backend, using DB05/DB07; F-D02/D11. Review lock order/exclusion constraints, local week/month boundaries (Monday proposed), close-vs-completion retry, immutable approved corrections and quote version acknowledgment. Approval is not payout; completed-only trainer pay is settled. Record options, selected result, tradeoffs, schema/API impact and concrete expected test examples; do not treat a proposed default as approved. Request the responsible owner’s answer only after a concrete reviewable proposal exists. Update this plan through change control without reopening settled MVP scope.",
-      "tests": "ADR contains the actual reviewer/date/result or explicitly remains Blocked; each affected task links the signed result and has unambiguous expected outcomes. No implementation marked verified from decision prose.",
+      "scope": "DEC-08 is approved under project-owner review with completed-session-only trainer pay. Preserve the accepted lock, payroll-period, approval, correction and quote semantics recorded in DEC-08. This decision task does not implement downstream settlement features.",
+      "tests": "Owner-reviewed decision and linked task evidence identify approval date and selected settlement examples. No application implementation is claimed.",
       "db": "None",
       "decisions": "",
       "complexity": "Medium",
       "out": "No application code, database operation or external approval implied by this planning task.",
-      "status": "Not Started"
+      "status": "Completed"
     },
     {
       "n": 85,
@@ -2471,13 +2474,13 @@
       "features": [],
       "contracts": [],
       "module": "decisions",
-      "scope": "Prepare one focused decision record for DEC-09, accountable to Coaching/Privacy + Finance + Frontend, using DB10/DB12; F-D12/D15/D17/D18/D19. Freeze relationship states, note edit/day/unit/row bounds, metric windows/denominators, export safety cap/snapshot, selected-gym polling and numerical cross-role refresh SLA. No unsupported member-plan delivery/global inbox; health ownership and export scopes are settled. Record options, selected result, tradeoffs, schema/API impact and concrete expected test examples; do not treat a proposed default as approved. Request the responsible owner’s answer only after a concrete reviewable proposal exists. Update this plan through change control without reopening settled MVP scope.",
+      "scope": "DEC-09 is approved under project-owner review. Its settled scope includes authenticated member viewing of own assigned workout/meal plans (read-only, C64/C65); global inbox remains out of scope. Preserve the approved relationship, note, day/unit/row, metrics, export, polling and freshness rules recorded in DEC-09. This is a decision task and does not implement the feature.",
       "tests": "ADR contains the actual reviewer/date/result or explicitly remains Blocked; each affected task links the signed result and has unambiguous expected outcomes. No implementation marked verified from decision prose.",
       "db": "None",
       "decisions": "",
       "complexity": "Medium",
       "out": "No application code, database operation or external approval implied by this planning task.",
-      "status": "Not Started"
+      "status": "Completed"
     },
     {
       "n": 86,
@@ -2531,7 +2534,7 @@
       "features": [],
       "contracts": [],
       "module": "decisions",
-      "scope": "Prepare one focused decision record for DEC-12, accountable to Mobile/Product + Security, using Phase13; F-D04/D12/D18. Approve Expo/OS/device support, member/trainer subset, secure token policy/store release and whether new push is commissioned. Progress/plan delivery beyond V1 requires new scope. Native UI uses same Nest business logic. Record options, selected result, tradeoffs, schema/API impact and concrete expected test examples; do not treat a proposed default as approved. Request the responsible owner’s answer only after a concrete reviewable proposal exists. Update this plan through change control without reopening settled MVP scope.",
+      "scope": "Prepare the still-open DEC-12 record for Mobile/Product + Security using Phase13; F-D04/D12/D18. Approve Expo/OS/device support, any native member/trainer subset, secure token policy/store release and whether new push is commissioned. Owner-approved first-release workout/meal views are web scope in tasks 051/052; they do not imply native/mobile plan delivery. Native UI uses the same Nest business logic. Record options, result, tradeoffs, schema/API impact and concrete tests; do not treat an unapproved mobile proposal as settled.",
       "tests": "ADR contains the actual reviewer/date/result or explicitly remains Blocked; each affected task links the signed result and has unambiguous expected outcomes. No implementation marked verified from decision prose.",
       "db": "None",
       "decisions": "",
@@ -2643,8 +2646,13 @@
     "ui_groups": 52,
     "local_groups": 22,
     "handler_line_sites": 149,
-    "contracts": 63,
+    "contracts": 65,
+    "source_derived_contracts": 63,
+    "owner_approved_additional_contracts": [
+      "C64",
+      "C65"
+    ],
     "existing_feature_method_paths": 8
   },
-  "execution_note": "User authorized001–010; owner approvedDEC02/04/05; external credential ownerEsandu, remediation unconfirmed."
+  "execution_note": "Current task statuses match MIGRATION_TASK_TRACKER.md as of 2026-10-30. Segment 01 is complete (23 tasks); hosted run 41011340034 passed all 11 checks at 49217dd. Owner-approved web member plan reads add C64/C65; no Segment 02 work started."
 }

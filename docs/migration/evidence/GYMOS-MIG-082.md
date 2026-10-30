@@ -1,6 +1,6 @@
 # GYMOS-MIG-082 — DEC-06 decision evidence
 
-Status: **Blocked awaiting project-owner approval.** A concrete proposal is available in [DEC-06](../decisions/DEC-06.md).
+Current status — 30 October 2026: **Completed as a decision-recording task under project-owner review.** DEC-06 is approved with the recorded owner amendments; no application implementation is claimed. Earlier preparation and approval-request notes below are historical checkpoints.
 
 - Revision reviewed: `b22bcf6af8ca5e66fe098922629bb58228a251fd` on `main`.
 - Environment: local V2 checkout; read-only source inspection plus documentation changes.
@@ -12,9 +12,9 @@ Status: **Blocked awaiting project-owner approval.** A concrete proposal is avai
 
 After explicit approval, record reviewer/date/result in DEC-06, update the register/tracker/task status, and use the decision only in dependency-ready tasks.
 
-## Finalization update — 30 October 2026
+## Historical approval-request checkpoint — 30 October 2026 (superseded)
 
-Project owner Esandu requested finalization after the recorded business confirmations. Owner finalization is recorded in the associated decision. Separate accountable reviewer sign-off has not been supplied and is not invented. Task remains pending that review and consistency verification; no application implementation is claimed. See [current finalization record](../SEGMENT_01_FINALIZATION.md).
+At that checkpoint, a separate accountable reviewer had not signed off. The later owner-review disposition below supersedes that separate-reviewer gate. No application implementation is claimed. See [current finalization record](../SEGMENT_01_FINALIZATION.md).
 
 ## Completed decision disposition — 30 October 2026
 

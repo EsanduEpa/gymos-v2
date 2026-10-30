@@ -1,6 +1,6 @@
 # GYMOS-MIG-010 — Exposed credential follow-up and V2 secret hygiene
 
-Assessment: 23 October 2026, Asia/Colombo. **Preparation delivered; external remediation unverified. This task is not Verified or Completed.** [Task specification](../MIGRATION_TASK_SPECS.md#task-id-gymos-mig-010), [Master Plan §23](../MIGRATION_EXECUTION_PLAN.md#23-risk-register), [risk R18](../MIGRATION_RISK_REGISTER.md), and [agent protocol](../AI_AGENT_MIGRATION_PROTOCOL.md) control scope. Dependency GYMOS-MIG-001 baseline evidence must be reviewed before completion. GYMOS-MIG-008 owns CI implementation; GYMOS-MIG-066 and GYMOS-MIG-071 consume the unresolved security/release evidence.
+Current status — 30 October 2026: **GYMOS-MIG-010 is Completed** on the basis of owner-attested provider remediation/follow-up plus independently verified local cleanup and V2 scanning. The older preparation and “not completed” statements below describe historical checkpoints, not current status. [Task specification](../MIGRATION_TASK_SPECS.md#task-id-gymos-mig-010), [risk R18](../MIGRATION_RISK_REGISTER.md), and [finalization](../SEGMENT_01_FINALIZATION.md) record the closure basis and evidence limits.
 
 ## Evidence boundary
 
@@ -9,6 +9,8 @@ V1 `/Users/esanduepa/Desktop/Projects/gymos` HEAD: `058aa8532741c4cb84289589fd2c
 Performed read-only source and Git metadata inspection. Did not run V1 `scripts/check-db.js`, connect to any database/provider/account, inspect actual environment-file values, rotate/revoke credentials, change V1, install tools, scan remote systems or invoke application workflows. Credential literals were compared only in process memory; output contains identifiers, paths, line numbers and classifications, never literal values or secret-derived hashes. No browser captures were needed.
 
 ## Redacted incident record
+
+The owner/status column below records the initial source-review checkpoint. Later owner-attested containment and current disposition are documented in the final owner-attested section at the end of this file.
 
 | Identifier | Observed source | Evidence and impact | Owner and status |
 |---|---|---|---|
@@ -107,7 +109,9 @@ The following work is **proposed and unexecuted**. It needs a named credential/a
 7. **Approve V2 secret policy and review.** No V1/demo/template credential reuse for V2, staging, production or durable test accounts. Use unique per-environment credentials and synthetic one-run fixture secrets, server-only secret references, least privilege and redacted logs. No actual environment files, secret values, password hashes or credential-bearing URLs in Git/evidence/DTOs. Review GYMOS-MIG-008 secret scanning and repeat the documented scan on the integrated revision.
 8. **Close with evidence.** Named owner signs the redacted evidence summary; reviewer checks revoke/reuse/access/history status, residual risk and GYMOS-MIG-001/008 evidence. Update task/tracker/risk together through the coordinating agent. GYMOS-MIG-066 security gate and GYMOS-MIG-071 release approval must see actual remediation status. An unresolved external rotation remains an explicit release blocker.
 
-## Acceptance and unresolved work
+## Historical preparation checkpoint — 23 October 2026 (superseded)
+
+## Acceptance and unresolved work at that checkpoint
 
 - [x] Source location confirmed without exposing values; V1 script not run and V1 unchanged.
 - [x] V2 tracked-source scan, ignore checks and limited CI inventory recorded with redacted findings and limitations.
@@ -132,7 +136,7 @@ Reproduction exited **0**; scanned **63** tracked/present-CI text files; exclude
 
 These are the three loopback template examples and README prompt false positive reviewed above. No remote URL, private key, common token shape or exact V1 literal reuse was reported by these rules. Generated/historical demo reuse and actual configured secrets remain unverified.
 
-## Owner update
+## Historical owner updates — intermediate checkpoints superseded by the final disposition below
 
 The project owner answered “Esandu” to the credential-owner question on23 October2026. No revocation/rotation/access-investigation result was provided. This identifies the responsible person; it does not establish remediation or authorize remote rotation/V1 edits. Task010 remains Blocked for that evidence.
 

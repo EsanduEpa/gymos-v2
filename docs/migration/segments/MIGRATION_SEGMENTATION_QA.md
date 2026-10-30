@@ -1,6 +1,6 @@
 # Migration Segmentation Quality Audit
 
-Audit date: 30 October 2026. This audits documentation structure and source traceability; it does not claim application parity or complete migration work.
+Historical segmentation audit — 30 October 2026, before the finalization reconciliation. This records the original documentation-structure and source-traceability QA; current completion/status evidence is in [Segment 01 finalization](../SEGMENT_01_FINALIZATION.md).eability; it does not claim application parity or complete migration work.
 
 ## Inputs inspected
 
@@ -19,8 +19,8 @@ Audit date: 30 October 2026. This audits documentation structure and source trac
 | V1 route ownership | PASS | 29 rows, 29 unique route IDs |
 | Local Markdown links | PASS | no missing local target found |
 | Existing migration sources preserved | PASS | no original plan/map was overwritten or deleted |
-| Application source untouched | PASS | working tree changes are confined to `docs/migration/segments/` |
-| Progress arithmetic | PASS | 15 completed + 73 remaining = 88; in-progress/blocked tasks remain remaining |
+| Application source untouched | PASS | the audited working-tree changes were documentation-only |
+| Progress arithmetic — original segmentation audit (23 October 2026) | Historical | 15 completed + 73 remaining = 88 at the planning baseline; later task completion is recorded in the live tracker |
 
 ## Manual coverage findings
 
@@ -33,7 +33,7 @@ Audit date: 30 October 2026. This audits documentation structure and source trac
 7. Current V2 basic member CRUD is explicitly treated as a basic-contact compatibility slice, not complete member enrollment.
 8. V1 defects—raw user leakage, partial enrollment, booking/settlement races, arbitrary pack debit, pre-start completion, repeat no-show, ignored zero settings, mutable pay terms, fake PAID/receipt/subscription controls—are corrected or deferred rather than preserved.
 9. Mobile tasks remain visible but conditional because V1 has no mobile implementation and DEC-12 is unresolved.
-10. On 30 October, GYMOS-MIG-085 received a concrete DEC-09 proposal and evidence; approval remains blocked and no dependent implementation is marked complete.
+10. Historical planning audit note: on 30 October, GYMOS-MIG-085 initially received a concrete DEC-09 proposal; the project owner later approved it and the decision task is complete. Dependent implementation remains in its owning feature tasks.
 
 ## Unresolved gates (not omissions)
 

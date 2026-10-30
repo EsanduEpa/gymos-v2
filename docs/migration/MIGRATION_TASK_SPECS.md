@@ -1,8 +1,8 @@
 # GymOS V2 — Authoritative Task Specifications
 
-> **30 October 2026 owner scope update:** [Segment 01 finalization](SEGMENT_01_FINALIZATION.md) supersedes earlier member-plan-delivery exclusions and suspension-earning proposals. Tasks 051/052 include authenticated read-only member access to own assigned workout/meal plans; trainer health access expires after 90 days as specified in DEC-09. Original inventory counts are not re-estimated effort. Owner finalization is recorded; separate accountable review remains pending.
+> **30 October 2026 owner scope update:** [Segment 01 finalization](SEGMENT_01_FINALIZATION.md) supersedes earlier member-plan-delivery exclusions and suspension-earning proposals. Tasks 051/052 include authenticated read-only member access to own assigned workout/meal plans; trainer health access expires after 90 days as specified in DEC-09. Original task IDs/counts are retained; no effort estimate is implied. The project owner accepts decision-review responsibility; independent specialist review is not claimed.
 
-This is the task-detail appendix of [Master Plan §12](MIGRATION_EXECUTION_PLAN.md#12-complete-task-breakdown-with-unique-ids), not a second roadmap. IDs/dependencies/status below are the authoritative definitions; the Master Plan index and tracker are synchronized views. All target paths labeled proposed are future work. Initial planning statuses were **Not Started**; live task statuses and evidence are maintained below. Source inspected23 October2026; no implementation is claimed.
+This is the task-detail appendix of [Master Plan §12](MIGRATION_EXECUTION_PLAN.md#12-complete-task-breakdown-with-unique-ids), not a second roadmap. IDs/dependencies/status below are the authoritative definitions; the Master Plan index and tracker are synchronized views. All target paths labeled proposed are future work. Initial planning statuses were **Not Started**; live task statuses and evidence are maintained below. Source inventory baseline: 23 October 2026.
 
 ## Task ID: GYMOS-MIG-001
 
@@ -716,7 +716,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-In Progress — implementation and local checks are complete; hosted pull-request run remains pending because no Git remote is configured.
+Completed. Authenticated Chrome verified all 11 hosted checks at closure revision `49217dd` in [run 41011340034](https://github.com/EsanduEpa/gymos-v2/actions/runs/41011340034); see [GYMOS-MIG-008 evidence](evidence/GYMOS-MIG-008.md). This run supersedes earlier no-remote and pending-hosted checkpoints.
 
 ## Task ID: GYMOS-MIG-009
 
@@ -876,7 +876,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Blocked. Evidence: [evidence/GYMOS-MIG-010.md](evidence/GYMOS-MIG-010.md).
+Completed on the basis of owner-attested external remediation and independently verified local cleanup/V2 scanning. Provider logs and historical-access certainty remain unavailable; see [evidence/GYMOS-MIG-010.md](evidence/GYMOS-MIG-010.md) and [risk R18](MIGRATION_RISK_REGISTER.md).
 
 ## Task ID: GYMOS-MIG-011
 
@@ -4357,7 +4357,7 @@ Not Started.
 ## Task ID: GYMOS-MIG-051
 
 ### Task Name
-Migrate workout builder and retrieval
+Migrate workout builder and assigned member view
 
 ### Phase
 8 — Trainer clients and coaching plans
@@ -4369,13 +4369,13 @@ Migrate workout builder and retrieval. Deliver the concrete outcomes in Implemen
 V1 source behavior and deviations are enumerated for T03, T04 in the Traceability Appendix. V2 source-existing surface is limited to E01–E08 plus diagnostic GET/; all other mapped C responsibilities are proposed/partial. Current readiness and preserved services are in Master Plan §5.
 
 ### Required Inputs
-[UI map](UI_MIGRATION_MAP.md) §§2–7,10,13,16,18 for T03, T04; [Functionality map](FUNCTIONALITY_MIGRATION_MAP.md) §§2–3,10–12,14.1,15; [Database map](DATABASE_MIGRATION_MAP.md) §§4,6–9,11–14.1; [API register](MIGRATION_TRACEABILITY.md#api-contract-register) for C31, C32. Read task-specific mapped source rows and decisions: DEC-09
+[UI map](UI_MIGRATION_MAP.md) §§2–7,10,13,16,18 for T03, T04; [Functionality map](FUNCTIONALITY_MIGRATION_MAP.md) §§2–3,10–12,14.1,15; [Database map](DATABASE_MIGRATION_MAP.md) §§4,6–9,11–14.1; [API register](MIGRATION_TRACEABILITY.md#api-contract-register) for C31, C32, C64. Read task-specific mapped source rows and decisions: DEC-09
 
 ### Dependencies
 [GYMOS-MIG-012](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-012), [GYMOS-MIG-050](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-050), [GYMOS-MIG-085](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-085)
 
 ### Implementation Scope
-Preserve client preselect, title/description and dynamic exercise rows, add/remove/edit, name/sets/reps/weight and save→client journey. Validate bounded nested DTO rows at runtime, positive counts, optional fields and relationship at commit. Store plan+children+audit/receipt in tenant transaction and expose through client profile history. Keep source seeded draft behavior until reviewed; never autosave sample content. Optional duration/notes are schema/action-supported but not rendered editor controls in V1; retain their contract disposition without inventing new UI. There is no V1 rest/instruction editor. Explicit zero weight must survive serialization.
+Preserve client preselect, title/description and dynamic exercise rows, add/remove/edit, name/sets/reps/weight and save→client journey. Validate bounded nested DTO rows at runtime, positive counts, optional fields and relationship at commit. Store plan+children+audit/receipt in tenant transaction and expose through trainer client profile history. First-release scope, approved by the project owner on 30 October 2026, also requires an authenticated member read API/page for only that member's explicitly assigned plans; member views are read-only, tenant-scoped and omit trainer-private/internal fields. Verify own, other-member, other-gym, logout/revocation and refresh behavior. Assignment must be explicit in the authorized trainer command; successful save assigns the plan to that same-gym member. Keep source seeded draft behavior until reviewed; never autosave sample content. Optional duration/notes are schema/action-supported but are not rendered editor controls in V1; retain their contract disposition without inventing trainer-editor controls. There is no V1 rest/instruction editor. Explicit zero weight must survive serialization.
 
 ### Files to Inspect
 - [/Users/esanduepa/Desktop/Projects/gymos/app/(dashboard)/trainer/clients/[id]/page.tsx](</Users/esanduepa/Desktop/Projects/gymos/app/(dashboard)/trainer/clients/[id]/page.tsx>)
@@ -4409,10 +4409,10 @@ Enforce mapped contract roles and current gym access in NestJS, then local resou
 Use strict runtime DTOs and mapped field schemas. Successful reads200, creates201 or explicitly documented202 pending; errors401 expired/invalid,403 forbidden,404 missing/foreign resource,409 stale/version/idempotency/collision conflict,422 field validation,429 rate limit,503 dependency unavailable. Unknown post-commit outcome resolves operation/receipt before retry; no generic failure that encourages duplicate financial effects. No GET writes.
 
 ### Testing Requirements
-Related trainer saves/retrieves exact exercise order/fields once; invalid/empty/oversized row set or changed relationship rejects with draft retained; foreign member cannot be assigned. Member web plan delivery is not silently added. Run targeted unit/runtime-validator, real database integration and API role/tenant negative cases for changed boundaries; real-browser E2E/visual checks for changed screens. No unrelated broad suite repetition after passing checks.
+Related trainer saves/retrieves exact exercise order/fields once; invalid/empty/oversized row set or changed relationship rejects with draft retained; foreign member cannot be assigned. An authenticated member can read their own assigned workout only; ID substitution for another member/gym, logout and revoked access deny, including after refresh. Member cannot edit or assign plans. Run targeted unit/runtime-validator, real database integration and API role/tenant negative cases for changed boundaries; real-browser E2E/visual checks for changed screens. No unrelated broad suite repetition after passing checks.
 
 ### Acceptance Criteria
-- Related trainer saves/retrieves exact exercise order/fields once; invalid/empty/oversized row set or changed relationship rejects with draft retained; foreign member cannot be assigned. Member web plan delivery is not silently added.
+- Related trainer saves/retrieves exact exercise order/fields once; invalid/empty/oversized row set or changed relationship rejects with draft retained; foreign member cannot be assigned. A member can view only their explicitly assigned workout, read-only, with safe DTO fields and current access checks.
 - Success and rejected/failure cases include persisted effect counts and role/gym-safe UI/API behavior; changed reads are pure and sanitized.
 - Evidence identifies revision, environment/fixtures, commands/exit codes and any skipped or unavailable verification.
 
@@ -4443,7 +4443,7 @@ Not Started.
 ## Task ID: GYMOS-MIG-052
 
 ### Task Name
-Migrate meal builder and live macro totals
+Migrate meal builder, macros and assigned member view
 
 ### Phase
 8 — Trainer clients and coaching plans
@@ -4455,13 +4455,13 @@ Migrate meal builder and live macro totals. Deliver the concrete outcomes in Imp
 V1 source behavior and deviations are enumerated for T03, T05 in the Traceability Appendix. V2 source-existing surface is limited to E01–E08 plus diagnostic GET/; all other mapped C responsibilities are proposed/partial. Current readiness and preserved services are in Master Plan §5.
 
 ### Required Inputs
-[UI map](UI_MIGRATION_MAP.md) §§2–7,10,13,16,18 for T03, T05; [Functionality map](FUNCTIONALITY_MIGRATION_MAP.md) §§2–3,10–12,14.1,15; [Database map](DATABASE_MIGRATION_MAP.md) §§4,6–9,11–14.1; [API register](MIGRATION_TRACEABILITY.md#api-contract-register) for C31, C33. Read task-specific mapped source rows and decisions: DEC-09
+[UI map](UI_MIGRATION_MAP.md) §§2–7,10,13,16,18 for T03, T05; [Functionality map](FUNCTIONALITY_MIGRATION_MAP.md) §§2–3,10–12,14.1,15; [Database map](DATABASE_MIGRATION_MAP.md) §§4,6–9,11–14.1; [API register](MIGRATION_TRACEABILITY.md#api-contract-register) for C31, C33, C65. Read task-specific mapped source rows and decisions: DEC-09
 
 ### Dependencies
 [GYMOS-MIG-012](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-012), [GYMOS-MIG-050](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-050), [GYMOS-MIG-085](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-085)
 
 ### Implementation Scope
-Preserve client/title, dynamic food/meal rows and live calories/protein/carbs/fat totals. Resolve V1 day comment0..6 versus builder1/proposed1..7 before persistence; preserve actual one-day-oriented UI rather than invent weekly editor. Validate units, nonnegative finite macros and row bounds, recompute/validate aggregate server-side. Transactionally assign plan+children+audit/receipt and retrieve in client tab.
+Preserve client/title, dynamic food/meal rows and live calories/protein/carbs/fat totals. Resolve V1 day comment0..6 versus builder1/proposed1..7 before persistence; preserve actual one-day-oriented UI rather than invent weekly editor. Validate units, nonnegative finite macros and row bounds, recompute/validate aggregate server-side. Transactionally assign plan+children+audit/receipt and retrieve in trainer client tab. First-release scope, approved by the project owner on 30 October 2026, also requires an authenticated member read API/page for only that member's explicitly assigned meal plans; member views are read-only, tenant-scoped and omit trainer-private/internal fields. Verify own, other-member, other-gym, logout/revocation and refresh behavior. Assignment must be explicit in the authorized trainer command; successful save assigns the plan to that same-gym member.
 
 ### Files to Inspect
 - [/Users/esanduepa/Desktop/Projects/gymos/app/(dashboard)/trainer/clients/[id]/page.tsx](</Users/esanduepa/Desktop/Projects/gymos/app/(dashboard)/trainer/clients/[id]/page.tsx>)
@@ -4495,7 +4495,7 @@ Enforce mapped contract roles and current gym access in NestJS, then local resou
 Use strict runtime DTOs and mapped field schemas. Successful reads200, creates201 or explicitly documented202 pending; errors401 expired/invalid,403 forbidden,404 missing/foreign resource,409 stale/version/idempotency/collision conflict,422 field validation,429 rate limit,503 dependency unavailable. Unknown post-commit outcome resolves operation/receipt before retry; no generic failure that encourages duplicate financial effects. No GET writes.
 
 ### Testing Requirements
-Add/remove/edit changes live totals accurately; server totals reject manipulated values/NaN/overflow; same intent stores one plan; invalid assignment retains rows. Correct day mapping and relationship/privacy regression pass. Run targeted unit/runtime-validator, real database integration and API role/tenant negative cases for changed boundaries; real-browser E2E/visual checks for changed screens. No unrelated broad suite repetition after passing checks.
+Add/remove/edit changes live totals accurately; server totals reject manipulated values/NaN/overflow; same intent stores one plan; invalid assignment retains rows. Correct day mapping and relationship/privacy regression pass. An authenticated member can read their own assigned meal plan only; ID substitution for another member/gym, logout and revoked access deny, including after refresh. Member cannot edit or assign plans. Run targeted unit/runtime-validator, real database integration and API role/tenant negative cases for changed boundaries; real-browser E2E/visual checks for changed screens. No unrelated broad suite repetition after passing checks.
 
 ### Acceptance Criteria
 - Add/remove/edit changes live totals accurately; server totals reject manipulated values/NaN/overflow; same intent stores one plan; invalid assignment retains rows. Correct day mapping and relationship/privacy regression pass.
@@ -5399,7 +5399,7 @@ V1 source behavior and deviations are enumerated for cross-cutting infrastructur
 [GYMOS-MIG-015](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-015), [GYMOS-MIG-024](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-024), [GYMOS-MIG-025](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-025), [GYMOS-MIG-026](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-026), [GYMOS-MIG-030](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-030), [GYMOS-MIG-035](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-035), [GYMOS-MIG-037](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-037), [GYMOS-MIG-038](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-038), [GYMOS-MIG-039](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-039), [GYMOS-MIG-048](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-048), [GYMOS-MIG-050](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-050), [GYMOS-MIG-051](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-051), [GYMOS-MIG-052](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-052), [GYMOS-MIG-057](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-057), [GYMOS-MIG-058](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-058), [GYMOS-MIG-059](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-059), [GYMOS-MIG-060](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-060), [GYMOS-MIG-061](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-061), [GYMOS-MIG-062](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-062)
 
 ### Implementation Scope
-Regenerate source inventories and compare all29 routes/74 TSX/44 exports/20 models/14 enums and C/E/workflow/control registers to delivered commits. Classify each as Complete/Corrected/Deferred/Missing/Failed verification with evidence. A deferred O14/unused chart is an intentional disposition, never implemented parity. Any new route/action discovered gets a task or approved disposition before gate.
+Regenerate the original V1 inventories (29 routes/74 TSX/44 exports/20 models/14 enums) and compare the 65 current C contracts, E operations and workflow/control registers to delivered commits. Account separately for the owner-approved V2-only member plan screen and C64/C65; do not inflate or alter the original 29-route V1 count. Classify each item Complete/Corrected/Deferred/Missing/Failed verification with evidence. A deferred O14/unused chart is intentional disposition, never implemented parity. Any additional route/action discovered gets a task or approved disposition before gate.
 
 ### Files to Inspect
 - [/Users/esanduepa/Desktop/Projects/gymos-v2/apps/api/src/app.module.ts](</Users/esanduepa/Desktop/Projects/gymos-v2/apps/api/src/app.module.ts>)
@@ -5427,10 +5427,10 @@ Read-only inspection/decision evidence only; no operational permission granted b
 Check source/evidence/ADR validity and mark missing evidence explicitly; do not execute an application workflow to validate documentation.
 
 ### Testing Requirements
-No source item lacks task/disposition; all released C contracts have tested implementation mapping and DTO version. Report fresh counts and limitations without invented percentage. Missing/failed critical items keep milestone open. Documentation links, source paths, IDs and evidence redaction are checked; no application test is invented for document-only changes.
+No source item lacks task/disposition; all released C contracts, including member-view C64/C65, have tested implementation mapping and DTO version. Report original V1 counts separately from owner-approved V2 additions and state limitations without invented percentage. Missing/failed critical items keep milestone open. Documentation links, source paths, IDs and evidence redaction are checked; no application test is invented for document-only changes.
 
 ### Acceptance Criteria
-- No source item lacks task/disposition; all released C contracts have tested implementation mapping and DTO version. Report fresh counts and limitations without invented percentage. Missing/failed critical items keep milestone open.
+- No source item lacks task/disposition; all released C contracts, including C64/C65, have tested implementation mapping and DTO version. Report original V1 counts separately from owner-approved V2 additions and state limitations without invented percentage. Missing/failed critical items keep milestone open.
 - All statements distinguish observed source, prior evidence, proposed work and unresolved decisions.
 - Evidence identifies revision, environment/fixtures, commands/exit codes and any skipped or unavailable verification.
 
@@ -6544,7 +6544,7 @@ Resolve Master/tenant configuration ownership and profile-save boundary
 Resolve Master/tenant configuration ownership and profile-save boundary. Deliver the concrete outcomes in Implementation Scope and Acceptance Criteria.
 
 ### Current State
-Approved MVP choices are recorded in map §14.1; the named technical subdecision remains unapproved/unverified. No ADR approval is inferred from this plan.
+DEC-01 is approved under the project owner’s explicitly accepted review authority. Independent specialist review is not claimed.
 
 ### Required Inputs
 [UI map](UI_MIGRATION_MAP.md) §§2–7,10,13,16,18 for shared scope; [Functionality map](FUNCTIONALITY_MIGRATION_MAP.md) §§2–3,10–12,14.1,15; [Database map](DATABASE_MIGRATION_MAP.md) §§4,6–9,11–14.1; [API register](MIGRATION_TRACEABILITY.md#api-contract-register) for No new public contract; internal/verification task.. Read task-specific mapped source rows and decisions: No additional unresolved decision assigned; honor approved map §14.1.
@@ -6553,7 +6553,7 @@ Approved MVP choices are recorded in map §14.1; the named technical subdecision
 [GYMOS-MIG-001](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-001)
 
 ### Implementation Scope
-Prepare one focused decision record for DEC-01, accountable to Architecture lead, using DB01; F-D07/D08/D16. Tenant config owns operational currency/zone/rates; choose staged C39 operation or separate saves; define safe pending projection. No cross-database atomic save. Record options, selected result, tradeoffs, schema/API impact and concrete expected test examples; do not treat a proposed default as approved. Request the responsible owner’s answer only after a concrete reviewable proposal exists. Update this plan through change control without reopening settled MVP scope.
+Master/tenant configuration ownership, staged profile-save boundary and safe pending projection as recorded in the approved decision. Owner review approval completes this decision-recording task; no implementation is claimed.
 
 ### Files to Inspect
 - [/Users/esanduepa/Desktop/Projects/gymos-v2/apps/api/src/app.module.ts](</Users/esanduepa/Desktop/Projects/gymos-v2/apps/api/src/app.module.ts>)
@@ -6581,10 +6581,10 @@ Read-only inspection/decision evidence only; no operational permission granted b
 Check source/evidence/ADR validity and mark missing evidence explicitly; do not execute an application workflow to validate documentation.
 
 ### Testing Requirements
-ADR contains the actual reviewer/date/result or explicitly remains Blocked; each affected task links the signed result and has unambiguous expected outcomes. No implementation marked verified from decision prose. Documentation links, source paths, IDs and evidence redaction are checked; no application test is invented for document-only changes.
+The approved decision record links the owner/date/result and affected tasks identify unambiguous expected outcomes. No application implementation is marked verified from decision prose. Documentation links, source paths, IDs and evidence redaction are checked; no application test is invented for document-only changes.
 
 ### Acceptance Criteria
-- ADR contains the actual reviewer/date/result or explicitly remains Blocked; each affected task links the signed result and has unambiguous expected outcomes. No implementation marked verified from decision prose.
+- The approved decision record links the owner/date/result and affected tasks identify unambiguous expected outcomes. No application implementation is marked verified from decision prose.
 - All statements distinguish observed source, prior evidence, proposed work and unresolved decisions.
 - Evidence identifies revision, environment/fixtures, commands/exit codes and any skipped or unavailable verification.
 
@@ -6610,7 +6610,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Blocked — DEC-01 proposal and evidence prepared on 26 October 2026; awaiting explicit project-owner approval.
+Completed on 30 October 2026 under project-owner review authority. DEC-01 is approved; independent specialist review and application implementation are not claimed. See [evidence](evidence/GYMOS-MIG-077.md) and the linked decision record.
 
 ## Task ID: GYMOS-MIG-078
 
@@ -6704,7 +6704,7 @@ Resolve Read-only support scope and expiry
 Resolve Read-only support scope and expiry. Deliver the concrete outcomes in Implementation Scope and Acceptance Criteria.
 
 ### Current State
-Approved MVP choices are recorded in map §14.1; the named technical subdecision remains unapproved/unverified. No ADR approval is inferred from this plan.
+DEC-03 is approved under the project owner’s explicitly accepted review authority. Independent specialist review is not claimed.
 
 ### Required Inputs
 [UI map](UI_MIGRATION_MAP.md) §§2–7,10,13,16,18 for shared scope; [Functionality map](FUNCTIONALITY_MIGRATION_MAP.md) §§2–3,10–12,14.1,15; [Database map](DATABASE_MIGRATION_MAP.md) §§4,6–9,11–14.1; [API register](MIGRATION_TRACEABILITY.md#api-contract-register) for No new public contract; internal/verification task.. Read task-specific mapped source rows and decisions: No additional unresolved decision assigned; honor approved map §14.1.
@@ -6713,7 +6713,7 @@ Approved MVP choices are recorded in map §14.1; the named technical subdecision
 [GYMOS-MIG-001](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-001)
 
 ### Implementation Scope
-Prepare one focused decision record for DEC-03, accountable to Platform security + Product, using DB08; F-D05. Set reason/expiry, entry/exit invalidation, allowed summary fields and status handling. Support has original actor, no health notes and no tenant write; these are settled. Record options, selected result, tradeoffs, schema/API impact and concrete expected test examples; do not treat a proposed default as approved. Request the responsible owner’s answer only after a concrete reviewable proposal exists. Update this plan through change control without reopening settled MVP scope.
+Read-only support reason/expiry, entry/exit invalidation, summary fields and status handling as recorded in the approved decision. Owner review approval completes this decision-recording task; no implementation is claimed.
 
 ### Files to Inspect
 - [/Users/esanduepa/Desktop/Projects/gymos-v2/apps/api/src/app.module.ts](</Users/esanduepa/Desktop/Projects/gymos-v2/apps/api/src/app.module.ts>)
@@ -6741,10 +6741,10 @@ Read-only inspection/decision evidence only; no operational permission granted b
 Check source/evidence/ADR validity and mark missing evidence explicitly; do not execute an application workflow to validate documentation.
 
 ### Testing Requirements
-ADR contains the actual reviewer/date/result or explicitly remains Blocked; each affected task links the signed result and has unambiguous expected outcomes. No implementation marked verified from decision prose. Documentation links, source paths, IDs and evidence redaction are checked; no application test is invented for document-only changes.
+The approved decision record links the owner/date/result and affected tasks identify unambiguous expected outcomes. No application implementation is marked verified from decision prose. Documentation links, source paths, IDs and evidence redaction are checked; no application test is invented for document-only changes.
 
 ### Acceptance Criteria
-- ADR contains the actual reviewer/date/result or explicitly remains Blocked; each affected task links the signed result and has unambiguous expected outcomes. No implementation marked verified from decision prose.
+- The approved decision record links the owner/date/result and affected tasks identify unambiguous expected outcomes. No application implementation is marked verified from decision prose.
 - All statements distinguish observed source, prior evidence, proposed work and unresolved decisions.
 - Evidence identifies revision, environment/fixtures, commands/exit codes and any skipped or unavailable verification.
 
@@ -6770,7 +6770,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Blocked — DEC-03 proposal and evidence prepared on 26 October 2026; awaiting explicit project-owner approval.
+Completed on 30 October 2026 under project-owner review authority. DEC-03 is approved; independent specialist review and application implementation are not claimed. See [evidence](evidence/GYMOS-MIG-079.md) and the linked decision record.
 
 ## Task ID: GYMOS-MIG-080
 
@@ -6944,7 +6944,7 @@ Resolve Exact money and operational earning policy
 Resolve Exact money and operational earning policy. Deliver the concrete outcomes in Implementation Scope and Acceptance Criteria.
 
 ### Current State
-Approved MVP choices are recorded in map §14.1; the named technical subdecision remains unapproved/unverified. No ADR approval is inferred from this plan.
+DEC-06 is approved under the project owner’s explicitly accepted review authority. Independent specialist review is not claimed.
 
 ### Required Inputs
 [UI map](UI_MIGRATION_MAP.md) §§2–7,10,13,16,18 for shared scope; [Functionality map](FUNCTIONALITY_MIGRATION_MAP.md) §§2–3,10–12,14.1,15; [Database map](DATABASE_MIGRATION_MAP.md) §§4,6–9,11–14.1; [API register](MIGRATION_TRACEABILITY.md#api-contract-register) for No new public contract; internal/verification task.. Read task-specific mapped source rows and decisions: No additional unresolved decision assigned; honor approved map §14.1.
@@ -6953,7 +6953,7 @@ Approved MVP choices are recorded in map §14.1; the named technical subdecision
 [GYMOS-MIG-001](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-001)
 
 ### Implementation Scope
-Prepare one focused decision record for DEC-06, accountable to Finance + Database, using DB06; F-D07/D10. Approve currency set, Decimal precision (19,4 proposed only), minor-unit residual allocation, zero-budget semantics and reports. Early suspension earning/expired unused recognition must be approved or kept separate/unavailable; payments remain deferred. Record options, selected result, tradeoffs, schema/API impact and concrete expected test examples; do not treat a proposed default as approved. Request the responsible owner’s answer only after a concrete reviewable proposal exists. Update this plan through change control without reopening settled MVP scope.
+Exact-money/reporting rules and suspension treatment as recorded in the approved decision: memberships and packs keep original expiry; daily membership operational earning continues during suspension without another payment/charge. Owner review approval completes this decision-recording task; no implementation is claimed.
 
 ### Files to Inspect
 - [/Users/esanduepa/Desktop/Projects/gymos-v2/apps/api/src/app.module.ts](</Users/esanduepa/Desktop/Projects/gymos-v2/apps/api/src/app.module.ts>)
@@ -6981,10 +6981,10 @@ Read-only inspection/decision evidence only; no operational permission granted b
 Check source/evidence/ADR validity and mark missing evidence explicitly; do not execute an application workflow to validate documentation.
 
 ### Testing Requirements
-ADR contains the actual reviewer/date/result or explicitly remains Blocked; each affected task links the signed result and has unambiguous expected outcomes. No implementation marked verified from decision prose. Documentation links, source paths, IDs and evidence redaction are checked; no application test is invented for document-only changes.
+The approved decision record links the owner/date/result and affected tasks identify unambiguous expected outcomes. No application implementation is marked verified from decision prose. Documentation links, source paths, IDs and evidence redaction are checked; no application test is invented for document-only changes.
 
 ### Acceptance Criteria
-- ADR contains the actual reviewer/date/result or explicitly remains Blocked; each affected task links the signed result and has unambiguous expected outcomes. No implementation marked verified from decision prose.
+- The approved decision record links the owner/date/result and affected tasks identify unambiguous expected outcomes. No application implementation is marked verified from decision prose.
 - All statements distinguish observed source, prior evidence, proposed work and unresolved decisions.
 - Evidence identifies revision, environment/fixtures, commands/exit codes and any skipped or unavailable verification.
 
@@ -7010,7 +7010,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Blocked — DEC-06 proposal and evidence prepared on 26 October 2026; awaiting explicit project-owner approval.
+Completed on 30 October 2026 under project-owner review authority. DEC-06 is approved; independent specialist review and application implementation are not claimed. See [evidence](evidence/GYMOS-MIG-082.md) and the linked decision record.
 
 ## Task ID: GYMOS-MIG-083
 
@@ -7024,7 +7024,7 @@ Resolve Gym time, term boundaries and scheduling input bounds
 Resolve Gym time, term boundaries and scheduling input bounds. Deliver the concrete outcomes in Implementation Scope and Acceptance Criteria.
 
 ### Current State
-Approved MVP choices are recorded in map §14.1; the named technical subdecision remains unapproved/unverified. No ADR approval is inferred from this plan.
+DEC-07 is approved under the project owner’s explicitly accepted review authority. Independent specialist review is not claimed.
 
 ### Required Inputs
 [UI map](UI_MIGRATION_MAP.md) §§2–7,10,13,16,18 for shared scope; [Functionality map](FUNCTIONALITY_MIGRATION_MAP.md) §§2–3,10–12,14.1,15; [Database map](DATABASE_MIGRATION_MAP.md) §§4,6–9,11–14.1; [API register](MIGRATION_TRACEABILITY.md#api-contract-register) for No new public contract; internal/verification task.. Read task-specific mapped source rows and decisions: No additional unresolved decision assigned; honor approved map §14.1.
@@ -7033,7 +7033,7 @@ Approved MVP choices are recorded in map §14.1; the named technical subdecision
 [GYMOS-MIG-001](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-001)
 
 ### Implementation Scope
-Prepare one focused decision record for DEC-07, accountable to Scheduling/Product + Database, using DB03/DB04/DB05; F-D01/D06/D08. Choose date inclusivity, DST ambiguity/gap rejection, overnight shifts, start tolerance/minimum duration precision, input maxima and pack order. Suggested earliest-expiry then stable ID is a proposal. Exact cancellation equality and15-minute no-show are settled. Record options, selected result, tradeoffs, schema/API impact and concrete expected test examples; do not treat a proposed default as approved. Request the responsible owner’s answer only after a concrete reviewable proposal exists. Update this plan through change control without reopening settled MVP scope.
+Date/DST/term/scheduling bounds, stable pack ordering and accepted cancellation/no-show boundaries as recorded in the approved decision. Original membership/pack expiry is unchanged during suspension. Owner review approval completes this decision-recording task; no implementation is claimed.
 
 ### Files to Inspect
 - [/Users/esanduepa/Desktop/Projects/gymos-v2/apps/api/src/app.module.ts](</Users/esanduepa/Desktop/Projects/gymos-v2/apps/api/src/app.module.ts>)
@@ -7061,10 +7061,10 @@ Read-only inspection/decision evidence only; no operational permission granted b
 Check source/evidence/ADR validity and mark missing evidence explicitly; do not execute an application workflow to validate documentation.
 
 ### Testing Requirements
-ADR contains the actual reviewer/date/result or explicitly remains Blocked; each affected task links the signed result and has unambiguous expected outcomes. No implementation marked verified from decision prose. Documentation links, source paths, IDs and evidence redaction are checked; no application test is invented for document-only changes.
+The approved decision record links the owner/date/result and affected tasks identify unambiguous expected outcomes. No application implementation is marked verified from decision prose. Documentation links, source paths, IDs and evidence redaction are checked; no application test is invented for document-only changes.
 
 ### Acceptance Criteria
-- ADR contains the actual reviewer/date/result or explicitly remains Blocked; each affected task links the signed result and has unambiguous expected outcomes. No implementation marked verified from decision prose.
+- The approved decision record links the owner/date/result and affected tasks identify unambiguous expected outcomes. No application implementation is marked verified from decision prose.
 - All statements distinguish observed source, prior evidence, proposed work and unresolved decisions.
 - Evidence identifies revision, environment/fixtures, commands/exit codes and any skipped or unavailable verification.
 
@@ -7090,7 +7090,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Blocked — DEC-07 proposal and evidence prepared on 26 October 2026; awaiting explicit project-owner approval.
+Completed on 30 October 2026 under project-owner review authority. DEC-07 is approved; independent specialist review and application implementation are not claimed. See [evidence](evidence/GYMOS-MIG-083.md) and the linked decision record.
 
 ## Task ID: GYMOS-MIG-084
 
@@ -7104,7 +7104,7 @@ Resolve Settlement locking, payroll periods and correction policy
 Resolve Settlement locking, payroll periods and correction policy. Deliver the concrete outcomes in Implementation Scope and Acceptance Criteria.
 
 ### Current State
-Approved MVP choices are recorded in map §14.1; the named technical subdecision remains unapproved/unverified. No ADR approval is inferred from this plan.
+DEC-08 is approved under the project owner’s explicitly accepted review authority. Independent specialist review is not claimed.
 
 ### Required Inputs
 [UI map](UI_MIGRATION_MAP.md) §§2–7,10,13,16,18 for shared scope; [Functionality map](FUNCTIONALITY_MIGRATION_MAP.md) §§2–3,10–12,14.1,15; [Database map](DATABASE_MIGRATION_MAP.md) §§4,6–9,11–14.1; [API register](MIGRATION_TRACEABILITY.md#api-contract-register) for No new public contract; internal/verification task.. Read task-specific mapped source rows and decisions: No additional unresolved decision assigned; honor approved map §14.1.
@@ -7113,7 +7113,7 @@ Approved MVP choices are recorded in map §14.1; the named technical subdecision
 [GYMOS-MIG-001](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-001)
 
 ### Implementation Scope
-Prepare one focused decision record for DEC-08, accountable to Finance/Payroll + Backend, using DB05/DB07; F-D02/D11. Review lock order/exclusion constraints, local week/month boundaries (Monday proposed), close-vs-completion retry, immutable approved corrections and quote version acknowledgment. Approval is not payout; completed-only trainer pay is settled. Record options, selected result, tradeoffs, schema/API impact and concrete expected test examples; do not treat a proposed default as approved. Request the responsible owner’s answer only after a concrete reviewable proposal exists. Update this plan through change control without reopening settled MVP scope.
+Settlement locks, payroll periods, correction and quote acknowledgement rules as recorded in the approved decision. Trainer pay is generated only for completed sessions. Owner review approval completes this decision-recording task; no implementation is claimed.
 
 ### Files to Inspect
 - [/Users/esanduepa/Desktop/Projects/gymos-v2/apps/api/src/app.module.ts](</Users/esanduepa/Desktop/Projects/gymos-v2/apps/api/src/app.module.ts>)
@@ -7141,10 +7141,10 @@ Read-only inspection/decision evidence only; no operational permission granted b
 Check source/evidence/ADR validity and mark missing evidence explicitly; do not execute an application workflow to validate documentation.
 
 ### Testing Requirements
-ADR contains the actual reviewer/date/result or explicitly remains Blocked; each affected task links the signed result and has unambiguous expected outcomes. No implementation marked verified from decision prose. Documentation links, source paths, IDs and evidence redaction are checked; no application test is invented for document-only changes.
+The approved decision record links the owner/date/result and affected tasks identify unambiguous expected outcomes. No application implementation is marked verified from decision prose. Documentation links, source paths, IDs and evidence redaction are checked; no application test is invented for document-only changes.
 
 ### Acceptance Criteria
-- ADR contains the actual reviewer/date/result or explicitly remains Blocked; each affected task links the signed result and has unambiguous expected outcomes. No implementation marked verified from decision prose.
+- The approved decision record links the owner/date/result and affected tasks identify unambiguous expected outcomes. No application implementation is marked verified from decision prose.
 - All statements distinguish observed source, prior evidence, proposed work and unresolved decisions.
 - Evidence identifies revision, environment/fixtures, commands/exit codes and any skipped or unavailable verification.
 
@@ -7170,7 +7170,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Blocked — DEC-08 proposal and evidence prepared on 26 October 2026; awaiting explicit project-owner approval.
+Completed on 30 October 2026 under project-owner review authority. DEC-08 is approved; independent specialist review and application implementation are not claimed. See [evidence](evidence/GYMOS-MIG-084.md) and the linked decision record.
 
 ## Task ID: GYMOS-MIG-085
 
@@ -7184,7 +7184,7 @@ Resolve Coaching privacy, metrics, exports and refresh guarantees
 Resolve Coaching privacy, metrics, exports and refresh guarantees. Deliver the concrete outcomes in Implementation Scope and Acceptance Criteria.
 
 ### Current State
-Approved MVP choices are recorded in map §14.1; the named technical subdecision remains unapproved/unverified. No ADR approval is inferred from this plan.
+DEC-09 is approved under the project owner’s explicitly accepted review authority. Independent specialist review is not claimed.
 
 ### Required Inputs
 [UI map](UI_MIGRATION_MAP.md) §§2–7,10,13,16,18 for shared scope; [Functionality map](FUNCTIONALITY_MIGRATION_MAP.md) §§2–3,10–12,14.1,15; [Database map](DATABASE_MIGRATION_MAP.md) §§4,6–9,11–14.1; [API register](MIGRATION_TRACEABILITY.md#api-contract-register) for No new public contract; internal/verification task.. Read task-specific mapped source rows and decisions: No additional unresolved decision assigned; honor approved map §14.1.
@@ -7193,7 +7193,7 @@ Approved MVP choices are recorded in map §14.1; the named technical subdecision
 [GYMOS-MIG-001](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-001)
 
 ### Implementation Scope
-Prepare one focused decision record for DEC-09, accountable to Coaching/Privacy + Finance + Frontend, using DB10/DB12; F-D12/D15/D17/D18/D19. Freeze relationship states, note edit/day/unit/row bounds, metric windows/denominators, export safety cap/snapshot, selected-gym polling and numerical cross-role refresh SLA. No unsupported member-plan delivery/global inbox; health ownership and export scopes are settled. Record options, selected result, tradeoffs, schema/API impact and concrete expected test examples; do not treat a proposed default as approved. Request the responsible owner’s answer only after a concrete reviewable proposal exists. Update this plan through change control without reopening settled MVP scope.
+Privacy, relationship, coaching, metrics, export and refresh rules as recorded in the approved decision, including 90-day trainer health-note eligibility and read-only member access to own assigned workout/meal plans. Owner review approval completes this decision-recording task; no implementation is claimed.
 
 ### Files to Inspect
 - [/Users/esanduepa/Desktop/Projects/gymos-v2/apps/api/src/app.module.ts](</Users/esanduepa/Desktop/Projects/gymos-v2/apps/api/src/app.module.ts>)
@@ -7221,10 +7221,10 @@ Read-only inspection/decision evidence only; no operational permission granted b
 Check source/evidence/ADR validity and mark missing evidence explicitly; do not execute an application workflow to validate documentation.
 
 ### Testing Requirements
-ADR contains the actual reviewer/date/result or explicitly remains Blocked; each affected task links the signed result and has unambiguous expected outcomes. No implementation marked verified from decision prose. Documentation links, source paths, IDs and evidence redaction are checked; no application test is invented for document-only changes.
+The approved decision record links the owner/date/result and affected tasks identify unambiguous expected outcomes. No application implementation is marked verified from decision prose. Documentation links, source paths, IDs and evidence redaction are checked; no application test is invented for document-only changes.
 
 ### Acceptance Criteria
-- ADR contains the actual reviewer/date/result or explicitly remains Blocked; each affected task links the signed result and has unambiguous expected outcomes. No implementation marked verified from decision prose.
+- The approved decision record links the owner/date/result and affected tasks identify unambiguous expected outcomes. No application implementation is marked verified from decision prose.
 - All statements distinguish observed source, prior evidence, proposed work and unresolved decisions.
 - Evidence identifies revision, environment/fixtures, commands/exit codes and any skipped or unavailable verification.
 
@@ -7250,7 +7250,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Blocked — DEC-09 proposal and evidence prepared on 30 October 2026; awaiting project-owner and accountable Coaching/Privacy, Finance, and Frontend review. Evidence: [GYMOS-MIG-085.md](evidence/GYMOS-MIG-085.md).
+Completed on 30 October 2026 under project-owner review authority. DEC-09 is approved; independent specialist review and application implementation are not claimed. See [evidence](evidence/GYMOS-MIG-085.md) and the linked decision record.
 
 ## Task ID: GYMOS-MIG-086
 
@@ -7433,7 +7433,7 @@ Approved MVP choices are recorded in map §14.1; the named technical subdecision
 [GYMOS-MIG-048](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-048)
 
 ### Implementation Scope
-Prepare one focused decision record for DEC-12, accountable to Mobile/Product + Security, using Phase13; F-D04/D12/D18. Approve Expo/OS/device support, member/trainer subset, secure token policy/store release and whether new push is commissioned. Progress/plan delivery beyond V1 requires new scope. Native UI uses same Nest business logic. Record options, selected result, tradeoffs, schema/API impact and concrete expected test examples; do not treat a proposed default as approved. Request the responsible owner’s answer only after a concrete reviewable proposal exists. Update this plan through change control without reopening settled MVP scope.
+Prepare the still-open DEC-12 record for Mobile/Product + Security using Phase13; F-D04/D12/D18. Approve Expo/OS/device support, any native member/trainer subset, secure token policy/store release and whether new push is commissioned. The owner-approved first-release workout/meal views are web scope in tasks 051/052; they do not imply native/mobile plan delivery. Native UI uses the same Nest business logic. Record options, result, tradeoffs, schema/API impact and concrete tests; do not treat an unapproved mobile proposal as settled.
 
 ### Files to Inspect
 - [/Users/esanduepa/Desktop/Projects/gymos-v2/apps/api/src/app.module.ts](</Users/esanduepa/Desktop/Projects/gymos-v2/apps/api/src/app.module.ts>)

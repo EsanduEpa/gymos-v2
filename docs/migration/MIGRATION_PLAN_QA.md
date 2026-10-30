@@ -2,6 +2,8 @@
 
 Supporting evidence for [Master Plan §30](MIGRATION_EXECUTION_PLAN.md#30-final-completion-criteria). This checks the plan only; it does not complete GYMOS-MIG-001 or any migration task. Future parity/runtime gates remain GYMOS-MIG-063–GYMOS-MIG-071.
 
+Historical planning audit — 23 October 2026. This report validates the original plan snapshot only; its initial “all tasks Not Started” and 63-contract counts are not current status. See the live tracker, coverage matrix and current traceability inventory.
+
 Planning date:23 October2026. 42 static checks passed; 0 failed.
 
 | Check | Result | Detail |
@@ -31,7 +33,7 @@ Planning date:23 October2026. 42 static checks passed; 0 failed.
 | Every route source path mapped | PASS |  |
 | Every TSX source path mapped | PASS |  |
 | All39 workflow dossiers | PASS |  |
-| All63 contract dossiers | PASS |  |
+| Original 63 source-derived contract dossiers | PASS |  |
 | 52 UI groups and22 local control groups | PASS |  |
 | 149 handler-line sites inventoried | PASS |  |
 | All local Markdown link targets exist | PASS | [] |
@@ -49,7 +51,7 @@ Planning date:23 October2026. 42 static checks passed; 0 failed.
 | V2 application/config/schema/dependency tree unchanged | PASS | Only V2 docs untracked. |
 | V1 application/config/schema/dependency tree unchanged | PASS | Only V2 docs untracked. |
 
-Source coverage counts distinguish routes/components from overlapping workflow/control/handler groups; no distinct-runtime-interaction percentage is claimed. Required HTTP method count remains subject to contract reviews; all63 C IDs and8 E operations are dispositioned. All88 tasks remain Not Started.
+Source coverage counts distinguish routes/components from overlapping workflow/control/handler groups; no distinct-runtime-interaction percentage is claimed. This historical 23 October report audited the original 63 C IDs and 8 E operations. Current traceability adds C64/C65 for approved new member-plan scope. Current task status is in the tracker; the original “all tasks Not Started” result is historical only.
 
 Static plan/source consistency only; existing API greeting unit1 pass is prior same-session evidence. No DB/API provisioning/seed/migrate/E2E/visual/restore run. Existing map files were read only and preserved; no application fixes, generated clients, migrations, configuration, dependencies or V1 data were changed.
 

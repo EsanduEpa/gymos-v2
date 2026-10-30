@@ -78,4 +78,4 @@ Stop until DEC-09 fixes relationship, privacy, metrics, limits and meal-day mapp
 
 ## Owner scope amendment — 30 October 2026
 
-Tasks 051/052 also own member read APIs/pages and assignment verification. Follow the [finalization acceptance requirements](../SEGMENT_01_FINALIZATION.md). Original seven task IDs are retained; scope and effort have increased. No member plan feature is implemented by this update.
+Tasks 051/052 also own member read APIs/pages and assignment verification. Follow the [finalization acceptance requirements](../SEGMENT_01_FINALIZATION.md). Original seven task IDs are retained; scope has increased and the effort estimate should be reviewed when execution is planned. No member plan feature is implemented by this update.
