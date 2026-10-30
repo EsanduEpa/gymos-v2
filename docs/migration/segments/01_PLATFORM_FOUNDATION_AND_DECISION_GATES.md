@@ -1,6 +1,6 @@
 # Segment 01 — Platform Foundation and Decision Gates
 
-> **Verified closure checkpoint — 30 October 2026 at `49217dd`:** Segment 01 is COMPLETED (23/23); overall 27/88 migration tasks completed. All 11 hosted checks passed at [run 41011340034](https://github.com/EsanduEpa/gymos-v2/actions/runs/41011340034) for this revision. Decisions are owner-approved; external credential remediation is owner-attested with local cleanup and V2 scanning verified. Later documentation-only reconciliation is verified by the corresponding newer PR run. See [finalization](../SEGMENT_01_FINALIZATION.md) for evidence limits and handoff. Earlier status entries are historical checkpoints.
+> **Current verified status — 30 October 2026 at `bdf3b41`:** Segment 01 is COMPLETED (23/23); overall 27/88 migration tasks completed. All 11 hosted checks passed at [run 41013407287](https://github.com/EsanduEpa/gymos-v2/actions/runs/41013407287). Decisions are owner-approved; external credential remediation is owner-attested with local cleanup and V2 scanning verified. See [finalization](../SEGMENT_01_FINALIZATION.md) for evidence limits and handoff. Earlier status entries are historical checkpoints.
 
 ## Execution instructions for AI agents
 
@@ -160,7 +160,7 @@ Stop if a task needs provider/owner authority, a named decision lacks approval, 
 - **Completed IDs:** 001–012, 014, 077–086 (23 owned tasks; task 013 belongs to Segment 02).
 - **Remaining IDs:** none.
 - **Evidence:** [CI repair and all 11 hosted results](../evidence/GYMOS-MIG-008.md), [owner-attested credential closure](../evidence/GYMOS-MIG-010.md), approved DEC-01/03/06/07/08/09 and linked evidence.
-- **Verification:** authenticated hosted [run 41011340034](https://github.com/EsanduEpa/gymos-v2/actions/runs/41011340034) at `49217dd` passed all 11 required jobs: workspace, build, lint, type-check, unit, owned-database, browser, recovery, secret scan, dependency review and lockfile audit. Earlier run 41010929511 passed implementation revision `9f1849a`. No real database or V1 was changed.
+- **Verification:** authenticated hosted [run 41013407287](https://github.com/EsanduEpa/gymos-v2/actions/runs/41013407287) at `bdf3b41` passed all 11 required jobs: workspace, build, lint, type-check, unit, owned-database, browser, recovery, secret scan, dependency review and lockfile audit. Earlier run 41010929511 passed implementation revision `9f1849a`. No real database or V1 was changed.
 - **Evidence boundary:** provider remediation/access review is owner-attested, not independently inspected; historical access uncertainty is retained. The legacy V1 diagnostic script still prints full records/raw errors and must not be run or published as evidence; safe-output cleanup is a separate legacy follow-up.
 - **Owner scope:** member read-only viewing of own assigned workout/meal plans is added to tasks 051/052; 90-day trainer privacy, completed-session-only pay, unchanged expiry and continued earning during suspension are recorded. See [finalization](../SEGMENT_01_FINALIZATION.md).
 - **Next dependency-satisfied task:** Segment 02 / GYMOS-MIG-013 dashboard shell (handoff only; not started here). Task 020 remains gated on DEC-11. Completion is not production-release approval.

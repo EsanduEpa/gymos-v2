@@ -31,7 +31,7 @@ The detailed remaining implementation sequence, responsibilities, integration li
 | GYMOS-MIG-005 | Completed | Preserve verifier/gate evidence; rerun affected cases after task006 changes database leasing. |
 | GYMOS-MIG-006 | Completed | Preserve bounded-pool and safe-shutdown evidence; reuse the lifecycle in task007. |
 | GYMOS-MIG-007 | Completed | Preserve the owned database/browser harness and evidence; task008 adds it to CI. |
-| GYMOS-MIG-008 | Completed | All 11 hosted checks passed at `49217dd` in [run 41011340034](https://github.com/EsanduEpa/gymos-v2/actions/runs/41011340034). See task008 evidence. |
+| GYMOS-MIG-008 | Completed | All 11 hosted checks passed at `bdf3b41` in [run 41013407287](https://github.com/EsanduEpa/gymos-v2/actions/runs/41013407287), including the browser redirect synchronization. See task008 evidence. |
 | GYMOS-MIG-009 | Completed for local disposable recovery drill | See [GYMOS-MIG-009 evidence](evidence/GYMOS-MIG-009.md) and [backup/restore runbook](runbooks/backup-restore.md). Managed/staging drill remains under Task 070; restored Master is intentionally unactivated pending repair. |
 | GYMOS-MIG-010 | Completed with evidence boundary | External remediation/follow-up is owner-attested; local hardcoded URL removal and V2 scanning are independently verified. Provider audit logs and historical access remain unverified. See task010 evidence and R18. |
 

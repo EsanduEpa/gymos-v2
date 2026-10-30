@@ -1,6 +1,6 @@
 # Segment 01 finalization — 30 October 2026
 
-> **Verified closure checkpoint — 30 October 2026 at `49217dd`:** Segment 01 is COMPLETED (23/23); 27/88 total migration tasks are completed. All 11 required hosted checks passed for this exact revision in [run 41011340034](https://github.com/EsanduEpa/gymos-v2/actions/runs/41011340034). The earlier implementation run at `9f1849a` also passed all 11 checks. The PR remains a draft and unmerged. Decision review is owner-approved; external credential remediation is owner-attested, with local cleanup and V2 secret scanning independently verified. Later documentation-only reconciliation is verified by the PR checks for its own revision.
+> **Current verified status — 30 October 2026 at `bdf3b41`:** Segment 01 is COMPLETED (23/23); 27/88 total migration tasks are completed. All 11 required hosted checks passed for this revision in [run 41013407287](https://github.com/EsanduEpa/gymos-v2/actions/runs/41013407287). The PR remains a draft and unmerged. Decision review is owner-approved; external credential remediation is owner-attested, with local cleanup and V2 secret scanning independently verified. The `49217dd` closure checkpoint and run 41011340034 remain historical verification evidence.
 
 ## Owner-confirmed business rules
 
@@ -44,9 +44,13 @@ All 23 Segment 01 tasks were recorded completed at this checkpoint. Run 41010929
 
 ## Final reconciliation — 30 October 2026
 
-- At the verified closure checkpoint, branch head was `49217ddb8ff93256120317b6b1a3ad50e5046e93`, matching origin and included in PR #1. Any later documentation-only follow-up is verified by the corresponding newer PR run.
-- Authenticated Chrome showed run [41011340034](https://github.com/EsanduEpa/gymos-v2/actions/runs/41011340034) succeeded at `49217dd`. All 11 jobs passed: workspace, build, lint, type check, unit tests, owned disposable database, browser isolation, encrypted backup/restore, secret scan, dependency review and lockfile audit.
+- The prior closure checkpoint was `49217ddb8ff93256120317b6b1a3ad50e5046e93`; run 41011340034 passed all 11 jobs at that revision.
+- Authenticated Chrome showed run [41013407287](https://github.com/EsanduEpa/gymos-v2/actions/runs/41013407287) succeeded for `bdf3b41097ad32504bc15275c42c2dffe2a97099`. All 11 jobs passed: workspace, build, lint, type check, unit tests, owned disposable database, browser isolation, encrypted backup/restore, secret scan, dependency review and lockfile audit.
 - Segment 01 owns exactly 23 completed original task IDs: 001–012, 014 and 077–086. Task 013 is owned by Segment 02. The coverage matrix assigns all 88 original task IDs exactly once; route ownership remains 29/29.
 - DEC-01/03/06/07/08/09 are approved under the project owner's accepted review authority. Independent specialist review is not claimed. The money, time, settlement, privacy and first-release plan-view rules are recorded in the decisions.
 - GYMOS-MIG-010 closure combines owner-attested Neon rotation, Vercel redeployment, smoke checks, password non-reuse and remaining security follow-up with independently verified local removal of the hardcoded V1 URL and V2 secret scan. Provider/audit logs were not independently inspected; historical unauthorized access cannot be ruled out. The legacy V1 diagnostic's raw record/error logging remains a separate follow-up; it was not executed and V1 was not changed.
 - No application feature or production deployment was performed. PR #1 remains draft and unmerged. The next dependency-satisfied task is GYMOS-MIG-013 (dashboard shell); this is a handoff, not work started in Segment 02.
+
+## Browser verification follow-up — 30 October 2026
+
+Run [41013007595](https://github.com/EsanduEpa/gymos-v2/actions/runs/41013007595) exposed a browser-test navigation race: the unauthenticated home page's streamed server-component redirect to `/login` was still settling when the test began its next `/login` navigation. The test now explicitly waits for the `/login` URL after visiting `/`. The focused owned two-gym browser test passed locally; run 41013407287 then passed the full browser isolation job and all ten other hosted checks. No product route or behavior changed.

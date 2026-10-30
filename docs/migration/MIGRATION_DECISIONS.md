@@ -1,6 +1,6 @@
 # GymOS V2 — Migration Decisions
 
-> **Verified closure checkpoint — 30 October 2026 at `49217dd`:** Segment 01 is COMPLETED (23/23); overall 27/88 tasks completed. All 11 hosted checks passed at [run 41011340034](https://github.com/EsanduEpa/gymos-v2/actions/runs/41011340034) for this revision. Decisions are owner-approved; external credential remediation is owner-attested, with local cleanup/V2 scanning verified. Later documentation-only reconciliation is verified by the corresponding newer PR run. Historical checkpoints are retained as history.
+> **Current verified status — 30 October 2026 at `bdf3b41`:** Segment 01 is COMPLETED (23/23); overall 27/88 tasks completed. All 11 hosted checks passed at [run 41013407287](https://github.com/EsanduEpa/gymos-v2/actions/runs/41013407287). Decisions are owner-approved; external credential remediation is owner-attested, with local cleanup/V2 scanning verified. Historical checkpoints are retained as history.
 
 > **30 October 2026 owner scope update:** [Segment 01 finalization](SEGMENT_01_FINALIZATION.md) supersedes earlier member-plan-delivery exclusions and suspension-earning proposals. Tasks 051/052 include authenticated read-only member access to own assigned workout/meal plans; trainer health access expires after 90 days as specified in DEC-09. Original inventory counts are not re-estimated effort. The project owner explicitly accepts decision-review responsibility; independent specialist review is not claimed.
 

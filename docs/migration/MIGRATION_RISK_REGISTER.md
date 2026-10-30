@@ -1,6 +1,6 @@
 # GymOS V2 — Migration Risk Register
 
-> **Current status — 30 October 2026 at `49217dd`:** Segment 01 is COMPLETED (23/23); overall 27/88 migration tasks completed. All 11 hosted checks passed at [run 41011340034](https://github.com/EsanduEpa/gymos-v2/actions/runs/41011340034). R18 is contained by owner attestation, with historical-access uncertainty retained. Historical checkpoints below remain history.
+> **Current verified status — 30 October 2026 at `bdf3b41`:** Segment 01 is COMPLETED (23/23); overall 27/88 migration tasks completed. All 11 hosted checks passed at [run 41013407287](https://github.com/EsanduEpa/gymos-v2/actions/runs/41013407287). R18 is contained by owner attestation, with historical-access uncertainty retained. Historical checkpoints below remain history.
 
 Supporting register for [Master Plan §23](MIGRATION_EXECUTION_PLAN.md#23-risk-register). Task definitions/acceptance remain authoritative in [Task Specifications](MIGRATION_TASK_SPECS.md). Probabilities are qualitative engineering assessments, not measured frequencies. Open rows represent risks still requiring mitigation/evidence in their consuming tasks; severity is residual severity. R18 is contained by owner attestation, while provider-log review and historical-access certainty remain unavailable.
 
