@@ -1,7 +1,7 @@
 # GYMOS-MIG-013 — Dashboard shell evidence
 
 Date/operator: 30 October 2026, Codex; project-owner review remains with Esandu.
-Status: **Implemented and locally verified; hosted checks pending.**
+Status: **Completed.** Code/CI revision `367bdf8` passed all 11 hosted checks in [run 41042328353](https://github.com/EsanduEpa/gymos-v2/actions/runs/41042328353); [PR #2](https://github.com/EsanduEpa/gymos-v2/pull/2) remains draft and unmerged.
 Branch: `codex/segment-02-identity-shell`, based on `87c1766`. The working tree was initially clean and only one worktree was attached. The existing local owner-safeguard documentation commit was preserved. PR #1 was inspected in signed-in Google Chrome: draft, unmerged, remote head `e45a334`. This change uses a separate branch/PR stacked on that foundation, without merging it.
 
 ## Implemented and inspected
@@ -33,4 +33,8 @@ Browser assertions cover all three gym roles, active links, header/sidebar dimen
 
 Visual review compared the existing V1 shell source/captures with actual V2 captures. V1 chrome geometry is retained; the existing V2 basic feature contents remain until their owning migration tasks. Screenshots: [owner desktop](GYMOS-MIG-013/owner-1440.png), [trainer desktop](GYMOS-MIG-013/trainer-1440.png), [member drawer at 320px](GYMOS-MIG-013/member-320-drawer.png), [member at 320px](GYMOS-MIG-013/member-320.png). [Branding captures](GYMOS-MIG-013/branding/) cover 1440/768/390/320px and identical two-gym banner geometry. Historical task 011 screenshots were restored instead of overwritten.
 
-Task 065 retains full supported-browser and final feature visual acceptance. No Safari/Firefox/Edge or selected-provider deployment verification is claimed. Hosted verification and immutable revision are recorded in the Segment 02 handoff after the PR checks run.
+Task 065 retains full supported-browser and final feature visual acceptance. No Safari/Firefox/Edge or selected-provider deployment verification is claimed. Hosted verification and immutable revisions are recorded in the [Segment 02 handoff](../SEGMENT_02_HANDOFF.md).
+
+## Hosted closure — 30 October 2026
+
+Authenticated Google Chrome verified [run 41042328353](https://github.com/EsanduEpa/gymos-v2/actions/runs/41042328353) at `367bdf8`: all 11 required jobs passed. The existing owned database job now executes the environment harness (3), identity suite (10), and tenant suite (20). Browser regression passed 6/6, including the server not-found race fix and stronger canonical-denial URL assertion. Scanning, both dependency checks and encrypted recovery remained enabled and passed. Final local follow-ups passed role/session/logout 3/3, followed by the role-shell capture check 1/1 after matching V1's static desktop scrolling. Build, lint and type checks passed. The failed historical run and correction are retained in the shared issue log; no assertion was weakened.

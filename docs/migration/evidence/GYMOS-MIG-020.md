@@ -1,7 +1,7 @@
 # GYMOS-MIG-020 — Web sessions and logout evidence
 
 Date/operator: 30 October 2026, Codex; project-owner decision reviewer: Esandu.
-Status: **Implemented and locally verified; hosted checks pending.** Branch `codex/segment-02-identity-shell`, base `87c1766`; final immutable revision/hosted run will be recorded in the handoff.
+Status: **Completed.** Code/CI revision `367bdf8` passed all 11 hosted checks in [run 41042328353](https://github.com/EsanduEpa/gymos-v2/actions/runs/41042328353); [PR #2](https://github.com/EsanduEpa/gymos-v2/pull/2) remains draft and unmerged. Branch `codex/segment-02-identity-shell`, base `87c1766`; implementation revision `e995288`, CI coverage follow-up `b773ead`, final browser correction `367bdf8`. See [handoff](../SEGMENT_02_HANDOFF.md).
 
 ## Policy reconciliation
 
@@ -38,4 +38,8 @@ Stopping only the owned API proves browser cookie deletion with unchanged Master
 
 ## Limits and handoff
 
-[Web session runbook](../runbooks/web-sessions.md) records configuration and manual checks. Selected-provider HTTPS/proxy verification and release decisions remain task 087/067. Full browser/OS matrix remains task 065. No provider, V1, production/shared database, mobile auth, password reset or self-registration was used/added. Hosted checks are a separate pending gate at this checkpoint; no merge is authorized.
+[Web session runbook](../runbooks/web-sessions.md) records configuration and manual checks. Selected-provider HTTPS/proxy verification and release decisions remain task 087/067. Full browser/OS matrix remains task 065. No provider, V1, production/shared database, mobile auth, password reset or self-registration was used/added. All 11 hosted checks passed on code/CI revision `367bdf8`; no merge is authorized. The documentation closure revision must pass its own latest-head checks, recorded on PR #2.
+
+## Hosted closure — 30 October 2026
+
+Authenticated Google Chrome verified [run 41042328353](https://github.com/EsanduEpa/gymos-v2/actions/runs/41042328353) at `367bdf8`: all 11 required jobs passed. The existing owned database job now executes the environment harness (3), identity suite (10), and tenant suite (20). Browser regression passed 6/6, including the server not-found race fix and stronger canonical-denial URL assertion. Scanning, both dependency checks and encrypted recovery remained enabled and passed. Final local follow-ups passed role/session/logout 3/3, followed by the role-shell capture check 1/1 after matching V1's static desktop scrolling. Build, lint and type checks passed. The failed historical run and correction are retained in the shared issue log; no assertion was weakened.

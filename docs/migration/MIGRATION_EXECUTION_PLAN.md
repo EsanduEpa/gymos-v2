@@ -182,14 +182,14 @@ Phase0 decision tasks077–086 are focused review records, not permission to imp
 | [GYMOS-MIG-010](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-010) | 0 | Track exposed V1 credential remediation and V2 secret hygiene | GYMOS-MIG-001 | Medium | Blocked |
 | [GYMOS-MIG-011](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-011) | 1 | Create V1 Classic semantic tokens | GYMOS-MIG-001, GYMOS-MIG-002, GYMOS-MIG-086 | Medium | Not Started |
 | [GYMOS-MIG-012](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-012) | 1 | Extract accessible shared UI primitives | GYMOS-MIG-011 | Medium | Not Started |
-| [GYMOS-MIG-013](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-013) | 1 | Integrate role/gym dashboard chrome | GYMOS-MIG-012, GYMOS-MIG-018, GYMOS-MIG-019 | Medium | Not Started |
+| [GYMOS-MIG-013](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-013) | 1 | Integrate role/gym dashboard chrome | GYMOS-MIG-012, GYMOS-MIG-018, GYMOS-MIG-019 | Medium | Completed |
 | [GYMOS-MIG-014](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-014) | 1 | Capture safe V1 baseline fixtures and visual manifest | GYMOS-MIG-007, GYMOS-MIG-011, GYMOS-MIG-012 | Medium | Completed |
 | [GYMOS-MIG-015](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-015) | 1 | Integrate basic gym branding editor and fallback | GYMOS-MIG-011, GYMOS-MIG-012, GYMOS-MIG-013, GYMOS-MIG-024, GYMOS-MIG-027, GYMOS-MIG-086 | Medium | Not Started |
 | [GYMOS-MIG-016](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-016) | 2 | Extend login with session policy and forced-change enforcement | GYMOS-MIG-002, GYMOS-MIG-003, GYMOS-MIG-007, GYMOS-MIG-078 | High | Not Started |
 | [GYMOS-MIG-017](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-017) | 2 | Implement temporary-credential issue/change/reissue | GYMOS-MIG-004, GYMOS-MIG-016, GYMOS-MIG-078 | High | Not Started |
 | [GYMOS-MIG-018](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-018) | 2 | Enforce operational actor and resource authorization | GYMOS-MIG-003, GYMOS-MIG-004, GYMOS-MIG-005, GYMOS-MIG-016, GYMOS-MIG-078, GYMOS-MIG-080 | High | Not Started |
 | [GYMOS-MIG-019](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-019) | 2 | Implement role-aware root, gym selection and protected navigation | GYMOS-MIG-012, GYMOS-MIG-016, GYMOS-MIG-018, GYMOS-MIG-086 | Medium | Not Started |
-| [GYMOS-MIG-020](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-020) | 2 | Harden web session transport and safe logout | GYMOS-MIG-016, GYMOS-MIG-017, GYMOS-MIG-019, GYMOS-MIG-078, GYMOS-MIG-087 | Medium | Not Started |
+| [GYMOS-MIG-020](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-020) | 2 | Harden web session transport and safe logout | GYMOS-MIG-016, GYMOS-MIG-017, GYMOS-MIG-019, GYMOS-MIG-078, GYMOS-MIG-087 | Medium | Completed |
 | [GYMOS-MIG-021](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-021) | 3 | Reserve idempotent provisioning operations | GYMOS-MIG-004, GYMOS-MIG-005, GYMOS-MIG-016, GYMOS-MIG-018, GYMOS-MIG-080, GYMOS-MIG-081 | High | Not Started |
 | [GYMOS-MIG-022](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-022) | 3 | Move physical provisioning to recoverable worker | GYMOS-MIG-006, GYMOS-MIG-007, GYMOS-MIG-009, GYMOS-MIG-021, GYMOS-MIG-080, GYMOS-MIG-081 | High | Not Started |
 | [GYMOS-MIG-023](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-023) | 3 | Finalize owner identity, theme and gym activation | GYMOS-MIG-017, GYMOS-MIG-018, GYMOS-MIG-022 | High | Not Started |

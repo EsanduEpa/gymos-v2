@@ -1124,7 +1124,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-In Progress — implemented and locally verified; hosted checks pending. See [evidence](evidence/GYMOS-MIG-013.md).
+Completed — local verification and all 11 hosted checks passed at `367bdf8`. See [evidence](evidence/GYMOS-MIG-013.md) and [Segment 02 handoff](SEGMENT_02_HANDOFF.md). PR #2 remains unmerged; owner review/merge authorization is separate.
 
 ## Task ID: GYMOS-MIG-014
 
@@ -1766,7 +1766,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-In Progress — implemented and locally verified; hosted checks pending. See [evidence](evidence/GYMOS-MIG-020.md).
+Completed — local verification and all 11 hosted checks passed at `367bdf8`. See [evidence](evidence/GYMOS-MIG-020.md) and [Segment 02 handoff](SEGMENT_02_HANDOFF.md). PR #2 remains unmerged; owner review/merge authorization is separate.
 
 ## Task ID: GYMOS-MIG-021
 

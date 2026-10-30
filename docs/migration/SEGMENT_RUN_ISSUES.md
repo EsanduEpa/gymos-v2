@@ -1,6 +1,6 @@
 # Migration segment run issues
 
-> **Current verified status — 30 October 2026 at `d26beb4`:** Segment 01 is COMPLETED (23/23); overall 27/88 migration tasks completed. All 11 hosted checks passed at [run 41013926983](https://github.com/EsanduEpa/gymos-v2/actions/runs/41013926983). Historical issue entries below are checkpoints; current dispositions are recorded in the final reconciliation entry.
+> **Segment 02 verification — 30 October 2026 at `367bdf8`:** Segment 01 remains completed (23/23), Segment 02 completed (6/6), overall 29/88 tasks completed. All 11 hosted checks passed in [run 41042328353](https://github.com/EsanduEpa/gymos-v2/actions/runs/41042328353). Historical entries retain their original checkpoint context; [current handoff](SEGMENT_02_HANDOFF.md).
 
 Use this shared log for issues discovered while executing migration segment files. Add one dated section per segment run. Record symptoms, impact, resolution or next action, and evidence links. Keep credentials, customer data, and other secrets out of this file.
 
@@ -101,3 +101,5 @@ Local evidence: [013](evidence/GYMOS-MIG-013.md), [020](evidence/GYMOS-MIG-020.m
 Run [41021183510](https://github.com/EsanduEpa/gymos-v2/actions/runs/41021183510) passed ten jobs, including identity 10/10 and tenant 20/20, but exposed a real navigation race in the stale-chooser case: the browser session monitor redirected a server not-found response to root before it could be inspected. The monitor now applies live gym invalidation only to a rendered authorized shell; uniform denied/unknown-gym responses remain in place. The original not-found assertion remains, with an added assertion that the denied URL stays canonical. Completion remains pending a passing hosted run.
 
 The final local role/session/logout follow-up passed 3/3. Its synthetic 401 now starts only after the logout POST: focusing the tab before submission must still perform a real valid-session check. Assertions are unchanged. Desktop sidebar scrolling was also aligned with V1's static full-content-height column, rather than introducing sticky positioning.
+
+Hosted follow-up resolved: [run 41042328353](https://github.com/EsanduEpa/gymos-v2/actions/runs/41042328353) passed all 11 jobs at `367bdf8`, including all six browser scenarios and the strengthened canonical denial assertion. [PR #2](https://github.com/EsanduEpa/gymos-v2/pull/2) remains draft/unmerged. Provider/release scope remains task 087.
