@@ -41,3 +41,7 @@ The workflow runs on pull requests. A local run proves the same checked-in comma
 Every code-consuming hosted job runs `pnpm prepare:checks` to generate both Prisma clients from schemas without database URLs and build shared package exports. Generated clients and package dist files are ignored outputs and are absent from a fresh checkout. Database/browser/recovery jobs explicitly pull `postgres:17` before the ownership-safe harness invokes `docker run --pull=never`. Browser jobs build both applications before starting production servers.
 
 `.gitleaksignore` lists only exact reviewed historical fingerprints for preservation-file SHA digests, policy prose, and the upstream Nest README demonstration badge token. It does not exclude files, disable rules or allow future credentials. The placeholder badge token was removed from the current README.
+
+## Private-repository dependency review
+
+Owner approved replacing the unsupported GitHub Advanced Security dependency-review action with `infrastructure/scripts/review-dependencies.mjs`. On PRs it reads committed package.json/lockfiles for base and proposed full SHAs into private temporary directories, runs the online pnpm audit for each without installing or running revision code, and emits only revision/high/critical counts. Base counts establish context; any proposed high/critical finding or unavailable/malformed audit fails the job. The full head audit also runs separately. This preserves private visibility and the high-severity vulnerability gate; no GitHub license-policy feature is claimed.
