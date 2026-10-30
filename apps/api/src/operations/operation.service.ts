@@ -190,6 +190,19 @@ export class OperationFoundationService {
     });
   }
 
+  async releaseLease(lease: Lease): Promise<void> {
+    await this.master.$transaction(async tx => {
+      const { operation } = await assertLease(tx, lease);
+      const state = stateForSteps(supportedKind(operation.kind), operation.completedSteps as CompletedSteps);
+      await tx.operation.update({ where: { id: operation.id, version: lease.version }, data: {
+        state, leaseToken: null, leaseExpiresAt: null, version: { increment: 1 },
+      } });
+      await appendMasterAudit(tx, { actorIdentityId: operation.actorIdentityId, operationId: operation.id,
+        stepCode: 'YIELDED', eventCode: 'OPERATION_YIELDED', resourceType: 'OPERATION', resourceId: operation.id,
+        eventOrdinal: operation.attemptCount, gymId: operation.gymId, transition: { from: operation.state, to: state } });
+    });
+  }
+
   async fail(lease: Lease, state: 'FAILED_RETRYABLE' | 'FAILED_FINAL' | 'REPAIR_REQUIRED', errorCode: string): Promise<Lease> {
     reference(errorCode);
     return this.master.$transaction(async tx => {

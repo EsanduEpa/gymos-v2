@@ -1,0 +1,11 @@
+# GYMOS-MIG-022 — Recoverable worker checkpoint
+
+30 October 2026; branch `codex/segment-03-platform-lifecycle`, following reservation revision `daeff3c`. Status: worker boundary implemented and locally verified; task 023 activation and final hosted integration remain pending. No owner acceptance or provider capability is claimed.
+
+Physical provisioning now runs only in the controlled worker. It leases/fences the original durable target, holds a session advisory lock across external effects, creates a deterministic NOLOGIN owner role with an operation-bound cluster marker, and uses that owner atomically in CREATE DATABASE. Existing targets require that exact ownership proof. Unknown targets become REPAIR_REQUIRED and are never adopted/dropped. Pinned SQL checksums are verified and copied into a private temporary artifact before Prisma deploy; raw migration diagnostics are never public. Connection budgets/admission and cleanup remain bounded.
+
+Database creation, verified schema/binding, and Master observation are checkpointed independently. Retry reconciles the original target; stale leases cannot checkpoint. The task 022 boundary deliberately yields TENANT_COMMITTED with Gym PROVISIONING and no new identity/access. Task 023 owns activation. The legacy CLI now invokes the same reservation/worker, with no independent SQL/activation path; until task 087 environment approval it accepts only a positively identified owned loopback Docker run.
+
+Verification: API build, lint, TypeScript and diff checks exit 0. `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/api exec vitest run --config vitest.config.platform.ts test/platform/worker.integration.test.ts --disableConsoleIntercept` exits 0, 6/6 tests. Failure injection follows reservation, physical creation, migrations, tenant verification and binding. Tests verify one reused physical target/configuration/history, zero owner identities/access, lease-loss recovery, concurrent workers, unavailable pinned artifact, ambiguous target refusal, CLI replay and unowned CLI refusal. Twelve owned databases and the disposable container were cleaned. An initial test-harness registration ordering error was fixed without relaxing ownership verification. No V1 or provider resource was executed/modified.
+
+Integration completion and all-11 hosted checks will be recorded on the final Segment 03 revision.

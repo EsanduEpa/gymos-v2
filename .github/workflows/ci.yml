@@ -126,6 +126,7 @@ jobs:
       - run: pnpm --dir apps/api build
       - run: pnpm --dir apps/api exec vitest run --config vitest.config.identity.ts --disableConsoleIntercept
       - run: pnpm --dir apps/api exec vitest run --config vitest.config.tenancy-integration.ts --disableConsoleIntercept
+      - run: pnpm --dir apps/api exec vitest run --config vitest.config.platform.ts --disableConsoleIntercept
       - if: always()
         run: |
           mkdir -p safe-evidence
