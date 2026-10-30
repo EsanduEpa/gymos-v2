@@ -46,7 +46,16 @@ Evidence: [GYMOS-MIG-016](evidence/GYMOS-MIG-016.md), [GYMOS-MIG-017](evidence/G
 
 | Issue | Impact | Resolution / next action | Status |
 | --- | --- | --- | --- |
-| Segment 03 execution checkpoint requires approved DEC-03, but `MIGRATION_DECISIONS.md` still lists DEC-03 as open/resolution task GYMOS-MIG-079 and no `decisions/DEC-03.md` approval record exists. | Segment instructions require stopping before implementation; support scope, expiry, permitted read fields and lifecycle are not settled. | Obtain and record the DEC-03 decision through GYMOS-MIG-079, then resume Segment 03. No task implementation was started in this run. | Open |
-| GYMOS-MIG-021 requires provisioning currency and timezone, while DEC-01 (configuration ownership) and DEC-06 (supported currency rules) remain unresolved in the decision register. | Even after DEC-03, the required provisioning fields/defaults cannot be implemented without inventing product policy. | Resolve the required DEC-01/06 inputs or explicitly narrow/sequence GYMOS-MIG-021 through approved change control before claiming it complete. | Open |
+| Segment 03 execution checkpoint requires approved DEC-03. | Segment instructions require stopping before implementation; support scope, expiry, permitted read fields and lifecycle are not settled. | [DEC-03](decisions/DEC-03.md) is now a concrete proposal with task evidence; project-owner approval is required before implementation resumes. | Awaiting approval |
+| GYMOS-MIG-021 requires provisioning currency and timezone while DEC-01 and DEC-06 are unresolved. | The required provisioning fields/defaults cannot be implemented without approved product policy. | [DEC-01](decisions/DEC-01.md) and [DEC-06](decisions/DEC-06.md) are now concrete proposals; approve or revise them, then re-evaluate task 021 sequencing. | Awaiting approval |
 
 Evidence: [Segment 03 execution record](segments/03_PLATFORM_ADMIN_AND_TENANT_LIFECYCLE.md), [decision register](MIGRATION_DECISIONS.md), [GYMOS-MIG-021 specification](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-021). No Segment 03 implementation tasks were run; all six remain Not Started.
+
+## Segment 04 — 2026-10-26
+
+| Issue | Impact | Resolution / next action | Status |
+| --- | --- | --- | --- |
+| Segment 04 depends on Segment 03, which remains blocked before implementation by DEC-03. GYMOS-MIG-027 also depends on GYMOS-MIG-023 and decision task 077, none completed; 013 is also not completed. | No Segment 04 task has its required implementation dependencies. GYMOS-MIG-015 additionally depends on GYMOS-MIG-024 and 027. | Resume after Segment 03 and the listed prerequisites are completed with evidence. No application implementation was started. | Open |
+| Segment 04 requires approved DEC-01/06/07/08; GYMOS-MIG-027 specifically requires 077/082/083 and forbids configuration fields before approval. | Ownership, currency precision/set, date/time boundaries, settlement/pay policy and cross-plane profile recovery are not yet approved. | Concrete proposals now exist for [DEC-01](decisions/DEC-01.md), [DEC-06](decisions/DEC-06.md), [DEC-07](decisions/DEC-07.md) and [DEC-08](decisions/DEC-08.md). Project-owner approval or revisions are required. | Awaiting approval |
+
+Evidence: [Segment 04 execution record](segments/04_GYM_CONFIGURATION_AND_MEMBERSHIP_RULES.md), [decision register](MIGRATION_DECISIONS.md), [Segment 03 run issues](SEGMENT_RUN_ISSUES.md#segment-03--2026-10-26). No Segment 04 implementation tasks were run; 015 and 027–030 remain Not Started.
