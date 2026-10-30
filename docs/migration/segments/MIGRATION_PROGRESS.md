@@ -1,12 +1,12 @@
 # GymOS Feature-Segment Progress
 
-> **Current verified status — 30 October 2026 at `bdf3b41`:** Segment 01 is COMPLETED (23/23); 27/88 tasks are completed overall. All 11 hosted checks passed at [run 41013407287](https://github.com/EsanduEpa/gymos-v2/actions/runs/41013407287). Owner-approved decision records and owner-attested external credential remediation are reflected in the linked evidence.
+> **Current verified status — 30 October 2026 at `d26beb4`:** Segment 01 is COMPLETED (23/23); 27/88 tasks are completed overall. All 11 hosted checks passed at [run 41013926983](https://github.com/EsanduEpa/gymos-v2/actions/runs/41013926983). Owner-approved decision records and owner-attested external credential remediation are reflected in the linked evidence.
 
 Evidence baseline: 30 October 2026. Counts come from [`../MIGRATION_TASK_TRACKER.md`](../MIGRATION_TASK_TRACKER.md); **Completed** means linked verification exists. Planning documents alone never advance status.
 
 | Segment | Name | Status | Total | Verified completed | Remaining | Blockers | Dependencies | Last verification note |
 |---|---|---|---:|---:|---:|---|---|---|
-| 01 | Platform Foundation and Decision Gates | COMPLETED | 23 | 23 | 0 | None for Segment 01; R18 historical-access uncertainty retained | None | Owner-approved decisions; owner-attested external remediation; all 11 checks passed at `bdf3b41`, including the browser test synchronization fix |
+| 01 | Platform Foundation and Decision Gates | COMPLETED | 23 | 23 | 0 | None for Segment 01; R18 historical-access uncertainty retained | None | Owner-approved decisions; owner-attested external remediation; all 11 checks passed at `d26beb4`, including the browser test synchronization fix |
 | 02 | Identity, Authentication, and Application Shell | IN PROGRESS | 6 | 4 | 2 | DEC-11 provider/session policy for task 020; task 013 shell integration | 01 | GYMOS-MIG-016–019 completed with linked evidence; 013/020 remain |
 | 03 | Platform Administration and Tenant Lifecycle | WAITING FOR PREREQUISITES | 6 | 0 | 6 | Segment 02 shell/session work; DEC-01/03/06 now approved | 01, 02 | Policy gates resolved; implementation not started |
 | 04 | Gym Configuration and Membership Rules | WAITING FOR PREREQUISITES | 5 | 0 | 5 | Segment 02/03 implementation; DEC-01/06/07/08 now approved | 01–03 | Policy gates resolved; implementation not started |

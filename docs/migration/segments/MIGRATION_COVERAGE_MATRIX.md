@@ -1,6 +1,6 @@
 # Migration Coverage Matrix
 
-> **Current verified status — 30 October 2026 at `bdf3b41`:** Segment 01 is COMPLETED (23/23); overall 27/88 tasks completed. The matrix assigns each of the 88 original task IDs to one segment. All 11 hosted checks passed at [run 41013407287](https://github.com/EsanduEpa/gymos-v2/actions/runs/41013407287). Decision approvals and GYMOS-MIG-010 evidence limits are recorded in the linked records.
+> **Current verified status — 30 October 2026 at `d26beb4`:** Segment 01 is COMPLETED (23/23); overall 27/88 tasks completed. The matrix assigns each of the 88 original task IDs to one segment. All 11 hosted checks passed at [run 41013926983](https://github.com/EsanduEpa/gymos-v2/actions/runs/41013926983). Decision approvals and GYMOS-MIG-010 evidence limits are recorded in the linked records.
 
 This matrix assigns every authoritative task and every V1 route responsibility to one owning segment. A dependency may consume an outcome but must not duplicate ownership. Task statuses reflect the tracker synchronized 30 October 2026.
 

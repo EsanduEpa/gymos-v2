@@ -716,7 +716,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Completed. Authenticated Chrome verified all 11 hosted checks at `bdf3b41` in [run 41013407287](https://github.com/EsanduEpa/gymos-v2/actions/runs/41013407287); see [GYMOS-MIG-008 evidence](evidence/GYMOS-MIG-008.md). This run supersedes earlier no-remote, pending-hosted and transient browser-race checkpoints.
+Completed. Authenticated Chrome verified all 11 hosted checks at `d26beb4` in [run 41013926983](https://github.com/EsanduEpa/gymos-v2/actions/runs/41013926983); see [GYMOS-MIG-008 evidence](evidence/GYMOS-MIG-008.md). This run supersedes earlier no-remote, pending-hosted and transient browser-race checkpoints.
 
 ## Task ID: GYMOS-MIG-009
 
