@@ -181,3 +181,11 @@ Metadata-only local inspection still finds a credential-bearing PostgreSQL URL l
 ## Local cleanup recheck — 30 October 2026
 
 Owner requested reinspection after cleanup. Local scripts/check-db.js now uses process.env.DATABASE_URL, validates presence and contains no credential-bearing PostgreSQL URL literal. Earlier local source discrepancy is resolved. The script still logs a full owner record and raw errors, so it was not executed; safe-output review is outstanding. No V1 edits or database connections were performed. External rotation, V1 smoke success, non-reuse and follow-up remain owner-attested.
+
+## Final owner-attested containment disposition — 30 October 2026
+
+The closure evidence is Esandu's direct reports in this conversation: Neon password rotation and Vercel redeployment; successful V1 login/member reads; explicit non-reuse of the exposed password; and “I solved them” after the old-password rejection, available activity/role review and source/history-cleanup instructions. The owner requested finalization and explicitly retained review responsibility. These reports are accepted as owner-attested external containment and follow-up, not independent provider inspection or proof that unauthorized access never occurred. No detailed access-log findings/retention or provider audit ID was supplied; that evidentiary limitation remains recorded.
+
+Independent local checks verify removal of the V1 hardcoded connection string, environment-variable use, and a passing redacted V2 history secret scan after exact false-positive review. No provider database was contacted and V1 was neither executed nor modified. Existing raw owner/error logging in the V1 diagnostic script remains a separate legacy safe-output follow-up; do not run it or publish its output. This does not reinstate the old password and is not represented as a verified V2 credential leak.
+
+Task 010 is Completed on the basis of owner-attested external remediation plus independently verified local source cleanup/V2 scanning. This supersedes earlier pending-containment records while preserving their history. R18 is recorded as contained by owner attestation, with historical access uncertainty retained. A later provider finding reopens the incident rather than silently revising this evidence.

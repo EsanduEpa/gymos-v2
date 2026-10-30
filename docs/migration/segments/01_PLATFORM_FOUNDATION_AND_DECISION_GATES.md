@@ -1,8 +1,6 @@
 # Segment 01 — Platform Foundation and Decision Gates
 
-> **Latest owner disposition — 30 October 2026:** Esandu accepts project-owner responsibility for all six decision reviews; tasks 077/079/082–085 are completed policy tasks. Segment 01 is 21/23 verified tasks (overall 25/88). Task 008 has an owner-reported failed hosted run awaiting diagnosis; task 010 remains pending final evidence/logging reconciliation. The local V1 hardcoded connection string is now removed. This supersedes earlier pending-review/count/credential-literal statements below. [Details](../SEGMENT_01_FINALIZATION.md).
-
-> **Current disposition — 30 October 2026:** [Finalization record](../SEGMENT_01_FINALIZATION.md) supersedes historical no-remote/unrotated reports and pending-owner-answer wording below. Owner finalization and credential remediation reports are recorded. Hosted verification, accountable review and local source-cleanup reconciliation remain open. Verified counts stay 15/23 for Segment 01 and 19/88 overall.
+> **Final status — 30 October 2026:** Segment 01 is COMPLETED (23/23); overall 27/88 tasks completed. All 11 hosted checks passed at 9f1849a: [verified run](https://github.com/EsanduEpa/gymos-v2/actions/runs/41010929511). Decisions are owner-reviewed; external credential remediation is owner-attested with local cleanup/scanning verified. Historical checkpoints below are retained as history.
 
 ## Execution instructions for AI agents
 
@@ -64,7 +62,7 @@ Completed foundations provide canonical email identity, typed gym access/actor l
 | [x] | 014 Visual fixtures | Synthetic safe V1 reference manifest | `apps/web/tests/visual` | 104 required baselines and preservation proof linked |
 | [x] | 078/080/081/086 | Approve identity, operation, schema/recovery, routes/Classic decisions | `decisions/DEC-02/04/05/10.md` | Follow approved decisions; changes require recorded approval |
 
-### Open work packets
+### Resolved work packets — acceptance history
 
 #### GYMOS-MIG-008 — complete workspace and hosted CI evidence
 
@@ -73,7 +71,7 @@ Completed foundations provide canonical email identity, typed gym access/actor l
 - **Sources:** root `package.json`, `infrastructure/scripts/check-workspace.mjs`, `docs/migration/runbooks/ci.md`, `evidence/GYMOS-MIG-008.md`.
 - **Targets:** verified existing workspace scripts; proposed CI workflow only after repository/provider is known.
 - **Instructions:** inspect existing local evidence; configure least-privilege hosted checks; ensure owned DB tests cannot target shared/production DBs; record skipped provider features honestly.
-- **Acceptance/test:** local lanes and hosted PR checks pass at one revision; secret scanner has no credential values in output; failure blocks merge. **[ ]**
+- **Acceptance/test:** local lanes and hosted PR checks pass at one revision; secret scanner has no credential values in output; failure blocks merge. **[x]**
 
 #### GYMOS-MIG-010 — contain exposed V1 credential
 
@@ -82,7 +80,7 @@ Completed foundations provide canonical email identity, typed gym access/actor l
 - **Sources:** redacted finding in `MIGRATION_RISK_REGISTER.md`; `evidence/GYMOS-MIG-010.md`.
 - **Targets:** evidence/incident record only; do not edit or execute V1.
 - **Instructions:** owner rotates/revokes at provider; checks reuse/deploy artifacts/access logs; supplies redacted confirmation; ensure V2 uses unrelated secrets; decide history treatment separately.
-- **Acceptance/test:** provider confirmation with date/scope, reuse/access findings, V2 separation evidence, and release-blocker disposition. A code scan alone fails acceptance. **[ ] BLOCKED externally**
+- **Acceptance/test:** provider confirmation with date/scope, reuse/access findings, V2 separation evidence, and release-blocker disposition. A code scan alone fails acceptance. **[x] Owner-attested containment; see final evidence**
 
 #### GYMOS-MIG-077 — DEC-01 configuration ownership
 
@@ -91,7 +89,7 @@ Completed foundations provide canonical email identity, typed gym access/actor l
 - **Sources:** V1 `Gym` and `actions/gym-config.ts`; current Master `Gym/Theme`; tenant `GymConfiguration`.
 - **Target:** proposed `docs/migration/decisions/DEC-01.md` plus synchronized maps/specs.
 - **Instructions:** enumerate every field, owner, write authority, operation/recovery behavior, public projection, version conflict, and failure result.
-- **Acceptance/test:** no duplicate source of truth; examples cover Master success/tenant failure and retry; reviewers named. **[ ]**
+- **Acceptance/test:** no duplicate source of truth; examples cover Master success/tenant failure and retry; reviewers named. **[x]**
 
 #### GYMOS-MIG-079 — DEC-03 support scope
 
@@ -99,7 +97,7 @@ Completed foundations provide canonical email identity, typed gym access/actor l
 - **Sources:** V1 S01/admin impersonation, approved target constraints, current guard.
 - **Target:** proposed `decisions/DEC-03.md`.
 - **Instructions:** define issuer/subject/gym/expiry/revocation, original actor, route scope, prohibited mutations/health data, and stale-context behavior.
-- **Acceptance/test:** forged/expired/wrong-gym sessions fail; every mutation denies support; audit retains original actor. **[ ]**
+- **Acceptance/test:** forged/expired/wrong-gym sessions fail; every mutation denies support; audit retains original actor. **[x]**
 
 #### GYMOS-MIG-082 — DEC-06 exact money and earning
 
@@ -107,39 +105,39 @@ Completed foundations provide canonical email identity, typed gym access/actor l
 - **Sources:** V1 `lib/pricing.ts`, financial actions, `RevenueRecord/SessionPack/Membership`; Database Map decisions.
 - **Target:** proposed `decisions/DEC-06.md`.
 - **Instructions:** use worked conservation examples; separate payment capture from operational earning; keep payment/refund/real receipt deferred.
-- **Acceptance/test:** exact sums conserve across partial terms/packs and terminal session effects; boundary/zero examples approved. **[ ]**
+- **Acceptance/test:** exact sums conserve across partial terms/packs and terminal session effects; boundary/zero examples approved. **[x]**
 
 #### GYMOS-MIG-083 — DEC-07 gym time, terms, scheduling
 
 - **Objective:** approve gym timezone authority, local-date inclusivity, DST gaps/ambiguity, shift/booking bounds, duration/tolerance, pack ordering, cancellation equality.
 - **Sources:** V1 Membership/SessionPack/PTSession and session/config actions.
 - **Target:** proposed `decisions/DEC-07.md`.
-- **Acceptance/test:** examples cover midnight, leap day, DST gap/fold, cutoff equality, overnight policy, and stable pack choice. **[ ]**
+- **Acceptance/test:** examples cover midnight, leap day, DST gap/fold, cutoff equality, overnight policy, and stable pack choice. **[x]**
 
 #### GYMOS-MIG-084 — DEC-08 settlement/payroll/corrections
 
 - **Objective:** approve lock order, exclusion strategy, once-only origins, payroll periods/close, quote version acknowledgment, and immutable corrections.
 - **Sources:** V1 `endSession`, `handleNoShow`, cancel and payroll actions; DEF-02–08.
 - **Target:** proposed `decisions/DEC-08.md`.
-- **Acceptance/test:** concurrent last-credit/complete/cancel/period-close examples yield one conserved outcome and a recoverable unknown result. **[ ]**
+- **Acceptance/test:** concurrent last-credit/complete/cancel/period-close examples yield one conserved outcome and a recoverable unknown result. **[x]**
 
 #### GYMOS-MIG-085 — DEC-09 coaching/privacy/exports/refresh
 
 - **Objective:** approve confirmed relationship states, health/note projections, builder limits/day mapping, metric windows, export caps/snapshots, poll cancellation, and cross-role refresh SLA.
 - **Sources:** T02–T05, dashboard/analytics/CSV/bell actions; meal day mismatch.
 - **Target:** proposed `decisions/DEC-09.md`; prepared 30 October 2026 at this execution checkpoint.
-- **Acceptance/test:** unrelated trainer/foreign gym/privacy negatives; safe export formulas/caps; stale poll cannot overwrite switched gym; explicit day mapping. **[ ]**
+- **Acceptance/test:** unrelated trainer/foreign gym/privacy negatives; safe export formulas/caps; stale poll cannot overwrite switched gym; explicit day mapping. **[x]**
 
-**Current proposal:** concrete defaults and tradeoffs are documented. They remain unapproved; GYMOS-MIG-085 is Blocked until the project owner and accountable Coaching/Privacy, Finance, and Frontend reviewers approve or revise DEC-09.
+**Final decision:** concrete defaults and the owner amendments are approved by Esandu, who explicitly accepts the review responsibilities. No independent specialist review is claimed.
 
 ## 7. Security and multi-tenancy checklist
 
 - [x] Master identity/access and tenant binding/schema foundations have linked evidence.
 - [x] Bounded pools and owned disposable test databases are evidenced.
-- [ ] Exposed credential is provider-contained and reuse/access reviewed.
-- [ ] Open decisions define safe support, privacy, exports, and exact effects.
-- [ ] Hosted CI prevents secret and isolation regressions.
-- [ ] No evidence includes database URLs, password/hash/token, or customer data.
+- [x] Exposed credential is provider-contained and reuse/access reviewed.
+- [x] Open decisions define safe support, privacy, exports, and exact effects.
+- [x] Hosted CI prevents secret and isolation regressions.
+- [x] No evidence includes database URLs, password/hash/token, or customer data.
 
 ## 8. Testing and verification
 
@@ -147,10 +145,10 @@ Use only supported root scripts: `pnpm check:workspace`, `pnpm build:workspace`,
 
 ## 9. Definition of done
 
-- [ ] All eight open items above are resolved or an explicitly approved release disposition exists.
-- [ ] Every completed foundation still passes its relevant regression lane.
-- [ ] Tracker, coverage, decisions, risks, and evidence agree.
-- [ ] No critical credential/tenant/operation ambiguity remains for dependent tasks.
+- [x] All eight open items above are resolved or an explicitly approved release disposition exists.
+- [x] Every completed foundation still passes its relevant regression lane.
+- [x] Tracker, coverage, decisions, risks, and evidence agree.
+- [x] No critical credential/tenant/operation ambiguity remains for dependent tasks.
 
 ## 10. AI-agent checkpoint rules
 
@@ -158,12 +156,11 @@ Stop if a task needs provider/owner authority, a named decision lacks approval, 
 
 ## 11. Progress and handoff
 
-- **Status:** IN PROGRESS / BLOCKED
-- **Completed IDs:** 001–007, 009, 011, 012, 014, 078, 080, 081, 086
-- **Remaining IDs:** 008, 010, 077, 079, 082, 083, 084, 085
-- **Files changed in this continuation:** `decisions/DEC-09.md`, `evidence/GYMOS-MIG-085.md`, and synchronized task/register/segment records.
-- **Tests/results:** GYMOS-MIG-008 local workspace, build, lint, type-check, unit, owned database, browser, and recovery verification recorded in linked evidence. Local checks passed at `6f3358c`; hosted checks and online lockfile audit remain unverified. Task 085 is a decision-preparation task; no application test was run or claimed.
-- **Known issues:** task 008 hosted evidence absent because no Git remote is configured; pnpm audit endpoint was unreachable and an escalated attempt was rejected by automatic approval review due to dependency metadata egress. Task 010 remains externally uncontained. DEC-01/03/06/07/08/09 proposals await owner/reviewer approval.
-- **Run issue log:** `docs/migration/SEGMENT_RUN_ISSUES.md`.
-- **Next recommended task:** obtain owner/reviewer responses on DEC-01/03/06/07/08/09 and continue the hosted GYMOS-MIG-008 gate when a remote/PR and authorized audit route are available. GYMOS-MIG-010 still requires provider-owner action.
-
+- **Status:** COMPLETED — 30 October 2026.
+- **Completed IDs:** 001–012, 014, 077–086 (23 owned tasks; task 013 belongs to Segment 02).
+- **Remaining IDs:** none.
+- **Evidence:** [CI repair and all 11 hosted results](../evidence/GYMOS-MIG-008.md), [owner-attested credential closure](../evidence/GYMOS-MIG-010.md), approved DEC-01/03/06/07/08/09 and linked evidence.
+- **Verification:** hosted [run](https://github.com/EsanduEpa/gymos-v2/actions/runs/41010929511) at 9f1849a passed workspace, build, lint, type-check, unit, owned-database, browser, recovery, secret-scan, base/proposed dependency review and lockfile audit. Local equivalents passed; no real database or V1 was changed.
+- **Evidence boundary:** provider remediation/access review is owner-attested, not independently inspected; historical access uncertainty is retained. The legacy V1 diagnostic script still prints full records/raw errors and must not be run or published as evidence; safe-output cleanup is a separate legacy follow-up.
+- **Owner scope:** member read-only viewing of own assigned workout/meal plans is added to tasks 051/052; 90-day trainer privacy, completed-session-only pay, unchanged expiry and continued earning during suspension are recorded. See [finalization](../SEGMENT_01_FINALIZATION.md).
+- **Next task:** Segment 02 / GYMOS-MIG-013 dashboard shell; task 020 still depends on DEC-11 provider/session policy. Completion is not production-release approval.

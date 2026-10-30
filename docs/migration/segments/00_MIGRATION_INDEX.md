@@ -1,8 +1,6 @@
 # GymOS V1 → V2 Feature Migration Index
 
-> **Latest owner disposition — 30 October 2026:** Esandu accepts project-owner responsibility for all six decision reviews; tasks 077/079/082–085 are completed policy tasks. Segment 01 is 21/23 verified tasks (overall 25/88). Task 008 has an owner-reported failed hosted run awaiting diagnosis; task 010 remains pending final evidence/logging reconciliation. The local V1 hardcoded connection string is now removed. This supersedes earlier pending-review/count/credential-literal statements below. [Details](../SEGMENT_01_FINALIZATION.md).
-
-> **Current disposition — 30 October 2026:** [Finalization record](../SEGMENT_01_FINALIZATION.md) supersedes historical no-remote/unrotated reports and pending-owner-answer wording below. Owner finalization and credential remediation reports are recorded. Hosted verification, accountable review and local source-cleanup reconciliation remain open. Verified counts stay 15/23 for Segment 01 and 19/88 overall.
+> **Final status — 30 October 2026:** Segment 01 is COMPLETED (23/23); overall 27/88 tasks completed. All 11 hosted checks passed at 9f1849a: [verified run](https://github.com/EsanduEpa/gymos-v2/actions/runs/41010929511). Decisions are owner-reviewed; external credential remediation is owner-attested with local cleanup/scanning verified. Historical checkpoints below are retained as history.
 
 > **Audit baseline:** 25 October 2026. **Purpose:** execution navigation, not implementation evidence. V1 remains the behavioral/UI reference; V2's approved Master/tenant architecture is the technical target. The authoritative task details remain in [`../MIGRATION_TASK_SPECS.md`](../MIGRATION_TASK_SPECS.md), and live evidence remains in [`../evidence/`](../evidence/).
 
@@ -47,10 +45,10 @@ Statuses in this directory reflect linked evidence, not the existence of a plan.
 
 | Order | Segment | Capability | Tasks owned | Status | Depends on |
 |---:|---|---|---:|---|---|
-| 1 | [01 — Platform Foundation and Decision Gates](01_PLATFORM_FOUNDATION_AND_DECISION_GATES.md) | Preserve verified infrastructure; finish CI, security containment, and product/technical decisions | 23 | IN PROGRESS / BLOCKED | None |
+| 1 | [01 — Platform Foundation and Decision Gates](01_PLATFORM_FOUNDATION_AND_DECISION_GATES.md) | Preserve verified infrastructure; finish CI, security containment, and product/technical decisions | 23 | COMPLETED | None |
 | 2 | [02 — Identity, Authentication, and Application Shell](02_IDENTITY_AUTH_AND_APPLICATION_SHELL.md) | Login, forced password change, role/gym routing, protected chrome, logout | 6 | IN PROGRESS (4/6 tasks) | 01 |
-| 3 | [03 — Platform Administration and Tenant Lifecycle](03_PLATFORM_ADMIN_AND_TENANT_LIFECYCLE.md) | Gym registry, provisioning, activation, support, suspension, schema rollout | 6 | BLOCKED before implementation (DEC-03) | 01, 02 |
-| 4 | [04 — Gym Configuration and Membership Rules](04_GYM_CONFIGURATION_AND_MEMBERSHIP_RULES.md) | Branding, profile, plans, rates, policies, membership eligibility | 5 | BLOCKED before implementation (prerequisites and DEC-01/06/07/08) | 01–03 |
+| 3 | [03 — Platform Administration and Tenant Lifecycle](03_PLATFORM_ADMIN_AND_TENANT_LIFECYCLE.md) | Gym registry, provisioning, activation, support, suspension, schema rollout | 6 | WAITING FOR PREREQUISITES | 01, 02 |
+| 4 | [04 — Gym Configuration and Membership Rules](04_GYM_CONFIGURATION_AND_MEMBERSHIP_RULES.md) | Branding, profile, plans, rates, policies, membership eligibility | 5 | WAITING FOR PREREQUISITES | 01–03 |
 | 5 | [05 — Member Enrollment and Account Management](05_MEMBER_ENROLLMENT_AND_ACCOUNT_MANAGEMENT.md) | Full registration, list/profile, status, packs, recovery journey | 5 | NOT STARTED | 02–04; session base from 07 for status/pack invariants |
 | 6 | [06 — Trainer Management and Coaching](06_TRAINER_MANAGEMENT_AND_COACHING.md) | Trainer enrollment/roster/directory, client 360, workout and meal plans | 7 | NOT STARTED | 02–05; session reads from 07 for confirmed relationships |
 | 7 | [07 — PT Sessions, Notifications, and Lifecycle](07_PT_SESSIONS_NOTIFICATIONS_AND_LIFECYCLE.md) | Booking/request, holds, transitions, views, notifications, exact-once settlement | 9 | NOT STARTED | 02, 04–06 |

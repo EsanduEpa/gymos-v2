@@ -27,7 +27,7 @@ Health notes remain tenant-owned and visible only to the owner and a trainer wit
 | CSV row cap and snapshot | `all-filtered` financial/payroll/session exports and audit visible-page export are capped at 10,000 data rows per request and 25 MiB uncompressed UTF-8. Exceeding either returns a stable 422 `EXPORT_LIMIT_EXCEEDED` with allowed scope/limit and no partial file. A tenant export reads one repeatable-read snapshot and emits `asOf`; audit export uses the page visible in O13, not all filtered audit events. Finance/payroll remain all-filtered under the cap; O08 remains all rows matching the selected day and its filters. No asynchronous export/job table is proposed at this cap. |
 | CSV privacy and spreadsheet safety | Strict kind/column allowlists; same authorization and filters as the source page/API; no tokens, passwords, hashes, DB identifiers, health notes, raw JSON or unrelated tenant data. Quote/escape RFC 4180 fields. Prefix formula-leading cells (`=`, `+`, `-`, `@`, tab or CR) with an apostrophe before CSV quoting. Use UTF-8 BOM, no-store, safe filename/content disposition, and never place credentials in URL or file. Record only a safe audit event if the approved export policy requires it; audit event does not contain row contents. |
 
-These numbers and semantics are **recommendations**, not approved policy. The owner and accountable reviewers may approve, revise with concrete alternatives, or reject them. No dependent schema/API implementation may treat them as settled until the approval record below is completed.
+These numbers and semantics are approved under the final owner review disposition below, incorporating the owner amendments. Future changes require recorded owner approval; implementation remains separately verified.
 
 ## Alternatives and tradeoffs
 
@@ -72,7 +72,7 @@ The owner selected a 90-day completed-session privacy window and explicitly incl
 
 ## Finalization boundary — 30 October 2026
 
-Owner authorization is recorded from this conversation. Historical proposal/preparation statements above describe earlier checkpoints. This document does not establish feature implementation or replace outstanding accountable review. See [finalization record](../SEGMENT_01_FINALIZATION.md) for current verification and scope.
+Owner authorization is recorded from this conversation. Historical proposal/preparation statements above describe earlier checkpoints. This document approves policy, not feature implementation; the final owner review disposition supersedes the earlier separate-reviewer gate. See [finalization record](../SEGMENT_01_FINALIZATION.md) for current verification and scope.
 
 ## Final owner review disposition — 30 October 2026
 

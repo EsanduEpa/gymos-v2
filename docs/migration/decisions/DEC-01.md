@@ -56,7 +56,7 @@ Project owner Esandu requested finalization on 30 October 2026 after discussing 
 
 ## Finalization boundary — 30 October 2026
 
-Owner authorization is recorded from this conversation. Historical proposal/preparation statements above describe earlier checkpoints. This document does not establish feature implementation or replace outstanding accountable review. See [finalization record](../SEGMENT_01_FINALIZATION.md) for current verification and scope.
+Owner authorization is recorded from this conversation. Historical proposal/preparation statements above describe earlier checkpoints. This document approves policy, not feature implementation; the final owner review disposition supersedes the earlier separate-reviewer gate. See [finalization record](../SEGMENT_01_FINALIZATION.md) for current verification and scope.
 
 ## Final owner review disposition — 30 October 2026
 

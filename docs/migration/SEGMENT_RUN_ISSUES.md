@@ -1,8 +1,6 @@
 # Migration segment run issues
 
-> **Latest owner disposition — 30 October 2026:** Esandu accepts project-owner responsibility for all six decision reviews; tasks 077/079/082–085 are completed policy tasks. Segment 01 is 21/23 verified tasks (overall 25/88). Task 008 has an owner-reported failed hosted run awaiting diagnosis; task 010 remains pending final evidence/logging reconciliation. The local V1 hardcoded connection string is now removed. This supersedes earlier pending-review/count/credential-literal statements below. [Details](SEGMENT_01_FINALIZATION.md).
-
-> **Current disposition — 30 October 2026:** [Finalization record](SEGMENT_01_FINALIZATION.md) supersedes historical no-remote/unrotated reports and pending-owner-answer wording below. Owner finalization and credential remediation reports are recorded. Hosted verification, accountable review and local source-cleanup reconciliation remain open. Verified counts stay 15/23 for Segment 01 and 19/88 overall.
+> **Final status — 30 October 2026:** Segment 01 is COMPLETED (23/23); overall 27/88 tasks completed. All 11 hosted checks passed at 9f1849a: [verified run](https://github.com/EsanduEpa/gymos-v2/actions/runs/41010929511). Decisions are owner-reviewed; external credential remediation is owner-attested with local cleanup/scanning verified. Historical checkpoints below are retained as history.
 
 Use this shared log for issues discovered while executing migration segment files. Add one dated section per segment run. Record symptoms, impact, resolution or next action, and evidence links. Keep credentials, customer data, and other secrets out of this file.
 

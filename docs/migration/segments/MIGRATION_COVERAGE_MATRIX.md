@@ -1,8 +1,6 @@
 # Migration Coverage Matrix
 
-> **Latest owner disposition — 30 October 2026:** Esandu accepts project-owner responsibility for all six decision reviews; tasks 077/079/082–085 are completed policy tasks. Segment 01 is 21/23 verified tasks (overall 25/88). Task 008 has an owner-reported failed hosted run awaiting diagnosis; task 010 remains pending final evidence/logging reconciliation. The local V1 hardcoded connection string is now removed. This supersedes earlier pending-review/count/credential-literal statements below. [Details](../SEGMENT_01_FINALIZATION.md).
-
-> **Current disposition — 30 October 2026:** [Finalization record](../SEGMENT_01_FINALIZATION.md) supersedes historical no-remote/unrotated reports and pending-owner-answer wording below. Owner finalization and credential remediation reports are recorded. Hosted verification, accountable review and local source-cleanup reconciliation remain open. Verified counts stay 15/23 for Segment 01 and 19/88 overall.
+> **Final status — 30 October 2026:** Segment 01 is COMPLETED (23/23); overall 27/88 tasks completed. All 11 hosted checks passed at 9f1849a: [verified run](https://github.com/EsanduEpa/gymos-v2/actions/runs/41010929511). Decisions are owner-reviewed; external credential remediation is owner-attested with local cleanup/scanning verified. Historical checkpoints below are retained as history.
 
 This matrix assigns every authoritative task and every V1 route responsibility to one owning segment. A dependency may consume an outcome but must not duplicate ownership. Status is evidence-backed as of 25 October 2026.
 
@@ -17,9 +15,9 @@ This matrix assigns every authoritative task and every V1 route responsibility t
 | GYMOS-MIG-005 | Tenant binding/schema gate | V1 `gymId` filtering | tenancy verifier/gate/registry | 01 | GYMOS-MIG-005 | COMPLETED |
 | GYMOS-MIG-006 | Bounded pools/shutdown | V1 single Prisma client | tenant lease/pool services | 01 | GYMOS-MIG-006 | COMPLETED |
 | GYMOS-MIG-007 | Disposable two-gym harness | V1 role journeys | `apps/api/test/support`, Playwright fixture | 01 | GYMOS-MIG-007 | COMPLETED |
-| GYMOS-MIG-008 | Workspace/CI checks | package scripts | workspace checks/hosted CI | 01 | GYMOS-MIG-008 | IN PROGRESS |
+| GYMOS-MIG-008 | Workspace/CI checks | package scripts | workspace checks/hosted CI | 01 | GYMOS-MIG-008 | COMPLETED (11 hosted checks passed) |
 | GYMOS-MIG-009 | Backup/isolated restore | V1 DB operational risk | `infrastructure/recovery`, runbook | 01 | GYMOS-MIG-009 | COMPLETED (local) |
-| GYMOS-MIG-010 | Exposed credential containment | V1 `scripts/check-db.js` | external remediation evidence/V2 hygiene | 01 | GYMOS-MIG-010 | BLOCKED |
+| GYMOS-MIG-010 | Exposed credential containment | V1 `scripts/check-db.js` | external remediation evidence/V2 hygiene | 01 | GYMOS-MIG-010 | COMPLETED (owner-attested external; local scan verified) |
 | GYMOS-MIG-011 | Classic semantic tokens | `app/globals.css`, V1 UI | `packages/theme-tokens` | 01 | GYMOS-MIG-011 | COMPLETED |
 | GYMOS-MIG-012 | Shared accessible UI primitives | `components/shared`, layout patterns | `apps/web/src/components/ui` | 01 | GYMOS-MIG-012 | COMPLETED |
 | GYMOS-MIG-013 | Role/gym dashboard chrome | dashboard layout/sidebar/header | proposed web dashboard shell | 02 | GYMOS-MIG-013 | NOT STARTED |

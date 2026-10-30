@@ -1,6 +1,6 @@
 # Segment 01 finalization — 30 October 2026
 
-> **Latest owner disposition — 30 October 2026:** Esandu accepts project-owner responsibility for all six decision reviews; tasks 077/079/082–085 are completed policy tasks. Segment 01 is 21/23 verified tasks (overall 25/88). Task 008 has an owner-reported failed hosted run awaiting diagnosis; task 010 remains pending final evidence/logging reconciliation. The local V1 hardcoded connection string is now removed. This supersedes earlier pending-review/count/credential-literal statements below. [Details](SEGMENT_01_FINALIZATION.md).
+> **Final status — 30 October 2026:** Segment 01 is COMPLETED (23/23); overall 27/88 tasks completed. All 11 hosted checks passed at 9f1849a: [verified run](https://github.com/EsanduEpa/gymos-v2/actions/runs/41010929511). Decisions are owner-reviewed; external credential remediation is owner-attested with local cleanup/scanning verified. Historical checkpoints below are retained as history.
 
 ## Owner-confirmed business rules
 
@@ -37,3 +37,7 @@ Segment 01 remains partially complete: 15/23 verified tasks. Eight gates remain:
 ## Latest verification and remaining work
 
 Local V1 scripts/check-db.js now obtains its connection from process.env.DATABASE_URL and rejects a missing value. Metadata inspection found no credential-bearing PostgreSQL URL literal. Redacted source inspection confirms it still prints a full owner record and raw connection errors; no script was executed and no V1 file was edited. Removal of the source literal is verified; absence of secrets from runtime output is not. Owner-reported external remediation remains recorded. Hosted workflow failure is owner-reported; exact run/job/error is requested. Review authority is now explicitly the project owner, closing all six decision tasks without inventing independent reviewers.
+
+## Final closure
+
+All 23 Segment 01 tasks are completed. Hosted run https://github.com/EsanduEpa/gymos-v2/actions/runs/41010929511 passed all 11 jobs at 9f1849a. The private-repository dependency review uses the explicitly owner-approved online base/proposed audit; npm metadata transmission is approved locally and on GitHub. Credential closure is based on the recorded owner attestations plus independently verified local cleanup and V2 scanning; no clean historical-access claim is made. Decisions are approved under the owner's explicitly accepted review authority. Subsequent closure edits are documentation only. PR https://github.com/EsanduEpa/gymos-v2/pull/1 contains the reviewable changes and remains unmerged. Next implementation task: Segment 02 / 013.
