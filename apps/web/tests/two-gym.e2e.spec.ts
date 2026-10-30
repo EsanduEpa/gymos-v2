@@ -426,6 +426,7 @@ test('role shell supports keyboard drawer, safe switching and current context', 
     await fixture.master.gymAccess.update({ where: { userId_gymId: { userId: access.userId, gymId: access.gymId } }, data: { linkStatus: 'REVOKED', version: { increment: 1 } } });
     await page.getByRole('link', { name: /Test Gym Alpha/ }).click();
     await expect(page.getByRole('heading', { name: 'This page could not be found' })).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/owner$`));
     await page.getByRole('link', { name: 'Return to Dashboard' }).click();
     await expect(page.getByRole('heading', { name: 'Test Gym Beta', exact: true })).toBeVisible();
   } finally {
@@ -459,9 +460,13 @@ test('web sessions enforce cookie, origin, expiry, revocation and logout boundar
   await expect(otherTab.locator('.shell-profile')).toContainText('Owner Beta');
   // A focus-triggered 401 during logout must not abort delivery of the
   // Server Action's cookie deletion response.
-  await page.route('**/api/session', route => route.fulfill({ status: 401 }));
+  let logoutStarted = false;
+  await page.route('**/api/session', route => logoutStarted ? route.fulfill({ status: 401 }) : route.continue());
   await page.route(`**/gyms/${fixture.gyms[1].slug}/owner`, async route => {
-    if (route.request().method() === 'POST') await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    if (route.request().method() === 'POST') {
+      logoutStarted = true;
+      await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    }
     await route.continue();
   });
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();

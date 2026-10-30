@@ -95,3 +95,9 @@ Evidence: [finalization](SEGMENT_01_FINALIZATION.md), [GYMOS-MIG-008](evidence/G
 | Existing visual tests wrote task 011's historical PNGs. | New shell captures would overwrite old evidence. | Restored original task 011 artifacts and directed new branding captures into task 013. | Resolved |
 
 Local evidence: [013](evidence/GYMOS-MIG-013.md), [020](evidence/GYMOS-MIG-020.md). Hosted gate remains pending at this checkpoint. No V1 code/database was run or modified; no shared/production data used.
+
+### Hosted browser follow-up — 30 October 2026
+
+Run [41021183510](https://github.com/EsanduEpa/gymos-v2/actions/runs/41021183510) passed ten jobs, including identity 10/10 and tenant 20/20, but exposed a real navigation race in the stale-chooser case: the browser session monitor redirected a server not-found response to root before it could be inspected. The monitor now applies live gym invalidation only to a rendered authorized shell; uniform denied/unknown-gym responses remain in place. The original not-found assertion remains, with an added assertion that the denied URL stays canonical. Completion remains pending a passing hosted run.
+
+The final local role/session/logout follow-up passed 3/3. Its synthetic 401 now starts only after the logout POST: focusing the tab before submission must still perform a real valid-session check. Assertions are unchanged. Desktop sidebar scrolling was also aligned with V1's static full-content-height column, rather than introducing sticky positioning.
