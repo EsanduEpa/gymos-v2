@@ -13,11 +13,13 @@ export class ProvisioningReservationService {
   constructor(private readonly database: DatabaseService) {}
   async reserve(actorIdentityId: string, authVersion: number, key: string, input: ProvisioningInput) {
     try {
+      // Replays retain the originally pinned artifact across application upgrades.
+      const previous = await this.database.master.operation.findFirst({ where: { actorIdentityId, kind: 'PROVISION_GYM', idempotencyKey: key }, select: { intendedTenantTemplateVersion: true, intendedTenantManifestDigest: true } });
       const claim = await new OperationFoundationService(this.database.master).claim({
         actorIdentityId, kind: 'PROVISION_GYM', idempotencyKey: key, requestedSlug: input.slug,
         intent: { ...input, ownerMode: 'GENERATE_OR_VERIFIED_REUSE' },
-        intendedTenantTemplateVersion: TENANT_TEMPLATE_MANIFEST.version,
-        intendedTenantManifestDigest: tenantManifestDigest(),
+        intendedTenantTemplateVersion: previous?.intendedTenantTemplateVersion ?? TENANT_TEMPLATE_MANIFEST.version,
+        intendedTenantManifestDigest: previous?.intendedTenantManifestDigest ?? tenantManifestDigest(),
         prepare: async (tx, operation) => {
           const actor = await tx.user.findUnique({ where: { id: actorIdentityId } });
           if (actor?.globalRole !== 'SUPER_ADMIN' || actor.authVersion !== authVersion || actor.mustChangePassword) throw new OperationConflictError('Platform authorization changed');

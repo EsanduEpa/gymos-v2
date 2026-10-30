@@ -43,6 +43,22 @@ export class CredentialService {
 
   private async authorizeOwner(tx: Prisma.TransactionClient, input: OwnerOperation) {
     const operation = await this.lockOperation(tx, input.operationId);
+    if (operation.kind === 'PROVISION_GYM') {
+      const [intent, actor, gym] = await Promise.all([
+        tx.provisioningIntent.findUnique({ where: { operationId: operation.id } }),
+        tx.user.findUnique({ where: { id: input.actorIdentityId } }),
+        tx.gym.findUnique({ where: { id: input.gymId }, select: { status: true } }),
+      ]);
+      const now = await this.databaseNow(tx);
+      if (operation.state !== 'COMPLETE' || operation.actorIdentityId !== input.actorIdentityId
+        || operation.subjectIdentityId !== input.identityId || operation.gymId !== input.gymId
+        || !intent || intent.reuseIdentity || intent.plannedOwnerIdentityId !== input.identityId
+        || actor?.globalRole !== 'SUPER_ADMIN' || actor.mustChangePassword
+        || (actor.credentialExpiresAt && actor.credentialExpiresAt <= now) || gym?.status !== 'ACTIVE') {
+        throw new ForbiddenException('New owner credential operation unavailable');
+      }
+      return operation;
+    }
     if (operation.subjectIdentityId !== input.identityId
       || operation.gymId !== input.gymId
       || operation.state !== 'COMPLETE'
@@ -82,7 +98,7 @@ export class CredentialService {
       where: { userId_gymId: { userId: input.identityId, gymId: input.gymId } },
       select: { role: true, enrollmentOperationId: true, linkStatus: true },
     });
-    const requiredRole = operation.kind === 'REGISTER_MEMBER' ? 'MEMBER' : 'TRAINER';
+    const requiredRole = operation.kind === 'PROVISION_GYM' ? 'OWNER' : operation.kind === 'REGISTER_MEMBER' ? 'MEMBER' : 'TRAINER';
     const newIdentity = delivery
       ? user.mustChangePassword && user.passwordChangedAt === null
         && user.authVersion === delivery.authVersion && user.credentialExpiresAt !== null

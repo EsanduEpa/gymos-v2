@@ -9,6 +9,7 @@ import { GymProvisioningService } from '../../src/gym-provisioning.service.js';
 import { TenantDatabaseService } from '../../src/tenant-database.service.js';
 import { ProvisioningWorker } from '../../src/platform/provisioning-worker.js';
 import { ProvisioningReservationService } from '../../src/platform/provisioning-reservation.service.js';
+import { TENANT_TEMPLATE_MANIFEST } from '../../src/tenancy/tenant-template-manifest.js';
 import { OperationFoundationService } from '../../src/operations/operation.service.js';
 import { createDisposablePostgresRun } from '../support/disposable-postgres.js';
 
@@ -32,18 +33,18 @@ it('recovers every external success/checkpoint boundary using the original physi
   const failed=await worker(async current=>{if(current===point && !fired){fired=true;throw new Error('Synthetic interruption');}}).runOnce(reserved.operationId);
   expect(failed.state).toBe('FAILED_RETRYABLE');expect(failed.gym.status).toBe('PROVISIONING');
   const original=await recordOwned(reserved.operationId);
-  const recovered=await worker().runOnce(reserved.operationId);expect(recovered.state).toBe('TENANT_COMMITTED');
+  const recovered=await worker().runOnce(reserved.operationId);expect(recovered.state).toBe('COMPLETE');
   const final=await recordOwned(reserved.operationId);expect(final.databaseName===original.databaseName).toBe(true);
   const tenant=await run.connect(final.databaseName!);
   try {
    expect((await tenant.query('SELECT count(*)::int AS count FROM "GymConfiguration"')).rows[0].count).toBe(1);
-   expect((await tenant.query('SELECT count(*)::int AS count FROM "_prisma_migrations" WHERE finished_at IS NOT NULL')).rows[0].count).toBe(4);
+   expect((await tenant.query('SELECT count(*)::int AS count FROM "_prisma_migrations" WHERE finished_at IS NOT NULL')).rows[0].count).toBe(TENANT_TEMPLATE_MANIFEST.migrations.length);
    expect((await tenant.query('SELECT "masterGymId" FROM "GymConfiguration"')).rows[0].masterGymId).toBe(final.gymId);
   } finally {await tenant.end();}
   expect((await worker().runOnce(reserved.operationId)).operationId).toBe(reserved.operationId);
-  expect(await master.gymAccess.count({where:{gymId:final.gymId!}})).toBe(0);
+  expect(await master.gymAccess.count({where:{gymId:final.gymId!,role:'OWNER',linkStatus:'ACTIVE'}})).toBe(1);
  }
- expect(await master.user.count()).toBe(before);
+ expect(await master.user.count()).toBe(before+5);
 },120_000);
 it('rejects an unknown existing database instead of adopting or deleting it',async()=>{
  const reserved=await reserve('orphan');const operation=await master.operation.findUniqueOrThrow({where:{id:reserved.operationId}});
@@ -56,7 +57,7 @@ it('fences a worker that loses its lease after database creation and resumes saf
  const reserved=await reserve('lost-lease');let fired=false;
  await expect(worker(async point=>{if(point==='AFTER_DATABASE_CREATE'&&!fired){fired=true;await master.operation.update({where:{id:reserved.operationId},data:{leaseExpiresAt:new Date(0),version:{increment:1}}});}}).runOnce(reserved.operationId)).rejects.toThrow('lease');
  await recordOwned(reserved.operationId);
- expect((await worker().runOnce(reserved.operationId)).state).toBe('TENANT_COMMITTED');
+ expect((await worker().runOnce(reserved.operationId)).state).toBe('COMPLETE');
 });
 it('concurrent workers produce one lease owner and one bound target',async()=>{
  const reserved=await reserve('concurrent-worker');
@@ -80,7 +81,7 @@ it('uses the same reservation/worker through the controlled CLI and refuses an u
  const env={...process.env,MASTER_DATABASE_URL:run.masterUrl,PROVISION_DATABASE_URL:run.masterUrl,TENANT_DATABASE_URL:run.masterUrl,GYMOS_OWNED_RUN_ID:run.runId};
  const args=['reserve',actor,randomUUID(),'CLI gym','cli-gym','cli@example.test','LKR','Asia/Colombo'];
  const first=await execute(process.execPath,[script,...args],{env,timeout:30_000});
- const result=JSON.parse(first.stdout);expect(result.state).toBe('TENANT_COMMITTED');
+ const result=JSON.parse(first.stdout);expect(result.state).toBe('COMPLETE');
  await recordOwned(result.operationId);
  const replay=await execute(process.execPath,[script,...args],{env,timeout:30_000});
  expect(JSON.parse(replay.stdout).operationId).toBe(result.operationId);

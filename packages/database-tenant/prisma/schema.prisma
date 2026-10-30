@@ -75,6 +75,8 @@ enum SchemaVerificationState {
 model GymConfiguration {
   id          String   @id
   masterGymId String   @unique
+  currency    String?
+  timezone    String?
   version     Int      @default(0)
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
