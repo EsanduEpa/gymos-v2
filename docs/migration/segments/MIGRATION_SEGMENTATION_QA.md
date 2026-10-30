@@ -1,6 +1,6 @@
 # Migration Segmentation Quality Audit
 
-Audit date: 25 October 2026. This audits documentation structure and source traceability; it does not claim application parity or complete migration work.
+Audit date: 30 October 2026. This audits documentation structure and source traceability; it does not claim application parity or complete migration work.
 
 ## Inputs inspected
 
@@ -33,6 +33,7 @@ Audit date: 25 October 2026. This audits documentation structure and source trac
 7. Current V2 basic member CRUD is explicitly treated as a basic-contact compatibility slice, not complete member enrollment.
 8. V1 defects—raw user leakage, partial enrollment, booking/settlement races, arbitrary pack debit, pre-start completion, repeat no-show, ignored zero settings, mutable pay terms, fake PAID/receipt/subscription controls—are corrected or deferred rather than preserved.
 9. Mobile tasks remain visible but conditional because V1 has no mobile implementation and DEC-12 is unresolved.
+10. On 30 October, GYMOS-MIG-085 received a concrete DEC-09 proposal and evidence; approval remains blocked and no dependent implementation is marked complete.
 
 ## Unresolved gates (not omissions)
 

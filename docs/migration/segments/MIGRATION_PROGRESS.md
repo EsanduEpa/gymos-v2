@@ -1,11 +1,11 @@
 # GymOS Feature-Segment Progress
 
-Evidence baseline: 25 October 2026. Counts come from [`../MIGRATION_TASK_TRACKER.md`](../MIGRATION_TASK_TRACKER.md); **Completed** means linked verification exists. Planning documents alone never advance status.
+Evidence baseline: 30 October 2026. Counts come from [`../MIGRATION_TASK_TRACKER.md`](../MIGRATION_TASK_TRACKER.md); **Completed** means linked verification exists. Planning documents alone never advance status.
 
 | Segment | Name | Status | Total | Verified completed | Remaining | Blockers | Dependencies | Last verification note |
 |---|---|---|---:|---:|---:|---|---|---|
-| 01 | Platform Foundation and Decision Gates | IN PROGRESS / BLOCKED | 23 | 15 | 8 | GYMOS-MIG-008 hosted checks; GYMOS-MIG-010 external credential containment; DEC-01/03/06/07/08/09 unresolved | None | Local foundation evidence through 25 Oct; no external containment inferred |
-| 02 | Identity, Authentication, and Application Shell | IN PROGRESS | 6 | 4 | 2 | DEC-11 provider/session policy for task 020; remaining Segment 01 gates | 01 | GYMOS-MIG-016–019 verified; next task 013 |
+| 01 | Platform Foundation and Decision Gates | IN PROGRESS / BLOCKED | 23 | 15 | 8 | GYMOS-MIG-008 hosted checks; GYMOS-MIG-010 external credential containment; DEC-01/03/06/07/08/09 approval | None | GYMOS-MIG-085 proposal prepared 30 Oct; decisions remain blocked pending review |
+| 02 | Identity, Authentication, and Application Shell | IN PROGRESS | 6 | 4 | 2 | DEC-11 provider/session policy for task 020; task 013 shell integration | 01 | GYMOS-MIG-016–019 completed with linked evidence; 013/020 remain |
 | 03 | Platform Administration and Tenant Lifecycle | BLOCKED before implementation | 6 | 0 | 6 | DEC-03 approval (GYMOS-MIG-079); GYMOS-MIG-021 additionally needs DEC-01/06 currency/timezone policy inputs | 01, 02 | Execution checkpoint reviewed 26 Oct; no implementation started. See shared segment run issues |
 | 04 | Gym Configuration and Membership Rules | BLOCKED before implementation | 5 | 0 | 5 | Segment 03 blocked; GYMOS-MIG-027 prerequisites 013/023/077/082/083 incomplete; DEC-01/06/07/08 open | 01–03 | Execution checkpoint reviewed 26 Oct; no implementation started. See shared segment run issues |
 | 05 | Member Enrollment and Account Management | NOT STARTED | 5 | 0 | 5 | Member status/pack work needs session aggregate task 040 | 02–04, 07/040 | Basic contact endpoint is not full enrollment |
@@ -15,7 +15,7 @@ Evidence baseline: 25 October 2026. Counts come from [`../MIGRATION_TASK_TRACKER
 | 09 | Scope Closure, Parity, and Quality Gates | NOT STARTED | 5 | 0 | 5 | All web segments; credential containment for security gate | 01–08 | V1 baseline fixtures exist; final parity not run |
 | 10 | Deployment, Recovery, and Controlled Release | NOT STARTED | 6 | 0 | 6 | DEC-11, configured provider/remote, segments 01–09 | 01–03, 09 | Local restore is not managed-environment DR |
 | 11 | Mobile Applications | NOT STARTED | 6 | 0 | 6 | DEC-12 and stable web/API lifecycle | 07–10 | No mobile app exists |
-| **Total** |  |  | **88** | **15** | **73** |  |  |  |
+| **Total** |  |  | **88** | **19** | **69** |  |  |  |
 
 ## Update protocol
 

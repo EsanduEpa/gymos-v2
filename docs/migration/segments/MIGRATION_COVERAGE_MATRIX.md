@@ -21,10 +21,10 @@ This matrix assigns every authoritative task and every V1 route responsibility t
 | GYMOS-MIG-013 | Role/gym dashboard chrome | dashboard layout/sidebar/header | proposed web dashboard shell | 02 | GYMOS-MIG-013 | NOT STARTED |
 | GYMOS-MIG-014 | Safe V1 visual fixtures | all V1 rendered screens | `apps/web/tests/visual` | 01 | GYMOS-MIG-014 | COMPLETED |
 | GYMOS-MIG-015 | Branding editor/fallback | O12 plus V2 theme scaffold | gym config web/API/theme | 04 | GYMOS-MIG-015 | NOT STARTED |
-| GYMOS-MIG-016 | Login/session/forced-change enforcement | A01; `lib/auth.ts` | auth controller/service/policies | 02 | GYMOS-MIG-016 | NOT STARTED |
-| GYMOS-MIG-017 | Temporary credential/change/reissue | A02; `actions/account.ts` | auth/identity credential commands | 02 | GYMOS-MIG-017 | NOT STARTED |
-| GYMOS-MIG-018 | Actor/resource authorization | `lib/authz.ts` | Nest guards/policies | 02 | GYMOS-MIG-018 | NOT STARTED |
-| GYMOS-MIG-019 | Role-aware root/navigation | R00/T00/M00/L02 | web route builder/guards | 02 | GYMOS-MIG-019 | NOT STARTED |
+| GYMOS-MIG-016 | Login/session/forced-change enforcement | A01; `lib/auth.ts` | auth controller/service/policies | 02 | GYMOS-MIG-016 | COMPLETED |
+| GYMOS-MIG-017 | Temporary credential/change/reissue | A02; `actions/account.ts` | auth/identity credential commands | 02 | GYMOS-MIG-017 | COMPLETED |
+| GYMOS-MIG-018 | Actor/resource authorization | `lib/authz.ts` | Nest guards/policies | 02 | GYMOS-MIG-018 | COMPLETED |
+| GYMOS-MIG-019 | Role-aware root/navigation | R00/T00/M00/L02 | web route builder/guards | 02 | GYMOS-MIG-019 | COMPLETED |
 | GYMOS-MIG-020 | Session transport/logout | Auth.js/session/logout | web BFF actions + auth API | 02 | GYMOS-MIG-020 | NOT STARTED |
 | GYMOS-MIG-021 | Provisioning reservation | V1 admin/create assumptions | operations + admin provisioning service | 03 | GYMOS-MIG-021 | NOT STARTED |
 | GYMOS-MIG-022 | Recoverable physical provisioning | V2 current synchronous provisioner | provisioning worker/checkpoints | 03 | GYMOS-MIG-022 | NOT STARTED |
@@ -82,15 +82,15 @@ This matrix assigns every authoritative task and every V1 route responsibility t
 | GYMOS-MIG-074 | Member mobile flows | M01–M03 behavior | proposed member native screens | 11 | GYMOS-MIG-074 | NOT STARTED |
 | GYMOS-MIG-075 | Trainer mobile flows | T01/T02/T03/T06 behavior | proposed trainer native screens | 11 | GYMOS-MIG-075 | NOT STARTED |
 | GYMOS-MIG-076 | Mobile tests/releases | approved mobile scope | Android/iOS pipelines | 11 | GYMOS-MIG-076 | NOT STARTED |
-| GYMOS-MIG-077 | Decide config ownership | O12/data map | DEC-01 | 01 | GYMOS-MIG-077 | NOT STARTED |
+| GYMOS-MIG-077 | Decide config ownership | O12/data map | DEC-01 | 01 | GYMOS-MIG-077 | BLOCKED — approval |
 | GYMOS-MIG-078 | Decide identity policy | A01/A02 | DEC-02 | 01 | GYMOS-MIG-078 | COMPLETED |
-| GYMOS-MIG-079 | Decide support scope | S01 | DEC-03 | 01 | GYMOS-MIG-079 | NOT STARTED |
+| GYMOS-MIG-079 | Decide support scope | S01 | DEC-03 | 01 | GYMOS-MIG-079 | BLOCKED — approval |
 | GYMOS-MIG-080 | Decide operation protocol | multi-write actions | DEC-04 | 01 | GYMOS-MIG-080 | COMPLETED |
 | GYMOS-MIG-081 | Decide schema/pool/recovery | database architecture | DEC-05 | 01 | GYMOS-MIG-081 | COMPLETED |
-| GYMOS-MIG-082 | Decide money/earning | pricing/financials | DEC-06 | 01 | GYMOS-MIG-082 | NOT STARTED |
-| GYMOS-MIG-083 | Decide time/term/scheduling | sessions/memberships | DEC-07 | 01 | GYMOS-MIG-083 | NOT STARTED |
-| GYMOS-MIG-084 | Decide settlement/payroll | session/payroll actions | DEC-08 | 01 | GYMOS-MIG-084 | NOT STARTED |
-| GYMOS-MIG-085 | Decide coaching/privacy/export | plans/analytics/exports | DEC-09 | 01 | GYMOS-MIG-085 | NOT STARTED |
+| GYMOS-MIG-082 | Decide money/earning | pricing/financials | DEC-06 | 01 | GYMOS-MIG-082 | BLOCKED — approval |
+| GYMOS-MIG-083 | Decide time/term/scheduling | sessions/memberships | DEC-07 | 01 | GYMOS-MIG-083 | BLOCKED — approval |
+| GYMOS-MIG-084 | Decide settlement/payroll | session/payroll actions | DEC-08 | 01 | GYMOS-MIG-084 | BLOCKED — approval |
+| GYMOS-MIG-085 | Decide coaching/privacy/export | plans/analytics/exports | DEC-09 | 01 | GYMOS-MIG-085 | BLOCKED — approval; proposal prepared 30 Oct |
 | GYMOS-MIG-086 | Decide routes/Classic/brand | all web UI | DEC-10 | 01 | GYMOS-MIG-086 | COMPLETED |
 | GYMOS-MIG-087 | Decide provider/release | deployment unknowns | DEC-11 | 10 | GYMOS-MIG-087 | NOT STARTED |
 | GYMOS-MIG-088 | Decide mobile scope | no V1 mobile | DEC-12 | 11 | GYMOS-MIG-088 | NOT STARTED |

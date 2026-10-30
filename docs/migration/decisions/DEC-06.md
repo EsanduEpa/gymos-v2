@@ -21,7 +21,7 @@ All money is exact and belongs to one gym currency. Membership earning is term b
 | Pack allocation | Convert pack price to integer minor units. Divide by credit count; assign the base quotient to every credit and one additional minor unit to the first `remainder` credits in deterministic consumption order. The allocations always sum exactly to pack price. |
 | Consumption order | DEC-07 selects the pack. Within a pack, credit ordinals are immutable; repeated settlement uses the same stored ordinal/allocation. |
 | Membership earning | Divide term price in minor units across gym-local covered dates using the same quotient/remainder method. Earlier dates receive residual minor units. Recognize a day's operational earning once for each elapsed covered date. |
-| Suspension | Suspension stops eligibility but does not accelerate or rewrite operational earning. Remaining scheduled term allocation stays `UNEARNED`; MVP reports it separately and does not recognize it automatically. |
+| Suspension | Owner-confirmed 30 October 2026: suspension stops eligibility but does not pause or extend the purchased term. Daily membership operational earning continues on the original allocation schedule through the original expiry. This creates no new charge or payment. Memberships and packs cannot be frozen; suspension does not extend expiry or automatically create a refund. |
 | Expired unused pack value | Keep it in a separate `EXPIRED_UNUSED` operational report line. MVP creates no revenue/payment/accounting event from expiry. |
 | Missed/late value | A settled charged session earns its stored credit allocation and is classified separately from completed-session earning. It is never merged into expired-unused value. |
 | Zero budget | Budget `0` is valid. Spend `0` means amount variance `0` and status `ON_TRACK`; spend above `0` means variance equals spend and status `OVER_BUDGET`. Percentage utilization is `null`, not infinity or zero. |
@@ -49,7 +49,7 @@ All money is exact and belongs to one gym currency. Membership earning is term b
 1. `100.00` across three credits allocates `33.34`, `33.33`, `33.33`; retries preserve the same allocations and exact total.
 2. Zero- and three-decimal configured currencies round at their correct minor unit; excess-scale input fails.
 3. No report crosses currencies or emits float/scientific notation.
-4. Suspension leaves remaining allocations unearned; expiry produces a separate unused line without a payment/revenue event.
+4. Suspension preserves the original expiry and daily membership allocation; pack expiry produces a separate unused line without a payment/revenue event.
 5. A charged missed session and completed session keep distinct categories while preserving the same stored credit value.
 6. Zero budget produces the defined status/variance and a `null` percentage without divide-by-zero.
 
@@ -58,3 +58,7 @@ These are future implementation tests. No accounting compliance claim or applica
 ## Approval record
 
 Awaiting the project owner's explicit approval or requested changes. Until then DEC-06 and GYMOS-MIG-082 remain blocked.
+
+## Project-owner clarification — 30 October 2026
+
+The owner explicitly confirmed continued daily membership earning during suspension, original expiry without freezes/extensions, and no additional payment event. This supersedes the former suspension proposal. Other DEC-06 details and reviewer sign-off remain pending; this clarification is not blanket approval or implementation evidence.

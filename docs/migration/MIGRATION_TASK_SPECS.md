@@ -7248,7 +7248,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+Blocked — DEC-09 proposal and evidence prepared on 30 October 2026; awaiting project-owner and accountable Coaching/Privacy, Finance, and Frontend review. Evidence: [GYMOS-MIG-085.md](evidence/GYMOS-MIG-085.md).
 
 ## Task ID: GYMOS-MIG-086
 

@@ -59,3 +59,7 @@ These are future implementation tests. No application behavior is claimed by thi
 ## Approval record
 
 Awaiting the project owner's explicit approval or requested changes. Until then DEC-07 and GYMOS-MIG-083 remain blocked.
+
+## Project-owner clarification — 30 October 2026
+
+The owner accepted the explained membership, cancellation, start and no-show boundaries. Memberships and packs expire within their purchased period even when the account is suspended; there is no freeze or automatic extension. This records the business-boundary confirmation, not blanket approval of every technical detail or reviewer sign-off.

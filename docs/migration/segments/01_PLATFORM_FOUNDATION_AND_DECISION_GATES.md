@@ -123,8 +123,10 @@ Completed foundations provide canonical email identity, typed gym access/actor l
 
 - **Objective:** approve confirmed relationship states, health/note projections, builder limits/day mapping, metric windows, export caps/snapshots, poll cancellation, and cross-role refresh SLA.
 - **Sources:** T02–T05, dashboard/analytics/CSV/bell actions; meal day mismatch.
-- **Target:** proposed `decisions/DEC-09.md`.
+- **Target:** proposed `decisions/DEC-09.md`; prepared 30 October 2026 at this execution checkpoint.
 - **Acceptance/test:** unrelated trainer/foreign gym/privacy negatives; safe export formulas/caps; stale poll cannot overwrite switched gym; explicit day mapping. **[ ]**
+
+**Current proposal:** concrete defaults and tradeoffs are documented. They remain unapproved; GYMOS-MIG-085 is Blocked until the project owner and accountable Coaching/Privacy, Finance, and Frontend reviewers approve or revise DEC-09.
 
 ## 7. Security and multi-tenancy checklist
 
@@ -155,9 +157,9 @@ Stop if a task needs provider/owner authority, a named decision lacks approval, 
 - **Status:** IN PROGRESS / BLOCKED
 - **Completed IDs:** 001–007, 009, 011, 012, 014, 078, 080, 081, 086
 - **Remaining IDs:** 008, 010, 077, 079, 082, 083, 084, 085
-- **Files changed:** `docs/migration/evidence/GYMOS-MIG-008.md`; this segment progress record; `docs/migration/SEGMENT_RUN_ISSUES.md`.
-- **Tests/results:** GYMOS-MIG-008 local workspace, build, lint, type-check, unit, owned database, browser, and recovery verification recorded in linked evidence. Local checks passed at `6f3358c`; hosted checks and online lockfile audit remain unverified.
-- **Known issues:** task 008 hosted evidence absent because no Git remote is configured; pnpm audit endpoint was unreachable and an escalated attempt was rejected by automatic approval review due to dependency metadata egress. Task 010 remains externally uncontained.
+- **Files changed in this continuation:** `decisions/DEC-09.md`, `evidence/GYMOS-MIG-085.md`, and synchronized task/register/segment records.
+- **Tests/results:** GYMOS-MIG-008 local workspace, build, lint, type-check, unit, owned database, browser, and recovery verification recorded in linked evidence. Local checks passed at `6f3358c`; hosted checks and online lockfile audit remain unverified. Task 085 is a decision-preparation task; no application test was run or claimed.
+- **Known issues:** task 008 hosted evidence absent because no Git remote is configured; pnpm audit endpoint was unreachable and an escalated attempt was rejected by automatic approval review due to dependency metadata egress. Task 010 remains externally uncontained. DEC-01/03/06/07/08/09 proposals await owner/reviewer approval.
 - **Run issue log:** `docs/migration/SEGMENT_RUN_ISSUES.md`.
-- **Next recommended task:** GYMOS-MIG-008 after a Git remote/hosted PR is available and the lockfile audit can be run through an authorized route; task 010 still requires provider owner action.
+- **Next recommended task:** obtain owner/reviewer responses on DEC-01/03/06/07/08/09 and continue the hosted GYMOS-MIG-008 gate when a remote/PR and authorized audit route are available. GYMOS-MIG-010 still requires provider-owner action.
 

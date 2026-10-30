@@ -57,3 +57,7 @@ These are future implementation tests. No payout or application behavior is clai
 ## Approval record
 
 Awaiting the project owner's explicit approval or requested changes. Until then DEC-08 and GYMOS-MIG-084 remain blocked.
+
+## Project-owner clarification — 30 October 2026
+
+The owner explicitly confirmed trainer pay only for completed sessions. Charged cancellations and no-shows do not generate trainer pay. Other DEC-08 details and reviewer sign-off remain pending.

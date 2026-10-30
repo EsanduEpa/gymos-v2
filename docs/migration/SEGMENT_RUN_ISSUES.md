@@ -59,3 +59,12 @@ Evidence: [Segment 03 execution record](segments/03_PLATFORM_ADMIN_AND_TENANT_LI
 | Segment 04 requires approved DEC-01/06/07/08; GYMOS-MIG-027 specifically requires 077/082/083 and forbids configuration fields before approval. | Ownership, currency precision/set, date/time boundaries, settlement/pay policy and cross-plane profile recovery are not yet approved. | Concrete proposals now exist for [DEC-01](decisions/DEC-01.md), [DEC-06](decisions/DEC-06.md), [DEC-07](decisions/DEC-07.md) and [DEC-08](decisions/DEC-08.md). Project-owner approval or revisions are required. | Awaiting approval |
 
 Evidence: [Segment 04 execution record](segments/04_GYM_CONFIGURATION_AND_MEMBERSHIP_RULES.md), [decision register](MIGRATION_DECISIONS.md), [Segment 03 run issues](SEGMENT_RUN_ISSUES.md#segment-03--2026-10-26). No Segment 04 implementation tasks were run; 015 and 027–030 remain Not Started.
+
+## Segment 01 — 2026-10-30 continuation
+
+| Issue | Impact | Resolution / next action | Status |
+|---|---|---|---|
+| GYMOS-MIG-085 lacked a concrete DEC-09 record for coaching privacy, metric definitions, export limits and freshness behavior. | Coaching, analytics, export and selected-gym refresh implementation cannot safely choose relationship states, numeric bounds, day mapping, scope or caps by inference. | Prepared [DEC-09](decisions/DEC-09.md) and [task evidence](evidence/GYMOS-MIG-085.md) with explicit proposed defaults and expected tests. Project owner and Coaching/Privacy, Finance, Frontend reviewers must approve or revise before affected feature work. | Awaiting approval |
+| Segment 01 status summaries predated completed identity/authentication tasks 016–019 and the new DEC-09 proposal. | Segment totals and handoff did not match current task evidence. | Updated segment progress to 19/88 completed overall (15 in Segment 01, 4 in Segment 02); kept GYMOS-MIG-085 Blocked because proposal preparation is not approval. | Resynchronized |
+
+No application code, database, hosted workflow or V1 file was changed in this continuation. Task 008 remains in progress because there is no configured Git remote/hosted run and online lockfile audit could not be verified. Task 010 remains blocked pending credential-owner/provider containment and access/reuse review evidence.
