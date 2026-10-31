@@ -642,7 +642,14 @@ test('platform registry supports audited read-only gym selection, switching, exi
   await page.screenshot({path:join(evidence,'support-beta-320.png'),fullPage:true,animations:'disabled'});
   await page.getByRole('button',{name:'Exit support',exact:true}).click();await expect(page).toHaveURL(/\/admin$/);
   expect((await page.context().cookies()).some(cookie=>cookie.name==='gymos_support_context')).toBe(false);
-  await page.goto(`${webBase}/gyms/${fixture.gyms[1].slug}/owner`);await expect(page).toHaveURL(/\/admin$/);
+  // The exit action may still finish its /admin RSC navigation after the
+  // cookie is cleared. Start protected navigation in a fresh document so a
+  // client redirect from the exiting document cannot abort this assertion.
+  const deniedTab=await page.context().newPage();
+  await deniedTab.goto(`${webBase}/gyms/${fixture.gyms[1].slug}/owner`);
+  await expect(deniedTab).toHaveURL(/\/admin$/);
+  await expect(deniedTab.locator('.support-banner')).toHaveCount(0);
+  await deniedTab.close();
   await oldTab.close();
 });
 
