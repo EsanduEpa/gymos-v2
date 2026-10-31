@@ -43,13 +43,14 @@ export class ProvisioningReservationService {
     }
   }
   async status(actorIdentityId: string, operationId: string) {
-    const operation = await this.database.master.operation.findFirst({ where: { id: operationId, actorIdentityId, kind: 'PROVISION_GYM' }, include: { gym: true, provisioningIntent: true } });
+    const operation = await this.database.master.operation.findFirst({ where: { id: operationId, actorIdentityId, kind: 'PROVISION_GYM' }, include: { gym: true, provisioningIntent: true, subject: { select: { passwordChangedAt: true } }, credentialDelivery: { select: { acknowledgedAt: true } } } });
     if (!operation?.gym || !operation.provisioningIntent) throw new NotFoundException('Operation unavailable');
     const intent = operation.provisioningIntent;
     const proof = intent.reuseIdentity ? await this.database.master.enrollmentProof.findFirst({ where: { enrollmentOperationId: operation.id, identityId: intent.plannedOwnerIdentityId, gymId: operation.gym.id, role: 'OWNER', consumedAt: { not: null } }, select: { id: true } }) : null;
     return platformOperationSchema.parse({
       operationId: operation.id, state: operation.state, step: operation.step, version: operation.version,
       retryable: operation.state === 'FAILED_RETRYABLE', ownerVerificationRequired: intent.reuseIdentity && !proof,
+      credentialHandoffAvailable: !intent.reuseIdentity && operation.state === 'COMPLETE' && !!operation.subject && operation.subject.passwordChangedAt === null && !operation.credentialDelivery?.acknowledgedAt,
       gym: { id: operation.gym.id, name: operation.gym.name, slug: operation.gym.slug, status: operation.gym.status },
     });
   }

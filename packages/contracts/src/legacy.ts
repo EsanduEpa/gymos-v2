@@ -1,3 +1,5 @@
+// Original source-inventory contracts remain frozen. Current platform E02/E03
+// consumers use registryPageSchema/platformOperationSchema from ./platform.
 import { z } from 'zod';
 import { globalRoleSchema, gymRoleSchema, idSchema, isoInstantSchema } from './index.js';
 

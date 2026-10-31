@@ -1,19 +1,21 @@
-import { Body, Controller, Get, Headers, HttpCode, Param, Post, Req, Res, UseGuards, UnprocessableEntityException } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Param, Post, Query, Req, Res, UseGuards, UnprocessableEntityException } from '@nestjs/common';
 import type { Response } from 'express';
-import { idempotencyKeySchema, operationRetrySchema, provisioningInputSchema } from '@gymos/contracts/platform';
+import { idempotencyKeySchema, operationRetrySchema, provisioningInputSchema, registryQuerySchema } from '@gymos/contracts/platform';
 import { credentialIssueInputSchema, credentialReissueInputSchema, credentialAcknowledgementInputSchema } from '@gymos/contracts/credentials';
 import { CredentialService } from './identity/credential.service.js';
-import { DatabaseService } from './database.service.js';
 import { SuperAdminGuard, type PlatformRequest } from './super-admin.guard.js';
 import { ProvisioningReservationService } from './platform/provisioning-reservation.service.js';
+import { PlatformRegistryService } from './platform/platform-registry.service.js';
 
 @Controller('admin')
 @UseGuards(SuperAdminGuard)
 export class AdminController {
-  constructor(private readonly reservations: ProvisioningReservationService, private readonly database: DatabaseService, private readonly credentials: CredentialService) {}
+  constructor(private readonly reservations: ProvisioningReservationService, private readonly credentials: CredentialService, private readonly registry: PlatformRegistryService) {}
   @Get('gyms')
-  gyms() {
-    return this.database.master.gym.findMany({ select: { id: true, name: true, slug: true, status: true }, orderBy: { createdAt: 'desc' } });
+  gyms(@Req() request: PlatformRequest, @Query() query: unknown) {
+    const input = registryQuerySchema.safeParse(query);
+    if (!input.success) throw new UnprocessableEntityException('Invalid registry page');
+    return this.registry.page(request.platformIdentity!.identityId, input.data.cursor);
   }
   @Post('gyms')
   @HttpCode(202)

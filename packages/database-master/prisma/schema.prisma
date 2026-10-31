@@ -264,3 +264,46 @@ model ProvisioningIntent {
   timezone String
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 }
+
+model GymRegistrySummary {
+  gymId String @id
+  memberCount Int?
+  trainerCount Int?
+  observedAt DateTime? @db.Timestamptz(3)
+  schemaVersion String?
+  health String @default("UNAVAILABLE")
+  version Int @default(0)
+}
+
+model SupportSession {
+  id String @id @default(cuid())
+  tokenHash String @unique
+  actorIdentityId String
+  authVersion Int
+  gymId String
+  scope String
+  reasonCode String
+  explanation String
+  issuedAt DateTime @default(now()) @db.Timestamptz(3)
+  expiresAt DateTime @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+  revocationReason String?
+  version Int @default(0)
+  events SupportEvent[]
+  @@index([actorIdentityId, revokedAt])
+  @@index([expiresAt])
+}
+model SupportEvent {
+  id String @id @default(cuid())
+  eventKey String @unique
+  supportSessionId String
+  session SupportSession @relation(fields:[supportSessionId], references:[id], onDelete:Restrict)
+  originalActorIdentityId String
+  gymId String
+  scope String
+  route String
+  outcome String
+  reasonReference String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([gymId, createdAt])
+}

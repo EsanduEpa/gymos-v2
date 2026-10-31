@@ -29,8 +29,8 @@ export class BoundedTenantLeases<T> {
   snapshot(): Capacity {
     return { resident: this.#entries.size, activeLeases: [...this.#entries.values()].reduce((sum, entry) => sum + entry.refs, 0), closing: [...this.#entries.values()].filter((entry) => entry.state === 'CLOSING').length, queued: this.#waiters.length, draining: this.#draining, drainTimedOut: this.#drainTimedOut };
   }
-  async withDatabase<Result>(name: string, work: (client: T) => Promise<Result>): Promise<Result> {
-    const entry = await this.#acquire(name);
+  async withDatabase<Result>(name: string, work: (client: T) => Promise<Result>, maintenance = false): Promise<Result> {
+    const entry = await this.#acquire(name, maintenance);
     try { return await work(entry.resource.client); }
     finally { this.#release(entry); }
   }
@@ -69,10 +69,10 @@ export class BoundedTenantLeases<T> {
     timer?.unref?.();
     return timer;
   }
-  #acquire(name: string): Promise<Entry<T>> {
+  #acquire(name: string, maintenance: boolean): Promise<Entry<T>> {
     if (!/^[a-z][a-z0-9_]{0,62}$/.test(name)) return Promise.reject(new AdmissionUnavailable('INVALID_TARGET'));
     if (this.#draining) return Promise.reject(new AdmissionUnavailable('DRAINING'));
-    if (this.#suspended.has(name)) return Promise.reject(new AdmissionUnavailable('DRAINING'));
+    if (this.#suspended.has(name) && !maintenance) return Promise.reject(new AdmissionUnavailable('DRAINING'));
     if (this.#waiters.length >= this.options.maxQueued) return Promise.reject(new AdmissionUnavailable('QUEUE_FULL'));
     return new Promise<Entry<T>>((resolve, reject) => {
       const waiter: Waiter<T> = { name, resolve, reject, deadline: this.options.now() + this.options.admissionMs };

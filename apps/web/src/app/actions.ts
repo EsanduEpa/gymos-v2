@@ -8,6 +8,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { sessionCookieOptions } from '@/lib/session-transport';
 import { apiUrl, gymRolePath, SESSION_COOKIE } from '@/lib/gymos';
+import { SUPPORT_COOKIE } from '@/lib/support-context';
 
 function field(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -53,6 +54,7 @@ export async function login(formData: FormData) {
   const options = sessionCookieOptions(result.accessToken, result.expiresIn);
   if (options.expires.getTime() <= Date.now()) redirect('/login?error=expired');
   (await cookies()).set(SESSION_COOKIE, result.accessToken, options);
+  (await cookies()).delete(SUPPORT_COOKIE);
   revalidatePath('/', 'layout');
   if (result.mustChangePassword) redirect('/change-password');
 
@@ -77,6 +79,7 @@ export async function signOut() {
   } catch { uncertain = true; }
   finally {
     jar.delete(SESSION_COOKIE);
+    jar.delete(SUPPORT_COOKIE);
     revalidatePath('/', 'layout');
   }
   redirect(uncertain ? '/login?error=logout-uncertain' : '/login');
@@ -118,6 +121,7 @@ export async function changePasswordAction(formData: FormData) {
 
 export async function finishPasswordChangeAction() {
   (await cookies()).delete(SESSION_COOKIE);
+  (await cookies()).delete(SUPPORT_COOKIE);
   revalidatePath('/', 'layout');
   redirect('/login');
 }

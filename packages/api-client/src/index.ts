@@ -9,6 +9,8 @@ export type RequestOptions<T> = {
   body?: unknown;
   /** A server-held token for web; OS-secure token for native. Never log it. */
   accessToken?: string;
+  /** Explicit server-held opaque context for the named read-only support API. */
+  supportContext?: string;
   idempotencyKey?: string;
   signal?: AbortSignal;
 };
@@ -63,6 +65,12 @@ export function createApiClient(baseUrl: string, fetcher: Fetcher = fetch) {
       if (options.idempotencyKey !== undefined) {
         if (!idempotencyKeySchema.safeParse(options.idempotencyKey).success) throw new TypeError('Invalid idempotency key');
         headers.set('idempotency-key', options.idempotencyKey);
+      }
+      if (options.supportContext !== undefined) {
+        const allowed = (method === 'GET' && /^\/admin\/support-sessions\/[^/]+\/gyms\/[^/]+\/summary$/.test(path))
+          || (method === 'DELETE' && /^\/admin\/support-sessions\/[^/]+$/.test(path));
+        if (!allowed || !/^[A-Za-z0-9_-]{43}$/.test(options.supportContext)) throw new TypeError('Support context is limited to approved summary and exit requests');
+        headers.set('x-gymos-support-context', options.supportContext);
       }
       const init: RequestInit = { method, headers, cache: 'no-store', redirect: 'manual' };
       if (options.signal) init.signal = options.signal;

@@ -1,4 +1,5 @@
-import { spawn, type ChildProcess } from 'node:child_process';
+import { execFile, spawn, type ChildProcess } from 'node:child_process';
+import { promisify } from 'node:util';
 import { createHmac, randomBytes } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import { createServer } from 'node:net';
@@ -9,7 +10,7 @@ import { seedTwoGymFixture } from '../../api/test/fixtures/two-gym-fixture.js';
 import { createDisposableEnvironment } from '../../api/test/support/disposable-environment.js';
 
 // Authentication scenarios must never persist bearer/password traffic in traces.
-test.use({ trace: 'off' });
+test.use({ trace: 'off', screenshot: 'off' });
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const apiDirectory = join(root, 'apps/api');
@@ -531,6 +532,81 @@ test('platform form reserves one pending gym with safe status and a stable retry
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await mkdir(join(root, 'docs/migration/evidence/GYMOS-MIG-021'), { recursive: true });
   await page.screenshot({ path: join(root, 'docs/migration/evidence/GYMOS-MIG-021/pending-320.png'), fullPage: true, animations: 'disabled' });
+  await promisify(execFile)(process.execPath,[join(apiDirectory,'scripts/provision-gym.mjs'),'resume',stored.id],{
+    env:{PATH:process.env.PATH,HOME:process.env.HOME,NODE_ENV:'test',GYMOS_OWNED_RUN_ID:environment.runId,MASTER_DATABASE_URL:environment.masterUrl,PROVISION_DATABASE_URL:environment.masterUrl,TENANT_DATABASE_URL:environment.masterUrl},timeout:30_000,
+  });
+  await environment.registerProvisionedDatabase(await fixture.master.operation.findUniqueOrThrow({where:{id:stored.id}}));
+  await page.goto(`${webBase}/admin`);
+  const row=page.getByRole('table',{name:'Registered gym tenants'}).getByRole('row').filter({has:page.getByText(input.name,{exact:true})});
+  await row.getByRole('button',{name:'Owner credential handoff'}).click();
+  await expect(row.getByRole('button',{name:'I delivered this credential'})).toBeVisible();
+  expect(await fixture.master.credentialDelivery.count({where:{operationId:stored.id}})).toBe(1);
+  // A second handoff request cannot retrieve the secret. Explicitly reissue it.
+  await row.getByRole('button',{name:'Owner credential handoff'}).click();
+  await row.getByRole('button',{name:'Reissue lost handoff',exact:true}).click();
+  const confirmation=page.getByRole('dialog',{name:'Reissue lost handoff?'});await expect(confirmation).toBeVisible();
+  await confirmation.getByRole('button',{name:'Confirm',exact:true}).click();
+  await expect(row.getByRole('button',{name:'I delivered this credential'})).toBeVisible();
+  expect((await fixture.master.credentialDelivery.findUniqueOrThrow({where:{operationId:stored.id}})).version).toBe(1);
+  await row.getByRole('button',{name:'I delivered this credential'}).click();
+  await expect(row).toContainText('Handoff acknowledged.');
+  expect(await row.locator('.credential-handoff output').count()).toBe(0);
+  expect((await fixture.master.credentialDelivery.findUniqueOrThrow({where:{operationId:stored.id}})).acknowledgedAt!==null).toBe(true);
+
+});
+
+test('platform registry supports audited read-only gym selection, switching, exit and narrow keyboard navigation', async ({ page }) => {
+  const execute=promisify(execFile);
+  for(const gym of fixture.gyms) await execute(process.execPath,[join(apiDirectory,'scripts/provision-gym.mjs'),'refresh-summary',gym.id,fixture.users.admin.id],{
+    env:{PATH:process.env.PATH,HOME:process.env.HOME,NODE_ENV:'test',GYMOS_OWNED_RUN_ID:environment.runId,MASTER_DATABASE_URL:environment.masterUrl,PROVISION_DATABASE_URL:environment.masterUrl,TENANT_DATABASE_URL:environment.masterUrl},timeout:20_000,
+  });
+  await openWithTestSession(page,fixture.users.admin.id,'/admin');
+  const table=page.getByRole('table',{name:'Registered gym tenants'});
+  const alpha=table.getByRole('row').filter({has:page.getByText('Test Gym Alpha',{exact:true})});
+  await expect(alpha).toContainText(String(fixture.expected.alphaMembers));
+  await expect(table).toBeVisible();
+  const evidence=join(root,'docs/migration/evidence/GYMOS-MIG-024');await mkdir(evidence,{recursive:true});
+  await page.screenshot({path:join(evidence,'registry-desktop.png'),fullPage:true,animations:'disabled'});
+  await page.setViewportSize({width:320,height:700});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.screenshot({path:join(evidence,'registry-320.png'),fullPage:true,animations:'disabled'});
+  await page.setViewportSize({width:1280,height:720});
+  await alpha.getByRole('button',{name:'View dashboard'}).focus();
+  await page.keyboard.press('Enter');
+  const reason=page.getByRole('textbox',{name:/^Support reason/});await reason.fill('Synthetic owner-summary diagnosis');
+  await page.getByRole('button',{name:'Enter support',exact:true}).click();
+  await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/owner$`));
+  await expect(page.locator('.support-banner')).toContainText('Viewing Test Gym Alpha');
+  await expect(page.locator('.support-banner')).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Test Gym Alpha',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Add member'})).toHaveCount(0);
+  await expect(page.locator('main')).not.toContainText('Alpha Person');
+  const supportCookie=(await page.context().cookies()).find(cookie=>cookie.name==='gymos_support_context')!;
+  expect(supportCookie.httpOnly&&supportCookie.secure&&supportCookie.sameSite==='Lax').toBe(true);
+  await page.screenshot({path:join(evidence,'support-alpha-desktop.png'),fullPage:true,animations:'disabled'});
+  const oldTab=await page.context().newPage();await oldTab.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/owner`);
+  await expect(oldTab.locator('.support-banner')).toContainText('Viewing Test Gym Alpha');
+  await page.getByRole('navigation',{name:'Main navigation'}).getByRole('link',{name:'All Gyms'}).click();
+  const beta=page.getByRole('table',{name:'Registered gym tenants'}).getByRole('row').filter({has:page.getByText('Test Gym Beta',{exact:true})});
+  await beta.getByRole('button',{name:'View dashboard'}).click();
+  await page.getByRole('textbox',{name:/^Support reason/}).fill('Synthetic second-gym diagnosis');
+  await page.getByRole('button',{name:'Enter support',exact:true}).click();
+  await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[1].slug}/owner$`));
+  await expect(page.locator('.support-banner')).toContainText('Viewing Test Gym Beta');
+  await expect(page.locator('.support-banner')).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Test Gym Beta',exact:true})).toBeVisible();
+  await expect(page.locator('main')).not.toContainText('Test Gym Alpha');
+  await expect(oldTab).toHaveURL(/\/admin$/);
+  await page.setViewportSize({width:320,height:700});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.getByRole('button',{name:'Open navigation menu'}).click();
+  await expect(page.getByRole('dialog',{name:'Navigation menu'})).toBeVisible();
+  await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'Open navigation menu'})).toBeFocused();
+  await page.screenshot({path:join(evidence,'support-beta-320.png'),fullPage:true,animations:'disabled'});
+  await page.getByRole('button',{name:'Exit support',exact:true}).click();await expect(page).toHaveURL(/\/admin$/);
+  expect((await page.context().cookies()).some(cookie=>cookie.name==='gymos_support_context')).toBe(false);
+  await page.goto(`${webBase}/gyms/${fixture.gyms[1].slug}/owner`);await expect(page).toHaveURL(/\/admin$/);
+  await oldTab.close();
 });
 
 test('logout clears the browser even when API revocation is unavailable', async ({ page }) => {

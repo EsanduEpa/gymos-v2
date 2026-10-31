@@ -11,6 +11,7 @@ import type { Prisma, PrismaClient } from '../generated/master/client.js';
 import { DatabaseService } from '../database.service.js';
 import { appendMasterAudit, appendMasterVersionAudit } from '../operations/transaction-audit.js';
 import { requestDigest } from '../operations/primitives.js';
+import { revokeSupportForActor } from '../platform/support-session.service.js';
 
 const TEMPORARY_CREDENTIAL_MS = 24 * 60 * 60_000;
 
@@ -315,6 +316,7 @@ export class CredentialService {
         },
       });
       if (changed.count !== 1) throw new ConflictException('Credential identity changed');
+      await revokeSupportForActor(tx, user.id, 'CREDENTIAL_REVOKED');
       await appendMasterVersionAudit(tx, {
         actorIdentityId: user.id,
         eventCode: 'PASSWORD_CHANGED',

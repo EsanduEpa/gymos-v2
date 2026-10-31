@@ -1,7 +1,7 @@
 import { Injectable, Logger, ServiceUnavailableException, type OnModuleDestroy } from '@nestjs/common';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
-import { PrismaClient } from './generated/tenant/client.js';
+import { PrismaClient, type Prisma } from './generated/tenant/client.js';
 import { AdmissionUnavailable, BoundedTenantLeases } from './bounded-tenant-leases.js';
 import { databasePoolConfig, DATABASE_POOL_LIMITS } from './database-pool-config.js';
 
@@ -69,6 +69,18 @@ export class TenantDatabaseService implements OnModuleDestroy {
       if (error instanceof AdmissionUnavailable || availabilityFailure(error)) throw new ServiceUnavailableException('Tenant database is temporarily unavailable');
       throw error;
     }
+  }
+
+  // Controlled maintenance shares the SAME resident/connection budgets. Ordinary
+  // tenant admission stays suspended. Never expose this through a tenant DTO.
+  withMaintenanceDatabase<Result>(databaseName: string, work: (client: PrismaClient) => Promise<Result>): Promise<Result> {
+    return this.leases.withDatabase(databaseName, work, true);
+  }
+  withAdministrativeRead<Result>(databaseName: string, work: (client: Prisma.TransactionClient) => Promise<Result>): Promise<Result> {
+    return this.withMaintenanceDatabase(databaseName, tenant => tenant.$transaction(async tx => {
+      await tx.$executeRaw`SET TRANSACTION READ ONLY`;
+      return work(tx);
+    }));
   }
 
   resumeDatabase(databaseName: string): void {

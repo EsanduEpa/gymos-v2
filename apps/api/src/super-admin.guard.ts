@@ -18,6 +18,11 @@ export class SuperAdminGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<PlatformRequest>();
+    if (request.headers['x-gymos-support-context']) {
+      const allowed = (['GET', 'HEAD'].includes(request.method) && /^\/admin\/support-sessions\/[^/]+\/gyms\/[^/]+\/summary\/?$/.test(request.path))
+        || (request.method === 'DELETE' && /^\/admin\/support-sessions\/[^/]+\/?$/.test(request.path));
+      if (!allowed) throw new ForbiddenException('Support scope does not permit this request');
+    }
     const identity = await identityFromAuthorization(request.headers.authorization);
     let user;
     let masterNow: Date;
