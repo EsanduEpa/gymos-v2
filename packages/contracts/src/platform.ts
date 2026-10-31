@@ -24,12 +24,17 @@ export type PlatformOperation = z.infer<typeof platformOperationSchema>;
 export const operationRetrySchema = z.strictObject({ expectedVersion: z.number().int().nonnegative() });
 export { idempotencyKeySchema };
 
+export const gymLifecycleInputSchema = z.strictObject({ expectedVersion: z.number().int().nonnegative(), target: z.enum(['SUSPENDED','ACTIVE']), reason: z.string().trim().min(10).max(500) });
+export const gymLifecycleStatusSchema = z.strictObject({ operationId: z.string(), gymId: z.string(), state: z.string(), version: z.number().int().nonnegative(), target: z.enum(['SUSPENDED','ACTIVE']), appliedGymVersion: z.number().int().nonnegative().nullable(), retryable: z.boolean() });
+export type GymLifecycleStatus = z.infer<typeof gymLifecycleStatusSchema>;
+
 export const registryQuerySchema = z.strictObject({ cursor: z.string().min(1).max(128).optional() });
 export const registryRowSchema = z.strictObject({
   id: z.string(), name: z.string(), slug: z.string(), status: z.enum(['PROVISIONING','ACTIVE','FAILED','SUSPENDED']), version: z.number().int().nonnegative(),
   ownerName: z.string().nullable(), memberCount: z.number().int().nonnegative().nullable(), trainerCount: z.number().int().nonnegative().nullable(),
   observedAt: z.iso.datetime().nullable(), health: z.enum(['VERIFIED','UNAVAILABLE','REPAIR_REQUIRED']),
   operation: platformOperationSchema.nullable(),
+  lifecycleOperation: gymLifecycleStatusSchema.nullable().optional(),
 });
 export const registryPageSchema = z.strictObject({ items: z.array(registryRowSchema).max(25), total: z.number().int().nonnegative(), nextCursor: z.string().nullable() });
 export const supportEntrySchema = z.strictObject({ gymId: z.string().min(1).max(128), scope: z.literal('GYM_SUMMARY_READ'), reasonCode: z.string().regex(/^[A-Z][A-Z0-9_]{1,49}$/), explanation: z.string().trim().min(10).max(500) });

@@ -74,14 +74,16 @@ export class TenantDatabaseService implements OnModuleDestroy {
   // Controlled maintenance shares the SAME resident/connection budgets. Ordinary
   // tenant admission stays suspended. Never expose this through a tenant DTO.
   withMaintenanceDatabase<Result>(databaseName: string, work: (client: PrismaClient) => Promise<Result>): Promise<Result> {
-    return this.leases.withDatabase(databaseName, work, true);
+    return this.leases.withDatabase(databaseName, work, true, true);
   }
   withAdministrativeRead<Result>(databaseName: string, work: (client: Prisma.TransactionClient) => Promise<Result>): Promise<Result> {
-    return this.withMaintenanceDatabase(databaseName, tenant => tenant.$transaction(async tx => {
+    return this.leases.withDatabase(databaseName, tenant => tenant.$transaction(async tx => {
       await tx.$executeRaw`SET TRANSACTION READ ONLY`;
       return work(tx);
-    }));
+    }), true);
   }
+  pauseAdministrativeReads(databaseName: string): void { this.leases.pauseAdministrativeReads(databaseName); }
+  resumeAdministrativeReads(databaseName: string): void { this.leases.resumeAdministrativeReads(databaseName); }
 
   resumeDatabase(databaseName: string): void {
     try { this.leases.resumeDatabase(databaseName); }

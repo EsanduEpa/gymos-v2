@@ -46,3 +46,18 @@ export async function ownerCredential(id:string,mode:'issue'|'reissue'|'acknowle
  return {delivery:credentialReissueResultSchema.parse(await response.json())};
  }catch{return {error:'Handoff outcome is unknown. An issued credential cannot be retrieved; use an explicit lost-handoff reissue.'};}
 }
+export async function changeGymLifecycle(gymId:string,key:string,input:unknown,resumeId?:string){
+ const token=await bearer();if(!token)return {error:'Sign in again.'};
+ const {gymLifecycleInputSchema,gymLifecycleStatusSchema,idempotencyKeySchema}=await import('@gymos/contracts/platform');
+ const parsed=gymLifecycleInputSchema.safeParse(input);
+ if(!resumeId&&(!parsed.success||!idempotencyKeySchema.safeParse(key).success))return {error:'Provide a current status, version and reason of 10–500 characters.'};
+ try{
+  const response=await fetch(apiUrl(resumeId?`/admin/lifecycle/${encodeURIComponent(resumeId)}/resume`:`/admin/gyms/${encodeURIComponent(gymId)}/lifecycle`),{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json','idempotency-key':key},body:JSON.stringify(resumeId?{}:parsed.success?parsed.data:{}),cache:'no-store',signal:AbortSignal.timeout(15_000)});
+  const body:unknown=await response.json().catch(()=>null);
+  if(!response.ok){
+   const operationId=body&&typeof body==='object'&&'operationId' in body&&typeof body.operationId==='string'&&/^[A-Za-z0-9_:-]{1,128}$/.test(body.operationId)?body.operationId:undefined;
+   return {operationId,error:response.status===409?'The gym version or operation changed. Refresh the registry before starting another transition.':'The transition is incomplete or its outcome is unknown. A recorded suspension stays blocked; resume the original operation.'};
+  }
+  const operation=gymLifecycleStatusSchema.parse(body);revalidatePath('/admin');return {operation};
+ }catch{return {error:'Transition outcome is unknown. Refresh the registry and resume the original operation; do not start a different request.'};}
+}

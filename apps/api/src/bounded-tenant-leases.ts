@@ -2,7 +2,7 @@
 type Timer = ReturnType<typeof setTimeout>;
 export type Resource<T> = { client: T; close: () => Promise<void> };
 type Entry<T> = { name: string; resource: Resource<T>; refs: number; state: 'OPEN' | 'CLOSING'; lastReleasedAt: number; idleTimer?: Timer; closePromise?: Promise<void> };
-type Waiter<T> = { name: string; resolve: (entry: Entry<T>) => void; reject: (error: AdmissionUnavailable) => void; deadline: number; timer?: Timer };
+type Waiter<T> = { name: string; maintenance: boolean; controlled: boolean; resolve: (entry: Entry<T>) => void; reject: (error: AdmissionUnavailable) => void; deadline: number; timer?: Timer };
 export type Capacity = { resident: number; activeLeases: number; closing: number; queued: number; draining: boolean; drainTimedOut: boolean };
 export type LeaseOptions = { maxResident: number; maxQueued: number; admissionMs: number; idleMs: number; drainMs: number; now: () => number; setTimer: (fn: () => void, delay: number) => Timer; clearTimer: (timer: Timer | undefined) => void; onDrainTimeout: (capacity: Capacity) => void; onCloseError: (state: { reason: string }) => void };
 export class AdmissionUnavailable extends Error {
@@ -15,6 +15,7 @@ export class BoundedTenantLeases<T> {
   #entries = new Map<string, Entry<T>>();
   #waiters: Waiter<T>[] = [];
   #suspended = new Set<string>();
+  #administrativeReadsPaused = new Set<string>();
   #suspendWaiters = new Map<string, { promise: Promise<void>; resolve: () => void; reject: (error: Error) => void }>();
   #draining = false;
   #drainPromise: Promise<void> | undefined;
@@ -29,8 +30,8 @@ export class BoundedTenantLeases<T> {
   snapshot(): Capacity {
     return { resident: this.#entries.size, activeLeases: [...this.#entries.values()].reduce((sum, entry) => sum + entry.refs, 0), closing: [...this.#entries.values()].filter((entry) => entry.state === 'CLOSING').length, queued: this.#waiters.length, draining: this.#draining, drainTimedOut: this.#drainTimedOut };
   }
-  async withDatabase<Result>(name: string, work: (client: T) => Promise<Result>, maintenance = false): Promise<Result> {
-    const entry = await this.#acquire(name, maintenance);
+  async withDatabase<Result>(name: string, work: (client: T) => Promise<Result>, maintenance = false, controlled = false): Promise<Result> {
+    const entry = await this.#acquire(name, maintenance, controlled);
     try { return await work(entry.resource.client); }
     finally { this.#release(entry); }
   }
@@ -64,18 +65,29 @@ export class BoundedTenantLeases<T> {
     this.#suspendWaiters.delete(name);
     this.#pump();
   }
+  pauseAdministrativeReads(name: string): void {
+    this.#administrativeReadsPaused.add(name);
+    for (let index = this.#waiters.length - 1; index >= 0; index--) {
+      const waiter = this.#waiters[index];
+      if (waiter.name !== name || !waiter.maintenance || waiter.controlled) continue;
+      this.#waiters.splice(index, 1); this.options.clearTimer(waiter.timer);
+      waiter.reject(new AdmissionUnavailable('DRAINING'));
+    }
+  }
+  resumeAdministrativeReads(name: string): void { this.#administrativeReadsPaused.delete(name); }
   #timer(fn: () => void, ms: number): Timer {
     const timer = this.options.setTimer(fn, ms);
     timer?.unref?.();
     return timer;
   }
-  #acquire(name: string, maintenance: boolean): Promise<Entry<T>> {
+  #acquire(name: string, maintenance: boolean, controlled: boolean): Promise<Entry<T>> {
     if (!/^[a-z][a-z0-9_]{0,62}$/.test(name)) return Promise.reject(new AdmissionUnavailable('INVALID_TARGET'));
     if (this.#draining) return Promise.reject(new AdmissionUnavailable('DRAINING'));
     if (this.#suspended.has(name) && !maintenance) return Promise.reject(new AdmissionUnavailable('DRAINING'));
+    if (maintenance && !controlled && this.#administrativeReadsPaused.has(name)) return Promise.reject(new AdmissionUnavailable('DRAINING'));
     if (this.#waiters.length >= this.options.maxQueued) return Promise.reject(new AdmissionUnavailable('QUEUE_FULL'));
     return new Promise<Entry<T>>((resolve, reject) => {
-      const waiter: Waiter<T> = { name, resolve, reject, deadline: this.options.now() + this.options.admissionMs };
+      const waiter: Waiter<T> = { name, maintenance, controlled, resolve, reject, deadline: this.options.now() + this.options.admissionMs };
       waiter.timer = this.#timer(() => {
         const index = this.#waiters.indexOf(waiter);
         if (index < 0) return;

@@ -84,6 +84,7 @@ export const stepSequences = {
   PROVISION_GYM: ['GYM_RESERVED', 'DATABASE_CREATED', 'TENANT_TEMPLATE_VERIFIED', 'TENANT_BOUND', 'MASTER_ACTIVATED'],
   REGISTER_MEMBER: ['MASTER_PREPARED', 'TENANT_REGISTRATION_COMMITTED', 'MASTER_ACTIVATED'],
   REGISTER_TRAINER: ['MASTER_PREPARED', 'TENANT_REGISTRATION_COMMITTED', 'MASTER_ACTIVATED'],
+  CHANGE_ACCESS: ['ADMISSION_BLOCKED', 'POOLS_DRAINED', 'LIFECYCLE_APPLIED'],
 } as const;
 export type SupportedKind = keyof typeof stepSequences;
 export type StepCode = typeof stepSequences[SupportedKind][number];
@@ -109,6 +110,7 @@ export function validateStepEvidence(kind: SupportedKind, step: StepCode, eviden
     TENANT_BOUND: ['gymId'], MASTER_PREPARED: ['gymId', 'subjectIdentityId'],
     TENANT_REGISTRATION_COMMITTED: kind === 'REGISTER_MEMBER' ? ['tenantActorId', 'tenantCommandReceiptId', 'tenantMembershipId'] : ['tenantActorId', 'tenantCommandReceiptId'],
     MASTER_ACTIVATED: ['gymId'],
+    ADMISSION_BLOCKED: ['gymId'], POOLS_DRAINED: ['gymId'], LIFECYCLE_APPLIED: ['gymId'],
   };
   if (!(stepSequences[kind] as readonly string[]).includes(step) || (required[step] ?? []).some(key => !Object.hasOwn(evidence, key))) throw new OperationIntegrityError('Checkpoint lacks required typed evidence');
   return JSON.parse(canonicalJson(evidence));
@@ -127,8 +129,8 @@ export function appendStep(kind: SupportedKind, current: CompletedSteps, step: S
 }
 export function stateForSteps(kind: SupportedKind, steps: CompletedSteps): OperationState {
   const sequence = stepSequences[kind] as readonly StepCode[];
-  if (steps.MASTER_ACTIVATED) return 'COMPLETE';
-  if (steps.TENANT_REGISTRATION_COMMITTED || steps.TENANT_BOUND) return 'TENANT_COMMITTED';
+  if (steps.MASTER_ACTIVATED || steps.LIFECYCLE_APPLIED) return 'COMPLETE';
+  if (steps.TENANT_REGISTRATION_COMMITTED || steps.TENANT_BOUND || steps.POOLS_DRAINED) return 'TENANT_COMMITTED';
   if (sequence.some(step => !!steps[step])) return 'MASTER_PREPARED';
   return 'PENDING';
 }

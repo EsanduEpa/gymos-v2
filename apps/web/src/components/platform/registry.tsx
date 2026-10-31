@@ -1,6 +1,7 @@
 'use client';
 import { useRef, useState } from 'react';
 import type { RegistryPage } from '@gymos/contracts/platform';
+import { LifecycleControl } from './lifecycle-control';
 import { enterSupport, exitSupport, retryProvisioning, ownerCredential } from '@/app/platform-actions';
 import { Button, Feedback, Field, StatusBadge, Card, CardHeader, EmptyState, ConfirmDialog } from '@/components/ui';
 
@@ -12,7 +13,7 @@ export function Registry({page,selectedSlug}:{page:Page;selectedSlug?:string}){
  {selectedSlug?<div className="support-banner"><strong>Viewing {page.items.find(gym=>gym.slug===selectedSlug)?.name??selectedSlug} · read-only support</strong><a href={`/gyms/${encodeURIComponent(selectedSlug)}/owner`}>Open summary</a><form action={exitSupport} data-support-exit><Button variant="secondary">Exit support</Button></form></div>:null}
  {error?<Feedback tone="error">{error}</Feedback>:null}
  {page.items.length===0?<EmptyState title="No gyms yet." hint="Create the first one using the form."/>:<div className="ui-table-shell"><div className="ui-table-scroll"><table aria-label="Registered gym tenants"><thead><tr><th>Gym name</th><th>Owner</th><th>Members</th><th>Status</th><th>Provisioning</th><th>Action</th></tr></thead><tbody>
- {page.items.map(gym=><tr key={gym.id} data-selected={gym.slug===selectedSlug||undefined}><td><strong>{gym.name}</strong><small>{gym.slug}</small></td><td>{gym.ownerName??'Name unavailable'}</td><td>{gym.memberCount??'Unavailable'}{gym.observedAt?<small>Observed {new Date(gym.observedAt).toLocaleString()} · {gym.health.replaceAll('_',' ')}</small>:null}</td><td><StatusBadge status={gym.status}/></td><td>{gym.operation?<><span>{gym.operation.state.replaceAll('_',' ')}</span><small>{gym.operation.step.replaceAll('_',' ')}</small><OperationControls operation={gym.operation}/></>:'No provisioning operation available'}</td><td><Button variant="secondary" type="button" disabled={pending||gym.slug===selectedSlug} onClick={()=>setSelected(gym.id)}>{gym.slug===selectedSlug?'Selected':'View dashboard'}</Button></td></tr>)}
+ {page.items.map(gym=><tr key={gym.id} data-selected={gym.slug===selectedSlug||undefined}><td><strong>{gym.name}</strong><small>{gym.slug}</small></td><td>{gym.ownerName??'Name unavailable'}</td><td>{gym.memberCount??'Unavailable'}{gym.observedAt?<small>Observed {new Date(gym.observedAt).toLocaleString()} · {gym.health.replaceAll('_',' ')}</small>:null}</td><td><StatusBadge status={gym.status}/></td><td>{gym.operation?<><span>{gym.operation.state.replaceAll('_',' ')}</span><small>{gym.operation.step.replaceAll('_',' ')}</small><OperationControls operation={gym.operation}/></>:'No provisioning operation available'}</td><td><Button variant="secondary" type="button" disabled={pending||gym.slug===selectedSlug} onClick={()=>setSelected(gym.id)}>{gym.slug===selectedSlug?'Selected':'View dashboard'}</Button><LifecycleControl gym={gym}/></td></tr>)}
  </tbody></table></div></div>}
  {page.nextCursor?<a href={`/admin?cursor=${encodeURIComponent(page.nextCursor)}`}>Next page →</a>:null}
  {selected?<form action={enter} className="stack-form support-entry" data-support-change>

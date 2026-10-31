@@ -17,6 +17,7 @@ import {
 import { z } from 'zod';
 import { DatabaseService } from './database.service.js';
 import { Prisma } from './generated/tenant/client.js';
+import type { Prisma as MasterPrisma } from './generated/master/client.js';
 import { GymAccessGuard, type GymRequest } from './gym-access.guard.js';
 import { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js';
 
@@ -46,20 +47,20 @@ export class GymsController {
     private readonly tenantGate: TenantSchemaGateService,
   ) {}
 
-  private async assertCurrentOwnerAccess(access: NonNullable<GymRequest['gymAccess']>): Promise<void> {
+  private async assertCurrentOwnerAccess(access: NonNullable<GymRequest['gymAccess']>, source: MasterPrisma.TransactionClient = this.database.master): Promise<void> {
     let user;
     let gymAccess;
     let gym;
     let now: Date;
     try {
       [user, gymAccess, gym] = await Promise.all([
-        this.database.master.user.findUnique({ where: { id: access.identityId },
+        source.user.findUnique({ where: { id: access.identityId },
           select: { authVersion: true, mustChangePassword: true, credentialExpiresAt: true } }),
-        this.database.master.gymAccess.findUnique({ where: { userId_gymId: { userId: access.identityId, gymId: access.gymId } },
+        source.gymAccess.findUnique({ where: { userId_gymId: { userId: access.identityId, gymId: access.gymId } },
           select: { role: true, linkStatus: true, version: true } }),
-        this.database.master.gym.findUnique({ where: { id: access.gymId }, select: { status: true } }),
+        source.gym.findUnique({ where: { id: access.gymId }, select: { status: true } }),
       ]);
-      const [clock] = await this.database.master.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS "now"`;
+      const [clock] = await source.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS "now"`;
       now = clock.now;
     } catch {
       throw new ServiceUnavailableException('Gym authorization is temporarily unavailable');
@@ -108,11 +109,16 @@ export class GymsController {
       throw new BadRequestException('Enter a valid theme color or logo URL');
     }
 
-    const theme = await this.database.master.theme.upsert({
+    const theme = await this.database.master.$transaction(async tx => {
+      // Serialize this Master-local mutation with the lifecycle status change.
+      await tx.$queryRaw`SELECT "id" FROM "Gym" WHERE "id" = ${access.gymId} FOR SHARE`;
+      await this.assertCurrentOwnerAccess(access, tx);
+      return tx.theme.upsert({
       where: { gymId: access.gymId },
       create: { gymId: access.gymId, ...parsed.data },
       update: parsed.data,
       select: { primaryColor: true, logoUrl: true },
+      });
     });
 
     return { slug: access.slug, theme };

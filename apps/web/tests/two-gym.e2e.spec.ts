@@ -609,6 +609,40 @@ test('platform registry supports audited read-only gym selection, switching, exi
   await oldTab.close();
 });
 
+test('platform lifecycle confirms suspension and verified reactivation while old owner navigation stays protected', async ({page,browser})=>{
+ const ownerContext=await browser.newContext();const ownerPage=await ownerContext.newPage();
+ try{
+  await openGymWithTestSession(ownerPage,fixture.users.ownerA.id,fixture.gyms[0].slug);
+  await expect(ownerPage.getByRole('heading',{name:'Test Gym Alpha',exact:true})).toBeVisible();
+  await openWithTestSession(page,fixture.users.admin.id,'/admin');
+  const row=()=>page.getByRole('table',{name:'Registered gym tenants'}).getByRole('row').filter({has:page.getByText('Test Gym Alpha',{exact:true})});
+  await row().getByRole('button',{name:'Suspend gym',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Suspend this gym?'});await expect(dialog).toBeVisible();
+  await dialog.getByRole('button',{name:'Confirm',exact:true}).click();await expect(dialog).toContainText('Give a reason');
+  expect((await fixture.master.gym.findUniqueOrThrow({where:{id:fixture.gyms[0].id}})).status).toBe('ACTIVE');
+  await dialog.getByRole('textbox',{name:/^Lifecycle reason/}).fill('Synthetic owner-requested suspension');
+  const evidence=join(root,'docs/migration/evidence/GYMOS-MIG-025');await mkdir(evidence,{recursive:true});
+  await page.setViewportSize({width:320,height:700});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.screenshot({path:join(evidence,'suspend-confirmation-320.png'),fullPage:true,animations:'disabled'});
+  await dialog.getByRole('button',{name:'Confirm',exact:true}).click();
+  await expect(row().getByRole('button',{name:'Reactivate gym',exact:true})).toBeVisible();
+  await expect(row()).toContainText('SUSPENDED');
+  await ownerPage.reload();await expect(ownerPage.getByRole('heading',{name:'This page could not be found'})).toBeVisible();
+  await expect(ownerPage.locator('.member-list')).toHaveCount(0);
+  expect((await fixture.master.gym.findUniqueOrThrow({where:{id:fixture.gyms[1].id}})).status).toBe('ACTIVE');
+  await row().getByRole('button',{name:'Reactivate gym',exact:true}).click();
+  const reactivate=page.getByRole('dialog',{name:'Reactivate this gym?'});await expect(reactivate).toBeVisible();
+  await reactivate.getByRole('textbox',{name:/^Lifecycle reason/}).fill('Synthetic verified reactivation check');
+  await reactivate.getByRole('button',{name:'Confirm',exact:true}).click();
+  await expect(row().getByRole('button',{name:'Suspend gym',exact:true})).toBeVisible();
+  await ownerPage.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/owner`);
+  await expect(ownerPage.getByRole('heading',{name:'Test Gym Alpha',exact:true})).toBeVisible();
+  await page.setViewportSize({width:1280,height:720});await expect(row()).toBeVisible();
+  await page.screenshot({path:join(evidence,'reactivated-registry.png'),fullPage:true,animations:'disabled'});
+ }finally{await ownerContext.close();}
+});
+
 test('logout clears the browser even when API revocation is unavailable', async ({ page }) => {
   await openGymWithTestSession(page, fixture.users.ownerB.id, fixture.gyms[1].slug);
   await expect(page.getByRole('heading', { name: 'Test Gym Beta', exact: true })).toBeVisible();

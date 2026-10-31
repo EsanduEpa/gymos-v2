@@ -115,3 +115,24 @@ test('per-tenant suspension blocks new leases, drains active work and requires e
   s.manager.resumeDatabase('gym_a'); assert.equal(await s.manager.withDatabase('gym_a', async (client) => client.name), 'gym_a');
   await s.manager.drain(); assert.deepEqual(s.closed, ['gym_a', 'gym_a']);
 });
+test('controlled maintenance shares capacity while paused administrative reads and ordinary suspension stay blocked', async () => {
+ const s=setup({maxResident:2}),hold=deferred();
+ await s.manager.suspendDatabase('gym_a');s.manager.pauseAdministrativeReads('gym_a');
+ await assert.rejects(s.manager.withDatabase('gym_a',async()=>1),error=>error.reason==='DRAINING');
+ await assert.rejects(s.manager.withDatabase('gym_a',async()=>1,true),error=>error.reason==='DRAINING');
+ const controlled=s.manager.withDatabase('gym_a',()=>hold.promise,true,true);await flush();
+ assert.equal(s.manager.snapshot().resident,1);assert.equal(s.manager.snapshot().activeLeases,1);
+ assert.equal(await s.manager.withDatabase('gym_b',async()=>2),2);
+ assert.equal(s.manager.snapshot().resident,2);
+ hold.resolve();await controlled;await s.manager.suspendDatabase('gym_a');s.manager.resumeAdministrativeReads('gym_a');
+ assert.equal(await s.manager.withDatabase('gym_a',async()=>3,true),3);
+ await assert.rejects(s.manager.withDatabase('gym_a',async()=>1),error=>error.reason==='DRAINING');
+ await s.manager.suspendDatabase('gym_a');s.manager.resumeDatabase('gym_a');
+ assert.equal(await s.manager.withDatabase('gym_a',async()=>4),4);await s.manager.drain();
+});
+test('pausing administrative reads cancels a queued support lease before allocation',async()=>{
+ const s=setup({maxResident:1}),hold=deferred();const busy=s.manager.withDatabase('gym_b',()=>hold.promise);await flush();
+ const support=s.manager.withDatabase('gym_a',async()=>1,true);const denied=assert.rejects(support,error=>error.reason==='DRAINING');await flush();
+ s.manager.pauseAdministrativeReads('gym_a');await denied;assert.deepEqual(s.created,['gym_b']);
+ hold.resolve();await busy;await s.manager.drain();
+});

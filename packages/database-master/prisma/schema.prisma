@@ -157,6 +157,7 @@ enum OperationState {
 
 model Operation {
   provisioningIntent ProvisioningIntent?
+  lifecycleIntent GymLifecycleIntent?
   id                            String              @id @default(cuid())
   kind                          OperationKind
   actorIdentityId               String
@@ -306,4 +307,13 @@ model SupportEvent {
   reasonReference String
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   @@index([gymId, createdAt])
+}
+
+model GymLifecycleIntent {
+  operationId String @id
+  operation Operation @relation(fields:[operationId], references:[id], onDelete:Restrict)
+  expectedGymVersion Int
+  target String
+  reason String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 }

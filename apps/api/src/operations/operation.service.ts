@@ -35,7 +35,7 @@ async function assertLease(tx: Tx, lease: Lease) {
   return { operation, now };
 }
 function supportedKind(kind: OperationKind): SupportedKind {
-  if (!['PROVISION_GYM', 'REGISTER_MEMBER', 'REGISTER_TRAINER'].includes(kind)) throw new OperationConflictError('Workflow checkpoints not commissioned for this kind');
+  if (!['PROVISION_GYM', 'REGISTER_MEMBER', 'REGISTER_TRAINER', 'CHANGE_ACCESS'].includes(kind)) throw new OperationConflictError('Workflow checkpoints not commissioned for this kind');
   return kind as SupportedKind;
 }
 function checkpointEffects(evidence: StepEvidence): Prisma.OperationUncheckedUpdateManyInput {

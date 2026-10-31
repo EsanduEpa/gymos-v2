@@ -7,6 +7,7 @@ import { canonicalJson, OperationIntegrityError } from '../operations/primitives
 import { appendMasterVersionAudit } from '../operations/transaction-audit.js';
 import { reviewedTenantManifest } from '../tenancy/tenant-template-manifest.js';
 import { ProvisioningReservationService } from './provisioning-reservation.service.js';
+import { GymLifecycleService } from './gym-lifecycle.service.js';
 
 type BoundGym = Gym & { expectedTenantOperation: Operation | null };
 export async function readApprovedTenantSummary(tenants: TenantDatabaseService, gym: BoundGym) {
@@ -34,11 +35,13 @@ export class PlatformRegistryService {
    this.database.master.gym.count(),
   ]);
   const rows=gyms.slice(0,25);const summaries=await this.database.master.gymRegistrySummary.findMany({where:{gymId:{in:rows.map(gym=>gym.id)}}});
+  const pendingLifecycle=await this.database.master.operation.findMany({where:{gymId:{in:rows.map(gym=>gym.id)},actorIdentityId,kind:'CHANGE_ACCESS',lifecycleIntent:{isNot:null},state:{notIn:['COMPLETE','FAILED_FINAL']}},orderBy:{createdAt:'desc'},take:25,select:{id:true,gymId:true}});
   return registryPageSchema.parse({total,nextCursor:gyms.length>25?rows.at(-1)!.id:null,items:await Promise.all(rows.map(async gym=>{
    const summary=summaries.find(row=>row.gymId===gym.id);
    return {id:gym.id,name:gym.name,slug:gym.slug,status:gym.status,version:gym.version,ownerName:gym.gymAccesses[0]?.user.displayName??null,
     memberCount:summary?.memberCount??null,trainerCount:summary?.trainerCount??null,observedAt:summary?.observedAt?.toISOString()??null,health:summary?.health??'UNAVAILABLE',
-    operation:gym.operations[0]?await new ProvisioningReservationService(this.database).status(actorIdentityId,gym.operations[0].id):null};
+    operation:gym.operations[0]?await new ProvisioningReservationService(this.database).status(actorIdentityId,gym.operations[0].id):null,
+    lifecycleOperation:pendingLifecycle.find(operation=>operation.gymId===gym.id)?await new GymLifecycleService(this.database,this.tenants).status(actorIdentityId,pendingLifecycle.find(operation=>operation.gymId===gym.id)!.id):null};
   }))});
  }
  // Explicit bounded worker job. The registry HTTP read never fans out to tenants.
