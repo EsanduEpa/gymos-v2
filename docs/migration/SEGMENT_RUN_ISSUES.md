@@ -115,3 +115,8 @@ Follow-up verified: corrected revision `0b7c909` passed all 11 jobs in [run 4117
 ## Documentation-head browser synchronization follow-up — 31 October 2026
 
 Run 41172783755 passed10/11; the browser suite passed9/10. In the scoped support exit journey, the browser correctly navigated to `/admin` when support expired/was removed; an immediately subsequent `page.goto` on that same still-navigating document was aborted. Preserve the protected-navigation assertion and cookie-clear assertion while issuing the negative navigation in a fresh tab. This removes only cross-document navigation interference; no assertion, route guard or support boundary is relaxed. Focused production-browser verification and a new all-11 latest revision are required.
+
+
+## Segment 03 browser synchronization follow-up resolved — 31 October 2026
+
+The fresh-tab protected-navigation check passed locally (browser 10/10) and in [latest code run 41173208643](https://github.com/EsanduEpa/gymos-v2/actions/runs/41173208643) at `95c4919`; all 11 hosted jobs passed, including owned disposable databases, browser isolation, secret scan, dependency review and lockfile audit. No assertion or security boundary was weakened. The documentation revision records this exact run and still requires its own all-11 latest-head result.
