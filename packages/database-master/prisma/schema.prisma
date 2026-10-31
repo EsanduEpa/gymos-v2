@@ -72,6 +72,7 @@ model Gym {
   databaseName                 String               @unique
   status                       GymStatus            @default(PROVISIONING)
   version                      Int                  @default(0)
+  publicProfileVersion         Int                  @default(0)
   expectedTenantSchemaVersion  String?
   expectedTenantManifestDigest String?
   gymAccesses                  GymAccess[]
@@ -127,6 +128,7 @@ model Theme {
   gym             Gym         @relation(fields: [gymId], references: [id], onDelete: Cascade)
   primaryColor    String      @default("#2563EB")
   logoUrl         String?
+  version         Int         @default(0)
   updatedAt       DateTime    @updatedAt
 }
 

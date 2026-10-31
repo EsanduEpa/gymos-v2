@@ -304,7 +304,7 @@ it('keeps supported mixed versions available, stops after the canary, and advanc
   expect(await countThroughGate(b.id)).toBe(1);
   const canary = await service().runNext(actor, reserved.rolloutId);
   expect(canary.state).toBe('CANARY_READY');
-  expect(await migrationCount(a.databaseName)).toBe(5);
+  expect(await migrationCount(a.databaseName)).toBe(TENANT_TEMPLATE_MANIFEST.migrations.length);
   expect(await migrationCount(b.databaseName)).toBe(4);
   expect(await countThroughGate(a.id)).toBe(1);
   expect(await countThroughGate(b.id)).toBe(1);
@@ -356,7 +356,7 @@ it('keeps supported mixed versions available, stops after the canary, and advanc
     actor,
     stopped.targets[0].operationId,
     stopped.targets[0].version,
-    'Synthetic actual v2 canary marker review',
+    'Synthetic current canary marker review',
   );
   expect((await service().runNext(actor, repair.rolloutId)).state).toBe(
     'COMPLETE',
@@ -369,7 +369,7 @@ it('keeps supported mixed versions available, stops after the canary, and advanc
   );
   const complete = await service().runNext(actor, reserved.rolloutId);
   expect(complete.state).toBe('COMPLETE');
-  expect(await migrationCount(b.databaseName)).toBe(5);
+  expect(await migrationCount(b.databaseName)).toBe(TENANT_TEMPLATE_MANIFEST.migrations.length);
   expect(await countThroughGate(b.id)).toBe(1);
   expect(await master.user.count()).toBe(beforeUsers);
   expect(
@@ -410,7 +410,7 @@ it('requires evidence review after every interrupted schema boundary and never d
     );
     const repaired = await service().runNext(actor, reserved.rolloutId);
     expect(repaired.state).toBe('COMPLETE');
-    expect(await migrationCount(gym.databaseName)).toBe(5);
+    expect(await migrationCount(gym.databaseName)).toBe(TENANT_TEMPLATE_MANIFEST.migrations.length);
     expect(await countThroughGate(gym.id)).toBe(1);
     expect(
       await master.schemaRepairReview.count({
@@ -434,7 +434,7 @@ it('reconciles a lost parent checkpoint and explicitly repairs a lost SchemaStat
   expect((await service().runNext(actor, reserved.rolloutId)).state).toBe(
     'COMPLETE',
   );
-  expect(await migrationCount(gym.databaseName)).toBe(5);
+  expect(await migrationCount(gym.databaseName)).toBe(TENANT_TEMPLATE_MANIFEST.migrations.length);
   const missing = await legacy('lost-marker');
   await tenants.withDatabase(missing.databaseName, (tenant) =>
     tenant.schemaState.delete({ where: { id: 'current' } }),
@@ -575,7 +575,7 @@ it('fences a lost migration lease and requires review of its actual installed re
   expect((await service().runNext(actor, reserved.rolloutId)).state).toBe(
     'COMPLETE',
   );
-  expect(await migrationCount(gym.databaseName)).toBe(5);
+  expect(await migrationCount(gym.databaseName)).toBe(TENANT_TEMPLATE_MANIFEST.migrations.length);
   expect(await countThroughGate(gym.id)).toBe(1);
 });
 it('serializes concurrent rollout workers and rejects non-platform reservation without additional effects', async () => {
@@ -596,7 +596,7 @@ it('serializes concurrent rollout workers and rejects non-platform reservation w
   expect((await service().status(actor, reserved.rolloutId)).state).toBe(
     'COMPLETE',
   );
-  expect(await migrationCount(gym.databaseName)).toBe(5);
+  expect(await migrationCount(gym.databaseName)).toBe(TENANT_TEMPLATE_MANIFEST.migrations.length);
   expect(
     await master.schemaRolloutTarget.count({
       where: { rolloutId: reserved.rolloutId },
@@ -661,7 +661,7 @@ it('uses the controlled CLI for reserve, canary approval and bounded batch execu
   expect((await command(['run', actor, reserved.rolloutId])).state).toBe(
     'COMPLETE',
   );
-  expect(await migrationCount(b.databaseName)).toBe(5);
+  expect(await migrationCount(b.databaseName)).toBe(TENANT_TEMPLATE_MANIFEST.migrations.length);
   expect(await countThroughGate(a.id)).toBe(1);
   expect(await countThroughGate(b.id)).toBe(1);
 });

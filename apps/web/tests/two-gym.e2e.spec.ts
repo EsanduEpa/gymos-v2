@@ -190,6 +190,36 @@ test.beforeEach(async()=>{
   await waitReady(`${apiBase}/`,api);
 });
 
+test('owner gym configuration keeps plan drafts on failure and saves exact zero plans', async ({ page }) => {
+  await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${fixture.gyms[0]!.slug}/owner/gym-config`);
+  await expect(page.getByRole('heading', { name: 'Gym Configuration' })).toBeVisible();
+  const profileTab = page.getByRole('tab', { name: 'Gym Profile' });
+  await profileTab.focus();
+  await page.keyboard.press('ArrowRight');
+  const plansTab = page.getByRole('tab', { name: 'Membership Plans' });
+  await expect(plansTab).toBeFocused();
+  await expect(plansTab).toHaveAttribute('aria-selected', 'true');
+  await page.getByRole('button', { name: '+ Add New Plan' }).click();
+  await page.getByLabel('Plan Name').fill('Browser Zero Plan');
+  await page.getByLabel('Description').fill('Preserve this draft after server validation fails.');
+  await page.getByLabel('Price (LKR)').fill('1.001');
+  await page.getByRole('button', { name: 'Create Plan' }).click();
+  await expect(page.locator('.ui-feedback[role="alert"]')).toContainText('Check the highlighted values');
+  await expect(page.getByLabel('Plan Name')).toHaveValue('Browser Zero Plan');
+  await expect(page.getByLabel('Description')).toHaveValue('Preserve this draft after server validation fails.');
+  await expect(page.getByLabel('Price (LKR)')).toHaveValue('1.001');
+  await page.getByLabel('Price (LKR)').fill('0');
+  await page.getByRole('button', { name: 'Create Plan' }).click();
+  await expect(page.locator('.ui-feedback[role="status"]')).toContainText('Membership plan created');
+  await expect(page.getByText('LKR 0', { exact: true })).toBeVisible();
+  await page.reload();
+  await page.getByRole('tab', { name: 'Membership Plans' }).click();
+  await expect(page.getByText('Browser Zero Plan')).toBeVisible();
+  await expect(page.getByText('LKR 0', { exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 320, height: 700 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
 test('shared controls support keyboard use, failure recovery, and narrow screens', async ({ page }) => {
   await mkdir(primitiveEvidenceDirectory, { recursive: true });
   await page.setViewportSize({ width: 320, height: 700 });

@@ -1,5 +1,6 @@
 import { failureSchema, idempotencyKeySchema, type ApiFailure } from '@gymos/contracts';
 import type { z } from 'zod';
+export * from './configuration.js';
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 type Fetcher = (input: string, init: RequestInit) => Promise<Response>;
