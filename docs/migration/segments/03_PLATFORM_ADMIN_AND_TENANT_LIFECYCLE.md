@@ -112,3 +112,7 @@ Stop if DEC-03 is unapproved, provider limits are needed for a production claim,
 ## Owner-authorized implementation — 30 October 2026
 
 Segment 03 is IN PROGRESS on `codex/segment-03-platform-lifecycle`, based on verified unmerged Segment 02 revision `0c969eb`. The owner explicitly authorizes independent Segment 03 work while Segment 02 manual acceptance remains PENDING. PRs #1/#2 remain draft/unmerged. Task 021's reservation boundary passed owned API/browser and operation regressions; [checkpoint](../evidence/GYMOS-MIG-021.md). Tasks 022–026 remain. Provider/environment/release choices remain task 087; no real provider resources or Segment 04 work are authorized here.
+
+## Integrated local checkpoint — 31 October 2026
+
+**IN PROGRESS:** all six tasks 021–026 are implemented and locally verified; final hosted checks remain pending. This supersedes the pre-start and first-task progress notes above. Platform integration31/31, production browser10/10, operation10/10, encrypted recovery1/1, unit/build/lint/type/workspace checks pass. [Integrated handoff](../SEGMENT_03_HANDOFF.md) records scope, commands, evidence, remaining manual review and stacked-PR safeguards. No provider or production capability is inferred; task087 remains open. Owner manual acceptance for Segment02 and03 remains pending.

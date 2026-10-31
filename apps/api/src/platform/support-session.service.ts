@@ -66,7 +66,8 @@ export class SupportSessionService {
   const gym=await this.database.master.gym.findUnique({where:{id:session.gymId},include:{theme:true,expectedTenantOperation:true}});
   if(!gym||gym.slug!==slug)throw new NotFoundException('Support gym unavailable');
   let tenant=null;let health:'VERIFIED'|'UNAVAILABLE'|'REPAIR_REQUIRED'|'MASTER_ONLY'='MASTER_ONLY';
-  const tenantAllowed=['ACTIVE','SUSPENDED'].includes(gym.status)&&gym.expectedTenantOperation?.state!=='REPAIR_REQUIRED';
+  const schemaWorkIncomplete=gym.expectedTenantOperation&&gym.expectedTenantOperation.state!=='COMPLETE';
+  const tenantAllowed=['ACTIVE','SUSPENDED'].includes(gym.status)&&!schemaWorkIncomplete;
   if(tenantAllowed){
    try{tenant=await readApprovedTenantSummary(this.tenants,gym);health='VERIFIED';}
    catch{

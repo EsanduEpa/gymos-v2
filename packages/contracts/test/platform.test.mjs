@@ -26,3 +26,9 @@ test('registry counts distinguish unavailable from zero and support summaries re
  assert.deepEqual(supportSummarySchema.parse(summary),summary);
  for(const key of ['healthNotes','passwordHash','databaseName','members','audit'])assert.equal(supportSummarySchema.safeParse({...summary,tenant:{...summary.tenant,[key]:'excluded'}}).success,false);
 });
+test('controlled rollout input pins the reviewed manifest and bounded unique gym selection without caller database targets',async()=>{
+ const {schemaRolloutInputSchema}=await import('../dist/platform.js');
+ const input={idempotencyKey:'rollout-fixture-key',targetVersion:'tenant-fixture',targetDigest:'a'.repeat(64),gymIds:['gym-a','gym-b'],batchSize:1};
+ assert.deepEqual(schemaRolloutInputSchema.parse(input),input);
+ for(const extra of [{gymIds:['gym-a','gym-a']},{batchSize:26},{databaseName:'caller-target'},{targetDigest:'invalid'}])assert.equal(schemaRolloutInputSchema.safeParse({...input,...extra}).success,false);
+});

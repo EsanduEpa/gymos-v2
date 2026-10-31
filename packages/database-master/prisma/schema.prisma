@@ -143,6 +143,7 @@ enum OperationKind {
   REGISTER_TRAINER
   UPDATE_GYM_PROFILE
   CHANGE_ACCESS
+  ROLLOUT_TENANT_SCHEMA
 }
 
 enum OperationState {
@@ -158,6 +159,7 @@ enum OperationState {
 model Operation {
   provisioningIntent ProvisioningIntent?
   lifecycleIntent GymLifecycleIntent?
+  schemaRolloutTarget SchemaRolloutTarget?
   id                            String              @id @default(cuid())
   kind                          OperationKind
   actorIdentityId               String
@@ -316,4 +318,73 @@ model GymLifecycleIntent {
   target String
   reason String
   createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model SchemaRollout {
+ id String @id @default(cuid())
+ actorIdentityId String
+ idempotencyKey String
+ requestDigest String
+ targetVersion String
+ targetDigest String
+ orderedGymIds Json
+ batchSize Int
+ state String @default("CANARY_PENDING")
+ version Int @default(0)
+ targets SchemaRolloutTarget[]
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([actorIdentityId,idempotencyKey])
+}
+model SchemaRolloutTarget {
+ operationId String @id
+ operation Operation @relation(fields:[operationId],references:[id],onDelete:Restrict)
+ rolloutId String
+ rollout SchemaRollout @relation(fields:[rolloutId],references:[id],onDelete:Restrict)
+ ordinal Int
+ databaseName String
+ ownershipOperationId String
+ sourceOperationId String
+ sourceVersion String
+ sourceDigest String
+ expectedGymVersion Int
+ reviews SchemaRepairReview[]
+ @@unique([rolloutId,ordinal])
+}
+model SchemaRepairReview {
+ id String @id @default(cuid())
+ operationId String
+ target SchemaRolloutTarget @relation(fields:[operationId],references:[operationId],onDelete:Restrict)
+ actorIdentityId String
+ approvedAttempt Int
+ reason String
+ observedVersion String
+ observedDigest String
+ schemaEvidenceDigest String
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([operationId,approvedAttempt])
+}
+model SchemaRolloutApproval {
+ id String @id @default(cuid())
+ rolloutId String
+ expectedVersion Int
+ actorIdentityId String
+ reason String
+ canaryEvidenceDigest String
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([rolloutId,expectedVersion])
+}
+model MasterSchemaState {
+ id String @id
+ templateVersion String
+ manifestDigest String
+ schemaEvidenceDigest String
+ verifiedAt DateTime @db.Timestamptz(3)
+ version Int @default(0)
+}
+model MasterSchemaDeployment {
+ id String @id @default(cuid())
+ manifestDigest String @unique
+ templateVersion String
+ schemaEvidenceDigest String
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
 }

@@ -35,7 +35,7 @@ async function assertLease(tx: Tx, lease: Lease) {
   return { operation, now };
 }
 function supportedKind(kind: OperationKind): SupportedKind {
-  if (!['PROVISION_GYM', 'REGISTER_MEMBER', 'REGISTER_TRAINER', 'CHANGE_ACCESS'].includes(kind)) throw new OperationConflictError('Workflow checkpoints not commissioned for this kind');
+  if (!['PROVISION_GYM', 'REGISTER_MEMBER', 'REGISTER_TRAINER', 'CHANGE_ACCESS', 'ROLLOUT_TENANT_SCHEMA'].includes(kind)) throw new OperationConflictError('Workflow checkpoints not commissioned for this kind');
   return kind as SupportedKind;
 }
 function checkpointEffects(evidence: StepEvidence): Prisma.OperationUncheckedUpdateManyInput {
@@ -179,7 +179,7 @@ export class OperationFoundationService {
       await tx.operation.update({ where: { id: operation.id, version: lease.version }, data: {
         ...checkpointEffects(input.evidence), completedSteps: steps as Prisma.InputJsonValue,
         state, step: input.step, version: { increment: 1 },
-        ...(input.step === 'TENANT_TEMPLATE_VERIFIED' ? { tenantSchemaVerifiedAt: now } : {}),
+        ...(['TENANT_TEMPLATE_VERIFIED', 'SCHEMA_APPLIED'].includes(input.step) ? { tenantSchemaVerifiedAt: now } : {}),
         ...(result ? { safeResult: result as Prisma.InputJsonValue, leaseToken: null, leaseExpiresAt: null } : {}),
       } });
       await appendMasterAudit(tx, { actorIdentityId: operation.actorIdentityId,

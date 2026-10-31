@@ -164,7 +164,7 @@ export class TenantSchemaVerifier {
           throw new TenantSchemaIntegrityError('Physical tenant binding mismatch');
         }
         if (!configuration) {
-          await tx.gymConfiguration.create({ data: { id: 'current', masterGymId } });
+          await tx.gymConfiguration.create({ data: { id: 'current', masterGymId }, select: { id: true } });
         }
         const [{ now }] = await tx.$queryRaw<Array<{ now: Date }>>`SELECT clock_timestamp() AS now`;
         const appliedAt = current.appliedTemplateVersion === evidence.templateVersion

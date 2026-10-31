@@ -30,7 +30,7 @@ export class GymLifecycleService {
     await this.authorize(tx,actorIdentityId,authVersion);
     const gym=await tx.gym.findUnique({where:{id:gymId}});if(!gym)throw new NotFoundException('Gym unavailable');
     if(gym.version!==input.expectedVersion||gym.status!==(input.target==='SUSPENDED'?'ACTIVE':'SUSPENDED'))throw new OperationConflictError('Gym status/version changed');
-    const pending=await tx.operation.findFirst({where:{gymId,kind:'CHANGE_ACCESS',id:{not:operation.id},state:{notIn:['COMPLETE','FAILED_FINAL']},lifecycleIntent:{isNot:null}},select:{id:true}});
+    const pending=await tx.operation.findFirst({where:{gymId,id:{not:operation.id},state:{notIn:['COMPLETE','FAILED_FINAL']},OR:[{kind:'CHANGE_ACCESS',lifecycleIntent:{isNot:null}},{kind:'ROLLOUT_TENANT_SCHEMA',schemaRolloutTarget:{isNot:null}}]},select:{id:true}});
     if(pending)throw new OperationConflictError('Resume the existing lifecycle operation first');
     await tx.gymLifecycleIntent.create({data:{operationId:operation.id,expectedGymVersion:input.expectedVersion,target:input.target,reason:input.reason}});
     await appendMasterAudit(tx,{actorIdentityId,operationId:operation.id,gymId,stepCode:'LIFECYCLE_RESERVED',eventCode:'GYM_LIFECYCLE_REQUESTED',resourceType:'GYM',resourceId:gymId,transition:{to:input.target,version:input.expectedVersion}});

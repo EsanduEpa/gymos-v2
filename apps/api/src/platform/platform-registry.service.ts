@@ -31,7 +31,7 @@ export class PlatformRegistryService {
  async page(actorIdentityId:string,cursor?:string){
   if(cursor && !(await this.database.master.gym.findUnique({where:{id:cursor},select:{id:true}})))throw new NotFoundException('Registry page unavailable');
   const [gyms,total]=await Promise.all([
-   this.database.master.gym.findMany({take:26,...(cursor?{cursor:{id:cursor},skip:1}:{}),orderBy:[{createdAt:'desc'},{id:'desc'}],include:{gymAccesses:{where:{role:'OWNER',linkStatus:'ACTIVE'},select:{user:{select:{displayName:true}}}},operations:{where:{kind:'PROVISION_GYM',actorIdentityId,provisioningIntent:{isNot:null}},take:1,orderBy:{createdAt:'desc'}}}}),
+   this.database.master.gym.findMany({take:26,...(cursor?{cursor:{id:cursor},skip:1}:{}),orderBy:[{createdAt:'desc'},{id:'desc'}],include:{expectedTenantOperation:{select:{state:true}},gymAccesses:{where:{role:'OWNER',linkStatus:'ACTIVE'},select:{user:{select:{displayName:true}}}},operations:{where:{kind:'PROVISION_GYM',actorIdentityId,provisioningIntent:{isNot:null}},take:1,orderBy:{createdAt:'desc'}}}}),
    this.database.master.gym.count(),
   ]);
   const rows=gyms.slice(0,25);const summaries=await this.database.master.gymRegistrySummary.findMany({where:{gymId:{in:rows.map(gym=>gym.id)}}});
@@ -39,7 +39,7 @@ export class PlatformRegistryService {
   return registryPageSchema.parse({total,nextCursor:gyms.length>25?rows.at(-1)!.id:null,items:await Promise.all(rows.map(async gym=>{
    const summary=summaries.find(row=>row.gymId===gym.id);
    return {id:gym.id,name:gym.name,slug:gym.slug,status:gym.status,version:gym.version,ownerName:gym.gymAccesses[0]?.user.displayName??null,
-    memberCount:summary?.memberCount??null,trainerCount:summary?.trainerCount??null,observedAt:summary?.observedAt?.toISOString()??null,health:summary?.health??'UNAVAILABLE',
+    memberCount:summary?.memberCount??null,trainerCount:summary?.trainerCount??null,observedAt:summary?.observedAt?.toISOString()??null,health:gym.expectedTenantOperation?.state==='REPAIR_REQUIRED'?'REPAIR_REQUIRED':gym.expectedTenantOperation?.state!=='COMPLETE'?'UNAVAILABLE':summary?.health??'UNAVAILABLE',
     operation:gym.operations[0]?await new ProvisioningReservationService(this.database).status(actorIdentityId,gym.operations[0].id):null,
     lifecycleOperation:pendingLifecycle.find(operation=>operation.gymId===gym.id)?await new GymLifecycleService(this.database,this.tenants).status(actorIdentityId,pendingLifecycle.find(operation=>operation.gymId===gym.id)!.id):null};
   }))});

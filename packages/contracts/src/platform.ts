@@ -47,3 +47,7 @@ export const supportSummarySchema = z.strictObject({
 });
 export type RegistryPage = z.infer<typeof registryPageSchema>;
 export type SupportSummary = z.infer<typeof supportSummarySchema>;
+export const schemaRolloutInputSchema = z.strictObject({
+ idempotencyKey: idempotencyKeySchema, targetVersion: z.string().min(1).max(128), targetDigest: z.string().regex(/^[a-f0-9]{64}$/),
+ gymIds: z.array(z.string().min(1).max(128)).min(1).max(100).refine(ids=>new Set(ids).size===ids.length), batchSize: z.number().int().min(1).max(25),
+});

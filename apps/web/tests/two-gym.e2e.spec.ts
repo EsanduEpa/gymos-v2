@@ -26,6 +26,8 @@ let web: ProcessState | undefined;
 let apiBase = '';
 let webBase = '';
 let testJwtSecret = '';
+let apiEnvironment:NodeJS.ProcessEnv={NODE_ENV:'production'};
+let scenarioStarted=false;
 
 async function freePort(): Promise<number> {
   const server = createServer();
@@ -72,6 +74,15 @@ async function loginWithPassword(page: Page, email: string, password: string): P
 
 async function login(page: Page, email: string): Promise<void> {
   await loginWithPassword(page, email, fixture.password);
+}
+
+async function waitForSessionLifecycle(page: Page): Promise<void> {
+  // Server-rendered shell text can be visible before the client listeners mount.
+  // A real focus-triggered/initial BFF response proves the listener is active.
+  const ready=page.waitForResponse(response=>response.url()===`${webBase}/api/session`&&response.request().method()==='GET'&&response.ok());
+  await page.bringToFront();
+  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+  await ready;
 }
 
 async function openWithTestSession(page: Page, userId: string, path: string, expiresIn = 900): Promise<void> {
@@ -151,14 +162,15 @@ test.beforeAll(async () => {
     NODE_ENV: 'production',
     TZ: 'UTC',
   };
-  api = start(process.execPath, [join(apiDirectory, 'dist/main.js')], apiDirectory, {
+  apiEnvironment={
     ...cleanEnvironment,
     PORT: String(apiPort),
     MASTER_DATABASE_URL: environment.masterUrl,
     TENANT_DATABASE_URL: environment.masterUrl,
     PROVISION_DATABASE_URL: environment.masterUrl,
     JWT_SECRET: testJwtSecret,
-  });
+  };
+  api = start(process.execPath, [join(apiDirectory, 'dist/main.js')], apiDirectory, apiEnvironment);
   await waitReady(`${apiBase}/`, api);
   web = start(process.execPath, [join(webDirectory, 'node_modules/next/dist/bin/next'), 'start', '-H', '127.0.0.1', '-p', String(webPort)], webDirectory, {
     ...cleanEnvironment,
@@ -167,6 +179,15 @@ test.beforeAll(async () => {
     GYMOS_UI_TEST_HARNESS: '1',
   });
   await waitReady(`${webBase}/login`, web);
+});
+
+test.beforeEach(async()=>{
+  if(!scenarioStarted){scenarioStarted=true;return;}
+  // Isolate in-memory request budgets/pools without changing policy or the
+  // persisted shared fixture. Every scenario still runs the real guarded API.
+  await stop(api);
+  api=start(process.execPath,[join(apiDirectory,'dist/main.js')],apiDirectory,apiEnvironment);
+  await waitReady(`${apiBase}/`,api);
 });
 
 test('shared controls support keyboard use, failure recovery, and narrow screens', async ({ page }) => {
@@ -218,6 +239,16 @@ test.afterAll(async () => {
   await stop(api);
   await fixture?.close();
   if (environment) console.info('[task007-owned-run-cleanup]', JSON.stringify(await environment.cleanup()));
+});
+test.afterEach(async ({page},testInfo)=>{
+  if(testInfo.status===testInfo.expectedStatus)return;
+  const token=(await page.context().cookies()).find(cookie=>cookie.name==='gymos_access_token')?.value;
+  if(!token)return;
+  // Status-only diagnostics; never retain headers, bearer values or bodies.
+  for(const path of ['/auth/session','/admin/gyms']){
+    const response=await fetch(`${apiBase}${path}`,{headers:{authorization:`Bearer ${token}`}}).catch(()=>null);
+    console.info('[owned-browser-dependency-status]',{path,status:response?.status??0,remaining:response?.headers.get('x-ratelimit-remaining')??null});
+  }
 });
 
 test('real browser and HTTP requests preserve two-gym isolation and pure reads', async ({ page, request }) => {
@@ -463,6 +494,8 @@ test('web sessions enforce cookie, origin, expiry, revocation and logout boundar
   const otherTab = await page.context().newPage();
   await otherTab.goto(`${webBase}/gyms/${fixture.gyms[1].slug}/owner`);
   await expect(otherTab.locator('.shell-profile')).toContainText('Owner Beta');
+  await waitForSessionLifecycle(otherTab);
+  await waitForSessionLifecycle(page);
   // A focus-triggered 401 during logout must not abort delivery of the
   // Server Action's cookie deletion response.
   let logoutStarted = false;
@@ -556,6 +589,10 @@ test('platform form reserves one pending gym with safe status and a stable retry
 });
 
 test('platform registry supports audited read-only gym selection, switching, exit and narrow keyboard navigation', async ({ page }) => {
+  // Earlier full-suite journeys intentionally create a member. Compare the
+  // snapshot with current persisted actors, while retaining the seed invariant.
+  const expectedAlphaMembers=await fixture.tenants[0].member.count();
+  expect(expectedAlphaMembers).toBeGreaterThanOrEqual(fixture.expected.alphaMembers);
   const execute=promisify(execFile);
   for(const gym of fixture.gyms) await execute(process.execPath,[join(apiDirectory,'scripts/provision-gym.mjs'),'refresh-summary',gym.id,fixture.users.admin.id],{
     env:{PATH:process.env.PATH,HOME:process.env.HOME,NODE_ENV:'test',GYMOS_OWNED_RUN_ID:environment.runId,MASTER_DATABASE_URL:environment.masterUrl,PROVISION_DATABASE_URL:environment.masterUrl,TENANT_DATABASE_URL:environment.masterUrl},timeout:20_000,
@@ -563,7 +600,7 @@ test('platform registry supports audited read-only gym selection, switching, exi
   await openWithTestSession(page,fixture.users.admin.id,'/admin');
   const table=page.getByRole('table',{name:'Registered gym tenants'});
   const alpha=table.getByRole('row').filter({has:page.getByText('Test Gym Alpha',{exact:true})});
-  await expect(alpha).toContainText(String(fixture.expected.alphaMembers));
+  await expect.poll(()=>alpha.getByRole('cell').nth(2).evaluate(element=>element.firstChild?.textContent?.trim())).toBe(String(expectedAlphaMembers));
   await expect(table).toBeVisible();
   const evidence=join(root,'docs/migration/evidence/GYMOS-MIG-024');await mkdir(evidence,{recursive:true});
   await page.screenshot({path:join(evidence,'registry-desktop.png'),fullPage:true,animations:'disabled'});
@@ -614,6 +651,7 @@ test('platform lifecycle confirms suspension and verified reactivation while old
  try{
   await openGymWithTestSession(ownerPage,fixture.users.ownerA.id,fixture.gyms[0].slug);
   await expect(ownerPage.getByRole('heading',{name:'Test Gym Alpha',exact:true})).toBeVisible();
+  await waitForSessionLifecycle(ownerPage);
   await openWithTestSession(page,fixture.users.admin.id,'/admin');
   const row=()=>page.getByRole('table',{name:'Registered gym tenants'}).getByRole('row').filter({has:page.getByText('Test Gym Alpha',{exact:true})});
   await row().getByRole('button',{name:'Suspend gym',exact:true}).click();
@@ -628,8 +666,16 @@ test('platform lifecycle confirms suspension and verified reactivation while old
   await dialog.getByRole('button',{name:'Confirm',exact:true}).click();
   await expect(row().getByRole('button',{name:'Reactivate gym',exact:true})).toBeVisible();
   await expect(row()).toContainText('SUSPENDED');
-  await ownerPage.reload();await expect(ownerPage.getByRole('heading',{name:'This page could not be found'})).toBeVisible();
+  // Live session eviction can win before a reload. Verify that behavior and
+  // the fresh-document denial independently, rather than racing the two.
+  await waitForSessionLifecycle(ownerPage);
+  await expect(ownerPage).toHaveURL(/\/no-access$/);
+  await expect(ownerPage.getByRole('heading',{name:'No active gym access'})).toBeVisible();
   await expect(ownerPage.locator('.member-list')).toHaveCount(0);
+  const deniedPage=await ownerContext.newPage();
+  await deniedPage.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/owner`);
+  await expect(deniedPage.getByRole('heading',{name:'This page could not be found'})).toBeVisible();
+  await expect(deniedPage.locator('.member-list')).toHaveCount(0);await deniedPage.close();
   expect((await fixture.master.gym.findUniqueOrThrow({where:{id:fixture.gyms[1].id}})).status).toBe('ACTIVE');
   await row().getByRole('button',{name:'Reactivate gym',exact:true}).click();
   const reactivate=page.getByRole('dialog',{name:'Reactivate this gym?'});await expect(reactivate).toBeVisible();
@@ -641,6 +687,19 @@ test('platform lifecycle confirms suspension and verified reactivation while old
   await page.setViewportSize({width:1280,height:720});await expect(row()).toBeVisible();
   await page.screenshot({path:join(evidence,'reactivated-registry.png'),fullPage:true,animations:'disabled'});
  }finally{await ownerContext.close();}
+});
+
+test('request budgets stay enabled in each owned API scenario',async({page,request})=>{
+  await openWithTestSession(page,fixture.users.admin.id,'/admin');
+  const token=(await page.context().cookies()).find(cookie=>cookie.name==='gymos_access_token')!.value;
+  let denied=false;
+  for(let attempt=0;attempt<110;attempt++){
+    const response=await request.get(`${apiBase}/auth/session`,{headers:{authorization:`Bearer ${token}`}});
+    if(attempt===0)expect(response.status()).toBe(200);
+    if(response.status()===429){denied=true;break;}
+    expect(response.status()).toBe(200);
+  }
+  expect(denied).toBe(true);
 });
 
 test('logout clears the browser even when API revocation is unavailable', async ({ page }) => {

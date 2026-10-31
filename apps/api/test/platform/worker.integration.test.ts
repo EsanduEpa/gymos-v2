@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
@@ -90,3 +90,14 @@ it('uses the same reservation/worker through the controlled CLI and refuses an u
  expect(refused.stderr).not.toContain(run.masterUrl);
  expect(await master.gym.count({where:{slug:'cli-gym'}})).toBe(1);
 },60_000);
+it('provisions with a dedicated CREATEDB/CREATEROLE login without superuser privileges',async()=>{
+ const role=`gymos_provisioner_${run.runId}`;const password=randomBytes(32).toString('hex');
+ const admin=await run.connect(run.masterName);
+ try{await admin.query(`CREATE ROLE "${role}" LOGIN PASSWORD '${password}' CREATEDB CREATEROLE NOSUPERUSER NOREPLICATION`);}finally{await admin.end();}
+ const url=new URL(run.masterUrl);url.username=role;url.password=password;
+ vi.stubEnv('PROVISION_DATABASE_URL',url.toString());const restricted=new GymProvisioningService(database);
+ try{
+  const reserved=await reserve('least-privilege');
+  expect((await new ProvisioningWorker(database,restricted,tenants).runOnce(reserved.operationId)).state).toBe('COMPLETE');await recordOwned(reserved.operationId);
+ }finally{await restricted.onApplicationShutdown();vi.stubEnv('PROVISION_DATABASE_URL',run.masterUrl);}
+});

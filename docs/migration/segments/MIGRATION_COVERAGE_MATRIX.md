@@ -28,12 +28,12 @@ This matrix assigns every authoritative task and every V1 route responsibility t
 | GYMOS-MIG-018 | Actor/resource authorization | `lib/authz.ts` | Nest guards/policies | 02 | GYMOS-MIG-018 | COMPLETED |
 | GYMOS-MIG-019 | Role-aware root/navigation | R00/T00/M00/L02 | web route builder/guards | 02 | GYMOS-MIG-019 | COMPLETED |
 | GYMOS-MIG-020 | Session transport/logout | Auth.js/session/logout | web BFF actions + auth API | 02 | GYMOS-MIG-020 | COMPLETED |
-| GYMOS-MIG-021 | Provisioning reservation | V1 admin/create assumptions | operations + admin provisioning service | 03 | GYMOS-MIG-021 | NOT STARTED |
-| GYMOS-MIG-022 | Recoverable physical provisioning | V2 current synchronous provisioner | provisioning worker/checkpoints | 03 | GYMOS-MIG-022 | NOT STARTED |
-| GYMOS-MIG-023 | Owner/theme/gym activation | S01 owner bootstrap | identity/access/theme activation | 03 | GYMOS-MIG-023 | NOT STARTED |
-| GYMOS-MIG-024 | Registry/read-only support | S01; `actions/admin.ts` | platform registry/support session | 03 | GYMOS-MIG-024 | NOT STARTED |
-| GYMOS-MIG-025 | Suspend/reactivate tenant | S01 status | Master access/gym lifecycle | 03 | GYMOS-MIG-025 | NOT STARTED |
-| GYMOS-MIG-026 | Tenant schema rollout/repair | database map | versioned orchestrator/repair | 03 | GYMOS-MIG-026 | NOT STARTED |
+| GYMOS-MIG-021 | Provisioning reservation | V1 admin/create assumptions | operations + admin provisioning service | 03 | GYMOS-MIG-021 | IMPLEMENTED; LOCAL VERIFIED; HOSTED PENDING |
+| GYMOS-MIG-022 | Recoverable physical provisioning | V2 current synchronous provisioner | provisioning worker/checkpoints | 03 | GYMOS-MIG-022 | IMPLEMENTED; LOCAL VERIFIED; HOSTED PENDING |
+| GYMOS-MIG-023 | Owner/theme/gym activation | S01 owner bootstrap | identity/access/theme activation | 03 | GYMOS-MIG-023 | IMPLEMENTED; LOCAL VERIFIED; HOSTED PENDING |
+| GYMOS-MIG-024 | Registry/read-only support | S01; `actions/admin.ts` | platform registry/support session | 03 | GYMOS-MIG-024 | IMPLEMENTED; LOCAL VERIFIED; HOSTED PENDING |
+| GYMOS-MIG-025 | Suspend/reactivate tenant | S01 status | Master access/gym lifecycle | 03 | GYMOS-MIG-025 | IMPLEMENTED; LOCAL VERIFIED; HOSTED PENDING |
+| GYMOS-MIG-026 | Tenant schema rollout/repair | database map | versioned orchestrator/repair | 03 | GYMOS-MIG-026 | IMPLEMENTED; LOCAL VERIFIED; HOSTED PENDING |
 | GYMOS-MIG-027 | Gym profile/config reads | O12; `actions/gym-config.ts` | tenant configuration module | 04 | GYMOS-MIG-027 | NOT STARTED |
 | GYMOS-MIG-028 | Membership plans/form | O12 Plans tab | membership-plan module/UI | 04 | GYMOS-MIG-028 | NOT STARTED |
 | GYMOS-MIG-029 | Rates/pay/cancellation policy | O12 remaining tabs | configuration policy DTOs/schema | 04 | GYMOS-MIG-029 | NOT STARTED |
@@ -138,6 +138,6 @@ Additional interfaces: L01/L02/X01–X03 belong to segments 01/02/09; H01 belong
 - **Uncovered authoritative tasks:** none.
 - **Uncovered V1 routes:** none.
 - **Intentional overlap:** task dependencies only; ownership remains single. Session aggregate task 040 is a prerequisite for member/trainer status and pack invariants, but remains owned by segment 07.
-- **Decision gates:** 077, 079 and 082–085 are completed and approved; 087 and 088 remain open and gate their downstream deployment/mobile work. Task 013 is the next dependency-satisfied task, but Segment 02 work is not started by this record.
+- **Decision gates:** 077, 079 and 082–085 are completed and approved; 087 and 088 remain open and gate their downstream deployment/mobile work. Segment 02 automated verification is complete and owner manual acceptance remains pending. Segment 03 is implemented and locally verified; hosted closure is pending in its separate stacked PR.
 - **Conflicts:** approved addenda override stale pre-start completion, fake DeskPayment/receipt/subscription billing, expanded theme, and meal-day assumptions. See `../MIGRATION_DECISIONS.md`.
 - **Coverage conclusion:** all 88 original task IDs have one unique segment assignment; all 29/29 route responsibilities have a static owner. Runtime/visual/functional parity is not yet proven and must not be described as 100% migrated.

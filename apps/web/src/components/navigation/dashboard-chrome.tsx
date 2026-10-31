@@ -9,8 +9,8 @@ import { exitSupport } from '@/app/platform-actions';
 import { gymRoleUrl, type GymAccessSummary } from '@/lib/gymos';
 import { Button, LoadingState } from '@/components/ui';
 
-// Only implemented destinations belong here. Feature navigation is added with
-// its owning slice; notification/support/subscription APIs are not available yet.
+// Only implemented destinations belong here. Support uses its explicit read-only
+// context; notification/subscription navigation waits for its owning slices.
 export function DashboardChrome({ gym, gyms, displayName, identityId, style, children, support }: {
   identityId: string; gym?: GymAccessSummary; gyms: GymAccessSummary[]; displayName: string;
   style?: CSSProperties; children: ReactNode;
