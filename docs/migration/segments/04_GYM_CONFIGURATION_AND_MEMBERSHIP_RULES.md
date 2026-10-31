@@ -39,43 +39,43 @@ Proposed tenant models/modules: versioned operational `GymConfiguration`, `Membe
 - **Prerequisites:** 013,018,023,077,082,083. **Sources:** O12 Profile, V1 Gym/config action, current schemas/theme.
 - **Targets:** tenant configuration Prisma fields/migration; proposed Nest config module/contracts/client/web adapter.
 - **Instructions:** implement approved ownership; pure sanitized read; versioned owner update; operation only if crossing Master/tenant; timezone/currency immutable or guarded per ADR.
-- **Acceptance/test:** owner success, trainer/member/support mutation denial, stale version, invalid bounds, foreign gym, Master/tenant injected failure, pure GET. **[ ]**
+- **Acceptance/test:** owner success, trainer/member/support mutation denial, stale version, invalid bounds, foreign gym, Master/tenant injected failure, pure GET. **[x]**
 
 ### GYMOS-MIG-028 — membership plans and owner plan form
 
 - **Prerequisites:** 012,018,027,082,083. **Sources:** O12 Plans, `createMembershipPlan`, `MembershipPlan` schema.
 - **Targets:** proposed tenant plan model/service/controller/DTOs and Plans tab.
 - **Instructions:** exact price string→Decimal, bounded duration/name/description, active/history semantics approved by ADR, duplicate policy explicit; never expose Prisma Decimal/record directly.
-- **Acceptance/test:** valid create/list, zero/negative/precision/overflow/unknown field, role/tenant negatives, empty/list UI, repeat submission. **[ ]**
+- **Acceptance/test:** valid create/list, zero/negative/precision/overflow/unknown field, role/tenant negatives, empty/list UI, repeat submission. **[x]**
 
 ### GYMOS-MIG-029 — rates, pay percentages, cancellation policy
 
 - **Prerequisites:** 012,027,028,082–084. **Sources:** remaining O12 tabs, V1 pricing/config actions.
 - **Targets:** proposed versioned tenant policy schema/service/APIs/tab forms.
 - **Instructions:** preserve V1 fields but honor zero; validate exact percentages/rates/windows/toggles; effective version and audit; expose quote-safe projection; existing sessions never change retroactively.
-- **Acceptance/test:** zero/null/boundary/precision/stale version, invalid toggle combination, role/tenant denial, historical quote unchanged. **[ ]**
+- **Acceptance/test:** zero/null/boundary/precision/stale version, invalid toggle combination, role/tenant denial, historical quote unchanged. **[x]**
 
 ### GYMOS-MIG-030 — date-derived membership eligibility and renewal
 
 - **Prerequisites:** 018,028,029,083. **Sources:** V1 Membership and unsafe expiry action; O02/O04 displays.
 - **Targets:** proposed tenant membership-term schema/service/contracts; no read-triggered job.
 - **Instructions:** derive active/expired/not-started from inclusive rules and gym time; renewal appends term with approved overlap policy; actor access status remains separate; return reason/asOf/version.
-- **Acceptance/test:** boundary before/on/after start/end, timezone/DST/leap date, multiple old/current/future terms, suspension, concurrent renewal, pure reads. **[ ]**
+- **Acceptance/test:** boundary before/on/after start/end, timezone/DST/leap date, multiple old/current/future terms, suspension, concurrent renewal, pure reads. **[x]**
 
 ### GYMOS-MIG-015 — branding editor and fallback
 
 - **Prerequisites:** 011–013,024,027,086. **Sources:** current theme endpoint/page, O12, Classic tokens.
 - **Targets:** adapt `gyms.controller.ts`, shared contracts/client, gym-config UI.
 - **Instructions:** OWNER-only primary hex and HTTPS logo; safe public projection/cache invalidation; sanitize/fallback broken logo; accessible contrast and immutable status colors; audit/version update.
-- **Acceptance/test:** invalid scheme/color/size, support/trainer/member mutation denial, two-gym switch, broken/missing logo, contrast, desktop/mobile visual diff. **[ ]**
+- **Acceptance/test:** invalid scheme/color/size, support/trainer/member mutation denial, two-gym switch, broken/missing logo, contrast, desktop/mobile visual diff. **[x]**
 
 ## 7. Security and multi-tenancy checklist
 
-- [ ] OWNER-only writes enforced in Nest; public theme exposes no registry/identity internals.
-- [ ] Tenant configuration and terms always use verified DB binding.
-- [ ] Exact value/time validation is server authoritative.
-- [ ] Optimistic versions prevent lost updates; operations recover cross-plane writes.
-- [ ] Theme URLs are HTTPS and safely rendered; no script/data URL.
+- [x] OWNER-only writes enforced in Nest; public theme exposes no registry/identity internals.
+- [x] Tenant configuration and terms always use verified DB binding.
+- [x] Exact value/time validation is server authoritative.
+- [x] Optimistic versions prevent lost updates; operations recover cross-plane writes.
+- [x] Theme URLs are HTTPS and safely rendered; no script/data URL.
 
 ## 8. Testing and verification
 
@@ -83,10 +83,10 @@ Use contract/client tests, API unit/service tests, owned tenant DB integration t
 
 ## 9. Definition of done
 
-- [ ] O12 and branding preserve V1 UI behavior with approved corrections.
-- [ ] Configuration ownership, exact values, time semantics, and versions match ADRs.
-- [ ] All five tasks pass role/tenant/failure/regression tests.
-- [ ] Current V2 theme and platform activation continue to work.
+- [x] O12 and branding preserve V1 UI behavior with approved corrections.
+- [x] Configuration ownership, exact values, time semantics, and versions match ADRs.
+- [x] All five tasks pass role/tenant/failure/regression tests.
+- [x] Current V2 theme and platform activation continue to work.
 
 ## 10. Agent checkpoints
 
@@ -94,9 +94,9 @@ Do not create policy/schema fields before their ADR is approved. Do not add open
 
 ## 11. Progress and handoff
 
-- **Current status:** WAITING FOR PREREQUISITES (30 October 2026); DEC-01/06/07/08 are approved.
-- **Completed:** none
-- **Remaining:** 015,027–030
-- **Next prerequisite:** GYMOS-MIG-013 is the next dependency-satisfied overall task (Segment 02). Re-evaluate tasks 027–030 after the Segment 02/03 dependencies, including 023, 024 and 013, are completed.
-- **Files/tests/issues/blockers/decisions:** The 26 October checkpoint below is historical. Segment 04 implementation tasks remain Not Started; its policy gates 077/082/083/084 are completed. Segment 02/03 prerequisites and task 024 remain. Issues are recorded in [SEGMENT_RUN_ISSUES.md](../SEGMENT_RUN_ISSUES.md).
+- **Current status:** Automated implementation and verification complete at `c9af453`; all 11 hosted jobs passed in [run 41210839760](https://github.com/EsanduEpa/gymos-v2/actions/runs/41210839760). PR #4 remains draft and unmerged.
+- **Completed:** GYMOS-MIG-015 and 027–030 (implementation and automated evidence).
+- **Remaining:** Owner manual acceptance and explicit merge authorization; these remain separate from automated completion.
+- **Owner acceptance:** Review and exercise owner profile/theme save and fallback, plans including zero price, rates/pay/cancellation values and version behavior, and membership eligibility/renewal boundaries using disposable fixtures.
+- **Handoff:** See [SEGMENT_04_HANDOFF.md](../SEGMENT_04_HANDOFF.md). Segment 05 remains not started. Issues are recorded in [SEGMENT_RUN_ISSUES.md](../SEGMENT_RUN_ISSUES.md).
 
