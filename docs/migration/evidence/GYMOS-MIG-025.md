@@ -1,5 +1,7 @@
 # GYMOS-MIG-025 — Suspension/reactivation checkpoint
 
+> **Integrated completion — 31 October 2026:** task 025 is Completed. Code/CI revision `0b7c909` passed all 11 hosted checks in [run 41172437503](https://github.com/EsanduEpa/gymos-v2/actions/runs/41172437503), after local platform 31/browser 10/operations 10/recovery 1 and build/lint/type/workspace/unit verification. [Segment 03 handoff](../SEGMENT_03_HANDOFF.md) records exact commands, fixtures, review boundaries and pending owner manual checks. Earlier checkpoints below are historical; owner acceptance and merge are not implied.
+
 31 October 2026; following registry/support revision `2d87e8c`. Implemented and locally verified; final hosted verification and owner manual acceptance remain pending.
 
 Platform lifecycle commands require an expected Gym version, 10–500 character reason and stable idempotency key. An immutable private lifecycle intent binds the operation; public status contains only allowlisted state/version/target metadata. A repeated key resumes/replays its original intent. Different intent, stale version, conflicting in-flight operation, wrong role and foreign operation are rejected. Required status/operation audits retain the original actor and reference the reason-bearing intent.

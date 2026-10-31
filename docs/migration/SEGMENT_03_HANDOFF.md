@@ -1,6 +1,6 @@
 # Segment 03 handoff — 31 October 2026
 
-Status: **IN PROGRESS — tasks 021–026 implemented and locally verified; final all-11 hosted checks pending.** Automated completion and owner manual acceptance are separate. Segment 02 owner manual acceptance remains **PENDING**, as expressly allowed by the owner. No Segment 04 implementation was started.
+Status: **COMPLETED — tasks 021–026 satisfy their acceptance criteria with local and hosted automated verification.** Overall migration: **35/88 completed, 53 remaining**. Automated completion and owner manual acceptance are separate. Segment 02 owner manual acceptance remains **PENDING**, as expressly allowed by the owner. No Segment 04 implementation was started.
 
 ## Review boundary
 
@@ -29,6 +29,7 @@ Node 24.22.0, pnpm 9.15.0, production Next.js 16.4.2, Chromium, owned disposable
 | `pnpm lint:workspace` | Passed |
 | `pnpm typecheck:workspace` | Passed |
 | `pnpm check:workspace`; `git diff --check` | Passed |
+| `node --test infrastructure/scripts/dependency-audit-result.test.mjs` | Audit validator 8/8 passed |
 | `pnpm test:unit` | Contracts 24, client 14, theme 5, API 19, pools 25 passed |
 | `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/api exec vitest run --config vitest.config.platform.ts --disableConsoleIntercept` | 31/31: reservation 3, worker 7, owner 3, support 5, lifecycle 4, rollout 9 |
 | `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/api exec vitest run --config vitest.config.operations.ts --disableConsoleIntercept` | Operation foundation 10/10 |
@@ -41,7 +42,7 @@ Browser checks use real HTTP/cookies and persistent fixture data. The harness no
 
 ## Hosted verification
 
-[Run 41172077267](https://github.com/EsanduEpa/gymos-v2/actions/runs/41172077267) at `5052c7a` passed 10/11 jobs, including the browser and all database suites; dependency review failed closed. Diagnosis reproduced locally: pnpm9 JSON audit exits1 for any advisory before applying the display severity threshold. Its valid response had two moderate, zero high and zero critical advisories; the previous validator incorrectly classified that response as unverifiable. The installed pnpm9.15 source confirms this control flow. The validator now checks all five nonnegative integer counts and exit consistency; malformed/error/process failure responses still fail, and high/critical findings still block the proposed revision. Eight regression tests pass and run inside the existing unit job. No job or audit threshold was removed. The owner specifically approved npm audit metadata egress after automatic review blocked local reproduction. Base/proposed live audits then exited0 with no high/critical findings; moderate findings remain visible. Final all-11 verification is pending on the corrected revision. A successful earlier revision never bypasses checks for later commits.
+[Run 41172077267](https://github.com/EsanduEpa/gymos-v2/actions/runs/41172077267) at `5052c7a` passed 10/11 jobs, including the browser and all database suites; dependency review failed closed. Diagnosis reproduced locally: pnpm 9 JSON audit exits1 for any advisory before applying the display severity threshold. Its valid response had two moderate, zero high and zero critical advisories; the previous validator incorrectly classified that response as unverifiable. The installed pnpm 9.15 source confirms this control flow. The validator now checks all five nonnegative integer counts and exit consistency; malformed/error/process failure responses still fail, and high/critical findings still block the proposed revision. Eight regression tests pass and run inside the existing unit job. No job or audit threshold was removed. The owner specifically approved npm audit metadata egress after automatic review blocked local reproduction. Base/proposed live audits then exited0 with no high/critical findings; moderate findings remain visible. Corrected code/CI revision [`0b7c909`](https://github.com/EsanduEpa/gymos-v2/commit/0b7c909c11d5ced32ce752d6d7bc22305d695906) passed **all 11** in [run 41172437503](https://github.com/EsanduEpa/gymos-v2/actions/runs/41172437503), inspected in signed-in Chrome. The passed jobs are workspace, build, lint, typecheck, unit (including 8 audit-validator cases), owned disposable databases (environment 3/identity 10/tenancy 20/platform 31), browser 10, encrypted recovery 1, secret scan, dependency review and lockfile audit. No required job was skipped. This closure changes documentation only; its own latest-head all 11 result must also be inspected on [PR #3 checks](https://github.com/EsanduEpa/gymos-v2/pull/3/checks) before delivery/merge. A successful earlier revision never bypasses checks for later commits.
 
 ## Pending owner checks and limitations
 

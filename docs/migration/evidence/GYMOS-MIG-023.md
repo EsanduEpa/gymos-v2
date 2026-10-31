@@ -1,5 +1,7 @@
 # GYMOS-MIG-023 — Owner activation checkpoint
 
+> **Integrated completion — 31 October 2026:** task 023 is Completed. Code/CI revision `0b7c909` passed all 11 hosted checks in [run 41172437503](https://github.com/EsanduEpa/gymos-v2/actions/runs/41172437503), after local platform 31/browser 10/operations 10/recovery 1 and build/lint/type/workspace/unit verification. [Segment 03 handoff](../SEGMENT_03_HANDOFF.md) records exact commands, fixtures, review boundaries and pending owner manual checks. Earlier checkpoints below are historical; owner acceptance and merge are not implied.
+
 30 October 2026; following worker revision `277a24f`. Implemented and locally verified; final Segment 03 hosted verification and owner manual acceptance remain pending.
 
 New provisioning requires tenant currency/timezone and an immutable committed owner-initialization receipt before Master publication. A new additive tenant migration and reviewed manifest preserve the original manifest unchanged. Requests accept either reviewed compatible version; no request performs migrations. Reservation replays retain their original pin across application upgrades.

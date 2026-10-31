@@ -1,5 +1,7 @@
 # GYMOS-MIG-021 — Provisioning reservation checkpoint
 
+> **Integrated completion — 31 October 2026:** task 021 is Completed. Code/CI revision `0b7c909` passed all 11 hosted checks in [run 41172437503](https://github.com/EsanduEpa/gymos-v2/actions/runs/41172437503), after local platform 31/browser 10/operations 10/recovery 1 and build/lint/type/workspace/unit verification. [Segment 03 handoff](../SEGMENT_03_HANDOFF.md) records exact commands, fixtures, review boundaries and pending owner manual checks. Earlier checkpoints below are historical; owner acceptance and merge are not implied.
+
 Date: 30 October 2026. Branch `codex/segment-03-platform-lifecycle`, based on `0c969eb`. Status: **Implemented reservation boundary; locally verified. Full Segment 03/hosted integration pending.** No owner manual acceptance is claimed.
 
 PRs #1/#2 were inspected in signed-in Chrome: both remain draft/unmerged, at `e45a334` and `0c969eb`. This branch depends on unmerged PR #2 and does not modify its branch. Segment 02 owner manual review is explicitly pending under the owner's Segment 03 authorization.
@@ -24,4 +26,4 @@ Local verification, Node 24.22.0 / pnpm 9.15.0:
 
 API checks cover five simultaneous same-key requests (one operation/Gym/intent, zero physical targets and zero new identities), lost-response replay, changed body/slug, different-key slug collision, strict target/password injection rejection, invalid currency/timezone/key, wrong role/revoked token, foreign operation status, sanitized projections, and existing identity password/version unchanged. Browser checks cover real form submission, same-key HTTP replay, status refresh, no target leakage, and 320px overflow. [Pending UI](GYMOS-MIG-021/pending-320.png).
 
-An initial browser attempt failed because a selector omitted hint text in a shared field's accessible label. Corrected the selector; assertions were preserved. No V1 application/database or shared/provider database was executed or modified. This checkpoint does not claim task 022 physical recovery, task 023 owner activation, all-11 hosted verification or Segment 03 completion.
+An initial browser attempt failed because a selector omitted hint text in a shared field's accessible label. Corrected the selector; assertions were preserved. No V1 application/database or shared/provider database was executed or modified. This checkpoint does not claim task 022 physical recovery, task 023 owner activation, all 11 hosted verification or Segment 03 completion.

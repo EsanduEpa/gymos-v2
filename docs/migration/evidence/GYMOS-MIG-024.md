@@ -1,5 +1,7 @@
 # GYMOS-MIG-024 — Registry and read-only support checkpoint
 
+> **Integrated completion — 31 October 2026:** task 024 is Completed. Code/CI revision `0b7c909` passed all 11 hosted checks in [run 41172437503](https://github.com/EsanduEpa/gymos-v2/actions/runs/41172437503), after local platform 31/browser 10/operations 10/recovery 1 and build/lint/type/workspace/unit verification. [Segment 03 handoff](../SEGMENT_03_HANDOFF.md) records exact commands, fixtures, review boundaries and pending owner manual checks. Earlier checkpoints below are historical; owner acceptance and merge are not implied.
+
 31 October 2026. Branch `codex/segment-03-platform-lifecycle`, following activation revision `736cfec`. Implemented and locally verified; final hosted verification and owner manual acceptance remain pending.
 
 The registry uses the mapped native tenant table and shared Classic controls, with server pagination, safe provisioning progress/retry, and explicit owner credential handoff. Member counts come from tenant Member records through an explicit bounded worker/read model. Registry HTTP reads never connect to tenants. Unobserved counts are unavailable; a failed observation retains its previous count/time and reports unavailable/repair health. Owner display names are separate from login credentials; absent names stay unavailable. Billing/tier behavior is not introduced. The controlled local CLI also supports `refresh-summary GYM_ID ACTOR_ID`.
