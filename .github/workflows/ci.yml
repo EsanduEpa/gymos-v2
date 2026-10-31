@@ -101,6 +101,7 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm prepare:checks
+      - run: node --test infrastructure/scripts/dependency-audit-result.test.mjs
       - run: pnpm test:unit
 
   disposable-database:
