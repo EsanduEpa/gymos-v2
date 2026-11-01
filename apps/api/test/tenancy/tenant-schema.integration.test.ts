@@ -188,7 +188,9 @@ it('rejects missing binding and missing state before domain work', async () => {
 it('rejects independently missing binding, missing state and tenant metadata mismatches', async () => {
   const valid = await context(0);
   let callbacks = 0;
-  await tenants[0].gymConfiguration.delete({ where: { id: 'current' } });
+  // Simulate a missing configuration row inside this owned disposable tenant.
+  // The production history table intentionally blocks ordinary parent deletes.
+  await tenants[0].$executeRaw`TRUNCATE TABLE "GymConfiguration" CASCADE`;
   await expect(gateFor().withVerifiedTenant(valid, async () => { callbacks++; }))
     .rejects.toBeInstanceOf(ServiceUnavailableException);
   await new TenantSchemaVerifier(tenants[0]).verifyAndAttest({ masterGymId: gymIds[0], operationId: operationIds[0] });

@@ -53,7 +53,7 @@ export type TenantTemplateManifest = {
     readonly triggers: readonly string[]; readonly columns: Readonly<Record<string, readonly string[]>>;
   };
 };
-export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
+export const TENANT_TEMPLATE_V2: TenantTemplateManifest = Object.freeze({
   ...TENANT_TEMPLATE_V1,
   version: 'tenant-2026-10-30.1',
   migrations: [...TENANT_TEMPLATE_V1.migrations, {
@@ -66,7 +66,39 @@ export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
       GymConfiguration: [...TENANT_TEMPLATE_V1.postconditions.columns.GymConfiguration, 'currency', 'timezone'] },
   },
 });
-export const TENANT_MANIFESTS: readonly TenantTemplateManifest[] = [TENANT_TEMPLATE_V1, TENANT_TEMPLATE_MANIFEST];
+export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
+  ...TENANT_TEMPLATE_V2,
+  version: 'tenant-2026-10-31.1',
+  migrations: [...TENANT_TEMPLATE_V2.migrations, {
+    name: '20261031030000_gym_configuration_memberships', checksum: 'f223a7b8a0d17732b29b0b925dd44e09683552008ccee29618be78486e12fbcb',
+  }],
+  postconditions: {
+    ...TENANT_TEMPLATE_V2.postconditions,
+    tables: [...TENANT_TEMPLATE_V2.postconditions.tables, 'GymConfigurationVersion', 'MembershipPlan', 'MembershipTerm'],
+    types: [...TENANT_TEMPLATE_V2.postconditions.types, 'PayPeriod', 'MembershipPlanStatus'],
+    indexes: [...TENANT_TEMPLATE_V2.postconditions.indexes, 'MembershipPlan_pkey', 'MembershipPlan_status_createdAt_idx',
+      'MembershipTerm_pkey', 'MembershipTerm_actorIdentityId_idempotencyKey_key', 'MembershipTerm_memberId_startDate_endDateExclusive_idx',
+      'GymConfigurationVersion_pkey', 'GymConfigurationVersion_gymConfigurationId_configurationVersion', 'GymConfigurationVersion_configurationVersion_idx'],
+    constraints: [...TENANT_TEMPLATE_V2.postconditions.constraints, 'GymConfiguration_rate_bounds', 'MembershipPlan_price_check',
+      'MembershipPlan_pkey', 'MembershipPlan_currency_check', 'MembershipPlan_duration_check', 'MembershipTerm_pkey', 'MembershipTerm_dates_check', 'MembershipTerm_price_check',
+      'MembershipTerm_currency_check', 'MembershipTerm_idempotency_check', 'MembershipTerm_memberId_fkey', 'MembershipTerm_planId_fkey',
+      'GymConfigurationVersion_pkey', 'GymConfigurationVersion_gymConfigurationId_configurationVersion',
+      'GymConfigurationVersion_gymConfigurationId_fkey', 'GymConfigurationVersion_version_check'],
+    triggers: [...TENANT_TEMPLATE_V2.postconditions.triggers, 'GymConfigurationVersion_capture', 'GymConfigurationVersion_immutable'],
+    columns: { ...TENANT_TEMPLATE_V2.postconditions.columns,
+      GymConfiguration: [...TENANT_TEMPLATE_V2.postconditions.columns.GymConfiguration, 'address', 'phone', 'email', 'payPeriod',
+        'defaultSessionFee', 'level2SessionFee', 'introSessionFee', 'level1BaseRate', 'level2BaseRate', 'offShiftPremium',
+        'cancellationWindowMinutes', 'lateCancelDeduction', 'minimumSessionDurationMinutes'],
+      MembershipPlan: ['createdAt', 'currency', 'description', 'durationDays', 'id', 'name', 'price', 'status', 'updatedAt', 'version'],
+      MembershipTerm: ['actorIdentityId', 'agreedPrice', 'configurationVersion', 'createdAt', 'currency', 'endDateExclusive',
+        'id', 'idempotencyKey', 'memberId', 'planId', 'planNameSnapshot', 'requestDigest', 'startDate'],
+      GymConfigurationVersion: ['address', 'configurationVersion', 'createdAt', 'currency', 'defaultSessionFee', 'email', 'gymConfigurationId',
+        'id', 'introSessionFee', 'lateCancelDeduction', 'level1BaseRate', 'level2BaseRate', 'level2SessionFee', 'minimumSessionDurationMinutes',
+        'offShiftPremium', 'payPeriod', 'phone', 'timezone', 'cancellationWindowMinutes'],
+    },
+  },
+});
+export const TENANT_MANIFESTS: readonly TenantTemplateManifest[] = [TENANT_TEMPLATE_V1, TENANT_TEMPLATE_V2, TENANT_TEMPLATE_MANIFEST];
 export function reviewedTenantManifest(version: string | null, digest: string | null) {
   return TENANT_MANIFESTS.find(manifest => manifest.version === version && tenantManifestDigest(manifest) === digest);
 }

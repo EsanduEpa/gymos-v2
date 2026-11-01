@@ -1,7 +1,7 @@
 import { contentDigest } from '../operations/primitives.js';
 // Immutable reviewed chain; schema deployment is an explicit owned runner command.
 export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
-  version: 'master-2026-10-31.1',
+  version: 'master-2026-10-31.2',
   migrations: [
     {
       name: '20261021100256_init_master',
@@ -48,6 +48,10 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       checksum:
         'c11c8f7bc508cecf109f17a89f2b9d1d13985c258b91acd3363e1c2dcc9ff293',
     },
+    {
+      name: '20261031030000_theme_version',
+      checksum: 'be233f1bf8d30b7d691074a4abe54648220cc773df109e8717b8019c7a04a265',
+    },
   ],
   postconditions: {
     tables: [
@@ -87,6 +91,7 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       'SupportSession_immutable',
     ],
     requiredColumns: {
+      Theme: ['id', 'gymId', 'primaryColor', 'logoUrl', 'version'],
       Gym: [
         'id',
         'databaseName',
@@ -95,6 +100,7 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
         'expectedTenantSchemaVersion',
         'expectedTenantManifestDigest',
         'expectedTenantOperationId',
+        'publicProfileVersion',
       ],
       Operation: [
         'id',
