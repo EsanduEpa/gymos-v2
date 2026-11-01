@@ -8,6 +8,7 @@ import {
 } from '../dist/index.js';
 import { existingEndpointContracts } from '../dist/legacy.js';
 import { changePasswordInputSchema, credentialAcknowledgementInputSchema, credentialAcknowledgementResultSchema, credentialIssueInputSchema, credentialReissueInputSchema, credentialReissueResultSchema } from '../dist/credentials.js';
+import { createMembershipPlanSchema, gymConfigurationSchema, updateGymThemeSchema } from '../dist/configuration.js';
 
 const asOf = '2026-10-23T00:00:00.000Z';
 const identity = {
@@ -21,7 +22,7 @@ const fixtures = {
   E01: { accessToken: 'fixture-only-token', tokenType: 'Bearer', expiresIn: 900,
     globalRole: 'USER', mustChangePassword: false, gyms: [{ id: gym.id, name: gym.name, slug: gym.slug, role: 'OWNER' }] },
   E02: [gym], E03: gym, E04: { slug: gym.slug, name: gym.name, theme },
-  E05: { slug: gym.slug, theme }, E06: { gymId: gym.id, slug: gym.slug, role: 'OWNER' },
+  E05: { slug: gym.slug, theme: { ...theme, version: 1 } }, E06: { gymId: gym.id, slug: gym.slug, role: 'OWNER' },
   E07: [member], E08: { ...member, createdAt: asOf },
 };
 
@@ -68,6 +69,18 @@ test('money uses exact strings and leaves precision/currency support to domain c
   assert.equal(moneySchema.safeParse({ amount: '1', currency: 'lkr' }).success, false);
   assert.equal(signedMoneySchema.parse({ amount: '-1.25', currency: 'LKR' }).amount, '-1.25');
   assert.equal(decimalStringSchema.safeParse('-0').success, false);
+});
+test('configuration contracts keep exact zero, distinguish blank from null, and reject unknown or unsafe values', () => {
+  const config = { version: 2, currency: 'LKR', timezone: 'Asia/Colombo', address: '', phone: null, email: null, payPeriod: 'MONTHLY',
+    defaultSessionFee: '0', level2SessionFee: null, introSessionFee: '0.00', level1BaseRate: '0', level2BaseRate: '1', offShiftPremium: '0.1',
+    cancellationWindowMinutes: 0, lateCancelDeduction: false, minimumSessionDurationMinutes: 15 };
+  assert.deepEqual(gymConfigurationSchema.parse(config), config);
+  assert.equal(gymConfigurationSchema.safeParse({ ...config, currency: 'EUR' }).success, false);
+  assert.equal(gymConfigurationSchema.safeParse({ ...config, defaultSessionFee: 0 }).success, false);
+  assert.equal(createMembershipPlanSchema.safeParse({ expectedVersion: 2, name: 'Free', price: '0.00', durationDays: 1 }).success, true);
+  assert.equal(createMembershipPlanSchema.safeParse({ expectedVersion: 2, name: 'bad', price: '0', durationDays: 1, gymId: 'foreign' }).success, false);
+  assert.equal(updateGymThemeSchema.safeParse({ expectedVersion: 1, primaryColor: '#123456', logoUrl: 'http://example.test/logo.png' }).success, false);
+  assert.equal(updateGymThemeSchema.safeParse({ expectedVersion: 1, logoUrl: null }).success, true);
 });
 test('date and metadata validation rejects malformed calendar dates and private fields', () => {
   assert.equal(localDateSchema.safeParse('2026-02-30').success, false);

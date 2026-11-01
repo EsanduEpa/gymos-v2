@@ -12,6 +12,7 @@ import {
   Post,
   Req,
   ServiceUnavailableException,
+  UnprocessableEntityException,
   UseGuards,
 } from '@nestjs/common';
 import { z } from 'zod';
@@ -20,25 +21,14 @@ import { Prisma } from './generated/tenant/client.js';
 import type { Prisma as MasterPrisma } from './generated/master/client.js';
 import { GymAccessGuard, type GymRequest } from './gym-access.guard.js';
 import { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js';
+import { appendMasterVersionAudit } from './operations/transaction-audit.js';
+import { updateGymPublicProfileSchema, updateGymThemeSchema } from '@gymos/contracts';
 
 const createMemberInput = z.strictObject({
   fullName: z.string().trim().min(2).max(120),
   email: z.string().trim().toLowerCase().pipe(z.email()).optional(),
 });
 
-const updateThemeInput = z
-  .strictObject({
-    primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-    logoUrl: z
-      .string()
-      .trim()
-      .max(2048)
-      .url()
-      .refine((url) => url.startsWith('https://'))
-      .nullable()
-      .optional(),
-  })
-  .refine((value) => Object.keys(value).length > 0);
 
 @Controller('gyms')
 export class GymsController {
@@ -83,12 +73,19 @@ export class GymsController {
       throw new NotFoundException('Gym not found');
     }
 
+    const candidateLogo = gym.theme?.logoUrl;
+    let safeLogo: string | null = null;
+    try {
+      const parsedLogo = candidateLogo ? new URL(candidateLogo) : null;
+      if (parsedLogo?.protocol === 'https:' && candidateLogo!.length <= 2048) safeLogo = parsedLogo.toString();
+    } catch { /* A broken stored logo uses the fixed-size monogram. */ }
+
     return {
       slug: gym.slug,
       name: gym.name,
       theme: {
-        primaryColor: gym.theme?.primaryColor ?? '#007A35',
-        logoUrl: gym.theme?.logoUrl ?? null,
+        primaryColor: gym.theme?.primaryColor && /^#[0-9a-fA-F]{6}$/.test(gym.theme.primaryColor) ? gym.theme.primaryColor : '#007A35',
+        logoUrl: safeLogo,
       },
     };
   }
@@ -104,24 +101,79 @@ export class GymsController {
       throw new ForbiddenException('Only gym owners can update themes');
     }
 
-    const parsed = updateThemeInput.safeParse(body);
+    const parsed = updateGymThemeSchema.safeParse(body);
     if (!parsed.success) {
-      throw new BadRequestException('Enter a valid theme color or logo URL');
+      throw new UnprocessableEntityException('Enter a valid theme color, HTTPS logo URL and current version');
     }
 
     const theme = await this.database.master.$transaction(async tx => {
       // Serialize this Master-local mutation with the lifecycle status change.
       await tx.$queryRaw`SELECT "id" FROM "Gym" WHERE "id" = ${access.gymId} FOR SHARE`;
       await this.assertCurrentOwnerAccess(access, tx);
-      return tx.theme.upsert({
-      where: { gymId: access.gymId },
-      create: { gymId: access.gymId, ...parsed.data },
-      update: parsed.data,
-      select: { primaryColor: true, logoUrl: true },
+      const { expectedVersion, ...input } = parsed.data;
+      const changes = { ...input, ...(input.logoUrl === '' ? { logoUrl: null } : {}) };
+      const updated = await tx.theme.updateMany({
+        where: { gymId: access.gymId, version: expectedVersion },
+        data: { ...changes, version: { increment: 1 } },
       });
+      if (updated.count !== 1) throw new ConflictException('Theme changed; reload and try again');
+      await appendMasterVersionAudit(tx, { actorIdentityId: access.identityId, gymId: access.gymId,
+        eventCode: 'GYM_THEME_UPDATED', resourceType: 'THEME', resourceId: access.gymId,
+        committedVersion: expectedVersion + 1, transition: { version: expectedVersion + 1 } });
+      return tx.theme.findUniqueOrThrow({ where: { gymId: access.gymId }, select: { primaryColor: true, logoUrl: true, version: true } });
     });
 
     return { slug: access.slug, theme };
+  }
+
+  @Get(':slug/theme/settings')
+  @UseGuards(GymAccessGuard)
+  async themeSettings(@Req() request: GymRequest) {
+    const access = request.gymAccess;
+    if (!access) throw new InternalServerErrorException('Gym context missing');
+    if (access.role !== 'OWNER') throw new ForbiddenException('Theme settings are owner-only');
+    await this.assertCurrentOwnerAccess(access);
+    const theme = await this.database.master.theme.findUnique({
+      where: { gymId: access.gymId }, select: { primaryColor: true, logoUrl: true, version: true },
+    });
+    if (!theme) throw new NotFoundException('Gym theme not found');
+    return { slug: access.slug, theme: { ...theme,
+      primaryColor: /^#[0-9a-fA-F]{6}$/.test(theme.primaryColor) ? theme.primaryColor : '#007A35',
+      logoUrl: theme.logoUrl && theme.logoUrl.length <= 2048 && /^https:\/\//i.test(theme.logoUrl) ? theme.logoUrl : null,
+    } };
+  }
+
+  @Get(':slug/public-profile')
+  @UseGuards(GymAccessGuard)
+  async publicProfile(@Req() request: GymRequest) {
+    const access = request.gymAccess;
+    if (!access) throw new InternalServerErrorException('Gym context missing');
+    if (access.role !== 'OWNER') throw new ForbiddenException('Gym profile is owner-only');
+    const gym = await this.database.master.gym.findUnique({ where: { id: access.gymId }, select: { name: true, publicProfileVersion: true } });
+    if (!gym) throw new NotFoundException('Gym not found');
+    return { name: gym.name, version: gym.publicProfileVersion };
+  }
+
+  @Patch(':slug/public-profile')
+  @UseGuards(GymAccessGuard)
+  async updatePublicProfile(@Req() request: GymRequest, @Body() body: unknown) {
+    const access = request.gymAccess;
+    if (!access) throw new InternalServerErrorException('Gym context missing');
+    if (access.role !== 'OWNER') throw new ForbiddenException('Gym profile is owner-only');
+    const parsed = updateGymPublicProfileSchema.safeParse(body);
+    if (!parsed.success) throw new UnprocessableEntityException('Enter a valid gym name and current version');
+    return this.database.master.$transaction(async tx => {
+      await tx.$queryRaw`SELECT "id" FROM "Gym" WHERE "id" = ${access.gymId} FOR SHARE`;
+      await this.assertCurrentOwnerAccess(access, tx);
+      const changed = await tx.gym.updateMany({ where: { id: access.gymId, publicProfileVersion: parsed.data.expectedVersion },
+        data: { name: parsed.data.name, publicProfileVersion: { increment: 1 } } });
+      if (changed.count !== 1) throw new ConflictException('Gym name changed; reload and try again');
+      const version = parsed.data.expectedVersion + 1;
+      await appendMasterVersionAudit(tx, { actorIdentityId: access.identityId, gymId: access.gymId,
+        eventCode: 'GYM_PUBLIC_PROFILE_UPDATED', resourceType: 'GYM_PROFILE', resourceId: access.gymId,
+        committedVersion: version, transition: { version } });
+      return { name: parsed.data.name, version };
+    });
   }
 
   @Get(':slug/access')

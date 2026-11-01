@@ -185,6 +185,7 @@ export async function seedTwoGymFixture(environment: Environment) {
       const evidence = await new TenantSchemaVerifier(
         tenants[index],
       ).verifyAndAttest({ masterGymId: gym.id, operationId });
+      await tenants[index].gymConfiguration.update({ where: { id: 'current' }, data: { currency: 'LKR', timezone: 'Asia/Colombo', version: { increment: 1 } } });
       await new TenantRegistryService({
         master,
       } as DatabaseService).observeVerifiedTenant({

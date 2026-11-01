@@ -41,6 +41,7 @@ model Member {
   registrationState     MemberRegistrationState @default(BASIC)
   enrollmentOperationId String?                 @unique
   version               Int                     @default(0)
+  memberships           MembershipTerm[]
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
 }
@@ -77,9 +78,93 @@ model GymConfiguration {
   masterGymId String   @unique
   currency    String?
   timezone    String?
+  address     String   @default("")
+  phone       String?
+  email       String?
+  payPeriod   PayPeriod @default(MONTHLY)
+  defaultSessionFee Decimal @default(50) @db.Decimal(19, 4)
+  level2SessionFee Decimal? @db.Decimal(19, 4)
+  introSessionFee Decimal? @db.Decimal(19, 4)
+  level1BaseRate Decimal @default(0.4) @db.Decimal(9, 6)
+  level2BaseRate Decimal @default(0.5) @db.Decimal(9, 6)
+  offShiftPremium Decimal @default(0.1) @db.Decimal(9, 6)
+  cancellationWindowMinutes Int @default(1440)
+  lateCancelDeduction Boolean @default(true)
+  minimumSessionDurationMinutes Int @default(20)
   version     Int      @default(0)
+  policyVersions GymConfigurationVersion[]
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model GymConfigurationVersion {
+  id String @id @default(cuid())
+  gymConfigurationId String
+  gymConfiguration GymConfiguration @relation(fields: [gymConfigurationId], references: [id], onDelete: Restrict)
+  configurationVersion Int
+  currency String?
+  timezone String?
+  address String
+  phone String?
+  email String?
+  payPeriod PayPeriod
+  defaultSessionFee Decimal @db.Decimal(19, 4)
+  level2SessionFee Decimal? @db.Decimal(19, 4)
+  introSessionFee Decimal? @db.Decimal(19, 4)
+  level1BaseRate Decimal @db.Decimal(9, 6)
+  level2BaseRate Decimal @db.Decimal(9, 6)
+  offShiftPremium Decimal @db.Decimal(9, 6)
+  cancellationWindowMinutes Int
+  lateCancelDeduction Boolean
+  minimumSessionDurationMinutes Int
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([gymConfigurationId, configurationVersion])
+  @@index([configurationVersion])
+}
+
+enum PayPeriod {
+  WEEKLY
+  MONTHLY
+}
+
+enum MembershipPlanStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model MembershipPlan {
+  id           String @id @default(cuid())
+  name         String
+  description  String?
+  price        Decimal @db.Decimal(19, 4)
+  currency     String
+  durationDays Int
+  status       MembershipPlanStatus @default(ACTIVE)
+  version      Int @default(0)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+  memberships  MembershipTerm[]
+  @@index([status, createdAt])
+}
+
+model MembershipTerm {
+  id                    String @id @default(cuid())
+  memberId              String
+  member                Member @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  planId                String
+  plan                  MembershipPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  startDate             DateTime @db.Date
+  endDateExclusive      DateTime @db.Date
+  agreedPrice           Decimal @db.Decimal(19, 4)
+  currency              String
+  planNameSnapshot      String
+  configurationVersion  Int
+  actorIdentityId       String
+  idempotencyKey        String
+  requestDigest         String
+  createdAt             DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([actorIdentityId, idempotencyKey])
+  @@index([memberId, startDate, endDateExclusive])
 }
 
 model SchemaState {

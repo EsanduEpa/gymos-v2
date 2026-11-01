@@ -34,7 +34,7 @@ function sorted(values: Iterable<string>): string[] {
 }
 
 function requireExact(label: string, actual: readonly string[], expected: readonly string[]): void {
-  if (!equal(sorted(actual), sorted(expected))) throw new TenantSchemaIntegrityError(`${label} postcondition mismatch`);
+  if (!equal(sorted(actual), sorted(expected))) throw new TenantSchemaIntegrityError(`${label} postcondition mismatch: actual=${sorted(actual).join(',')} expected=${sorted(expected).join(',')}`);
 }
 
 export type InstalledTenantEvidence = {
@@ -164,7 +164,9 @@ export class TenantSchemaVerifier {
           throw new TenantSchemaIntegrityError('Physical tenant binding mismatch');
         }
         if (!configuration) {
-          await tx.gymConfiguration.create({ data: { id: 'current', masterGymId }, select: { id: true } });
+          // Keep this initializer compatible with reviewed older tenant schemas
+          // whose GymConfiguration table predates fields in the current client.
+          await tx.$executeRaw`INSERT INTO "GymConfiguration" ("id", "masterGymId", "updatedAt") VALUES ('current', ${masterGymId}, CURRENT_TIMESTAMP) ON CONFLICT ("id") DO NOTHING`;
         }
         const [{ now }] = await tx.$queryRaw<Array<{ now: Date }>>`SELECT clock_timestamp() AS now`;
         const appliedAt = current.appliedTemplateVersion === evidence.templateVersion

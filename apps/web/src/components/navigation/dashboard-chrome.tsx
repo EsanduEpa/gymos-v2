@@ -48,6 +48,7 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
         {mobile ? <button type="button" onClick={close} aria-label="Close navigation menu">×</button> : null}</div>
       <nav aria-label={mobile ? 'Mobile navigation' : 'Main navigation'}>
         <a href={destination} aria-current={pathname === destination || pathname === `/gyms/${gym?.slug}` ? 'page' : undefined} onClick={close}><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>{label}</a>
+        {!support && gym?.role === 'OWNER' ? <a href={`${destination}/gym-config`} aria-current={pathname.endsWith('/gym-config') ? 'page' : undefined} onClick={close}>Gym Configuration</a> : null}
         {gym && gyms.length > 1 ? <a href="/gyms/select" onClick={() => { close(); setSwitching(true); }}>Switch gym</a> : null}
         {support ? <a href="/admin" onClick={close}>All Gyms</a> : null}
       </nav>

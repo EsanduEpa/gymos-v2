@@ -1,6 +1,6 @@
 # Migration Coverage Matrix
 
-> **Segment 03 automated completion — 31 October 2026 at `0b7c909`:** Segments 01/02/03 completed (23/6/6 tasks); **35/88 completed, 53 remaining**. All11 hosted checks passed in [run 41172437503](https://github.com/EsanduEpa/gymos-v2/actions/runs/41172437503). [Handoff](../SEGMENT_03_HANDOFF.md). Owner manual acceptance for02/03 remains pending; PRs #1–3 remain draft/unmerged under the manual safeguard. Segment 04 is not started.
+> **Segment 04 automated completion — 31 October 2026 at `c9af453`:** Segments 01–04 completed (23/6/6/5 tasks); **40/88 completed, 48 remaining**. All 11 hosted checks passed in [run 41210839760](https://github.com/EsanduEpa/gymos-v2/actions/runs/41210839760). [Segment 04 handoff](../SEGMENT_04_HANDOFF.md). Owner manual acceptance for Segments 02–04 remains pending; PRs #1–4 remain draft/unmerged under the manual safeguard.
 
 This matrix assigns every authoritative task and every V1 route responsibility to one owning segment. A dependency may consume an outcome but must not duplicate ownership. Task statuses reflect the tracker synchronized 31 October 2026.
 
@@ -22,7 +22,7 @@ This matrix assigns every authoritative task and every V1 route responsibility t
 | GYMOS-MIG-012 | Shared accessible UI primitives | `components/shared`, layout patterns | `apps/web/src/components/ui` | 01 | GYMOS-MIG-012 | COMPLETED |
 | GYMOS-MIG-013 | Role/gym dashboard chrome | dashboard layout/sidebar/header | proposed web dashboard shell | 02 | GYMOS-MIG-013 | COMPLETED |
 | GYMOS-MIG-014 | Safe V1 visual fixtures | all V1 rendered screens | `apps/web/tests/visual` | 01 | GYMOS-MIG-014 | COMPLETED |
-| GYMOS-MIG-015 | Branding editor/fallback | O12 plus V2 theme scaffold | gym config web/API/theme | 04 | GYMOS-MIG-015 | NOT STARTED |
+| GYMOS-MIG-015 | Branding editor/fallback | O12 plus V2 theme scaffold | gym config web/API/theme | 04 | GYMOS-MIG-015 | COMPLETED |
 | GYMOS-MIG-016 | Login/session/forced-change enforcement | A01; `lib/auth.ts` | auth controller/service/policies | 02 | GYMOS-MIG-016 | COMPLETED |
 | GYMOS-MIG-017 | Temporary credential/change/reissue | A02; `actions/account.ts` | auth/identity credential commands | 02 | GYMOS-MIG-017 | COMPLETED |
 | GYMOS-MIG-018 | Actor/resource authorization | `lib/authz.ts` | Nest guards/policies | 02 | GYMOS-MIG-018 | COMPLETED |
@@ -34,10 +34,10 @@ This matrix assigns every authoritative task and every V1 route responsibility t
 | GYMOS-MIG-024 | Registry/read-only support | S01; `actions/admin.ts` | platform registry/support session | 03 | GYMOS-MIG-024 | COMPLETED |
 | GYMOS-MIG-025 | Suspend/reactivate tenant | S01 status | Master access/gym lifecycle | 03 | GYMOS-MIG-025 | COMPLETED |
 | GYMOS-MIG-026 | Tenant schema rollout/repair | database map | versioned orchestrator/repair | 03 | GYMOS-MIG-026 | COMPLETED |
-| GYMOS-MIG-027 | Gym profile/config reads | O12; `actions/gym-config.ts` | tenant configuration module | 04 | GYMOS-MIG-027 | NOT STARTED |
-| GYMOS-MIG-028 | Membership plans/form | O12 Plans tab | membership-plan module/UI | 04 | GYMOS-MIG-028 | NOT STARTED |
-| GYMOS-MIG-029 | Rates/pay/cancellation policy | O12 remaining tabs | configuration policy DTOs/schema | 04 | GYMOS-MIG-029 | NOT STARTED |
-| GYMOS-MIG-030 | Membership eligibility/renewal | `Membership`, expiry action | membership terms/service | 04 | GYMOS-MIG-030 | NOT STARTED |
+| GYMOS-MIG-027 | Gym profile/config reads | O12; `actions/gym-config.ts` | tenant configuration module | 04 | GYMOS-MIG-027 | COMPLETED |
+| GYMOS-MIG-028 | Membership plans/form | O12 Plans tab | membership-plan module/UI | 04 | GYMOS-MIG-028 | COMPLETED |
+| GYMOS-MIG-029 | Rates/pay/cancellation policy | O12 remaining tabs | configuration policy DTOs/schema | 04 | GYMOS-MIG-029 | COMPLETED |
+| GYMOS-MIG-030 | Membership eligibility/renewal | `Membership`, expiry action | membership terms/service | 04 | GYMOS-MIG-030 | COMPLETED |
 | GYMOS-MIG-031 | Member registration | O03; `actions/members.ts` | member enrollment saga/API/UI | 05 | GYMOS-MIG-031 | NOT STARTED |
 | GYMOS-MIG-032 | Member list/profile | O02/O04 | member query/detail/UI | 05 | GYMOS-MIG-032 | NOT STARTED |
 | GYMOS-MIG-033 | Member status/hold release | O04 status action | recoverable member status command | 05 | GYMOS-MIG-033 | NOT STARTED |

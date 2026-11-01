@@ -30,7 +30,7 @@ export const legacyThemeValuesSchema = z.strictObject({
 export const legacyThemeSchema = z.strictObject({
   slug: legacyGymSlugSchema, name: z.string(), theme: legacyThemeValuesSchema,
 });
-export const legacyUpdatedThemeSchema = z.strictObject({ slug: legacyGymSlugSchema, theme: legacyThemeValuesSchema });
+export const legacyUpdatedThemeSchema = z.strictObject({ slug: legacyGymSlugSchema, theme: legacyThemeValuesSchema.extend({ version: z.number().int().nonnegative() }) });
 export const legacyAccessSchema = z.strictObject({ gymId: idSchema, slug: legacyGymSlugSchema, role: gymRoleSchema });
 export const legacyMemberSchema = z.strictObject({
   id: idSchema, fullName: z.string(), email: z.email().nullable(), status: legacyMemberStatusSchema,
