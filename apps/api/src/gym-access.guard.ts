@@ -40,6 +40,7 @@ export class GymAccessGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<GymRequest>();
+    if (request.headers['x-gymos-support-context']) throw new ForbiddenException('Support is limited to approved read-only summaries');
     const identity = await identityFromAuthorization(request.headers.authorization);
 
     const slug = request.params.slug;

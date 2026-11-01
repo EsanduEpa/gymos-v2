@@ -10,12 +10,19 @@ import type { Request } from 'express';
 import { identityFromAuthorization } from './auth-token.js';
 import { DatabaseService } from './database.service.js';
 
+export type PlatformRequest = Request & { platformIdentity?: { identityId: string; authVersion: number } };
+
 @Injectable()
 export class SuperAdminGuard implements CanActivate {
   constructor(private readonly database: DatabaseService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<Request>();
+    const request = context.switchToHttp().getRequest<PlatformRequest>();
+    if (request.headers['x-gymos-support-context']) {
+      const allowed = (['GET', 'HEAD'].includes(request.method) && /^\/admin\/support-sessions\/[^/]+\/gyms\/[^/]+\/summary\/?$/.test(request.path))
+        || (request.method === 'DELETE' && /^\/admin\/support-sessions\/[^/]+\/?$/.test(request.path));
+      if (!allowed) throw new ForbiddenException('Support scope does not permit this request');
+    }
     const identity = await identityFromAuthorization(request.headers.authorization);
     let user;
     let masterNow: Date;
@@ -36,6 +43,7 @@ export class SuperAdminGuard implements CanActivate {
     if (user.globalRole !== 'SUPER_ADMIN') {
       throw new ForbiddenException('Super Admin access required');
     }
+    request.platformIdentity = { identityId: identity.userId, authVersion: identity.authVersion };
     return true;
   }
 }

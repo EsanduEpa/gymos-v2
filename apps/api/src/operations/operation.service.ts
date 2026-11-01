@@ -35,7 +35,7 @@ async function assertLease(tx: Tx, lease: Lease) {
   return { operation, now };
 }
 function supportedKind(kind: OperationKind): SupportedKind {
-  if (!['PROVISION_GYM', 'REGISTER_MEMBER', 'REGISTER_TRAINER'].includes(kind)) throw new OperationConflictError('Workflow checkpoints not commissioned for this kind');
+  if (!['PROVISION_GYM', 'REGISTER_MEMBER', 'REGISTER_TRAINER', 'CHANGE_ACCESS', 'ROLLOUT_TENANT_SCHEMA'].includes(kind)) throw new OperationConflictError('Workflow checkpoints not commissioned for this kind');
   return kind as SupportedKind;
 }
 function checkpointEffects(evidence: StepEvidence): Prisma.OperationUncheckedUpdateManyInput {
@@ -56,6 +56,7 @@ export class OperationFoundationService {
     intent: unknown; gymId?: string; requestedSlug?: string; supportContextId?: string;
     intendedTenantTemplateVersion?: string; intendedTenantManifestDigest?: string;
     protectedFingerprint?: string;
+    prepare?: (tx: Tx, operation: Operation) => Promise<void>;
   }) {
     reference(input.actorIdentityId); idempotencyKey(input.idempotencyKey);
     const scopeKey = input.kind === 'PROVISION_GYM' ? provisionScope(input.requestedSlug ?? '') : gymScope(input.gymId ?? '');
@@ -87,7 +88,9 @@ export class OperationFoundationService {
         intendedTenantTemplateVersion: input.intendedTenantTemplateVersion ?? null,
         intendedTenantManifestDigest: input.intendedTenantManifestDigest ?? null,
       } });
-      return { operation, replayed: false, result: null };
+      await input.prepare?.(tx, operation);
+      const prepared = input.prepare ? await tx.operation.findUniqueOrThrow({ where: { id: operation.id } }) : operation;
+      return { operation: prepared, replayed: false, result: null };
     });
   }
 
@@ -176,7 +179,7 @@ export class OperationFoundationService {
       await tx.operation.update({ where: { id: operation.id, version: lease.version }, data: {
         ...checkpointEffects(input.evidence), completedSteps: steps as Prisma.InputJsonValue,
         state, step: input.step, version: { increment: 1 },
-        ...(input.step === 'TENANT_TEMPLATE_VERIFIED' ? { tenantSchemaVerifiedAt: now } : {}),
+        ...(['TENANT_TEMPLATE_VERIFIED', 'SCHEMA_APPLIED'].includes(input.step) ? { tenantSchemaVerifiedAt: now } : {}),
         ...(result ? { safeResult: result as Prisma.InputJsonValue, leaseToken: null, leaseExpiresAt: null } : {}),
       } });
       await appendMasterAudit(tx, { actorIdentityId: operation.actorIdentityId,
@@ -184,6 +187,19 @@ export class OperationFoundationService {
         resourceType: 'OPERATION', resourceId: operation.id,
         gymId: input.evidence.gymId ?? operation.gymId, transition: { from: operation.state, to: state } });
       return { lease: { ...lease, version: lease.version + 1 }, state, result };
+    });
+  }
+
+  async releaseLease(lease: Lease): Promise<void> {
+    await this.master.$transaction(async tx => {
+      const { operation } = await assertLease(tx, lease);
+      const state = stateForSteps(supportedKind(operation.kind), operation.completedSteps as CompletedSteps);
+      await tx.operation.update({ where: { id: operation.id, version: lease.version }, data: {
+        state, leaseToken: null, leaseExpiresAt: null, version: { increment: 1 },
+      } });
+      await appendMasterAudit(tx, { actorIdentityId: operation.actorIdentityId, operationId: operation.id,
+        stepCode: 'YIELDED', eventCode: 'OPERATION_YIELDED', resourceType: 'OPERATION', resourceId: operation.id,
+        eventOrdinal: operation.attemptCount, gymId: operation.gymId, transition: { from: operation.state, to: state } });
     });
   }
 

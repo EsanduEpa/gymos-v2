@@ -144,7 +144,7 @@ export async function verifyInstalledTenant(
 export class TenantSchemaVerifier {
   constructor(private readonly tenant: PrismaClient) {}
 
-  async verifyAndAttest(input: { masterGymId: string; operationId: string }): Promise<InstalledTenantEvidence> {
+  async verifyAndAttest(input: { masterGymId: string; operationId: string }, manifest: TenantTemplateManifest = TENANT_TEMPLATE_MANIFEST): Promise<InstalledTenantEvidence> {
     const masterGymId = reference(input.masterGymId);
     const operationId = reference(input.operationId);
     await this.tenant.schemaState.upsert({
@@ -154,17 +154,17 @@ export class TenantSchemaVerifier {
     });
     try {
       return await this.tenant.$transaction(async (tx) => {
-        const evidence = await verifyInstalledTenant(tx);
+        const evidence = await verifyInstalledTenant(tx, manifest);
         const current = await tx.schemaState.findUniqueOrThrow({ where: { id: 'current' } });
         if (current.state !== 'APPLYING' || current.lastOperationId !== operationId) {
           throw new TenantSchemaIntegrityError('Tenant verification ownership changed');
         }
-        const configuration = await tx.gymConfiguration.findUnique({ where: { id: 'current' } });
+        const configuration = await tx.gymConfiguration.findUnique({ where: { id: 'current' }, select: { masterGymId: true } });
         if (configuration && configuration.masterGymId !== masterGymId) {
           throw new TenantSchemaIntegrityError('Physical tenant binding mismatch');
         }
         if (!configuration) {
-          await tx.gymConfiguration.create({ data: { id: 'current', masterGymId } });
+          await tx.gymConfiguration.create({ data: { id: 'current', masterGymId }, select: { id: true } });
         }
         const [{ now }] = await tx.$queryRaw<Array<{ now: Date }>>`SELECT clock_timestamp() AS now`;
         const appliedAt = current.appliedTemplateVersion === evidence.templateVersion

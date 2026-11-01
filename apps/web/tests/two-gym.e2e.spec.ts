@@ -1,4 +1,5 @@
-import { spawn, type ChildProcess } from 'node:child_process';
+import { execFile, spawn, type ChildProcess } from 'node:child_process';
+import { promisify } from 'node:util';
 import { createHmac, randomBytes } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import { createServer } from 'node:net';
@@ -9,7 +10,7 @@ import { seedTwoGymFixture } from '../../api/test/fixtures/two-gym-fixture.js';
 import { createDisposableEnvironment } from '../../api/test/support/disposable-environment.js';
 
 // Authentication scenarios must never persist bearer/password traffic in traces.
-test.use({ trace: 'off' });
+test.use({ trace: 'off', screenshot: 'off' });
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const apiDirectory = join(root, 'apps/api');
@@ -25,6 +26,8 @@ let web: ProcessState | undefined;
 let apiBase = '';
 let webBase = '';
 let testJwtSecret = '';
+let apiEnvironment:NodeJS.ProcessEnv={NODE_ENV:'production'};
+let scenarioStarted=false;
 
 async function freePort(): Promise<number> {
   const server = createServer();
@@ -73,7 +76,16 @@ async function login(page: Page, email: string): Promise<void> {
   await loginWithPassword(page, email, fixture.password);
 }
 
-async function openGymWithTestSession(page: Page, userId: string, slug: string, expiresIn = 900): Promise<void> {
+async function waitForSessionLifecycle(page: Page): Promise<void> {
+  // Server-rendered shell text can be visible before the client listeners mount.
+  // A real focus-triggered/initial BFF response proves the listener is active.
+  const ready=page.waitForResponse(response=>response.url()===`${webBase}/api/session`&&response.request().method()==='GET'&&response.ok());
+  await page.bringToFront();
+  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+  await ready;
+}
+
+async function openWithTestSession(page: Page, userId: string, path: string, expiresIn = 900): Promise<void> {
   const issuedAt = Math.floor(Date.now() / 1000);
   const header = Buffer.from(JSON.stringify({ alg: 'HS256' })).toString('base64url');
   const payload = Buffer.from(JSON.stringify({
@@ -94,7 +106,11 @@ async function openGymWithTestSession(page: Page, userId: string, slug: string, 
     httpOnly: true,
     sameSite: 'Lax',
   }]);
-  await page.goto(`${webBase}/gyms/${slug}`);
+  await page.goto(`${webBase}${path}`);
+}
+
+async function openGymWithTestSession(page: Page, userId: string, slug: string, expiresIn = 900): Promise<void> {
+  await openWithTestSession(page, userId, `/gyms/${slug}`, expiresIn);
 }
 
 async function contrastRatio(page: Page, selector: string): Promise<number> {
@@ -146,14 +162,15 @@ test.beforeAll(async () => {
     NODE_ENV: 'production',
     TZ: 'UTC',
   };
-  api = start(process.execPath, [join(apiDirectory, 'dist/main.js')], apiDirectory, {
+  apiEnvironment={
     ...cleanEnvironment,
     PORT: String(apiPort),
     MASTER_DATABASE_URL: environment.masterUrl,
     TENANT_DATABASE_URL: environment.masterUrl,
     PROVISION_DATABASE_URL: environment.masterUrl,
     JWT_SECRET: testJwtSecret,
-  });
+  };
+  api = start(process.execPath, [join(apiDirectory, 'dist/main.js')], apiDirectory, apiEnvironment);
   await waitReady(`${apiBase}/`, api);
   web = start(process.execPath, [join(webDirectory, 'node_modules/next/dist/bin/next'), 'start', '-H', '127.0.0.1', '-p', String(webPort)], webDirectory, {
     ...cleanEnvironment,
@@ -162,6 +179,15 @@ test.beforeAll(async () => {
     GYMOS_UI_TEST_HARNESS: '1',
   });
   await waitReady(`${webBase}/login`, web);
+});
+
+test.beforeEach(async()=>{
+  if(!scenarioStarted){scenarioStarted=true;return;}
+  // Isolate in-memory request budgets/pools without changing policy or the
+  // persisted shared fixture. Every scenario still runs the real guarded API.
+  await stop(api);
+  api=start(process.execPath,[join(apiDirectory,'dist/main.js')],apiDirectory,apiEnvironment);
+  await waitReady(`${apiBase}/`,api);
 });
 
 test('shared controls support keyboard use, failure recovery, and narrow screens', async ({ page }) => {
@@ -213,6 +239,16 @@ test.afterAll(async () => {
   await stop(api);
   await fixture?.close();
   if (environment) console.info('[task007-owned-run-cleanup]', JSON.stringify(await environment.cleanup()));
+});
+test.afterEach(async ({page},testInfo)=>{
+  if(testInfo.status===testInfo.expectedStatus)return;
+  const token=(await page.context().cookies()).find(cookie=>cookie.name==='gymos_access_token')?.value;
+  if(!token)return;
+  // Status-only diagnostics; never retain headers, bearer values or bodies.
+  for(const path of ['/auth/session','/admin/gyms']){
+    const response=await fetch(`${apiBase}${path}`,{headers:{authorization:`Bearer ${token}`}}).catch(()=>null);
+    console.info('[owned-browser-dependency-status]',{path,status:response?.status??0,remaining:response?.headers.get('x-ratelimit-remaining')??null});
+  }
 });
 
 test('real browser and HTTP requests preserve two-gym isolation and pure reads', async ({ page, request }) => {
@@ -458,6 +494,8 @@ test('web sessions enforce cookie, origin, expiry, revocation and logout boundar
   const otherTab = await page.context().newPage();
   await otherTab.goto(`${webBase}/gyms/${fixture.gyms[1].slug}/owner`);
   await expect(otherTab.locator('.shell-profile')).toContainText('Owner Beta');
+  await waitForSessionLifecycle(otherTab);
+  await waitForSessionLifecycle(page);
   // A focus-triggered 401 during logout must not abort delivery of the
   // Server Action's cookie deletion response.
   let logoutStarted = false;
@@ -496,6 +534,179 @@ test('web sessions enforce cookie, origin, expiry, revocation and logout boundar
   await expect(page.locator('.shell-profile')).toContainText('Owner Beta');
   await expect(page.locator('main')).not.toContainText('Alpha Person');
   await page.screenshot({ path: join(evidence, 'fresh-identity.png'), animations: 'disabled' });
+});
+
+test('platform form reserves one pending gym with safe status and a stable retry key', async ({ page, request }) => {
+  await openWithTestSession(page, fixture.users.admin.id, '/admin');
+  const before = await fixture.master.gym.count();
+  const key = await page.locator('input[name="requestKey"]').inputValue();
+  const input = { name: 'Browser reserved gym', slug: `browser-reserved-${environment.runId}`, ownerEmail: `browser-owner-${environment.runId}@example.test`, currency: 'LKR', timezone: 'Asia/Colombo' };
+  await page.getByLabel('Gym name', { exact: true }).fill(input.name);
+  await page.getByRole('textbox', { name: /^Gym slug/ }).fill(input.slug);
+  await page.getByRole('textbox', { name: /^Owner email/ }).fill(input.ownerEmail);
+  await page.getByLabel('Currency', { exact: true }).fill(input.currency);
+  await page.getByRole('textbox', { name: /^Timezone/ }).fill(input.timezone);
+  await page.getByRole('button', { name: 'Create gym', exact: true }).click();
+  const status = page.getByRole('region', { name: 'Provisioning status' });
+  await expect(status).toContainText('PENDING');
+  await expect(status).toContainText('remains unavailable');
+  const cookie = (await page.context().cookies()).find(item => item.name === 'gymos_access_token')!;
+  const replay = await request.post(`${apiBase}/admin/gyms`, { headers: { authorization: `Bearer ${cookie.value}`, 'idempotency-key': key }, data: input });
+  expect(replay.status()).toBe(202);
+  const result = await replay.json();
+  await expect(status).toContainText(result.operationId);
+  expect(await fixture.master.gym.count()).toBe(before + 1);
+  expect(await fixture.master.user.count({ where: { email: input.ownerEmail } })).toBe(0);
+  const stored = await fixture.master.operation.findUniqueOrThrow({ where: { id: result.operationId } });
+  expect((await page.content()).includes(stored.databaseName!)).toBe(false);
+  await page.getByRole('button', { name: 'Refresh status' }).click();
+  await expect(status).toContainText(result.operationId);
+  await page.setViewportSize({ width: 320, height: 700 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await mkdir(join(root, 'docs/migration/evidence/GYMOS-MIG-021'), { recursive: true });
+  await page.screenshot({ path: join(root, 'docs/migration/evidence/GYMOS-MIG-021/pending-320.png'), fullPage: true, animations: 'disabled' });
+  await promisify(execFile)(process.execPath,[join(apiDirectory,'scripts/provision-gym.mjs'),'resume',stored.id],{
+    env:{PATH:process.env.PATH,HOME:process.env.HOME,NODE_ENV:'test',GYMOS_OWNED_RUN_ID:environment.runId,MASTER_DATABASE_URL:environment.masterUrl,PROVISION_DATABASE_URL:environment.masterUrl,TENANT_DATABASE_URL:environment.masterUrl},timeout:30_000,
+  });
+  await environment.registerProvisionedDatabase(await fixture.master.operation.findUniqueOrThrow({where:{id:stored.id}}));
+  await page.goto(`${webBase}/admin`);
+  const row=page.getByRole('table',{name:'Registered gym tenants'}).getByRole('row').filter({has:page.getByText(input.name,{exact:true})});
+  await row.getByRole('button',{name:'Owner credential handoff'}).click();
+  await expect(row.getByRole('button',{name:'I delivered this credential'})).toBeVisible();
+  expect(await fixture.master.credentialDelivery.count({where:{operationId:stored.id}})).toBe(1);
+  // A second handoff request cannot retrieve the secret. Explicitly reissue it.
+  await row.getByRole('button',{name:'Owner credential handoff'}).click();
+  await row.getByRole('button',{name:'Reissue lost handoff',exact:true}).click();
+  const confirmation=page.getByRole('dialog',{name:'Reissue lost handoff?'});await expect(confirmation).toBeVisible();
+  await confirmation.getByRole('button',{name:'Confirm',exact:true}).click();
+  await expect(row.getByRole('button',{name:'I delivered this credential'})).toBeVisible();
+  expect((await fixture.master.credentialDelivery.findUniqueOrThrow({where:{operationId:stored.id}})).version).toBe(1);
+  await row.getByRole('button',{name:'I delivered this credential'}).click();
+  await expect(row).toContainText('Handoff acknowledged.');
+  expect(await row.locator('.credential-handoff output').count()).toBe(0);
+  expect((await fixture.master.credentialDelivery.findUniqueOrThrow({where:{operationId:stored.id}})).acknowledgedAt!==null).toBe(true);
+
+});
+
+test('platform registry supports audited read-only gym selection, switching, exit and narrow keyboard navigation', async ({ page }) => {
+  // Earlier full-suite journeys intentionally create a member. Compare the
+  // snapshot with current persisted actors, while retaining the seed invariant.
+  const expectedAlphaMembers=await fixture.tenants[0].member.count();
+  expect(expectedAlphaMembers).toBeGreaterThanOrEqual(fixture.expected.alphaMembers);
+  const execute=promisify(execFile);
+  for(const gym of fixture.gyms) await execute(process.execPath,[join(apiDirectory,'scripts/provision-gym.mjs'),'refresh-summary',gym.id,fixture.users.admin.id],{
+    env:{PATH:process.env.PATH,HOME:process.env.HOME,NODE_ENV:'test',GYMOS_OWNED_RUN_ID:environment.runId,MASTER_DATABASE_URL:environment.masterUrl,PROVISION_DATABASE_URL:environment.masterUrl,TENANT_DATABASE_URL:environment.masterUrl},timeout:20_000,
+  });
+  await openWithTestSession(page,fixture.users.admin.id,'/admin');
+  const table=page.getByRole('table',{name:'Registered gym tenants'});
+  const alpha=table.getByRole('row').filter({has:page.getByText('Test Gym Alpha',{exact:true})});
+  await expect.poll(()=>alpha.getByRole('cell').nth(2).evaluate(element=>element.firstChild?.textContent?.trim())).toBe(String(expectedAlphaMembers));
+  await expect(table).toBeVisible();
+  const evidence=join(root,'docs/migration/evidence/GYMOS-MIG-024');await mkdir(evidence,{recursive:true});
+  await page.screenshot({path:join(evidence,'registry-desktop.png'),fullPage:true,animations:'disabled'});
+  await page.setViewportSize({width:320,height:700});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.screenshot({path:join(evidence,'registry-320.png'),fullPage:true,animations:'disabled'});
+  await page.setViewportSize({width:1280,height:720});
+  await alpha.getByRole('button',{name:'View dashboard'}).focus();
+  await page.keyboard.press('Enter');
+  const reason=page.getByRole('textbox',{name:/^Support reason/});await reason.fill('Synthetic owner-summary diagnosis');
+  await page.getByRole('button',{name:'Enter support',exact:true}).click();
+  await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/owner$`));
+  await expect(page.locator('.support-banner')).toContainText('Viewing Test Gym Alpha');
+  await expect(page.locator('.support-banner')).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Test Gym Alpha',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Add member'})).toHaveCount(0);
+  await expect(page.locator('main')).not.toContainText('Alpha Person');
+  const supportCookie=(await page.context().cookies()).find(cookie=>cookie.name==='gymos_support_context')!;
+  expect(supportCookie.httpOnly&&supportCookie.secure&&supportCookie.sameSite==='Lax').toBe(true);
+  await page.screenshot({path:join(evidence,'support-alpha-desktop.png'),fullPage:true,animations:'disabled'});
+  const oldTab=await page.context().newPage();await oldTab.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/owner`);
+  await expect(oldTab.locator('.support-banner')).toContainText('Viewing Test Gym Alpha');
+  await page.getByRole('navigation',{name:'Main navigation'}).getByRole('link',{name:'All Gyms'}).click();
+  const beta=page.getByRole('table',{name:'Registered gym tenants'}).getByRole('row').filter({has:page.getByText('Test Gym Beta',{exact:true})});
+  await beta.getByRole('button',{name:'View dashboard'}).click();
+  await page.getByRole('textbox',{name:/^Support reason/}).fill('Synthetic second-gym diagnosis');
+  await page.getByRole('button',{name:'Enter support',exact:true}).click();
+  await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[1].slug}/owner$`));
+  await expect(page.locator('.support-banner')).toContainText('Viewing Test Gym Beta');
+  await expect(page.locator('.support-banner')).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Test Gym Beta',exact:true})).toBeVisible();
+  await expect(page.locator('main')).not.toContainText('Test Gym Alpha');
+  await expect(oldTab).toHaveURL(/\/admin$/);
+  await page.setViewportSize({width:320,height:700});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.getByRole('button',{name:'Open navigation menu'}).click();
+  await expect(page.getByRole('dialog',{name:'Navigation menu'})).toBeVisible();
+  await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'Open navigation menu'})).toBeFocused();
+  await page.screenshot({path:join(evidence,'support-beta-320.png'),fullPage:true,animations:'disabled'});
+  await page.getByRole('button',{name:'Exit support',exact:true}).click();await expect(page).toHaveURL(/\/admin$/);
+  expect((await page.context().cookies()).some(cookie=>cookie.name==='gymos_support_context')).toBe(false);
+  // The exit action may still finish its /admin RSC navigation after the
+  // cookie is cleared. Start protected navigation in a fresh document so a
+  // client redirect from the exiting document cannot abort this assertion.
+  const deniedTab=await page.context().newPage();
+  await deniedTab.goto(`${webBase}/gyms/${fixture.gyms[1].slug}/owner`);
+  await expect(deniedTab).toHaveURL(/\/admin$/);
+  await expect(deniedTab.locator('.support-banner')).toHaveCount(0);
+  await deniedTab.close();
+  await oldTab.close();
+});
+
+test('platform lifecycle confirms suspension and verified reactivation while old owner navigation stays protected', async ({page,browser})=>{
+ const ownerContext=await browser.newContext();const ownerPage=await ownerContext.newPage();
+ try{
+  await openGymWithTestSession(ownerPage,fixture.users.ownerA.id,fixture.gyms[0].slug);
+  await expect(ownerPage.getByRole('heading',{name:'Test Gym Alpha',exact:true})).toBeVisible();
+  await waitForSessionLifecycle(ownerPage);
+  await openWithTestSession(page,fixture.users.admin.id,'/admin');
+  const row=()=>page.getByRole('table',{name:'Registered gym tenants'}).getByRole('row').filter({has:page.getByText('Test Gym Alpha',{exact:true})});
+  await row().getByRole('button',{name:'Suspend gym',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Suspend this gym?'});await expect(dialog).toBeVisible();
+  await dialog.getByRole('button',{name:'Confirm',exact:true}).click();await expect(dialog).toContainText('Give a reason');
+  expect((await fixture.master.gym.findUniqueOrThrow({where:{id:fixture.gyms[0].id}})).status).toBe('ACTIVE');
+  await dialog.getByRole('textbox',{name:/^Lifecycle reason/}).fill('Synthetic owner-requested suspension');
+  const evidence=join(root,'docs/migration/evidence/GYMOS-MIG-025');await mkdir(evidence,{recursive:true});
+  await page.setViewportSize({width:320,height:700});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await page.screenshot({path:join(evidence,'suspend-confirmation-320.png'),fullPage:true,animations:'disabled'});
+  await dialog.getByRole('button',{name:'Confirm',exact:true}).click();
+  await expect(row().getByRole('button',{name:'Reactivate gym',exact:true})).toBeVisible();
+  await expect(row()).toContainText('SUSPENDED');
+  // Live session eviction can win before a reload. Verify that behavior and
+  // the fresh-document denial independently, rather than racing the two.
+  await waitForSessionLifecycle(ownerPage);
+  await expect(ownerPage).toHaveURL(/\/no-access$/);
+  await expect(ownerPage.getByRole('heading',{name:'No active gym access'})).toBeVisible();
+  await expect(ownerPage.locator('.member-list')).toHaveCount(0);
+  const deniedPage=await ownerContext.newPage();
+  await deniedPage.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/owner`);
+  await expect(deniedPage.getByRole('heading',{name:'This page could not be found'})).toBeVisible();
+  await expect(deniedPage.locator('.member-list')).toHaveCount(0);await deniedPage.close();
+  expect((await fixture.master.gym.findUniqueOrThrow({where:{id:fixture.gyms[1].id}})).status).toBe('ACTIVE');
+  await row().getByRole('button',{name:'Reactivate gym',exact:true}).click();
+  const reactivate=page.getByRole('dialog',{name:'Reactivate this gym?'});await expect(reactivate).toBeVisible();
+  await reactivate.getByRole('textbox',{name:/^Lifecycle reason/}).fill('Synthetic verified reactivation check');
+  await reactivate.getByRole('button',{name:'Confirm',exact:true}).click();
+  await expect(row().getByRole('button',{name:'Suspend gym',exact:true})).toBeVisible();
+  await ownerPage.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/owner`);
+  await expect(ownerPage.getByRole('heading',{name:'Test Gym Alpha',exact:true})).toBeVisible();
+  await page.setViewportSize({width:1280,height:720});await expect(row()).toBeVisible();
+  await page.screenshot({path:join(evidence,'reactivated-registry.png'),fullPage:true,animations:'disabled'});
+ }finally{await ownerContext.close();}
+});
+
+test('request budgets stay enabled in each owned API scenario',async({page,request})=>{
+  await openWithTestSession(page,fixture.users.admin.id,'/admin');
+  const token=(await page.context().cookies()).find(cookie=>cookie.name==='gymos_access_token')!.value;
+  let denied=false;
+  for(let attempt=0;attempt<110;attempt++){
+    const response=await request.get(`${apiBase}/auth/session`,{headers:{authorization:`Bearer ${token}`}});
+    if(attempt===0)expect(response.status()).toBe(200);
+    if(response.status()===429){denied=true;break;}
+    expect(response.status()).toBe(200);
+  }
+  expect(denied).toBe(true);
 });
 
 test('logout clears the browser even when API revocation is unavailable', async ({ page }) => {

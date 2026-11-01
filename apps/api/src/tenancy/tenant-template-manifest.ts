@@ -3,7 +3,7 @@ import { canonicalJson } from '../operations/primitives.js';
 
 export const RUNNING_TENANT_API_COMPATIBILITY = 1;
 
-export const TENANT_TEMPLATE_MANIFEST = Object.freeze({
+export const TENANT_TEMPLATE_V1 = Object.freeze({
   version: 'tenant-2026-10-24.1',
   apiCompatibility: { min: 1, max: 1 },
   migrations: [
@@ -43,7 +43,33 @@ export const TENANT_TEMPLATE_MANIFEST = Object.freeze({
   },
 } as const);
 
-export type TenantTemplateManifest = typeof TENANT_TEMPLATE_MANIFEST;
+export type TenantTemplateManifest = {
+  readonly version: string;
+  readonly apiCompatibility: { readonly min: number; readonly max: number };
+  readonly migrations: readonly { readonly name: string; readonly checksum: string }[];
+  readonly postconditions: {
+    readonly tables: readonly string[]; readonly types: readonly string[];
+    readonly indexes: readonly string[]; readonly constraints: readonly string[];
+    readonly triggers: readonly string[]; readonly columns: Readonly<Record<string, readonly string[]>>;
+  };
+};
+export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
+  ...TENANT_TEMPLATE_V1,
+  version: 'tenant-2026-10-30.1',
+  migrations: [...TENANT_TEMPLATE_V1.migrations, {
+    name: '20261030020000_initial_configuration', checksum: 'a1c3eb5e99ae8d921ea3802ca80d6fe90f6b33ba22f7da56ea27c681cdc600d7',
+  }],
+  postconditions: {
+    ...TENANT_TEMPLATE_V1.postconditions,
+    constraints: [...TENANT_TEMPLATE_V1.postconditions.constraints, 'GymConfiguration_currency_check', 'GymConfiguration_timezone_check'],
+    columns: { ...TENANT_TEMPLATE_V1.postconditions.columns,
+      GymConfiguration: [...TENANT_TEMPLATE_V1.postconditions.columns.GymConfiguration, 'currency', 'timezone'] },
+  },
+});
+export const TENANT_MANIFESTS: readonly TenantTemplateManifest[] = [TENANT_TEMPLATE_V1, TENANT_TEMPLATE_MANIFEST];
+export function reviewedTenantManifest(version: string | null, digest: string | null) {
+  return TENANT_MANIFESTS.find(manifest => manifest.version === version && tenantManifestDigest(manifest) === digest);
+}
 
 export function tenantManifestDigest(manifest: TenantTemplateManifest = TENANT_TEMPLATE_MANIFEST): string {
   return createHash('sha256').update(canonicalJson(manifest), 'utf8').digest('hex');

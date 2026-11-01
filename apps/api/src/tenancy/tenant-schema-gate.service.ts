@@ -4,8 +4,7 @@ import { canonicalJson } from '../operations/primitives.js';
 import { TenantDatabaseService } from '../tenant-database.service.js';
 import {
   assertRunningApiCompatibility,
-  TENANT_TEMPLATE_MANIFEST,
-  tenantManifestDigest,
+  reviewedTenantManifest,
 } from './tenant-template-manifest.js';
 
 export type TenantGateContext = {
@@ -33,20 +32,19 @@ export class TenantSchemaGateService {
   ): Promise<Result> {
     let metadataVerified = false;
     try {
-      assertRunningApiCompatibility();
-      const digest = tenantManifestDigest();
-      if (context.expectedTenantSchemaVersion !== TENANT_TEMPLATE_MANIFEST.version
-        || context.expectedTenantManifestDigest !== digest
-        || !context.expectedTenantOperationId
+      const manifest = reviewedTenantManifest(context.expectedTenantSchemaVersion, context.expectedTenantManifestDigest);
+      if (!manifest) throw unavailable();
+      assertRunningApiCompatibility(manifest);
+      if (!context.expectedTenantOperationId
         || context.expectedTenantOperationState !== 'COMPLETE'
-        || context.observedTenantSchemaVersion !== TENANT_TEMPLATE_MANIFEST.version
-        || context.observedTenantManifestDigest !== digest) throw unavailable();
+        || context.observedTenantSchemaVersion !== manifest.version
+        || context.observedTenantManifestDigest !== context.expectedTenantManifestDigest) throw unavailable();
       return await this.tenants.withDatabase(context.databaseName, async (tenant) => {
         let configuration;
         let schemaState;
         try {
           [configuration, schemaState] = await Promise.all([
-            tenant.gymConfiguration.findUnique({ where: { id: 'current' } }),
+            tenant.gymConfiguration.findUnique({ where: { id: 'current' }, select: { masterGymId: true } }),
             tenant.schemaState.findUnique({ where: { id: 'current' } }),
           ]);
         } catch {
@@ -57,7 +55,7 @@ export class TenantSchemaGateService {
           || schemaState.appliedTemplateVersion !== context.expectedTenantSchemaVersion
           || schemaState.appliedManifestDigest !== context.expectedTenantManifestDigest
           || schemaState.lastOperationId !== context.expectedTenantOperationId
-          || canonicalJson(schemaState.verifiedMigrations) !== canonicalJson(TENANT_TEMPLATE_MANIFEST.migrations)) {
+          || canonicalJson(schemaState.verifiedMigrations) !== canonicalJson(manifest.migrations)) {
           throw unavailable();
         }
         metadataVerified = true;

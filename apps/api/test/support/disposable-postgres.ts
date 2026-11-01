@@ -1,6 +1,6 @@
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { createReadStream } from 'node:fs';
@@ -349,6 +349,31 @@ export async function createDisposablePostgresRun() {
     verifyOwnership,
     dropOwnedDatabase,
     createOwnedDatabase,
+    async registerProvisionedDatabase(operation: { id: string; gymId: string | null; databaseName: string | null; requestDigest: string }) {
+      await verifyContainer();
+      const name=operation.databaseName;
+      if (!name || !/^gymos_[a-f0-9]{32}$/.test(name) || !/^[A-Za-z0-9_:-]+$/.test(operation.id) || !/^[A-Za-z0-9_:-]+$/.test(operation.gymId ?? '') || !/^d1:[a-f0-9]{64}$/.test(operation.requestDigest)) throw new Error('Invalid owned provisioning target');
+      const role=`gymos_owner_${createHash('sha256').update(operation.id).digest('hex').slice(0,32)}`;
+      const expected=`gymos-provision:${operation.id}:${operation.gymId}:${operation.requestDigest}`;
+      const admin=new pg.Client({connectionString:urlFor('postgres')});await admin.connect();
+      try {
+        const row=(await admin.query("SELECT r.rolname AS owner, shobj_description(r.oid, 'pg_authid') AS marker FROM pg_database d JOIN pg_roles r ON r.oid=d.datdba WHERE d.datname=$1",[name])).rows[0];
+        if (!row) return false;
+        if(row.owner!==role || row.marker!==expected)throw new Error('Refusing ambiguous provisioned database ownership');
+      } finally {await admin.end();}
+      if(!names.includes(name))names.push(name);
+      if(created.has(name))return true;
+      // The physical worker created this target. Only the positively verified
+      // cluster/role proof above permits this first marker connection.
+      const client=new pg.Client({connectionString:urlFor(name),connectionTimeoutMillis:3000});
+      await client.connect();
+      try {
+        await client.query('CREATE SCHEMA "__gymos_test"');
+        await client.query('CREATE TABLE "__gymos_test"."Ownership" (run_id TEXT NOT NULL, marker TEXT NOT NULL)');
+        await client.query('INSERT INTO "__gymos_test"."Ownership" VALUES ($1,$2)',[runId,marker]);
+      } finally {await client.end();}
+      created.add(name);return true;
+    },
     async migrate(name: string, kind: 'master' | 'tenant') {
       await verifyContainer();
       await verifyOwnership(name);

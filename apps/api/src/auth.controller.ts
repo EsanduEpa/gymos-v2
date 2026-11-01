@@ -16,6 +16,7 @@ import { z } from 'zod';
 import { identityEmailSchema } from './identity/email.js';
 import { DatabaseService } from './database.service.js';
 import { identityFromAuthorization } from './auth-token.js';
+import { revokeSupportForActor } from './platform/support-session.service.js';
 
 const loginInput = z.strictObject({
   email: identityEmailSchema,
@@ -92,10 +93,14 @@ export class AuthController {
     try {
       // Version CAS makes concurrent logout requests rotate exactly once and
       // prevents a stale request from revoking a later replacement session.
-      const revoked = await this.database.master.$transaction(async (tx) => tx.user.updateMany({
+      const revoked = await this.database.master.$transaction(async (tx) => {
+        const changed = await tx.user.updateMany({
         where: { id: identity.userId, authVersion: identity.authVersion },
         data: { authVersion: { increment: 1 } },
-      }));
+        });
+        if (changed.count === 1) await revokeSupportForActor(tx, identity.userId, 'LOGOUT_REVOKED');
+        return changed;
+      });
       if (revoked.count !== 1) throw new UnauthorizedException('Invalid or expired session');
       return { revoked: true };
     } catch (error) {

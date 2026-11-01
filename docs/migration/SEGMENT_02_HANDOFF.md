@@ -48,3 +48,7 @@ This handoff/tracker closure changes documentation only. Its new proposed revisi
 Use disposable V2 identities only. Confirm the role/gym/name and implemented links; at 320px use Enter/Tab/Shift+Tab/Escape and backdrop dismissal. Switch between two authorized gyms and confirm no prior gym rows/theme. With two tabs open, sign out, then use Back/a private bookmark: sign-in must replace private content. Stop only an owned disposable API and sign out: cookie deletion and other-device revocation uncertainty must both appear. Never copy a cookie value into evidence. See the [web session runbook](runbooks/web-sessions.md) for configuration and detailed checks.
 
 Task 065 retains the final supported-browser/OS and complete feature visual matrix; no Safari/Firefox/Edge or provider deployment verification is claimed. Next dependency-eligible work is GYMOS-MIG-021 in Segment 03, with review and separate branch setup. No further segment was implemented here. Owner decision-review responsibility remains with Esandu; no independent specialist review is claimed.
+
+## Owner manual review disposition — Segment 03 authorization
+
+The owner explicitly authorized starting Segment 03 while Segment 02's manual acceptance checks remain **PENDING**. Automated verification is recorded separately; no owner manual acceptance is claimed. This does not block independent Segment 03 implementation. PRs #1 and #2 remain draft/unmerged; no merge is authorized.

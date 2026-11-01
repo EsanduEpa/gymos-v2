@@ -103,3 +103,20 @@ Run [41021183510](https://github.com/EsanduEpa/gymos-v2/actions/runs/41021183510
 The final local role/session/logout follow-up passed 3/3. Its synthetic 401 now starts only after the logout POST: focusing the tab before submission must still perform a real valid-session check. Assertions are unchanged. Desktop sidebar scrolling was also aligned with V1's static full-content-height column, rather than introducing sticky positioning.
 
 Hosted follow-up resolved: [run 41042328353](https://github.com/EsanduEpa/gymos-v2/actions/runs/41042328353) passed all 11 jobs at `367bdf8`, including all six browser scenarios and the strengthened canonical denial assertion. [PR #2](https://github.com/EsanduEpa/gymos-v2/pull/2) remains draft/unmerged. Provider/release scope remains task 087.
+
+
+## Segment 03 dependency-review follow-up — 31 October 2026
+
+[Run 41172077267](https://github.com/EsanduEpa/gymos-v2/actions/runs/41172077267) at `5052c7a` passed 10/11; dependency review failed closed on a valid base JSON audit (moderate 2/high 0/critical 0). Local reproduction initially required specific owner approval to transmit committed dependency names/versions to npm; approval was received before retry. pnpm 9.15 JSON mode returns1 for any severity before applying `--audit-level`, confirmed in installed primary source. The corrected validator requires all five nonnegative safe integer counts and consistent exit0/1, rejects unavailable/malformed/error/signal/process-failure responses, and retains the high/critical proposed-revision gate. Eight focused tests pass, including high/critical blocking and failure handling; tests are added to the existing unit job. Base/proposed live audits pass the unchanged threshold. No dependency update, ignored advisory, disabled check or policy exception was introduced. Final hosted recheck follows.
+
+Follow-up verified: corrected revision `0b7c909` passed all 11 jobs in [run 41172437503](https://github.com/EsanduEpa/gymos-v2/actions/runs/41172437503). The audit-parser issue is resolved; moderate advisories remain reported under the unchanged high/critical gate.
+
+
+## Documentation-head browser synchronization follow-up — 31 October 2026
+
+Run 41172783755 passed10/11; the browser suite passed9/10. In the scoped support exit journey, the browser correctly navigated to `/admin` when support expired/was removed; an immediately subsequent `page.goto` on that same still-navigating document was aborted. Preserve the protected-navigation assertion and cookie-clear assertion while issuing the negative navigation in a fresh tab. This removes only cross-document navigation interference; no assertion, route guard or support boundary is relaxed. Focused production-browser verification and a new all-11 latest revision are required.
+
+
+## Segment 03 browser synchronization follow-up resolved — 31 October 2026
+
+The fresh-tab protected-navigation check passed locally (browser 10/10) and in [latest code run 41173208643](https://github.com/EsanduEpa/gymos-v2/actions/runs/41173208643) at `95c4919`; all 11 hosted jobs passed, including owned disposable databases, browser isolation, secret scan, dependency review and lockfile audit. No assertion or security boundary was weakened. The documentation revision records this exact run and still requires its own all-11 latest-head result.

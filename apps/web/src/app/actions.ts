@@ -1,5 +1,6 @@
 'use server';
 
+import { platformOperationSchema, provisioningInputSchema, idempotencyKeySchema } from '@gymos/contracts/platform';
 import { existingEndpointContracts, logoutResultSchema } from '@gymos/contracts/legacy';
 import { changePasswordInputSchema, changePasswordResultSchema } from '@gymos/contracts/credentials';
 import { revalidatePath } from 'next/cache';
@@ -7,6 +8,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { sessionCookieOptions } from '@/lib/session-transport';
 import { apiUrl, gymRolePath, SESSION_COOKIE } from '@/lib/gymos';
+import { SUPPORT_COOKIE } from '@/lib/support-context';
 
 function field(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -52,6 +54,7 @@ export async function login(formData: FormData) {
   const options = sessionCookieOptions(result.accessToken, result.expiresIn);
   if (options.expires.getTime() <= Date.now()) redirect('/login?error=expired');
   (await cookies()).set(SESSION_COOKIE, result.accessToken, options);
+  (await cookies()).delete(SUPPORT_COOKIE);
   revalidatePath('/', 'layout');
   if (result.mustChangePassword) redirect('/change-password');
 
@@ -76,6 +79,7 @@ export async function signOut() {
   } catch { uncertain = true; }
   finally {
     jar.delete(SESSION_COOKIE);
+    jar.delete(SUPPORT_COOKIE);
     revalidatePath('/', 'layout');
   }
   redirect(uncertain ? '/login?error=logout-uncertain' : '/login');
@@ -117,6 +121,7 @@ export async function changePasswordAction(formData: FormData) {
 
 export async function finishPasswordChangeAction() {
   (await cookies()).delete(SESSION_COOKIE);
+  (await cookies()).delete(SUPPORT_COOKIE);
   revalidatePath('/', 'layout');
   redirect('/login');
 }
@@ -159,41 +164,41 @@ export async function createMember(slug: string, formData: FormData) {
 export async function createGym(formData: FormData) {
   const token = await sessionToken();
   if (!token) redirect('/login');
-
-  const name = field(formData, 'name');
-  const slug = field(formData, 'slug').toLowerCase();
-  const ownerEmail = field(formData, 'ownerEmail').toLowerCase();
-  const ownerPassword = formData.get('ownerPassword');
-  if (
-    name.length < 2 ||
-    !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) ||
-    !ownerEmail.includes('@') ||
-    typeof ownerPassword !== 'string' ||
-    ownerPassword.length < 12
-  ) {
-    redirect('/admin?error=gym-input');
-  }
-
-  let response: Response;
+  const input = provisioningInputSchema.safeParse({
+    name: field(formData, 'name'), slug: field(formData, 'slug'), ownerEmail: field(formData, 'ownerEmail'),
+    currency: field(formData, 'currency'), timezone: field(formData, 'timezone'),
+  });
+  const key = idempotencyKeySchema.safeParse(formData.get('requestKey'));
+  if (!input.success || !key.success) return { error: 'Check the gym, owner, currency and timezone fields.' };
   try {
-    response = await fetch(apiUrl('/admin/gyms'), {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ name, slug, ownerEmail, ownerPassword }),
-      cache: 'no-store',
+    const response = await fetch(apiUrl('/admin/gyms'), {
+      method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, 'idempotency-key': key.data },
+      body: JSON.stringify(input.data), cache: 'no-store',
     });
-  } catch {
-    redirect('/admin?error=unavailable');
+    if (response.status === 401) redirect('/login');
+    if (response.status === 403) return { error: 'Platform administrator access is required.' };
+    if (response.status === 409) return { error: 'This request key or gym slug conflicts with an existing request. Keep the original details when checking a request.' };
+    if (!response.ok) return { error: 'The request outcome could not be confirmed. Submit the same unchanged details to check the original request.' };
+    const operation = platformOperationSchema.safeParse(await response.json().catch(() => null));
+    if (!operation.success) return { error: 'The request outcome could not be confirmed. Keep the original request key and details.' };
+    revalidatePath('/admin');
+    return { operation: operation.data };
+  } catch (error) {
+    // Preserve framework redirects without exposing transport failures.
+    if (error instanceof Error && error.message.startsWith('NEXT_REDIRECT')) throw error;
+    return { error: 'The request outcome could not be confirmed. Submit the same unchanged details to check the original request.' };
   }
+}
 
+export async function readProvisioningStatus(operationId: string) {
+  const token = await sessionToken();
+  if (!token) redirect('/login');
+  if (!/^[A-Za-z0-9_:-]{1,128}$/.test(operationId)) return { error: 'Operation unavailable.' };
+  let response: Response;
+  try { response = await fetch(apiUrl(`/admin/operations/${operationId}`), { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' }); }
+  catch { return { error: 'Status is temporarily unavailable. Your request has not been resubmitted.' }; }
   if (response.status === 401) redirect('/login');
-  if (response.status === 403) redirect('/admin?error=forbidden');
-  if (response.status === 409) redirect('/admin?error=duplicate');
-  if (!response.ok) redirect('/admin?error=unavailable');
-
-  revalidatePath('/admin');
-  redirect(`/admin?created=${encodeURIComponent(slug)}`);
+  const parsed = platformOperationSchema.safeParse(await response.json().catch(() => null));
+  if (!response.ok || !parsed.success) return { error: 'Could not load this operation status.' };
+  return { operation: parsed.data };
 }

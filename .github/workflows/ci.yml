@@ -101,6 +101,7 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm prepare:checks
+      - run: node --test infrastructure/scripts/dependency-audit-result.test.mjs
       - run: pnpm test:unit
 
   disposable-database:
@@ -126,6 +127,7 @@ jobs:
       - run: pnpm --dir apps/api build
       - run: pnpm --dir apps/api exec vitest run --config vitest.config.identity.ts --disableConsoleIntercept
       - run: pnpm --dir apps/api exec vitest run --config vitest.config.tenancy-integration.ts --disableConsoleIntercept
+      - run: pnpm --dir apps/api exec vitest run --config vitest.config.platform.ts --disableConsoleIntercept
       - if: always()
         run: |
           mkdir -p safe-evidence

@@ -54,6 +54,11 @@ export async function createDisposableEnvironment() {
       await save();
       return database;
     },
+    async registerProvisionedDatabase(operation: Parameters<typeof run.registerProvisionedDatabase>[0]) {
+      const registered = await run.registerProvisionedDatabase(operation);
+      await save();
+      return registered;
+    },
     async cleanup() {
       const result = await run.cleanup();
       await rm(directory, { recursive: true });

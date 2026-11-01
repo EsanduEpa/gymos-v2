@@ -283,3 +283,17 @@ a { color: inherit; text-decoration: none; }
 .shell-sidebar nav a, .shell-drawer nav a { display: flex; align-items: center; gap: 12px; }
 .shell-sidebar-footer .ui-button { justify-content: start; min-height: 36px; border-color: transparent; background: transparent; color: #b5b8c2; font-size: 14px; font-weight: 500; }
 .shell-sidebar-footer .ui-button:hover { background: #202534; color: #fca5a5; }
+
+.platform-operation { overflow-wrap: anywhere; }
+
+.support-banner { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:14px 20px; border:1px solid var(--classic-border); background:var(--classic-surface-muted); color:var(--classic-text); }
+.support-banner small { display:block; }
+.support-entry { margin-top:20px; max-width:640px; }
+.support-stats { display:flex; flex-wrap:wrap; gap:16px; }
+.ui-table-shell tr[data-selected] { background:var(--classic-surface-hover); }
+.ui-table-shell td small { display:block; color:var(--classic-text-muted); margin-top:4px; }
+.operation-controls { display:flex; flex-direction:column; align-items:flex-start; gap:8px; max-width:280px; overflow-wrap:anywhere; }
+.operation-controls code { font-size:10px; }
+.operation-controls p { margin:0; }
+.credential-handoff { display:grid; gap:8px; }
+.credential-handoff output { user-select:all; overflow-wrap:anywhere; }

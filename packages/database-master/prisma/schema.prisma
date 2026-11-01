@@ -143,6 +143,7 @@ enum OperationKind {
   REGISTER_TRAINER
   UPDATE_GYM_PROFILE
   CHANGE_ACCESS
+  ROLLOUT_TENANT_SCHEMA
 }
 
 enum OperationState {
@@ -156,6 +157,9 @@ enum OperationState {
 }
 
 model Operation {
+  provisioningIntent ProvisioningIntent?
+  lifecycleIntent GymLifecycleIntent?
+  schemaRolloutTarget SchemaRolloutTarget?
   id                            String              @id @default(cuid())
   kind                          OperationKind
   actorIdentityId               String
@@ -248,4 +252,139 @@ model CredentialDelivery {
 
   @@index([identityId, issuedAt])
   @@index([gymId, issuedAt])
+}
+
+// Private durable intent. Never serialize this model in status/registry DTOs.
+model ProvisioningIntent {
+  operationId String @id
+  operation Operation @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  name String
+  ownerEmail String
+  plannedOwnerIdentityId String
+  reuseIdentity Boolean
+  actorAuthVersion Int
+  currency String
+  timezone String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model GymRegistrySummary {
+  gymId String @id
+  memberCount Int?
+  trainerCount Int?
+  observedAt DateTime? @db.Timestamptz(3)
+  schemaVersion String?
+  health String @default("UNAVAILABLE")
+  version Int @default(0)
+}
+
+model SupportSession {
+  id String @id @default(cuid())
+  tokenHash String @unique
+  actorIdentityId String
+  authVersion Int
+  gymId String
+  scope String
+  reasonCode String
+  explanation String
+  issuedAt DateTime @default(now()) @db.Timestamptz(3)
+  expiresAt DateTime @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+  revocationReason String?
+  version Int @default(0)
+  events SupportEvent[]
+  @@index([actorIdentityId, revokedAt])
+  @@index([expiresAt])
+}
+model SupportEvent {
+  id String @id @default(cuid())
+  eventKey String @unique
+  supportSessionId String
+  session SupportSession @relation(fields:[supportSessionId], references:[id], onDelete:Restrict)
+  originalActorIdentityId String
+  gymId String
+  scope String
+  route String
+  outcome String
+  reasonReference String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([gymId, createdAt])
+}
+
+model GymLifecycleIntent {
+  operationId String @id
+  operation Operation @relation(fields:[operationId], references:[id], onDelete:Restrict)
+  expectedGymVersion Int
+  target String
+  reason String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model SchemaRollout {
+ id String @id @default(cuid())
+ actorIdentityId String
+ idempotencyKey String
+ requestDigest String
+ targetVersion String
+ targetDigest String
+ orderedGymIds Json
+ batchSize Int
+ state String @default("CANARY_PENDING")
+ version Int @default(0)
+ targets SchemaRolloutTarget[]
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([actorIdentityId,idempotencyKey])
+}
+model SchemaRolloutTarget {
+ operationId String @id
+ operation Operation @relation(fields:[operationId],references:[id],onDelete:Restrict)
+ rolloutId String
+ rollout SchemaRollout @relation(fields:[rolloutId],references:[id],onDelete:Restrict)
+ ordinal Int
+ databaseName String
+ ownershipOperationId String
+ sourceOperationId String
+ sourceVersion String
+ sourceDigest String
+ expectedGymVersion Int
+ reviews SchemaRepairReview[]
+ @@unique([rolloutId,ordinal])
+}
+model SchemaRepairReview {
+ id String @id @default(cuid())
+ operationId String
+ target SchemaRolloutTarget @relation(fields:[operationId],references:[operationId],onDelete:Restrict)
+ actorIdentityId String
+ approvedAttempt Int
+ reason String
+ observedVersion String
+ observedDigest String
+ schemaEvidenceDigest String
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([operationId,approvedAttempt])
+}
+model SchemaRolloutApproval {
+ id String @id @default(cuid())
+ rolloutId String
+ expectedVersion Int
+ actorIdentityId String
+ reason String
+ canaryEvidenceDigest String
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ @@unique([rolloutId,expectedVersion])
+}
+model MasterSchemaState {
+ id String @id
+ templateVersion String
+ manifestDigest String
+ schemaEvidenceDigest String
+ verifiedAt DateTime @db.Timestamptz(3)
+ version Int @default(0)
+}
+model MasterSchemaDeployment {
+ id String @id @default(cuid())
+ manifestDigest String @unique
+ templateVersion String
+ schemaEvidenceDigest String
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
 }

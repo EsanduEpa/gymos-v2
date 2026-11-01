@@ -1853,7 +1853,7 @@ High
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+Completed — 31 October 2026. Local acceptance and all 11 hosted checks pass at `0b7c909`. [Evidence](evidence/GYMOS-MIG-021.md); [Segment 03 handoff](SEGMENT_03_HANDOFF.md). Owner manual acceptance remains pending; no merge/deployment approval is implied.
 
 ## Task ID: GYMOS-MIG-022
 
@@ -1940,7 +1940,7 @@ High
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+Completed — 31 October 2026. Local acceptance and all 11 hosted checks pass at `0b7c909`. [Evidence](evidence/GYMOS-MIG-022.md); [Segment 03 handoff](SEGMENT_03_HANDOFF.md). Owner manual acceptance remains pending; no merge/deployment approval is implied.
 
 ## Task ID: GYMOS-MIG-023
 
@@ -2027,7 +2027,7 @@ High
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+Completed — 31 October 2026. Local acceptance and all 11 hosted checks pass at `0b7c909`. [Evidence](evidence/GYMOS-MIG-023.md); [Segment 03 handoff](SEGMENT_03_HANDOFF.md). Owner manual acceptance remains pending; no merge/deployment approval is implied.
 
 ## Task ID: GYMOS-MIG-024
 
@@ -2114,7 +2114,7 @@ High
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+Completed — 31 October 2026. Local acceptance and all 11 hosted checks pass at `0b7c909`. [Evidence](evidence/GYMOS-MIG-024.md); [Segment 03 handoff](SEGMENT_03_HANDOFF.md). Owner manual acceptance remains pending; no merge/deployment approval is implied.
 
 ## Task ID: GYMOS-MIG-025
 
@@ -2199,7 +2199,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+Completed — 31 October 2026. Local acceptance and all 11 hosted checks pass at `0b7c909`. [Evidence](evidence/GYMOS-MIG-025.md); [Segment 03 handoff](SEGMENT_03_HANDOFF.md). Owner manual acceptance remains pending; no merge/deployment approval is implied.
 
 ## Task ID: GYMOS-MIG-026
 
@@ -2282,7 +2282,7 @@ High
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+Completed — 31 October 2026. Local acceptance and all 11 hosted checks pass at `0b7c909`. [Evidence](evidence/GYMOS-MIG-026.md); [Segment 03 handoff](SEGMENT_03_HANDOFF.md). Owner manual acceptance remains pending; no merge/deployment approval is implied.
 
 ## Task ID: GYMOS-MIG-027
 
