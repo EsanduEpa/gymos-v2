@@ -1,10 +1,11 @@
 'use server';
 
-import { existingEndpointContracts } from '@gymos/contracts/legacy';
+import { existingEndpointContracts, logoutResultSchema } from '@gymos/contracts/legacy';
 import { changePasswordInputSchema, changePasswordResultSchema } from '@gymos/contracts/credentials';
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { sessionCookieOptions } from '@/lib/session-transport';
 import { apiUrl, gymRolePath, SESSION_COOKIE } from '@/lib/gymos';
 
 function field(formData: FormData, key: string): string {
@@ -48,13 +49,10 @@ export async function login(formData: FormData) {
   if (!parsed.success) redirect('/login?error=unavailable');
   const result = parsed.data;
 
-  (await cookies()).set(SESSION_COOKIE, result.accessToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: result.expiresIn,
-  });
+  const options = sessionCookieOptions(result.accessToken, result.expiresIn);
+  if (options.expires.getTime() <= Date.now()) redirect('/login?error=expired');
+  (await cookies()).set(SESSION_COOKIE, result.accessToken, options);
+  revalidatePath('/', 'layout');
   if (result.mustChangePassword) redirect('/change-password');
 
   const firstGym = result.gyms[0];
@@ -63,8 +61,24 @@ export async function login(formData: FormData) {
 }
 
 export async function signOut() {
-  (await cookies()).delete(SESSION_COOKIE);
-  redirect('/login');
+  const jar = await cookies();
+  const token = jar.get(SESSION_COOKIE)?.value;
+  let uncertain = false;
+  try {
+    if (token) {
+      const response = await fetch(apiUrl('/auth/logout'), {
+        method: 'POST', headers: { authorization: `Bearer ${token}` },
+        cache: 'no-store', signal: AbortSignal.timeout(5000),
+      });
+      // Even a 401 cannot confirm identity-wide revocation of other sessions.
+      uncertain = !response.ok || !logoutResultSchema.safeParse(await response.json().catch(() => null)).success;
+    }
+  } catch { uncertain = true; }
+  finally {
+    jar.delete(SESSION_COOKIE);
+    revalidatePath('/', 'layout');
+  }
+  redirect(uncertain ? '/login?error=logout-uncertain' : '/login');
 }
 
 export async function changePasswordAction(formData: FormData) {
@@ -103,6 +117,7 @@ export async function changePasswordAction(formData: FormData) {
 
 export async function finishPasswordChangeAction() {
   (await cookies()).delete(SESSION_COOKIE);
+  revalidatePath('/', 'layout');
   redirect('/login');
 }
 

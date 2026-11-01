@@ -10,7 +10,7 @@ Read all sections and approved DEC-02/DEC-10; verify segment 01 gates; inspect c
 - **Objective:** migrate A01/A02/R00/T00/M00/L02/H01 plus sign-out, forced credential change, current actor authorization, and role navigation.
 - **Result:** users authenticate safely, choose/resolve a permitted gym, cannot bypass forced change, land on the right role page, and see V1-equivalent dashboard chrome without cross-gym leakage.
 - **Priority / complexity:** Critical / Large.
-- **Dependencies:** segment 01; approved DEC-02 and DEC-10; provider-specific token/cookie portions wait for DEC-11.
+- **Dependencies:** segment 01; approved DEC-02 and DEC-10; the relevant web-session portion of DEC-11 was approved by the owner on 30 October 2026; provider/release scope remains task 087.
 - **In scope:** GYMOS-MIG-013, 016–020.
 - **Out of scope:** enrollment creation, gym provisioning/support, feature pages, mobile tokens, password reset/forgot/self-registration not present in V1.
 
@@ -88,7 +88,7 @@ Master owns login identity, password hash, credential expiry, must-change flag, 
 - **Sources:** V1 dashboard layout and four layout components; UI Map L02/X01–03.
 - **Targets:** proposed web dashboard layout/chrome/nav; existing UI primitives.
 - **Implementation:** normalized route builder; role nav; active state; mobile focus/keyboard/drawer; gym/identity display; support/lapsed banner slots; bell integration boundary; safe error/not-found/loading.
-- **Acceptance/testing:** 320px and desktop; keyboard/Escape/focus/body scroll; role link matrix; cross-gym switch clears stale UI; visual comparison to fixtures. **[ ]**
+- **Acceptance/testing:** 320px and desktop; keyboard/Escape/focus/body scroll; role link matrix; cross-gym switch clears stale UI; visual comparison to fixtures. **[x]** — [evidence](../evidence/GYMOS-MIG-013.md).
 
 ### GYMOS-MIG-020 — web session transport and safe logout
 
@@ -97,16 +97,16 @@ Master owns login identity, password hash, credential expiry, must-change flag, 
 - **Sources:** current web actions/client and V1 sign-out.
 - **Targets:** web server actions/BFF helpers, auth logout/renewal endpoint if approved, cookie configuration/tests.
 - **Implementation:** HttpOnly/SameSite/Secure domain/path/expiry; no browser bearer exposure; CSRF/origin treatment; clear cookie even when backend unavailable; bind cache to identity/gym/role and use no-store for private reads.
-- **Acceptance/testing:** cookie inspection, logout/back button, expired/revoked token, refresh race, cross-origin rejection, no token in HTML/localStorage/logs. **[ ]**
+- **Acceptance/testing:** cookie inspection, logout/back button, expired/revoked token, cross-origin rejection, no token in HTML/localStorage/logs. **[x]** — [evidence](../evidence/GYMOS-MIG-020.md); no refresh under approved DEC-02, concurrent logout/stale-response races covered instead.
 
 ## 7. Security and multi-tenancy checklist
 
 - [x] Forced-change and credential expiry enforced by API, not only navigation.
 - [x] Auth/access versions revoke stale tokens.
 - [x] Gym/actor resolved from current Master access and verified tenant binding.
-- [ ] Foreign resource and relationship checks are server-side.
-- [ ] Bearer/temporary passwords/hashes never reach client logs or persistent browser storage.
-- [ ] Cache and navigation state are keyed by identity+gym+role and cleared on switch/logout.
+- [x] Current exposed gym/actor boundaries are enforced server-side; future relationship/resource endpoints retain their owning feature tests (see task 018 limits).
+- [x] Bearer/temporary passwords/hashes never reach client logs or persistent browser storage; approved one-time handoff remains task 017.
+- [x] Cache and navigation state are keyed by identity+gym+role and cleared on switch/logout.
 
 ## 8. Testing and verification
 
@@ -114,10 +114,10 @@ Run `pnpm --dir apps/api exec vitest run src` for unit changes, the relevant ide
 
 ## 9. Definition of done
 
-- [ ] A01/A02/R00/T00/M00/L02/H01 and sign-out meet mapped V1 behavior/approved corrections.
-- [ ] Six tasks pass targeted API, DB, browser, role, and tenant negatives (013 and 020 remain).
-- [ ] No current V2 admin/create/basic member capability regresses.
-- [ ] Intentional deviations and provider-dependent settings are documented.
+- [x] Scoped A01/A02/R00/T00/M00/L02/H01 and sign-out behavior meet mapped requirements/approved corrections; final supported-browser and feature visual matrix remains task 065.
+- [x] Six tasks pass targeted API, DB, browser, role and tenant negatives; 013/020 final hosted evidence linked below.
+- [x] No current V2 admin/create/basic member capability regresses.
+- [x] Intentional boundaries and provider-dependent release settings are documented.
 
 ## 10. Agent checkpoints
 
@@ -125,9 +125,21 @@ Do not start feature pages before actor authorization works. Stop if DEC-11 is r
 
 ## 11. Progress and handoff
 
-- **Status:** IN PROGRESS
-- **Completed:** 016 — login session policy and forced-change API enforcement. [Evidence](../evidence/GYMOS-MIG-016.md); 017 — temporary credential issue/change/reissue. [Evidence](../evidence/GYMOS-MIG-017.md); 018 — operational actor and current access authorization. [Evidence](../evidence/GYMOS-MIG-018.md); 019 — role-aware root and protected navigation. [Evidence](../evidence/GYMOS-MIG-019.md)
-- **Remaining:** 013,020
-- **Files/tests/issues/blockers/decisions:** implementation and exact verification recorded in task evidence. Shared issue log: [SEGMENT_RUN_ISSUES.md](../SEGMENT_RUN_ISSUES.md). DEC-11 blocks final provider cookie/logout policy in task 020; task 017 supplies the usable password-change route.
-- **Next recommended task:** GYMOS-MIG-013.
+- **Status:** COMPLETED (6/6; implementation/verification, not merged or deployed)
+- **Completed:** 013 — role/gym dashboard shell. [Evidence](../evidence/GYMOS-MIG-013.md); 020 — approved web transport/logout. [Evidence](../evidence/GYMOS-MIG-020.md); 016 — login session policy and forced-change API enforcement. [Evidence](../evidence/GYMOS-MIG-016.md); 017 — temporary credential issue/change/reissue. [Evidence](../evidence/GYMOS-MIG-017.md); 018 — operational actor and current access authorization. [Evidence](../evidence/GYMOS-MIG-018.md); 019 — role-aware root and protected navigation. [Evidence](../evidence/GYMOS-MIG-019.md)
+- **Remaining:** None within Segment 02. Owner review and merge authorization remain required.
+- **Files/tests/issues/blockers/decisions:** implementation and exact verification recorded in task evidence. Shared issue log: [SEGMENT_RUN_ISSUES.md](../SEGMENT_RUN_ISSUES.md). DEC-11 web-session portion was approved by the owner on 30 October 2026; provider/release scope remains open in 087. Tasks 013/020 are completed with local and all 11 hosted checks at `367bdf8`.
+- **Next recommended task:** GYMOS-MIG-021 (Segment 03), after review/branch setup; do not merge either PR without owner authorization.
 
+
+## 30 October 2026 continuation
+
+- Reconciled 016–019 against source/evidence and preserved their authentication/authorization. Task 013 was implemented first and passed owned role/drawer/switching checks before task 020 implementation.
+- Owner approved only the limited web-session portion of [DEC-11](../decisions/DEC-11.md). Provider/release choices remain in 087; no additional policy was inferred.
+- [013 evidence](../evidence/GYMOS-MIG-013.md), [020 evidence](../evidence/GYMOS-MIG-020.md), [configuration/manual checks](../runbooks/web-sessions.md).
+- Separate branch `codex/segment-02-identity-shell` preserves local `87c1766`; stacked PR depends on unmerged draft foundation PR #1. No change was pushed to the foundation branch or main. Explicit owner merge authorization and all 11 checks on latest revision remain mandatory.
+- Historical checkpoint: local verification preceded the hosted checks; completion was not claimed at that stage.
+
+## Final verification and handoff — 30 October 2026
+
+[Run 41042328353](https://github.com/EsanduEpa/gymos-v2/actions/runs/41042328353) passed all 11 jobs at `367bdf8`, including browser 6/6, identity 10/10 and tenant 20/20. Tasks 013 and 020 are completed; total migration completion is 29/88. [Final handoff](../SEGMENT_02_HANDOFF.md) records revisions, boundaries, manual checks and the unmerged foundation dependency. PR #2 must be retargeted to main after an owner-authorized foundation merge, then latest-head checks/review/owner authorization are required again. Do not merge Segment 02 into the foundation branch.

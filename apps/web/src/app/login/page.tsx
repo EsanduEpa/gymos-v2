@@ -7,6 +7,8 @@ const messages: Record<string, string> = {
   invalid: 'Check your email and password, then try again.',
   rate: 'Too many attempts. Please wait a minute and try again.',
   unavailable: 'GymOS is temporarily unavailable. Please try again shortly.',
+  expired: 'Your session has expired. Sign in again.',
+  'logout-uncertain': 'You are signed out in this browser. We could not confirm sign-out on other devices. Sign in and sign out again to revoke them.',
   access: 'This account does not have access to an active gym.',
 };
 
@@ -31,7 +33,7 @@ async function LoginContent({
         <div className="form-card auth-card">
           <div className="eyebrow dark">WELCOME BACK</div>
           <h2>Sign in</h2>
-          <p className="muted">Use your GymOS owner or Super Admin account.</p>
+          <p className="muted">Use your GymOS account.</p>
           {error && messages[error] ? <Feedback tone="error">{messages[error]}</Feedback> : null}
           <form action={login} className="stack-form">
             <Field label="Email address" type="email" name="email" autoComplete="email" required />

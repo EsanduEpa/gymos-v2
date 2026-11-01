@@ -46,3 +46,11 @@ export const existingEndpointContracts = {
   E07: { method: 'GET', path: '/gyms/:slug/members', response: legacyMembersSchema },
   E08: { method: 'POST', path: '/gyms/:slug/members', response: legacyCreatedMemberSchema },
 } as const;
+
+// Safe shell projection; no credential or tenant connection material.
+export const currentSessionSchema = legacyLoginSchema.omit({ accessToken: true, tokenType: true, expiresIn: true }).extend({
+  identityId: idSchema,
+  displayName: z.string().max(200).nullable(),
+});
+
+export const logoutResultSchema = z.strictObject({ revoked: z.literal(true) });

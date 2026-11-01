@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { Suspense } from 'react';
 import { notFound, redirect } from 'next/navigation';
 import { apiUrl, gymRolePath, SESSION_COOKIE } from '@/lib/gymos';
-import { OwnerGymPage } from '@/components/navigation/owner-gym-page';
+
 import { LoadingState } from '@/components/ui';
 
 async function GymPageContent({ params, searchParams }: {
@@ -30,7 +30,11 @@ async function GymPageContent({ params, searchParams }: {
     if (access.role !== 'TRAINER' && access.role !== 'MEMBER') notFound();
     redirect(`/gyms/${encodeURIComponent(slug)}/${gymRolePath(access.role)}`);
   }
-  return <OwnerGymPage params={Promise.resolve({ slug })} searchParams={searchParams} />;
+  const query = await searchParams;
+  const suffix = new URLSearchParams();
+  if (query.error) suffix.set('error', query.error);
+  if (query.created) suffix.set('created', query.created);
+  redirect(`/gyms/${encodeURIComponent(slug)}/owner${suffix.size ? `?${suffix}` : ''}`);
 }
 
 export default function GymPage({ params, searchParams }: {

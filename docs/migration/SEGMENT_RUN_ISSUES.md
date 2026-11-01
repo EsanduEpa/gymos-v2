@@ -1,6 +1,6 @@
 # Migration segment run issues
 
-> **Current verified status — 30 October 2026 at `d26beb4`:** Segment 01 is COMPLETED (23/23); overall 27/88 migration tasks completed. All 11 hosted checks passed at [run 41013926983](https://github.com/EsanduEpa/gymos-v2/actions/runs/41013926983). Historical issue entries below are checkpoints; current dispositions are recorded in the final reconciliation entry.
+> **Segment 02 verification — 30 October 2026 at `367bdf8`:** Segment 01 remains completed (23/23), Segment 02 completed (6/6), overall 29/88 tasks completed. All 11 hosted checks passed in [run 41042328353](https://github.com/EsanduEpa/gymos-v2/actions/runs/41042328353). Historical entries retain their original checkpoint context; [current handoff](SEGMENT_02_HANDOFF.md).
 
 Use this shared log for issues discovered while executing migration segment files. Add one dated section per segment run. Record symptoms, impact, resolution or next action, and evidence links. Keep credentials, customer data, and other secrets out of this file.
 
@@ -80,3 +80,26 @@ No application code, database, hosted workflow or V1 file was changed in this hi
 | Run 41013007595 failed the browser isolation test because a streamed unauthenticated redirect to `/login` overlapped the next login navigation. | Hosted browser verification was incomplete at that documentation revision. | Added an explicit URL wait after navigating to `/`; the focused owned browser test passed locally, and authenticated Chrome verified all 11 jobs passed at `d26beb4` in [run 41013926983](https://github.com/EsanduEpa/gymos-v2/actions/runs/41013926983). | Resolved |
 
 Evidence: [finalization](SEGMENT_01_FINALIZATION.md), [GYMOS-MIG-008](evidence/GYMOS-MIG-008.md), [GYMOS-MIG-010](evidence/GYMOS-MIG-010.md), [risk register](MIGRATION_RISK_REGISTER.md). The prior run 41011340034 at `49217dd` remains a historical passing checkpoint; run 41013926983 is the latest verified revision.
+
+## Segment 02 — 2026-10-30 continuation
+
+| Issue | Impact | Resolution / next action | Status |
+|---|---|---|---|
+| DEC-11 did not exist. | Final session transport policy was unavailable. | Owner approved the limited web-session proposal; recorded DEC-11. Provider/capacity/release decisions remain task 087. | Session policy resolved; provider scope open |
+| Bare owner gym route did not canonicalize. | Shell test remained on the legacy entry URL. | Redirect to the approved role route, preserving safe form feedback. | Resolved |
+| Browser trainer/member fixtures lacked committed registration operations/tenant receipts. | Role-entry tests correctly failed task 018 authorization; previous roster denial did not prove a usable trainer shell. | Completed only the owned fixtures; guard unchanged. Successful trainer/member shell entry now tested. | Resolved |
+| Initial integration/browser commands lacked Docker socket access. | Setup could not start. | Explicitly owned disposable runs passed with authorized access and cleanup. | Resolved |
+| Identity integration ran concurrently with a build replacing API dist files. | CLI test could not import its generated runtime module. | Completed build, then reran integration: 10/10 passed. No product assertion changed. | Resolved |
+| Chromium adjusted cookie Expires slightly past the signed JWT expiry using the HTTP Date header. | Strict cookie lifetime assertion failed by a fraction of a second. | Expire the cookie two seconds early; same assertion passes. Real authentication checks use the actual browser clock. | Resolved |
+| Concurrent session validation could race logout's cookie-deletion response; unrelated Next route announcer also matched generic alert test selectors. | Another tab could show an expiry message; logout response could be interrupted. | Suspend local checks on logout and discard stale results; use the actual feedback selector. Focus-during-logout test and cookie deletion pass. | Resolved |
+| Existing visual tests wrote task 011's historical PNGs. | New shell captures would overwrite old evidence. | Restored original task 011 artifacts and directed new branding captures into task 013. | Resolved |
+
+Local evidence: [013](evidence/GYMOS-MIG-013.md), [020](evidence/GYMOS-MIG-020.md). Hosted gate remains pending at this checkpoint. No V1 code/database was run or modified; no shared/production data used.
+
+### Hosted browser follow-up — 30 October 2026
+
+Run [41021183510](https://github.com/EsanduEpa/gymos-v2/actions/runs/41021183510) passed ten jobs, including identity 10/10 and tenant 20/20, but exposed a real navigation race in the stale-chooser case: the browser session monitor redirected a server not-found response to root before it could be inspected. The monitor now applies live gym invalidation only to a rendered authorized shell; uniform denied/unknown-gym responses remain in place. The original not-found assertion remains, with an added assertion that the denied URL stays canonical. Completion remains pending a passing hosted run.
+
+The final local role/session/logout follow-up passed 3/3. Its synthetic 401 now starts only after the logout POST: focusing the tab before submission must still perform a real valid-session check. Assertions are unchanged. Desktop sidebar scrolling was also aligned with V1's static full-content-height column, rather than introducing sticky positioning.
+
+Hosted follow-up resolved: [run 41042328353](https://github.com/EsanduEpa/gymos-v2/actions/runs/41042328353) passed all 11 jobs at `367bdf8`, including all six browser scenarios and the strengthened canonical denial assertion. [PR #2](https://github.com/EsanduEpa/gymos-v2/pull/2) remains draft/unmerged. Provider/release scope remains task 087.

@@ -122,6 +122,10 @@ jobs:
       - run: pnpm prepare:checks
       - run: docker pull postgres:17
       - run: pnpm test:database:owned
+      # CLI integration cases import dist identity validators; build before tests.
+      - run: pnpm --dir apps/api build
+      - run: pnpm --dir apps/api exec vitest run --config vitest.config.identity.ts --disableConsoleIntercept
+      - run: pnpm --dir apps/api exec vitest run --config vitest.config.tenancy-integration.ts --disableConsoleIntercept
       - if: always()
         run: |
           mkdir -p safe-evidence

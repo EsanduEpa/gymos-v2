@@ -25,7 +25,7 @@ async function NoAccessContent() {
     <div className="eyebrow dark">YOUR WORKSPACE</div>
     <h1>No active gym access</h1>
     <p className="muted">Ask your gym administrator to grant access, then sign in again.</p>
-    <form action={signOut}><Button variant="secondary" type="submit">Sign out</Button></form>
+    <form action={signOut} data-session-exit><Button variant="secondary" type="submit">Sign out</Button></form>
   </section></main>;
 }
 
