@@ -48,6 +48,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - run: pnpm prepare:checks
       - run: pnpm build:workspace
 
   lint:
@@ -64,6 +65,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - run: pnpm prepare:checks
       - run: pnpm lint:workspace
 
   typecheck:
@@ -80,6 +82,8 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - run: pnpm prepare:checks
+      - run: pnpm --dir apps/web exec next typegen
       - run: pnpm typecheck:workspace
 
   unit:
@@ -96,6 +100,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - run: pnpm prepare:checks
       - run: pnpm test:unit
 
   disposable-database:
@@ -114,6 +119,8 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - run: pnpm prepare:checks
+      - run: docker pull postgres:17
       - run: pnpm test:database:owned
       - if: always()
         run: |
@@ -144,6 +151,9 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - run: pnpm prepare:checks
+      - run: docker pull postgres:17
+      - run: pnpm build:workspace
       - run: pnpm --dir apps/web exec playwright install --with-deps chromium
       - run: pnpm test:isolated
       - if: always()
@@ -175,6 +185,8 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - run: pnpm prepare:checks
+      - run: docker pull postgres:17
       - run: pnpm test:recovery:owned
       - if: always()
         run: |
@@ -191,6 +203,9 @@ jobs:
           retention-days: 7
 
   secret-scan:
+    permissions:
+      contents: read
+      pull-requests: read
     name: Secret scan
     runs-on: ubuntu-24.04
     steps:
@@ -211,10 +226,19 @@ jobs:
     if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/dependency-review-action@v5
         with:
-          fail-on-severity: high
-          comment-summary-in-pr: never
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.22.0
+      - name: Audit base and proposed lockfiles
+        run: node infrastructure/scripts/review-dependencies.mjs
+        env:
+          DEPENDENCY_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          DEPENDENCY_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
 
   dependency-audit:
     name: Lockfile vulnerability audit

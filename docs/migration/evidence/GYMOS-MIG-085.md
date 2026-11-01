@@ -1,6 +1,6 @@
 # GYMOS-MIG-085 — DEC-09 decision evidence
 
-Status: **Blocked awaiting project-owner and accountable reviewer approval.** A concrete proposal is available in [DEC-09](../decisions/DEC-09.md).
+Current status — 30 October 2026: **Completed as a decision-recording task under project-owner review.** DEC-09 is approved with the recorded privacy and first-release scope amendments; no application implementation is claimed. Earlier preparation and approval-request notes below are historical checkpoints.
 
 - Revision reviewed: `b22bcf6af8ca5e66fe098922629bb58228a251fd` on `main`.
 - Environment: local V2 checkout; read-only source inspection plus documentation changes.
@@ -11,3 +11,11 @@ Status: **Blocked awaiting project-owner and accountable reviewer approval.** A 
 - Not performed: application/schema change, export, notification poll, provider interaction, project-owner approval, deployment, V1 modification, or customer-data access.
 
 After explicit approval, record actual reviewers/date/result in DEC-09; update the decision register, task spec, tracker and affected segment handoffs together. Dependent implementation tasks may use only the approved result.
+
+## Historical approval-request checkpoint — 30 October 2026 (superseded)
+
+At that checkpoint, a separate accountable reviewer had not signed off. The later owner-review disposition below supersedes that separate-reviewer gate. No application implementation is claimed. See [current finalization record](../SEGMENT_01_FINALIZATION.md).
+
+## Completed decision disposition — 30 October 2026
+
+Project owner Esandu accepted responsibility for decision review and approved finalization with the recorded amendments. This explicitly supersedes the separate reviewer requirement and prior blocked status. Decision task 085 is Completed as a documentation/policy task; no application implementation is claimed. Linked decision and owner scope amendments are the acceptance authority. Static diff/link checks apply; application tests do not establish decision approval.

@@ -1,5 +1,7 @@
 # GymOS V1 → V2 Feature Migration Index
 
+> **Current verified status — 30 October 2026 at `d26beb4`:** Segment 01 is COMPLETED (23/23); overall 27/88 tasks completed. All 11 hosted checks passed at [run 41013926983](https://github.com/EsanduEpa/gymos-v2/actions/runs/41013926983). Owner-approved decisions and owner-attested external remediation with independently verified local cleanup/scanning are reflected in current evidence. Older audit checkpoints are historical.
+
 > **Audit baseline:** 25 October 2026. **Purpose:** execution navigation, not implementation evidence. V1 remains the behavioral/UI reference; V2's approved Master/tenant architecture is the technical target. The authoritative task details remain in [`../MIGRATION_TASK_SPECS.md`](../MIGRATION_TASK_SPECS.md), and live evidence remains in [`../evidence/`](../evidence/).
 
 ## 1. Objective and authority
@@ -29,24 +31,25 @@ No segment may modify V1, import customer data, preserve V1 IDs, invent deferred
 | UI | 29 route responsibilities, 26 rendered pages, role dashboard chrome | Preserve V1 hierarchy and interactions using shared accessible primitives and semantic theme tokens |
 | Delivery | Web-only V1 | Web MVP first; mobile is an explicitly gated later segment using the same APIs |
 
-## 3. Current verified state
+## 3. Current verified state — 30 October 2026
 
-- Completed foundations: GYMOS-MIG-001–007, 009, 011, 012, 014, 078, 080, 081, and 086.
-- In progress: GYMOS-MIG-008; local checks pass, hosted pull-request scanning/review lacks a configured remote.
-- Blocked external security work: GYMOS-MIG-010; the exposed V1 credential has not been confirmed rotated/revoked or checked for reuse.
+- Completed tasks include Segment 01 IDs 001–012, 014 and 077–086; overall 27/88. See tracker for the full current status.
+- GYMOS-MIG-008 completed; all 11 hosted checks passed at current verified revision `d26beb4` in run 41013926983.
+- GYMOS-MIG-010 completed based on owner-attested Neon rotation/redeployment, smoke checks, non-reuse and follow-up; local hardcoded URL removal and V2 scan were independently verified. Provider logs and historical access are not independently verified.
+- Decision tasks 077, 079, 082–085 are completed under project-owner review; independent specialist review is not claimed.
 - Implemented V2 code already includes identity/access schema, tenant schema verification, bounded tenant leases, durable operation/receipt/audit primitives, disposable two-gym tests, recovery tooling, shared contracts/client, Classic tokens, shared UI primitives, and V1 visual fixtures.
 - Most V1 business domains and role screens remain not started. Existing V2 member CRUD is a basic contact slice, not full enrollment.
 
-Statuses in this directory reflect linked evidence, not the existence of a plan.
+Statuses in this directory reflect linked evidence, not the existence of a plan. The next dependency-satisfied handoff is GYMOS-MIG-013; Segment 02 work was not started during Segment 01 closure.
 
 ## 4. Segment list and execution order
 
 | Order | Segment | Capability | Tasks owned | Status | Depends on |
 |---:|---|---|---:|---|---|
-| 1 | [01 — Platform Foundation and Decision Gates](01_PLATFORM_FOUNDATION_AND_DECISION_GATES.md) | Preserve verified infrastructure; finish CI, security containment, and product/technical decisions | 23 | IN PROGRESS / BLOCKED | None |
+| 1 | [01 — Platform Foundation and Decision Gates](01_PLATFORM_FOUNDATION_AND_DECISION_GATES.md) | Preserve verified infrastructure; finish CI, security containment, and product/technical decisions | 23 | COMPLETED | None |
 | 2 | [02 — Identity, Authentication, and Application Shell](02_IDENTITY_AUTH_AND_APPLICATION_SHELL.md) | Login, forced password change, role/gym routing, protected chrome, logout | 6 | IN PROGRESS (4/6 tasks) | 01 |
-| 3 | [03 — Platform Administration and Tenant Lifecycle](03_PLATFORM_ADMIN_AND_TENANT_LIFECYCLE.md) | Gym registry, provisioning, activation, support, suspension, schema rollout | 6 | BLOCKED before implementation (DEC-03) | 01, 02 |
-| 4 | [04 — Gym Configuration and Membership Rules](04_GYM_CONFIGURATION_AND_MEMBERSHIP_RULES.md) | Branding, profile, plans, rates, policies, membership eligibility | 5 | BLOCKED before implementation (prerequisites and DEC-01/06/07/08) | 01–03 |
+| 3 | [03 — Platform Administration and Tenant Lifecycle](03_PLATFORM_ADMIN_AND_TENANT_LIFECYCLE.md) | Gym registry, provisioning, activation, support, suspension, schema rollout | 6 | WAITING FOR PREREQUISITES | 01, 02 |
+| 4 | [04 — Gym Configuration and Membership Rules](04_GYM_CONFIGURATION_AND_MEMBERSHIP_RULES.md) | Branding, profile, plans, rates, policies, membership eligibility | 5 | WAITING FOR PREREQUISITES | 01–03 |
 | 5 | [05 — Member Enrollment and Account Management](05_MEMBER_ENROLLMENT_AND_ACCOUNT_MANAGEMENT.md) | Full registration, list/profile, status, packs, recovery journey | 5 | NOT STARTED | 02–04; session base from 07 for status/pack invariants |
 | 6 | [06 — Trainer Management and Coaching](06_TRAINER_MANAGEMENT_AND_COACHING.md) | Trainer enrollment/roster/directory, client 360, workout and meal plans | 7 | NOT STARTED | 02–05; session reads from 07 for confirmed relationships |
 | 7 | [07 — PT Sessions, Notifications, and Lifecycle](07_PT_SESSIONS_NOTIFICATIONS_AND_LIFECYCLE.md) | Booking/request, holds, transitions, views, notifications, exact-once settlement | 9 | NOT STARTED | 02, 04–06 |
@@ -71,7 +74,7 @@ Segments express ownership, not permission to ignore task-level dependencies. Wh
  07–10 + DEC-12 ──> 11 Mobile
 ```
 
-Critical decision gates before feature implementation: DEC-01 (configuration ownership), DEC-03 (support), DEC-06 (money/earning), DEC-07 (time/term), DEC-08 (settlement/payroll), DEC-09 (coaching/privacy/export/refresh), DEC-11 (provider/release), and DEC-12 (mobile). Approved DEC-02/04/05/10 must be followed, not reopened without change control.
+DEC-01/03/06/07/08/09 are owner-approved and their decision-recording tasks are complete; their rules govern downstream feature implementation. DEC-11 (provider/release) and DEC-12 (mobile) remain open decision gates. Approved DEC-02/04/05/10 must be followed, not reopened without change control.
 
 ## 6. Agent execution rules
 

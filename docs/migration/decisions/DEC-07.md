@@ -1,9 +1,9 @@
 # DEC-07 — Gym time, term boundaries and scheduling input bounds
 
-- Status: **Blocked — concrete proposal awaiting project-owner approval.**
+- Status: **Approved by project owner Esandu — 30 October 2026.**
 - Prepared: 26 October 2026, Asia/Colombo.
 - Resolution task: [GYMOS-MIG-083](../MIGRATION_TASK_SPECS.md#task-id-gymos-mig-083).
-- Accountable reviewer: project owner with Scheduling/Product + Database.
+- Accountable reviewer: Esandu, project owner; owner explicitly accepts the decision-review responsibilities.
 - Authority: Master Plan; Database map DB03/DB04/DB05; Functionality map F-D01/F-D06/F-D08.
 
 ## Preserved approved requirements
@@ -56,10 +56,18 @@ The gym's IANA timezone controls local dates and schedule display. Membership te
 
 These are future implementation tests. No application behavior is claimed by this proposal.
 
-## Approval record
+## Historical approval-request checkpoint — 30 October 2026 (superseded)
 
-Awaiting the project owner's explicit approval or requested changes. Until then DEC-07 and GYMOS-MIG-083 remain blocked.
+At that checkpoint, the owner had requested finalization but the owner-review disposition was not yet recorded. The later owner approval below supersedes the separate-reviewer requirement.
 
 ## Project-owner clarification — 30 October 2026
 
 The owner accepted the explained membership, cancellation, start and no-show boundaries. Memberships and packs expire within their purchased period even when the account is suspended; there is no freeze or automatic extension. This records the business-boundary confirmation, not blanket approval of every technical detail or reviewer sign-off.
+
+## Finalization boundary — 30 October 2026
+
+Owner authorization is recorded from this conversation. Historical proposal/preparation statements above describe earlier checkpoints. This document approves policy, not feature implementation; the final owner review disposition supersedes the earlier separate-reviewer gate. See [finalization record](../SEGMENT_01_FINALIZATION.md) for current verification and scope.
+
+## Final owner review disposition — 30 October 2026
+
+Esandu explicitly stated that decision review will be performed by the project owner and that this is acceptable. This supersedes the separate-reviewer gate and historical pending-review statements above. DEC-07 is approved under owner review with the recorded amendments. No independent specialist review is claimed. This approves policy, not implementation or production release.

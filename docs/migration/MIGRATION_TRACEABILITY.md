@@ -637,9 +637,9 @@ One record per discovered page-route responsibility; complete component/control/
 | Target Master entities | M.GymAccess, M.User; cross-plane operation/audit when task specifies. |
 | Target Gym entities | T.Member, T.PTSession, T.Trainer, T.WorkoutExercise, T.WorkoutPlan; receipts/hold/settlement structures when task specifies. Full ownership: User → Master User identity+GymAccess; Tenant Member/Trainer (no password); PTSession → Tenant Session + confirmation snapshots and effect-source keys; WorkoutPlan → Tenant WorkoutPlan; WorkoutExercise → Tenant WorkoutExercise |
 | Target Nest modules | coaching |
-| REST endpoints | C30 GET `/gyms/:slug/me/clients`; C32 POST `/gyms/:slug/me/clients/:memberId/workout-plans` |
-| Request/response DTOs | TrainerClientPageDto (C30); WorkoutPlanCreateDto (C32) |
-| Target Next route/components | /gyms/[slug]/trainer/plans/workout/new (proposed); source basename adapted under role feature; shared components follow full inventory. |
+| REST endpoints | C30 GET `/gyms/:slug/me/clients`; C32 POST `/gyms/:slug/me/clients/:memberId/workout-plans`; C64 GET `/gyms/:slug/me/workout-plans` |
+| Request/response DTOs | TrainerClientPageDto (C30); WorkoutPlanCreateDto (C32); MemberWorkoutPlanPageDto (C64) |
+| Target Next route/components | /gyms/[slug]/trainer/plans/workout/new and owner-approved /gyms/[slug]/member/plans workout tab (proposed); source basename adapted under role feature; shared components follow full inventory. |
 | Tests | Task acceptance scenarios in GYMOS-MIG-051; Task064 journeys,065 visuals,066 isolation. No screenshot-only completion. |
 | Known defects | Defect register in Master Plan §9; raw serialization, ignored errors, mock billing and lifecycle corrections apply where mapped. |
 | Existing V2 status | A01/S01/L02 and basic member/theme foundations partially present; no V1 page parity is verified. E08 is not registration. |
@@ -665,9 +665,9 @@ One record per discovered page-route responsibility; complete component/control/
 | Target Master entities | M.GymAccess, M.User; cross-plane operation/audit when task specifies. |
 | Target Gym entities | T.MealPlan, T.MealPlanEntry, T.Member, T.PTSession, T.Trainer; receipts/hold/settlement structures when task specifies. Full ownership: User → Master User identity+GymAccess; Tenant Member/Trainer (no password); PTSession → Tenant Session + confirmation snapshots and effect-source keys; MealPlan → Tenant MealPlan; MealPlanEntry → Tenant MealPlanEntry |
 | Target Nest modules | coaching |
-| REST endpoints | C30 GET `/gyms/:slug/me/clients`; C33 POST `/gyms/:slug/me/clients/:memberId/meal-plans` |
-| Request/response DTOs | TrainerClientPageDto (C30); MealPlanCreateDto (C33) |
-| Target Next route/components | /gyms/[slug]/trainer/plans/meal/new (proposed); source basename adapted under role feature; shared components follow full inventory. |
+| REST endpoints | C30 GET `/gyms/:slug/me/clients`; C33 POST `/gyms/:slug/me/clients/:memberId/meal-plans`; C65 GET `/gyms/:slug/me/meal-plans` |
+| Request/response DTOs | TrainerClientPageDto (C30); MealPlanCreateDto (C33); MemberMealPlanPageDto (C65) |
+| Target Next route/components | /gyms/[slug]/trainer/plans/meal/new and owner-approved /gyms/[slug]/member/plans meal tab (proposed); source basename adapted under role feature; shared components follow full inventory. |
 | Tests | Task acceptance scenarios in GYMOS-MIG-052; Task064 journeys,065 visuals,066 isolation. No screenshot-only completion. |
 | Known defects | Defect register in Master Plan §9; raw serialization, ignored errors, mock billing and lifecycle corrections apply where mapped. |
 | Existing V2 status | A01/S01/L02 and basic member/theme foundations partially present; no V1 page parity is verified. E08 is not registration. |
@@ -1134,7 +1134,7 @@ Each row preserves the source map semantics; approved §14.1 corrections and tas
 | UI-LC013 | \| O12 Profile/Plans/Session Fees/Pay Rates/Policy tabs; Add Plan toggle, form inputs \| Shared feedback clears on tab; inline form, not modal; checkbox/percentage/blank inputs are drafts \| Local tabs/toggle/draft; C39–C44/C40 on submit only. New appearance editor W37 separately scoped \| | GYMOS-MIG-004, GYMOS-MIG-015, GYMOS-MIG-027, GYMOS-MIG-028, GYMOS-MIG-029, GYMOS-MIG-030; adapt/correct, local state/nav remains local; deferred billing/withdrawn expiry stay excluded. |
 | UI-LC014 | \| O14 current-plan/four-tier cards \| Current plan disabled; update-payment and switch-plan show browser alerts; four static prices/tiers not checkout offers \| **Mock/deferred:** preserve honest non-operational state or hide by scope decision; no fake billing command/API. C58 display only, D14 \| | GYMOS-MIG-062; adapt/correct, local state/nav remains local; deferred billing/withdrawn expiry stay excluded. |
 | UI-LC015 | \| T01 live elapsed timer, decline modal reason, notes modal, card links \| Timer local from startedAt; required notes UI vs action gap; decline reason optional; cancel modal no effect \| Local clock/modal/draft; server determines min-duration and eligibility, never trust client elapsed time; W17/W23 submit \| | GYMOS-MIG-042, GYMOS-MIG-044, GYMOS-MIG-045, GYMOS-MIG-046, GYMOS-MIG-047; adapt/correct, local state/nav remains local; deferred billing/withdrawn expiry stay excluded. |
-| UI-LC016 | \| T03 Overview/Workouts/Meal Plans/History tabs; builder links \| Last 2 workout/meal plans, last 10 related sessions; links prefill clientId. No member plan delivery UI \| Local tabs/navigation; C31 read explicitly capped or paged with hasMore. Prefill clientId not permission \| | GYMOS-MIG-050, GYMOS-MIG-051, GYMOS-MIG-052; adapt/correct, local state/nav remains local; deferred billing/withdrawn expiry stay excluded. |
+| UI-LC016 | \| T03 Overview/Workouts/Meal Plans/History tabs; builder links \| V1 T03 shows last 2 workout/meal plans and last 10 related sessions; no V1 member plan delivery UI. V2 first release adds owner-approved read-only views of own assigned plans (051/052) \| Local tabs/navigation; C31 read capped/paged. Prefill clientId not permission; member reads use C64/C65 self+tenant authorization \| | GYMOS-MIG-050, GYMOS-MIG-051, GYMOS-MIG-052; V1 source inventory preserved; owner-approved V2 scope covered, deferred billing/withdrawn expiry stay excluded. |
 | UI-LC017 | \| T04 workout Add Exercise/Remove/edit/client/title \| Starts 2 sample rows; sets/reps/weight; weight 0 may become undefined via truthy conversion; duration/notes typed in action but not editable UI \| Local array/draft; C32 explicit zero/null normalization, no separate row API before save \| | GYMOS-MIG-051; adapt/correct, local state/nav remains local; deferred billing/withdrawn expiry stay excluded. |
 | UI-LC018 | \| T05 meal Add Meal/Remove/edit/type/client/title/live macro totals \| Starts 2 samples, day 1, six meal types from selector; kcal/protein/carbs/fats summed locally, no day picker \| Local rows/totals only; C33 validates authoritative payload; do not persist samples until explicit save; D12 defaults/day semantics \| | GYMOS-MIG-052; adapt/correct, local state/nav remains local; deferred billing/withdrawn expiry stay excluded. |
 | UI-LC019 | \| T06 earnings pager; M01 name search/card Request link \| Earnings 25-row DataTable; directory active trainers name search, request context link \| C34/C35 GET if paged; directory search remains name-only unless changed deliberately; no command for filter/navigation \| | GYMOS-MIG-039, GYMOS-MIG-046, GYMOS-MIG-048, GYMOS-MIG-049, GYMOS-MIG-056, GYMOS-MIG-072, GYMOS-MIG-074, GYMOS-MIG-075; adapt/correct, local state/nav remains local; deferred billing/withdrawn expiry stay excluded. |
@@ -2632,6 +2632,34 @@ Approved correction: noShowDeduction is not an editable toggle in MVP; eligible 
 | ID / label / suggested method and path | Authorization and request/query | Proposed `Read<data>` / domain errors beyond common rules |
 |---|---|---|
 | C63 **proposed** GET `/gyms/:slug/member-session-overview` | O+G; YYYY-MM,q(name/email),page/pageSize | Page of `{member:MemberSummary,latestMembership?,packTotals:{total,remaining,used,basis},monthSessionCounts:{pending,scheduled,completed,missed,cancelled,declined},matchingSessionCount}` plus full-filter totals. Define lifetime vs selected-month basis; More reads C20. Prevent all-member/all-session join in browser |
+
+
+### C64 — Proposed first-release member view (owner-approved scope)
+
+- Method/path: GET `/gyms/:slug/me/workout-plans`.
+- UI: one owner-approved V2 member assigned-plans screen with workout/meal tabs; this is new V2 scope, not a V1 route responsibility.
+- Web binding: authenticated server read adapter; owner: tenant.
+- Proposed DTO label: MemberWorkoutPlanPageDto. This is a suggested contract label, not an existing type.
+- Task: GYMOS-MIG-051.
+- Owner scope approval: 30 October 2026; see [DEC-09](decisions/DEC-09.md).
+
+| ID / suggested method and path | Authorization and query | Proposed response and contract-specific requirements |
+|---|---|---|
+| C64 **proposed** GET `/gyms/:slug/me/workout-plans` | MEMBER+G; resolve the Member actor from current authenticated identity and selected gym; no caller-supplied memberId. Use bounded shared page/cursor inputs. | Page of only workout plans explicitly assigned to this member by a same-gym authorized trainer, stable newest-first order, `hasMore`/cursor when capped. DTO includes member-safe plan/exercise fields only; trainer-private/internal fields are omitted. No write, assignment, or access to another member/gym. Recheck current access on every request; logout/revocation denies. |
+
+
+### C65 — Proposed first-release member view (owner-approved scope)
+
+- Method/path: GET `/gyms/:slug/me/meal-plans`.
+- UI: same owner-approved V2 member assigned-plans screen, meal tab; this is new V2 scope, not a V1 route responsibility.
+- Web binding: authenticated server read adapter; owner: tenant.
+- Proposed DTO label: MemberMealPlanPageDto. This is a suggested contract label, not an existing type.
+- Task: GYMOS-MIG-052.
+- Owner scope approval: 30 October 2026; see [DEC-09](decisions/DEC-09.md).
+
+| ID / suggested method and path | Authorization and query | Proposed response and contract-specific requirements |
+|---|---|---|
+| C65 **proposed** GET `/gyms/:slug/me/meal-plans` | MEMBER+G; resolve the Member actor from current authenticated identity and selected gym; no caller-supplied memberId. Use bounded shared page/cursor inputs. | Page of only meal plans explicitly assigned to this member by a same-gym authorized trainer, stable newest-first order, `hasMore`/cursor when capped. DTO includes member-safe plan/entry fields only; trainer-private/internal fields are omitted. No write, assignment, or access to another member/gym. Recheck current access on every request; logout/revocation denies. |
 
 ## Supplemental proposed operations
 

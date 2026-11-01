@@ -1,6 +1,6 @@
 # GYMOS-MIG-010 — Exposed credential follow-up and V2 secret hygiene
 
-Assessment: 23 October 2026, Asia/Colombo. **Preparation delivered; external remediation unverified. This task is not Verified or Completed.** [Task specification](../MIGRATION_TASK_SPECS.md#task-id-gymos-mig-010), [Master Plan §23](../MIGRATION_EXECUTION_PLAN.md#23-risk-register), [risk R18](../MIGRATION_RISK_REGISTER.md), and [agent protocol](../AI_AGENT_MIGRATION_PROTOCOL.md) control scope. Dependency GYMOS-MIG-001 baseline evidence must be reviewed before completion. GYMOS-MIG-008 owns CI implementation; GYMOS-MIG-066 and GYMOS-MIG-071 consume the unresolved security/release evidence.
+Current status — 30 October 2026: **GYMOS-MIG-010 is Completed** on the basis of owner-attested provider remediation/follow-up plus independently verified local cleanup and V2 scanning. The older preparation and “not completed” statements below describe historical checkpoints, not current status. [Task specification](../MIGRATION_TASK_SPECS.md#task-id-gymos-mig-010), [risk R18](../MIGRATION_RISK_REGISTER.md), and [finalization](../SEGMENT_01_FINALIZATION.md) record the closure basis and evidence limits.
 
 ## Evidence boundary
 
@@ -9,6 +9,8 @@ V1 `/Users/esanduepa/Desktop/Projects/gymos` HEAD: `058aa8532741c4cb84289589fd2c
 Performed read-only source and Git metadata inspection. Did not run V1 `scripts/check-db.js`, connect to any database/provider/account, inspect actual environment-file values, rotate/revoke credentials, change V1, install tools, scan remote systems or invoke application workflows. Credential literals were compared only in process memory; output contains identifiers, paths, line numbers and classifications, never literal values or secret-derived hashes. No browser captures were needed.
 
 ## Redacted incident record
+
+The owner/status column below records the initial source-review checkpoint. Later owner-attested containment and current disposition are documented in the final owner-attested section at the end of this file.
 
 | Identifier | Observed source | Evidence and impact | Owner and status |
 |---|---|---|---|
@@ -107,7 +109,9 @@ The following work is **proposed and unexecuted**. It needs a named credential/a
 7. **Approve V2 secret policy and review.** No V1/demo/template credential reuse for V2, staging, production or durable test accounts. Use unique per-environment credentials and synthetic one-run fixture secrets, server-only secret references, least privilege and redacted logs. No actual environment files, secret values, password hashes or credential-bearing URLs in Git/evidence/DTOs. Review GYMOS-MIG-008 secret scanning and repeat the documented scan on the integrated revision.
 8. **Close with evidence.** Named owner signs the redacted evidence summary; reviewer checks revoke/reuse/access/history status, residual risk and GYMOS-MIG-001/008 evidence. Update task/tracker/risk together through the coordinating agent. GYMOS-MIG-066 security gate and GYMOS-MIG-071 release approval must see actual remediation status. An unresolved external rotation remains an explicit release blocker.
 
-## Acceptance and unresolved work
+## Historical preparation checkpoint — 23 October 2026 (superseded)
+
+## Acceptance and unresolved work at that checkpoint
 
 - [x] Source location confirmed without exposing values; V1 script not run and V1 unchanged.
 - [x] V2 tracked-source scan, ignore checks and limited CI inventory recorded with redacted findings and limitations.
@@ -132,7 +136,7 @@ Reproduction exited **0**; scanned **63** tracked/present-CI text files; exclude
 
 These are the three loopback template examples and README prompt false positive reviewed above. No remote URL, private key, common token shape or exact V1 literal reuse was reported by these rules. Generated/historical demo reuse and actual configured secrets remain unverified.
 
-## Owner update
+## Historical owner updates — intermediate checkpoints superseded by the final disposition below
 
 The project owner answered “Esandu” to the credential-owner question on23 October2026. No revocation/rotation/access-investigation result was provided. This identifies the responsible person; it does not establish remediation or authorize remote rotation/V1 edits. Task010 remains Blocked for that evidence.
 
@@ -155,3 +159,37 @@ Asked on 25 October 2026 whether the old login or demo passwords had been checke
 ## V1 availability clarification — 25 October 2026
 
 Esandu clarified that V1 remains hosted on Vercel for function testing and must continue running alongside V2. This supersedes the 24 October interpretation that the V1 database was no longer needed. Preserve V1 and its current testing setup; do not remove or alter it as part of Task 10. V2 must use a separate new database and new credentials. Actual V2 local/hosted database settings have not been inspected or verified. Keeping V1 available does not resolve the exposed-login rotation or reuse review.
+
+## Owner-reported containment update — 30 October 2026
+
+Esandu identified Neon PostgreSQL as the V1 database provider and reported rotating the password and redeploying V1 through Vercel. The owner reported that Vercel now displays the affected settings as updated, and subsequently confirmed successful V1 login and access to member records.
+
+This is owner-reported password rotation and application smoke verification; no provider dashboard, credential values, fresh old-password rejection test, session invalidation or provider audit evidence was independently inspected. This update supersedes the earlier owner report that rotation had not occurred, without erasing that history.
+
+Remaining: verify the exposed credential is the rotated role/branch and fails on a fresh connection; confirm existing-session handling and affected branches/consumers (including local settings); complete private reuse and available access-log review; record source/history/artifact treatment, integrated scan and reviewer sign-off. Task 010 remains open pending these checks; no secret values are required in evidence.
+
+### Owner-reported password non-reuse — 30 October 2026
+
+When asked whether the exposed database password had been used in V2 or any other project/account, Esandu answered “no i havent used.” Record this as the owner's explicit non-reuse confirmation for that password. It supersedes the earlier absence of an owner answer on reuse; it is not an independently inspected inventory of environment stores, historical/generated demo passwords, logs or backups. No secret values were requested or inspected. Fresh old-credential rejection, existing-session handling, available access-log review, source/history/artifact treatment and integrated scanning/reviewer evidence remain outstanding.
+
+### Owner-reported completion of remaining follow-up — 30 October 2026
+
+After receiving instructions for (1) fresh old-password rejection verification, (2) review of available Neon activity records and role/session follow-up, and (3) removal of the hardcoded V1 credential and review of older copies, Esandu stated “I solved them.” Record this as the owner's report that those follow-up items were addressed, alongside the prior rotation, successful V1 smoke check and password non-reuse confirmations.
+
+No detailed outcomes, log coverage/retention, session-handling result, provider evidence reference, cleanup revision or history-treatment result were supplied in that reply. Do not infer a clean access history or independently verified remediation from this statement. The next agent should inspect local cleanup and integrated scanner/CI evidence without printing secrets, then reconcile reviewer sign-off and any missing external evidence. Do not repeat requests for the already supplied owner confirmations. Task 010 remains pending evidence reconciliation rather than being marked Verified/Completed solely from this report.
+
+## Finalization reconciliation — 30 October 2026
+
+Metadata-only local inspection still finds a credential-bearing PostgreSQL URL literal in V1 scripts/check-db.js. No secret was printed, no connection was attempted and V1 was not edited. Owner-reported follow-up completion therefore does not establish local source cleanup. Whether this literal is now revoked was not independently tested. Preserve the rotation/non-reuse/smoke attestations and reconcile this discrepancy before verified closure. See [finalization record](../SEGMENT_01_FINALIZATION.md).
+
+## Local cleanup recheck — 30 October 2026
+
+Owner requested reinspection after cleanup. Local scripts/check-db.js now uses process.env.DATABASE_URL, validates presence and contains no credential-bearing PostgreSQL URL literal. Earlier local source discrepancy is resolved. The script still logs a full owner record and raw errors, so it was not executed; safe-output review is outstanding. No V1 edits or database connections were performed. External rotation, V1 smoke success, non-reuse and follow-up remain owner-attested.
+
+## Final owner-attested containment disposition — 30 October 2026
+
+The closure evidence is Esandu's direct reports in this conversation: Neon password rotation and Vercel redeployment; successful V1 login/member reads; explicit non-reuse of the exposed password; and “I solved them” after the old-password rejection, available activity/role review and source/history-cleanup instructions. The owner requested finalization and explicitly retained review responsibility. These reports are accepted as owner-attested external containment and follow-up, not independent provider inspection or proof that unauthorized access never occurred. No detailed access-log findings/retention or provider audit ID was supplied; that evidentiary limitation remains recorded.
+
+Independent local checks verify removal of the V1 hardcoded connection string, environment-variable use, and a passing redacted V2 history secret scan after exact false-positive review. No provider database was contacted and V1 was neither executed nor modified. Existing raw owner/error logging in the V1 diagnostic script remains a separate legacy safe-output follow-up; do not run it or publish its output. This does not reinstate the old password and is not represented as a verified V2 credential leak.
+
+Task 010 is Completed on the basis of owner-attested external remediation plus independently verified local source cleanup/V2 scanning. This supersedes earlier pending-containment records while preserving their history. R18 is recorded as contained by owner attestation, with historical access uncertainty retained. A later provider finding reopens the incident rather than silently revising this evidence.

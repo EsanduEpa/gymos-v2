@@ -1,9 +1,9 @@
 # DEC-08 — Settlement locking, payroll periods and correction policy
 
-- Status: **Blocked — concrete proposal awaiting project-owner approval.**
+- Status: **Approved by project owner Esandu — 30 October 2026.**
 - Prepared: 26 October 2026, Asia/Colombo.
 - Resolution task: [GYMOS-MIG-084](../MIGRATION_TASK_SPECS.md#task-id-gymos-mig-084).
-- Accountable reviewer: project owner with Finance/Payroll + Backend.
+- Accountable reviewer: Esandu, project owner; owner explicitly accepts the decision-review responsibilities.
 - Authority: Master Plan; Database map DB05/DB07; Functionality map F-D02/F-D11.
 
 ## Preserved approved requirements
@@ -54,10 +54,18 @@ Trainer pay is created only from completed sessions. Session rate, trainer level
 
 These are future implementation tests. No payout or application behavior is claimed by this proposal.
 
-## Approval record
+## Historical approval-request checkpoint — 30 October 2026 (superseded)
 
-Awaiting the project owner's explicit approval or requested changes. Until then DEC-08 and GYMOS-MIG-084 remain blocked.
+At that checkpoint, the owner had requested finalization but the owner-review disposition was not yet recorded. The later owner approval below supersedes the separate-reviewer requirement.
 
 ## Project-owner clarification — 30 October 2026
 
-The owner explicitly confirmed trainer pay only for completed sessions. Charged cancellations and no-shows do not generate trainer pay. Other DEC-08 details and reviewer sign-off remain pending.
+The owner explicitly confirmed trainer pay only for completed sessions. Charged cancellations and no-shows do not generate trainer pay. The final disposition below approves the remaining DEC-08 policy under owner review.
+
+## Finalization boundary — 30 October 2026
+
+Owner authorization is recorded from this conversation. Historical proposal/preparation statements above describe earlier checkpoints. This document approves policy, not feature implementation; the final owner review disposition supersedes the earlier separate-reviewer gate. See [finalization record](../SEGMENT_01_FINALIZATION.md) for current verification and scope.
+
+## Final owner review disposition — 30 October 2026
+
+Esandu explicitly stated that decision review will be performed by the project owner and that this is acceptable. This supersedes the separate-reviewer gate and historical pending-review statements above. DEC-08 is approved under owner review with the recorded amendments. No independent specialist review is claimed. This approves policy, not implementation or production release.

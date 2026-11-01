@@ -224,6 +224,9 @@ test('real browser and HTTP requests preserve two-gym isolation and pure reads',
   await page.goto(`${webBase}/login`);
   expect(await request.get(`${apiBase}/gyms/${fixture.gyms[0].slug}/theme`)).toBeOK();
   await page.goto(`${webBase}/`);
+  // The unauthenticated home route streams its server-component redirect to /login.
+  // Wait for that client-side navigation to settle before starting the next login navigation.
+  await expect(page).toHaveURL(/\/login$/);
   expect(await fixture.master.$transaction([
     fixture.master.user.count(), fixture.master.gym.count(), fixture.master.gymAccess.count(),
     fixture.master.operation.count(), fixture.master.platformAuditLog.count(),

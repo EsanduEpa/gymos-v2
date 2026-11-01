@@ -1,5 +1,7 @@
 # Migration segment run issues
 
+> **Current verified status — 30 October 2026 at `d26beb4`:** Segment 01 is COMPLETED (23/23); overall 27/88 migration tasks completed. All 11 hosted checks passed at [run 41013926983](https://github.com/EsanduEpa/gymos-v2/actions/runs/41013926983). Historical issue entries below are checkpoints; current dispositions are recorded in the final reconciliation entry.
+
 Use this shared log for issues discovered while executing migration segment files. Add one dated section per segment run. Record symptoms, impact, resolution or next action, and evidence links. Keep credentials, customer data, and other secrets out of this file.
 
 ## Entry template
@@ -12,7 +14,7 @@ Use this shared log for issues discovered while executing migration segment file
 
 Evidence: link to segment evidence and any relevant task IDs.
 
-## Segment 01 — 2026-10-25
+## Segment 01 — 2026-10-25 (historical checkpoint; superseded)
 
 | Issue | Impact | Resolution / next action | Status |
 | --- | --- | --- | --- |
@@ -42,7 +44,7 @@ Evidence: [GYMOS-MIG-008 evidence](evidence/GYMOS-MIG-008.md), [Segment 01 execu
 
 Evidence: [GYMOS-MIG-016](evidence/GYMOS-MIG-016.md), [GYMOS-MIG-017](evidence/GYMOS-MIG-017.md), [GYMOS-MIG-018](evidence/GYMOS-MIG-018.md), [GYMOS-MIG-019](evidence/GYMOS-MIG-019.md), [Segment 02 execution record](segments/02_IDENTITY_AUTH_AND_APPLICATION_SHELL.md). Remaining tasks: 013 and 020; DEC-11 remains the gate for final session/logout policy in task 020.
 
-## Segment 03 — 2026-10-26
+## Segment 03 — 2026-10-26 (historical checkpoint; decision gates since approved)
 
 | Issue | Impact | Resolution / next action | Status |
 | --- | --- | --- | --- |
@@ -51,20 +53,30 @@ Evidence: [GYMOS-MIG-016](evidence/GYMOS-MIG-016.md), [GYMOS-MIG-017](evidence/G
 
 Evidence: [Segment 03 execution record](segments/03_PLATFORM_ADMIN_AND_TENANT_LIFECYCLE.md), [decision register](MIGRATION_DECISIONS.md), [GYMOS-MIG-021 specification](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-021). No Segment 03 implementation tasks were run; all six remain Not Started.
 
-## Segment 04 — 2026-10-26
+## Segment 04 — 2026-10-26 (historical checkpoint; decision gates since approved)
 
 | Issue | Impact | Resolution / next action | Status |
 | --- | --- | --- | --- |
 | Segment 04 depends on Segment 03, which remains blocked before implementation by DEC-03. GYMOS-MIG-027 also depends on GYMOS-MIG-023 and decision task 077, none completed; 013 is also not completed. | No Segment 04 task has its required implementation dependencies. GYMOS-MIG-015 additionally depends on GYMOS-MIG-024 and 027. | Resume after Segment 03 and the listed prerequisites are completed with evidence. No application implementation was started. | Open |
 | Segment 04 requires approved DEC-01/06/07/08; GYMOS-MIG-027 specifically requires 077/082/083 and forbids configuration fields before approval. | Ownership, currency precision/set, date/time boundaries, settlement/pay policy and cross-plane profile recovery are not yet approved. | Concrete proposals now exist for [DEC-01](decisions/DEC-01.md), [DEC-06](decisions/DEC-06.md), [DEC-07](decisions/DEC-07.md) and [DEC-08](decisions/DEC-08.md). Project-owner approval or revisions are required. | Awaiting approval |
 
-Evidence: [Segment 04 execution record](segments/04_GYM_CONFIGURATION_AND_MEMBERSHIP_RULES.md), [decision register](MIGRATION_DECISIONS.md), [Segment 03 run issues](SEGMENT_RUN_ISSUES.md#segment-03--2026-10-26). No Segment 04 implementation tasks were run; 015 and 027–030 remain Not Started.
+Evidence: [Segment 04 execution record](segments/04_GYM_CONFIGURATION_AND_MEMBERSHIP_RULES.md), [decision register](MIGRATION_DECISIONS.md), [Segment 03 run issues](SEGMENT_RUN_ISSUES.md#segment-03--2026-10-26-historical-checkpoint-decision-gates-since-approved). No Segment 04 implementation tasks were run; 015 and 027–030 remain Not Started. Current blockers are upstream tasks 013 and Segment 03 implementation prerequisites, not the now-approved DEC-01/06/07/08 gates.
 
-## Segment 01 — 2026-10-30 continuation
+## Segment 01 — 2026-10-30 continuation (historical checkpoint; superseded)
 
 | Issue | Impact | Resolution / next action | Status |
 |---|---|---|---|
 | GYMOS-MIG-085 lacked a concrete DEC-09 record for coaching privacy, metric definitions, export limits and freshness behavior. | Coaching, analytics, export and selected-gym refresh implementation cannot safely choose relationship states, numeric bounds, day mapping, scope or caps by inference. | Prepared [DEC-09](decisions/DEC-09.md) and [task evidence](evidence/GYMOS-MIG-085.md) with explicit proposed defaults and expected tests. Project owner and Coaching/Privacy, Finance, Frontend reviewers must approve or revise before affected feature work. | Awaiting approval |
 | Segment 01 status summaries predated completed identity/authentication tasks 016–019 and the new DEC-09 proposal. | Segment totals and handoff did not match current task evidence. | Updated segment progress to 19/88 completed overall (15 in Segment 01, 4 in Segment 02); kept GYMOS-MIG-085 Blocked because proposal preparation is not approval. | Resynchronized |
 
-No application code, database, hosted workflow or V1 file was changed in this continuation. Task 008 remains in progress because there is no configured Git remote/hosted run and online lockfile audit could not be verified. Task 010 remains blocked pending credential-owner/provider containment and access/reuse review evidence.
+No application code, database, hosted workflow or V1 file was changed in this historical continuation. The no-remote/no-hosted-run and pending-owner-evidence statements were superseded by the final reconciliation below.
+
+## Segment 01 — 2026-10-30 final reconciliation
+
+| Issue | Impact | Resolution / next action | Status |
+|---|---|---|---|
+| Historical run entries said no remote, hosted checks, or owner approval were available. | Those entries conflicted with current task/evidence records. | PR #1 is open and draft. Authenticated Chrome verified run 41011340034 at `49217dd`; all 11 checks passed. Owner-approved decisions and credential closure are in the linked records. Earlier dated entries remain historical. | Resolved |
+| Evidence used different status language for credential containment and Segment 01 completion. | Risk R18 and task 010 could be read as still open or as independently provider-verified. | Tracker, evidence and risk register now record owner-attested provider remediation plus independent local checks, retaining uncertainty about provider logs and historical access. No provider was contacted and V1 was not run or edited. | Resolved |
+| Run 41013007595 failed the browser isolation test because a streamed unauthenticated redirect to `/login` overlapped the next login navigation. | Hosted browser verification was incomplete at that documentation revision. | Added an explicit URL wait after navigating to `/`; the focused owned browser test passed locally, and authenticated Chrome verified all 11 jobs passed at `d26beb4` in [run 41013926983](https://github.com/EsanduEpa/gymos-v2/actions/runs/41013926983). | Resolved |
+
+Evidence: [finalization](SEGMENT_01_FINALIZATION.md), [GYMOS-MIG-008](evidence/GYMOS-MIG-008.md), [GYMOS-MIG-010](evidence/GYMOS-MIG-010.md), [risk register](MIGRATION_RISK_REGISTER.md). The prior run 41011340034 at `49217dd` remains a historical passing checkpoint; run 41013926983 is the latest verified revision.

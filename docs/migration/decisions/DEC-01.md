@@ -1,9 +1,9 @@
 # DEC-01 — Master/tenant configuration ownership and profile-save boundary
 
-- Status: **Blocked — concrete proposal awaiting project-owner approval.**
+- Status: **Approved by project owner Esandu — 30 October 2026.**
 - Prepared: 26 October 2026, Asia/Colombo.
 - Resolution task: [GYMOS-MIG-077](../MIGRATION_TASK_SPECS.md#task-id-gymos-mig-077).
-- Accountable reviewer: project owner with Architecture lead.
+- Accountable reviewer: Esandu, project owner; owner explicitly accepts the decision-review responsibilities.
 - Authority: Master Plan; Database map DB01; Functionality map F-D07/F-D08/F-D16.
 
 ## Preserved approved requirements
@@ -50,6 +50,14 @@ Master owns platform routing, gym lifecycle status and public branding. Each ten
 
 These are future implementation tests. No application behavior is claimed by this proposal.
 
-## Approval record
+## Historical approval-request checkpoint — 30 October 2026 (superseded)
 
-Awaiting the project owner's explicit approval or requested changes. Until then DEC-01 and GYMOS-MIG-077 remain blocked.
+At that checkpoint, the owner had requested finalization but the owner-review disposition was not yet recorded. The later owner approval below supersedes the separate-reviewer requirement.
+
+## Finalization boundary — 30 October 2026
+
+Owner authorization is recorded from this conversation. Historical proposal/preparation statements above describe earlier checkpoints. This document approves policy, not feature implementation; the final owner review disposition supersedes the earlier separate-reviewer gate. See [finalization record](../SEGMENT_01_FINALIZATION.md) for current verification and scope.
+
+## Final owner review disposition — 30 October 2026
+
+Esandu explicitly stated that decision review will be performed by the project owner and that this is acceptable. This supersedes the separate-reviewer gate and historical pending-review statements above. DEC-01 is approved under owner review with the recorded amendments. No independent specialist review is claimed. This approves policy, not implementation or production release.

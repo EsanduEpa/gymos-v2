@@ -16,7 +16,7 @@ Do not use this segment to hide unfinished feature work. Reinspect both codebase
 
 ## 2. Current V1 implementation
 
-The authoritative inventory is 29 route responsibilities (26 rendered pages), 74 TSX files, 40 component files, 44 exported actions, 20 models, 14 enums, 39 workflows, 52 interaction groups, 22 local-control groups, 63 proposed contracts and 8 existing V2 operations. V1 also contains partial/mock O14 subscription controls, fake receipt alerts, derived PAID billing, unused progress data/components, no member plan delivery, no check-in/community/ratings, and only primary Classic styling.
+The original V1 inventory is 29 route responsibilities (26 rendered pages), 74 TSX files, 40 component files, 44 exported actions, 20 models, 14 enums, 39 workflows, 52 interaction groups, 22 local-control groups, 63 source-derived proposed contracts and 8 existing V2 operations. Two additional V2 member plan-read contracts (C64/C65) were added for owner-approved first-release scope; these are new V2 scope, not V1 routes. V1 has no member plan delivery, check-in/community/ratings, and only primary Classic styling.
 
 ## 3. Target V2 implementation
 
