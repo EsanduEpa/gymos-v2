@@ -59,12 +59,22 @@ export const memberDetailSchema = z.strictObject({
   asOf: isoInstantSchema,
 });
 
-export const memberRegistrationResultSchema = z.strictObject({ operationId: idSchema, memberId: idSchema,
-  term: z.strictObject({ id: idSchema, planName: z.string().max(80), startDate: localDateSchema, endDateExclusive: localDateSchema,
-    agreedPrice: nonnegativeDecimalStringSchema, currency: z.enum(['LKR', 'USD']) }),
-  status: z.enum(['COMPLETE', 'PENDING']), replayed: z.boolean(),
-  temporaryPassword: z.string().min(1).max(128).optional(),
-  credentialDeliveryVersion: versionSchema.optional(), credentialExpiresAt: isoInstantSchema.optional() });
+export const memberRegistrationResultSchema = z.discriminatedUnion('status', [
+  z.strictObject({ operationId: idSchema, status: z.literal('PENDING'), replayed: z.boolean(), consentRequired: z.literal(true) }),
+  z.strictObject({ operationId: idSchema, memberId: idSchema,
+    term: z.strictObject({ id: idSchema, planName: z.string().max(80), startDate: localDateSchema, endDateExclusive: localDateSchema,
+      agreedPrice: nonnegativeDecimalStringSchema, currency: z.enum(['LKR', 'USD']) }),
+    status: z.literal('COMPLETE'), replayed: z.boolean(),
+    temporaryPassword: z.string().min(1).max(128).optional(),
+    credentialDeliveryVersion: versionSchema.optional(), credentialExpiresAt: isoInstantSchema.optional() }),
+]);
+
+export const memberEnrollmentConsentInputSchema = z.strictObject({
+  decision: z.enum(['ACCEPT', 'DECLINE']), currentPassword: z.string().min(1).max(1024),
+});
+export const memberEnrollmentConsentResultSchema = z.strictObject({
+  operationId: idSchema, status: z.enum(['CONSENT_RECORDED', 'CONSENT_DECLINED']), replayed: z.boolean(),
+});
 
 export type MemberRegistrationInput = z.infer<typeof memberRegistrationInputSchema>;
 export type MemberListItem = z.infer<typeof memberListItemSchema>;

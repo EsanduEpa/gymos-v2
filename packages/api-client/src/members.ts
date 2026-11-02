@@ -1,4 +1,5 @@
-import { memberDetailSchema, memberListQuerySchema, memberListSchema, memberRegistrationInputSchema, memberRegistrationResultSchema } from '@gymos/contracts';
+import { memberDetailSchema, memberEnrollmentConsentInputSchema, memberEnrollmentConsentResultSchema,
+  memberListQuerySchema, memberListSchema, memberRegistrationInputSchema, memberRegistrationResultSchema } from '@gymos/contracts';
 import type { RequestOptions } from './index.js';
 
 type Requester = { request<T>(path: string, options: RequestOptions<T>): Promise<T> };
@@ -15,6 +16,12 @@ export const memberApi = (client: Requester) => ({
     return client.request(`/gyms/${encodeURIComponent(slug)}/member-registrations`, {
       method: 'POST', response: memberRegistrationResultSchema, accessToken,
       idempotencyKey: input.idempotencyKey, body: input,
+    });
+  },
+  consent: (slug: string, operationId: string, accessToken: string, body: unknown) => {
+    const input = memberEnrollmentConsentInputSchema.parse(body);
+    return client.request(`/gyms/${encodeURIComponent(slug)}/member-enrollments/${encodeURIComponent(operationId)}/consent`, {
+      method: 'POST', response: memberEnrollmentConsentResultSchema, accessToken, body: input,
     });
   },
 });

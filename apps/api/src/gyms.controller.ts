@@ -17,6 +17,7 @@ import {
   UnprocessableEntityException,
   UseGuards,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { z } from 'zod';
 import { DatabaseService } from './database.service.js';
 import { Prisma } from './generated/tenant/client.js';
@@ -24,9 +25,11 @@ import type { Prisma as MasterPrisma } from './generated/master/client.js';
 import { GymAccessGuard, type GymRequest } from './gym-access.guard.js';
 import { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js';
 import { appendMasterVersionAudit } from './operations/transaction-audit.js';
-import { memberListQuerySchema, memberListSchema, memberRegistrationInputSchema, updateGymPublicProfileSchema, updateGymThemeSchema } from '@gymos/contracts';
+import { memberEnrollmentConsentInputSchema, memberEnrollmentConsentResultSchema, memberListQuerySchema, memberListSchema,
+  memberRegistrationInputSchema, updateGymPublicProfileSchema, updateGymThemeSchema } from '@gymos/contracts';
 import { gymLocalDate } from './membership-rules.js';
 import { MemberEnrollmentService } from './member-enrollment.service.js';
+import { identityFromAuthorization } from './auth-token.js';
 
 const createMemberInput = z.strictObject({
   fullName: z.string().trim().min(2).max(120),
@@ -343,5 +346,18 @@ export class GymsController {
     if (!parsed.success) throw new UnprocessableEntityException('Enter valid member details and a membership plan');
     if (!this.memberEnrollment) throw new InternalServerErrorException('Member enrollment is unavailable');
     return this.memberEnrollment.enroll(access, parsed.data);
+  }
+
+  @Post(':slug/member-enrollments/:operationId/consent')
+  async memberEnrollmentConsent(@Req() request: Request, @Param('slug') slug: string,
+    @Param('operationId') operationId: string, @Body() body: unknown) {
+    if (!this.memberEnrollment) throw new InternalServerErrorException('Member enrollment is unavailable');
+    const identity = await identityFromAuthorization(request.headers.authorization);
+    const parsed = memberEnrollmentConsentInputSchema.safeParse(body);
+    if (!parsed.success) throw new UnprocessableEntityException('Enter a valid consent decision and current password');
+    const result = await this.memberEnrollment.consent(slug, operationId, {
+      identityId: identity.userId, authVersion: identity.authVersion, ...parsed.data,
+    });
+    return memberEnrollmentConsentResultSchema.parse(result);
   }
 }

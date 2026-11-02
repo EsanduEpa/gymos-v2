@@ -1,6 +1,6 @@
 'use server';
 
-import { memberRegistrationInputSchema, memberRegistrationResultSchema } from '@gymos/contracts';
+import { memberEnrollmentConsentInputSchema, memberEnrollmentConsentResultSchema, memberRegistrationInputSchema, memberRegistrationResultSchema } from '@gymos/contracts';
 import { credentialAcknowledgementInputSchema, credentialAcknowledgementResultSchema, credentialReissueInputSchema, credentialReissueResultSchema } from '@gymos/contracts/credentials';
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
@@ -11,6 +11,39 @@ export type MemberRegistrationActionState = {
   error?: string; idempotencyKey: string;
   result?: ReturnType<typeof memberRegistrationResultSchema.parse>;
 };
+
+export type MemberEnrollmentConsentActionState = {
+  error?: string;
+  result?: ReturnType<typeof memberEnrollmentConsentResultSchema.parse>;
+};
+
+export async function memberEnrollmentConsentAction(slug: string, operationId: string,
+  _previous: MemberEnrollmentConsentActionState, formData: FormData): Promise<MemberEnrollmentConsentActionState> {
+  const parsed = memberEnrollmentConsentInputSchema.safeParse({
+    decision: formData.get('decision'), currentPassword: formData.get('currentPassword'),
+  });
+  if (!parsed.success) return { error: 'Enter your current password and choose whether to accept this gym enrollment.' };
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token) redirect('/login');
+  let response: Response;
+  try {
+    response = await fetch(apiUrl(`/gyms/${encodeURIComponent(slug)}/member-enrollments/${encodeURIComponent(operationId)}/consent`), {
+      method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify(parsed.data), cache: 'no-store',
+    });
+  } catch {
+    return { error: 'Consent could not be confirmed. Sign in again and retry this same request.' };
+  }
+  if (response.status === 401) redirect('/login?error=expired');
+  if (response.status === 403 || response.status === 404) notFound();
+  const result = memberEnrollmentConsentResultSchema.safeParse(await response.json().catch(() => null));
+  if (!response.ok || !result.success) {
+    return { error: response.status === 409
+      ? 'This enrollment already has a role or its consent state changed. Contact the gym owner.'
+      : 'We could not verify your account or save this choice. Check your current password and try again.' };
+  }
+  return { result: result.data };
+}
 
 export async function registerMemberAction(slug: string, previous: MemberRegistrationActionState, formData: FormData): Promise<MemberRegistrationActionState> {
   const keyValue = formData.get('idempotencyKey');

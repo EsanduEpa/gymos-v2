@@ -19,6 +19,17 @@ Evidence baseline: 31 October 2026. Counts come from [`../MIGRATION_TASK_TRACKER
 | 11 | Mobile Applications | NOT STARTED | 6 | 0 | 6 | DEC-12 and stable web/API lifecycle | 07–10 | No mobile app exists |
 | **Total** |  |  | **88** | **40** | **48** |  |  |  |
 
+## Segment 05 scheduling follow-up — 2 November 2026
+
+The owner requested waiting for the relevant Segment 06/07 prerequisites.
+Verify 036 → 040 → 043, then return to unfinished member tasks 031–035 using the
+[ownership and return checklist](../SEGMENT_05_FOLLOW_UP.md). Completion counts
+and task statuses are unchanged by this scheduling record. Member-specific
+consent/recovery, profile integration, status/hold release, pack issuance and
+end-to-end acceptance remain required. Return before Segment 07 booking tasks
+041/042, which depend on 034; waiting for the entire segment would create a
+scheduling cycle.
+
 ## Update protocol
 
 After verifying a task, update its authoritative tracker/evidence first, then this table and the owning segment handoff. Record exact revision, environment, commands/exit codes, fixtures, success and negative cases, screenshots where applicable, skipped checks, and residual risk. `IMPLEMENTED` without passing evidence is not `COMPLETED` or `VERIFIED`.

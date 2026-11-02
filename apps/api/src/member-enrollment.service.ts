@@ -1,5 +1,5 @@
 import { createHmac, randomBytes } from 'node:crypto';
-import { Injectable, ConflictException, ForbiddenException, ServiceUnavailableException, UnprocessableEntityException } from '@nestjs/common';
+import { Injectable, ConflictException, ForbiddenException, NotFoundException, ServiceUnavailableException, UnprocessableEntityException } from '@nestjs/common';
 import argon2 from 'argon2';
 import type { Prisma } from './generated/master/client.js';
 import { memberRegistrationResultSchema, type MemberRegistrationInput } from '@gymos/contracts';
@@ -13,6 +13,7 @@ import { addLocalDays, asDate, dateString, gymLocalDate } from './membership-rul
 import { CredentialService } from './identity/credential.service.js';
 import type { GymRequest } from './gym-access.guard.js';
 import { normalizeIdentityEmail } from './identity/email.js';
+import { IdentityFoundationService } from './identity/identity.service.js';
 
 @Injectable()
 export class MemberEnrollmentService {
@@ -59,7 +60,23 @@ export class MemberEnrollmentService {
           const gym = await tx.gym.findUnique({ where: { id: access.gymId }, select: { status: true } });
           if (gym?.status !== 'ACTIVE') throw new ForbiddenException('Gym is unavailable');
           const existing = await tx.user.findUnique({ where: { email }, select: { id: true } });
-          if (existing) throw new ConflictException('This identity already exists; it must explicitly consent to gym membership');
+          if (existing) {
+            await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${`member-enrollment:${access.gymId}:${existing.id}`}, 0))`;
+            const [identity, gymAccess, pending] = await Promise.all([
+              tx.user.findUnique({ where: { id: existing.id }, select: { globalRole: true } }),
+              tx.gymAccess.findUnique({ where: { userId_gymId: { userId: existing.id, gymId: access.gymId } }, select: { role: true } }),
+              tx.operation.findFirst({ where: { gymId: access.gymId, subjectIdentityId: existing.id, kind: 'REGISTER_MEMBER',
+                state: { in: ['PENDING', 'MASTER_PREPARED', 'TENANT_COMMITTED', 'FAILED_RETRYABLE'] } }, select: { id: true } }),
+            ]);
+            if (!identity || identity.globalRole !== 'USER') throw new ConflictException('This identity cannot join this gym');
+            if (gymAccess) throw new ConflictException('This identity already has a role in this gym');
+            if (pending) throw new ConflictException('An enrollment for this identity is already awaiting consent or recovery');
+            await tx.operation.update({ where: { id: operation.id }, data: { subjectIdentityId: existing.id, version: { increment: 1 } } });
+            await appendMasterAudit(tx, { actorIdentityId: access.identityId, operationId: operation.id, gymId: access.gymId,
+              stepCode: 'CONSENT_REQUIRED', eventCode: 'MEMBER_ENROLLMENT_CONSENT_REQUIRED', resourceType: 'IDENTITY', resourceId: existing.id,
+              transition: { to: 'PENDING' } });
+            return;
+          }
           const initialHash = await argon2.hash(randomBytes(32).toString('base64url'), { type: argon2.argon2id });
           const identity = await tx.user.create({ data: { email, displayName: input.fullName, passwordHash: initialHash } });
           await tx.gymAccess.create({ data: { userId: identity.id, gymId: access.gymId, role: 'MEMBER', actorKind: 'MEMBER',
@@ -81,17 +98,38 @@ export class MemberEnrollmentService {
       throw new OperationIntegrityError('Member enrollment operation binding is incomplete');
     }
     const memberIdentityId = operation.subjectIdentityId;
+    if (operation.state === 'FAILED_FINAL' || operation.state === 'REPAIR_REQUIRED') {
+      throw new ConflictException('Enrollment requires owner recovery before it can continue');
+    }
+    const preparedAccess = await this.database.master.gymAccess.findUnique({
+      where: { userId_gymId: { userId: memberIdentityId, gymId: access.gymId } },
+      select: { role: true, linkStatus: true, enrollmentOperationId: true, actorKind: true, tenantActorId: true },
+    });
+    if (!preparedAccess) {
+      return memberRegistrationResultSchema.parse({ operationId, status: 'PENDING', replayed: claim.replayed, consentRequired: true });
+    }
+    if (preparedAccess.role !== 'MEMBER' || preparedAccess.enrollmentOperationId !== operationId
+      || preparedAccess.linkStatus !== 'PENDING' && preparedAccess.linkStatus !== 'ACTIVE') {
+      throw new ConflictException('Enrollment access binding conflicts with this request');
+    }
+    const consentProof = await this.database.master.enrollmentProof.findUnique({
+      where: { identityId_gymId_role_enrollmentOperationId: {
+        identityId: memberIdentityId, gymId: access.gymId, role: 'MEMBER', enrollmentOperationId: operationId,
+      } }, select: { consumedAt: true },
+    });
+    if (consentProof && !consentProof.consumedAt) throw new ServiceUnavailableException('Enrollment consent is being recovered');
+    const reusedIdentity = Boolean(consentProof?.consumedAt);
     if (operation.state === 'COMPLETE') {
       if (!operation.tenantActorId || !operation.tenantMembershipId) throw new OperationIntegrityError('Completed enrollment is missing its tenant references');
       const term = await this.tenantGate.withVerifiedTenant(access, tenant => tenant.membershipTerm.findUnique({ where: { id: operation.tenantMembershipId! },
         select: { id: true, planNameSnapshot: true, startDate: true, endDateExclusive: true, agreedPrice: true, currency: true } }));
       if (!term) throw new OperationIntegrityError('Committed membership term cannot be read');
-      const credential = await this.credentials.issueTemporaryCredential({ actorIdentityId: access.identityId, gymId: access.gymId, operationId });
+      const credential = reusedIdentity ? null : await this.credentials.issueTemporaryCredential({ actorIdentityId: access.identityId, gymId: access.gymId, operationId });
       return memberRegistrationResultSchema.parse({ operationId, memberId: operation.tenantActorId,
         term: { id: term.id, planName: term.planNameSnapshot, startDate: dateString(term.startDate), endDateExclusive: dateString(term.endDateExclusive),
           agreedPrice: term.agreedPrice.toString(), currency: term.currency }, status: 'COMPLETE', replayed: true,
-        credentialDeliveryVersion: credential.deliveryVersion,
-        ...(credential.status === 'ISSUED' ? { temporaryPassword: credential.temporaryPassword, credentialExpiresAt: credential.expiresAt.toISOString() } : {}),
+        ...(credential ? { credentialDeliveryVersion: credential.deliveryVersion,
+          ...(credential.status === 'ISSUED' ? { temporaryPassword: credential.temporaryPassword, credentialExpiresAt: credential.expiresAt.toISOString() } : {}) } : {}),
       });
     }
     let lease = await service.acquireLease(operationId, operation.version);
@@ -215,13 +253,31 @@ export class MemberEnrollmentService {
     const term = await this.tenantGate.withVerifiedTenant(access, tenant => tenant.membershipTerm.findUnique({ where: { id: complete.tenantMembershipId! },
       select: { id: true, planNameSnapshot: true, startDate: true, endDateExclusive: true, agreedPrice: true, currency: true } }));
     if (!term) throw new OperationIntegrityError('Committed membership term cannot be read');
-    const credential = await this.credentials.issueTemporaryCredential({ actorIdentityId: access.identityId, gymId: access.gymId, operationId });
+    const credential = reusedIdentity ? null : await this.credentials.issueTemporaryCredential({ actorIdentityId: access.identityId, gymId: access.gymId, operationId });
     return memberRegistrationResultSchema.parse({ operationId, memberId: complete.tenantActorId,
       term: { id: term.id, planName: term.planNameSnapshot, startDate: dateString(term.startDate), endDateExclusive: dateString(term.endDateExclusive),
         agreedPrice: term.agreedPrice.toString(), currency: term.currency },
-      status: 'COMPLETE', replayed: claim.replayed || credential.status === 'ALREADY_ISSUED',
-      credentialDeliveryVersion: credential.deliveryVersion,
-      ...(credential.status === 'ISSUED' ? { temporaryPassword: credential.temporaryPassword, credentialExpiresAt: credential.expiresAt.toISOString() } : {}),
+      status: 'COMPLETE', replayed: claim.replayed || credential?.status === 'ALREADY_ISSUED',
+      ...(credential ? { credentialDeliveryVersion: credential.deliveryVersion,
+        ...(credential.status === 'ISSUED' ? { temporaryPassword: credential.temporaryPassword, credentialExpiresAt: credential.expiresAt.toISOString() } : {}) } : {}),
     });
+  }
+
+  async consent(slug: string, operationId: string, input: {
+    identityId: string; authVersion: number; currentPassword: string; decision: 'ACCEPT' | 'DECLINE';
+  }) {
+    const gym = await this.database.master.gym.findUnique({ where: { slug }, select: { id: true, status: true } });
+    const operation = await this.database.master.operation.findUnique({ where: { id: operationId },
+      select: { id: true, kind: true, gymId: true, subjectIdentityId: true } });
+    if (!gym || gym.status !== 'ACTIVE' || !operation || operation.kind !== 'REGISTER_MEMBER'
+      || operation.gymId !== gym.id || operation.subjectIdentityId !== input.identityId) {
+      throw new NotFoundException('Enrollment consent is unavailable');
+    }
+    const result = await new IdentityFoundationService(this.database.master).consentEnrollment({
+      gymId: gym.id, role: 'MEMBER', enrollmentOperationId: operation.id,
+      authenticatedIdentityId: input.identityId, authenticatedAuthVersion: input.authVersion,
+      currentPassword: input.currentPassword, decision: input.decision,
+    });
+    return { operationId: operation.id, ...result };
   }
 }

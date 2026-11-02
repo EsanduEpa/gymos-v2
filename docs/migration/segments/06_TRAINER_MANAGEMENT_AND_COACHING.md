@@ -73,6 +73,7 @@ Stop until DEC-09 fixes relationship, privacy, metrics, limits and meal-day mapp
 - **Completed:** none
 - **Remaining:** 036–039,050–052
 - **Next recommended task:** GYMOS-MIG-036; execute 050 only after sessions establish confirmed relationships.
+- **Segment 05 return checkpoint:** task 036 supplies the trainer-registration prerequisite for 040. Record its own acceptance evidence, then follow the [member follow-up checklist](../SEGMENT_05_FOLLOW_UP.md). Shared trainer enrollment work does not establish completion of member consent/recovery under task 031.
 - **Files/tests/issues/blockers/decisions:** _fill during execution_
 
 

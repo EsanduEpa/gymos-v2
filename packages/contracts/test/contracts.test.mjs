@@ -9,7 +9,8 @@ import {
 import { existingEndpointContracts } from '../dist/legacy.js';
 import { changePasswordInputSchema, credentialAcknowledgementInputSchema, credentialAcknowledgementResultSchema, credentialIssueInputSchema, credentialReissueInputSchema, credentialReissueResultSchema } from '../dist/credentials.js';
 import { createMembershipPlanSchema, gymConfigurationSchema, updateGymThemeSchema } from '../dist/configuration.js';
-import { memberListQuerySchema, memberListSchema, memberRegistrationInputSchema } from '../dist/members.js';
+import { memberEnrollmentConsentInputSchema, memberEnrollmentConsentResultSchema, memberListQuerySchema, memberListSchema,
+  memberRegistrationInputSchema, memberRegistrationResultSchema } from '../dist/members.js';
 
 const asOf = '2026-10-23T00:00:00.000Z';
 const identity = {
@@ -113,6 +114,14 @@ test('member enrollment and paged projections enforce strict profile bounds and 
   assert.equal(memberRegistrationInputSchema.safeParse({ ...input, healthNotes: 'x'.repeat(4001) }).success, false);
   assert.equal(memberRegistrationInputSchema.safeParse({ ...input, passwordHash: 'never accepted' }).success, false);
   assert.deepEqual(memberListQuerySchema.parse({ page: '2', q: '  alex  ', status: 'ACTIVE' }), { page: 2, pageSize: 25, q: 'alex', status: 'ACTIVE' });
+  const pendingEnrollment = { operationId: 'operation-123', status: 'PENDING', replayed: false, consentRequired: true };
+  assert.deepEqual(memberRegistrationResultSchema.parse(pendingEnrollment), pendingEnrollment);
+  assert.equal(memberRegistrationResultSchema.safeParse({ ...pendingEnrollment, memberId: 'member-123' }).success, false);
+  const consentInput = { decision: 'ACCEPT', currentPassword: 'private-current-password' };
+  assert.deepEqual(memberEnrollmentConsentInputSchema.parse(consentInput), consentInput);
+  assert.equal(memberEnrollmentConsentInputSchema.safeParse({ ...consentInput, token: 'not-accepted' }).success, false);
+  assert.deepEqual(memberEnrollmentConsentResultSchema.parse({ operationId: 'operation-123', status: 'CONSENT_RECORDED', replayed: true }),
+    { operationId: 'operation-123', status: 'CONSENT_RECORDED', replayed: true });
   const data = { items: [{ id: 'member-1', fullName: 'Synthetic Member', email: null, status: 'ACTIVE', registrationState: 'COMPLETE',
     createdAt: asOf, currentTerm: { id: 'term-1', planName: 'Monthly', startDate: '2026-10-01', endDateExclusive: '2026-11-01',
       agreedPrice: '0.00', currency: 'LKR' } }], page: 1, pageSize: 25, totalCount: 1, totalPages: 1, asOf };

@@ -136,7 +136,8 @@ it('reuses one self-verified identity with distinct roles/actor IDs across gyms 
     { gymId: b.id, role: 'TRAINER' as const, enrollmentOperationId: 'operation-b' }];
   const proofs = [];
   for (const binding of bindings) {
-    const proof = await identities.issueEnrollmentProof({ ...binding, authenticatedIdentityId: user.id, currentPassword: password });
+    const proof = await identities.issueEnrollmentProof({ ...binding, authenticatedIdentityId: user.id,
+      authenticatedAuthVersion: user.authVersion, currentPassword: password });
     proofs.push(proof);
     const [first, repeat] = await Promise.all([
       identities.consumeProofAndPrepareAccess({ ...binding, token: proof.token }),
@@ -177,12 +178,15 @@ it('rejects incorrect proof bindings, wrong secret, expiry, changed security ver
   const user = await fixtureIdentity('proof@example.test');
   const gym = await master.gym.findFirstOrThrow();
   const binding = { gymId: gym.id, role: 'MEMBER' as const, enrollmentOperationId: 'proof-operation' };
-  await expect(identities.issueEnrollmentProof({ ...binding, authenticatedIdentityId: user.id, currentPassword: 'wrong' })).rejects.toThrow('verification failed');
-  const proof = await identities.issueEnrollmentProof({ ...binding, authenticatedIdentityId: user.id, currentPassword: password });
+  await expect(identities.issueEnrollmentProof({ ...binding, authenticatedIdentityId: user.id,
+    authenticatedAuthVersion: user.authVersion, currentPassword: 'wrong' })).rejects.toThrow('verification failed');
+  const proof = await identities.issueEnrollmentProof({ ...binding, authenticatedIdentityId: user.id,
+    authenticatedAuthVersion: user.authVersion, currentPassword: password });
   await expect(identities.consumeProofAndPrepareAccess({ ...binding, token: proof.token, role: 'TRAINER' })).rejects.toThrow('proof invalid');
   await expect(identities.consumeProofAndPrepareAccess({ ...binding, token: proof.token, gymId: 'foreign' })).rejects.toThrow('proof invalid');
   await expect(identities.consumeProofAndPrepareAccess({ ...binding, token: proof.token, enrollmentOperationId: 'other' })).rejects.toThrow('proof invalid');
   await master.user.update({ where: { id: user.id }, data: { authVersion: { increment: 1 } } });
+  const rotatedUser = await master.user.findUniqueOrThrow({ where: { id: user.id }, select: { authVersion: true } });
   await expect(identities.consumeProofAndPrepareAccess({ ...binding, token: proof.token })).rejects.toThrow('proof invalid');
   expect(await master.gymAccess.count({ where: { userId: user.id } })).toBe(0);
   const client = await run.connect(run.masterName);
@@ -191,10 +195,12 @@ it('rejects incorrect proof bindings, wrong secret, expiry, changed security ver
   } finally { await client.end(); }
   await expect(identities.consumeProofAndPrepareAccess({ ...binding, token: proof.token })).rejects.toThrow('proof invalid');
   const acceptedBinding = { ...binding, enrollmentOperationId: 'accepted-op' };
-  const accepted = await identities.issueEnrollmentProof({ ...acceptedBinding, authenticatedIdentityId: user.id, currentPassword: password });
+  const accepted = await identities.issueEnrollmentProof({ ...acceptedBinding, authenticatedIdentityId: user.id,
+    authenticatedAuthVersion: rotatedUser.authVersion, currentPassword: password });
   await identities.consumeProofAndPrepareAccess({ ...acceptedBinding, token: accepted.token });
   const conflictBinding = { ...binding, role: 'TRAINER' as const, enrollmentOperationId: 'conflict-op' };
-  const conflict = await identities.issueEnrollmentProof({ ...conflictBinding, authenticatedIdentityId: user.id, currentPassword: password });
+  const conflict = await identities.issueEnrollmentProof({ ...conflictBinding, authenticatedIdentityId: user.id,
+    authenticatedAuthVersion: rotatedUser.authVersion, currentPassword: password });
   await expect(identities.consumeProofAndPrepareAccess({ ...conflictBinding, token: conflict.token })).rejects.toBeInstanceOf(ConflictException);
   expect(await master.gymAccess.count({ where: { userId: user.id } })).toBe(1);
   expect((await master.enrollmentProof.findFirstOrThrow({ where: { enrollmentOperationId: 'conflict-op' } })).consumedAt).toBeNull();
@@ -205,12 +211,15 @@ it('denies restricted/expired identities internal consent before future public a
   const user = await fixtureIdentity('restricted@example.test');
   const gym = await master.gym.findFirstOrThrow();
   const binding = { gymId: gym.id, role: 'MEMBER' as const, enrollmentOperationId: 'restricted-op' };
-  const liveProof = await identities.issueEnrollmentProof({ ...binding, authenticatedIdentityId: user.id, currentPassword: password });
+  const liveProof = await identities.issueEnrollmentProof({ ...binding, authenticatedIdentityId: user.id,
+    authenticatedAuthVersion: user.authVersion, currentPassword: password });
   await master.user.update({ where: { id: user.id }, data: { mustChangePassword: true } });
-  await expect(identities.issueEnrollmentProof({ ...binding, enrollmentOperationId: 'another', authenticatedIdentityId: user.id, currentPassword: password })).rejects.toThrow('verification failed');
+  await expect(identities.issueEnrollmentProof({ ...binding, enrollmentOperationId: 'another', authenticatedIdentityId: user.id,
+    authenticatedAuthVersion: user.authVersion, currentPassword: password })).rejects.toThrow('verification failed');
   await expect(identities.consumeProofAndPrepareAccess({ ...binding, token: liveProof.token })).rejects.toThrow('proof invalid');
   await master.user.update({ where: { id: user.id }, data: { mustChangePassword: false, credentialExpiresAt: new Date(0) } });
-  await expect(identities.issueEnrollmentProof({ ...binding, enrollmentOperationId: 'expired', authenticatedIdentityId: user.id, currentPassword: password })).rejects.toThrow('verification failed');
+  await expect(identities.issueEnrollmentProof({ ...binding, enrollmentOperationId: 'expired', authenticatedIdentityId: user.id,
+    authenticatedAuthVersion: user.authVersion, currentPassword: password })).rejects.toThrow('verification failed');
   expect(await master.gymAccess.count({ where: { userId: user.id } })).toBe(0);
 });
 

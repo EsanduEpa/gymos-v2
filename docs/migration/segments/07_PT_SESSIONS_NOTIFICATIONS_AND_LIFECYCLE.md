@@ -121,5 +121,6 @@ Stop until DEC-06/07/08 and required people/config fields are approved. Implemen
 - **Completed:** none
 - **Remaining:** 040–048
 - **Next recommended task:** GYMOS-MIG-040.
+- **Segment 05 return checkpoint:** after verified tasks 040/043, resume member-specific work under 031–035 using the [follow-up checklist](../SEGMENT_05_FOLLOW_UP.md). Task 040 supplies foundations; it does not complete member pack issuance or status workflows. Return before booking tasks 041/042, which require 034, and before 047, which requires 033.
 - **Files/tests/issues/blockers/decisions:** _fill during execution_
 

@@ -15,8 +15,8 @@ test.use({ trace: 'off', screenshot: 'off' });
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const apiDirectory = join(root, 'apps/api');
 const webDirectory = join(root, 'apps/web');
-const classicEvidenceDirectory = join(root, 'docs/migration/evidence/GYMOS-MIG-013/branding');
-const primitiveEvidenceDirectory = join(root, 'docs/migration/evidence/GYMOS-MIG-012');
+const classicEvidenceDirectory = join(webDirectory, 'test-results/migration-evidence/GYMOS-MIG-013/branding');
+const primitiveEvidenceDirectory = join(webDirectory, 'test-results/migration-evidence/GYMOS-MIG-012');
 
 type ProcessState = { child: ChildProcess; errors: () => string };
 let environment: Awaited<ReturnType<typeof createDisposableEnvironment>>;
@@ -398,6 +398,63 @@ test('real browser and HTTP requests preserve two-gym isolation and pure reads',
   expect((await fixture.tenants[1].gymConfiguration.findUniqueOrThrow({ where: { id: 'current' } })).masterGymId).toBe(fixture.gyms[1].id);
 });
 
+test('full member enrollment hands off a one-time credential and enforces first-login password change', async ({ page, browser, request }) => {
+  const plan = await fixture.tenants[0].membershipPlan.create({ data: {
+    name: 'Browser Enrollment Plan', price: '0.01', currency: 'LKR', durationDays: 30,
+  } });
+  const beforeBeta = await fixture.tenants[1].member.count();
+  const email = `browser-enrollment-${environment.runId}@example.test`;
+  await openGymWithTestSession(page, fixture.users.ownerA.id, fixture.gyms[0].slug);
+  await page.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/owner/members/new`);
+  await expect(page.getByRole('heading', { name: 'Member details' })).toBeVisible();
+  await page.getByLabel('Full name').fill('Browser Enrollment Member');
+  await page.getByLabel('Email address').fill(email);
+  await page.getByLabel('Phone').fill('+94112223344');
+  await page.getByLabel('Date of birth').fill('1995-06-15');
+  await page.getByLabel('Initial membership plan').selectOption(plan.id);
+  await page.getByRole('button', { name: 'Register member' }).click();
+  await expect(page.getByRole('heading', { name: 'One-time credential handoff' })).toBeVisible();
+  const temporaryPassword = await page.getByLabel('Temporary password').inputValue();
+  expect(temporaryPassword.length).toBeGreaterThanOrEqual(20);
+  expect(JSON.stringify(await fixture.master.operation.findMany({ where: { kind: 'REGISTER_MEMBER' } }))).not.toContain(temporaryPassword);
+  expect(JSON.stringify(await fixture.master.credentialDelivery.findMany())).not.toContain(temporaryPassword);
+  await page.getByRole('button', { name: 'I have recorded the password' }).click();
+  await expect(page).toHaveURL(/\/owner\/members\//);
+  const identity = await fixture.master.user.findUniqueOrThrow({ where: { email } });
+  expect(identity.mustChangePassword).toBe(true);
+  expect(identity.credentialExpiresAt?.getTime()).toBeGreaterThan(Date.now());
+  const [alphaCount, betaCount] = await Promise.all([
+    fixture.tenants[0].member.count({ where: { email } }),
+    fixture.tenants[1].member.count(),
+  ]);
+  expect(alphaCount).toBe(1);
+  expect(betaCount).toBe(beforeBeta);
+
+  const memberContext = await browser.newContext();
+  try {
+    const memberPage = await memberContext.newPage();
+    await loginWithPassword(memberPage, email, temporaryPassword);
+    await expect(memberPage).toHaveURL(/\/change-password$/);
+    const replacement = randomBytes(24).toString('base64url');
+    await memberPage.getByLabel('Temporary password').fill(temporaryPassword);
+    await memberPage.locator('#newPassword').fill(replacement);
+    await memberPage.getByLabel('Confirm new password').fill(replacement);
+    await memberPage.getByRole('button', { name: 'Update password' }).click();
+    await expect(memberPage.locator('.ui-feedback-success')).toContainText('Password updated');
+    await memberPage.getByRole('button', { name: 'Continue to sign in' }).click();
+    await loginWithPassword(memberPage, email, replacement);
+    await expect(memberPage).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/member$`));
+    await expect(memberPage.getByRole('heading', { name: 'Test Gym Alpha', exact: true })).toBeVisible();
+    await expect(memberPage.locator('.gym-banner')).toContainText('Your member workspace.');
+    const memberCookie = (await memberContext.cookies()).find(cookie => cookie.name === 'gymos_access_token');
+    expect(memberCookie?.httpOnly).toBe(true);
+    expect((await request.get(`${apiBase}/gyms/${fixture.gyms[1].slug}/access`, {
+      headers: { authorization: `Bearer ${memberCookie?.value}` },
+    })).status()).toBe(403);
+    expect((await fixture.master.user.findUniqueOrThrow({ where: { id: identity.id } })).mustChangePassword).toBe(false);
+  } finally { await memberContext.close(); }
+});
+
 test('V1 Classic branding stays readable and keeps identical geometry at approved widths', async ({ page }) => {
   test.setTimeout(120_000);
   await mkdir(classicEvidenceDirectory, { recursive: true });
@@ -448,7 +505,7 @@ test('V1 Classic branding stays readable and keeps identical geometry at approve
 });
 
 test('role shell supports keyboard drawer, safe switching and current context', async ({ page }) => {
-  const evidence = join(root, 'docs/migration/evidence/GYMOS-MIG-013');
+  const evidence = join(webDirectory, 'test-results/migration-evidence/GYMOS-MIG-013');
   await mkdir(evidence, { recursive: true });
   const before = await fixture.master.$transaction([fixture.master.user.count(), fixture.master.gymAccess.count(), fixture.master.operation.count()]);
   for (const [user, role, label] of [
@@ -511,7 +568,7 @@ test('role shell supports keyboard drawer, safe switching and current context', 
 });
 
 test('web sessions enforce cookie, origin, expiry, revocation and logout boundaries', async ({ page, request }) => {
-  const evidence = join(root, 'docs/migration/evidence/GYMOS-MIG-020');
+  const evidence = join(webDirectory, 'test-results/migration-evidence/GYMOS-MIG-020');
   await mkdir(evidence, { recursive: true });
   await openGymWithTestSession(page, fixture.users.ownerB.id, fixture.gyms[1].slug);
   await expect(page.getByRole('heading', { name: 'Test Gym Beta', exact: true })).toBeVisible();
@@ -602,8 +659,8 @@ test('platform form reserves one pending gym with safe status and a stable retry
   await expect(status).toContainText(result.operationId);
   await page.setViewportSize({ width: 320, height: 700 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await mkdir(join(root, 'docs/migration/evidence/GYMOS-MIG-021'), { recursive: true });
-  await page.screenshot({ path: join(root, 'docs/migration/evidence/GYMOS-MIG-021/pending-320.png'), fullPage: true, animations: 'disabled' });
+  await mkdir(join(webDirectory, 'test-results/migration-evidence/GYMOS-MIG-021'), { recursive: true });
+  await page.screenshot({ path: join(webDirectory, 'test-results/migration-evidence/GYMOS-MIG-021/pending-320.png'), fullPage: true, animations: 'disabled' });
   await promisify(execFile)(process.execPath,[join(apiDirectory,'scripts/provision-gym.mjs'),'resume',stored.id],{
     env:{PATH:process.env.PATH,HOME:process.env.HOME,NODE_ENV:'test',GYMOS_OWNED_RUN_ID:environment.runId,MASTER_DATABASE_URL:environment.masterUrl,PROVISION_DATABASE_URL:environment.masterUrl,TENANT_DATABASE_URL:environment.masterUrl},timeout:30_000,
   });
@@ -641,7 +698,7 @@ test('platform registry supports audited read-only gym selection, switching, exi
   const alpha=table.getByRole('row').filter({has:page.getByText('Test Gym Alpha',{exact:true})});
   await expect.poll(()=>alpha.getByRole('cell').nth(2).evaluate(element=>element.firstChild?.textContent?.trim())).toBe(String(expectedAlphaMembers));
   await expect(table).toBeVisible();
-  const evidence=join(root,'docs/migration/evidence/GYMOS-MIG-024');await mkdir(evidence,{recursive:true});
+  const evidence=join(webDirectory,'test-results/migration-evidence/GYMOS-MIG-024');await mkdir(evidence,{recursive:true});
   await page.screenshot({path:join(evidence,'registry-desktop.png'),fullPage:true,animations:'disabled'});
   await page.setViewportSize({width:320,height:700});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
@@ -705,7 +762,7 @@ test('platform lifecycle confirms suspension and verified reactivation while old
   await dialog.getByRole('button',{name:'Confirm',exact:true}).click();await expect(dialog).toContainText('Give a reason');
   expect((await fixture.master.gym.findUniqueOrThrow({where:{id:fixture.gyms[0].id}})).status).toBe('ACTIVE');
   await dialog.getByRole('textbox',{name:/^Lifecycle reason/}).fill('Synthetic owner-requested suspension');
-  const evidence=join(root,'docs/migration/evidence/GYMOS-MIG-025');await mkdir(evidence,{recursive:true});
+  const evidence=join(webDirectory,'test-results/migration-evidence/GYMOS-MIG-025');await mkdir(evidence,{recursive:true});
   await page.setViewportSize({width:320,height:700});
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.screenshot({path:join(evidence,'suspend-confirmation-320.png'),fullPage:true,animations:'disabled'});
@@ -763,7 +820,7 @@ test('logout clears the browser even when API revocation is unavailable', async 
   await expect(page.locator('.ui-feedback[role="alert"]')).toContainText('could not confirm sign-out on other devices');
   expect((await page.context().cookies()).some(item => item.name === 'gymos_access_token')).toBe(false);
   expect((await fixture.master.user.findUniqueOrThrow({ where: { id: fixture.users.ownerB.id } })).authVersion).toBe(before);
-  await page.screenshot({ path: join(root, 'docs/migration/evidence/GYMOS-MIG-020/backend-unavailable.png'), animations: 'disabled' });
+  await page.screenshot({ path: join(webDirectory, 'test-results/migration-evidence/GYMOS-MIG-020/backend-unavailable.png'), animations: 'disabled' });
   await page.goto(`${webBase}/gyms/${fixture.gyms[1].slug}/owner`);
   await expect(page).toHaveURL(/\/login$/);
 });
