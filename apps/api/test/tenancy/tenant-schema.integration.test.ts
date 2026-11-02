@@ -782,6 +782,7 @@ it('recovers trainer enrollment when Master activation fails after the tenant re
     await master.$executeRawUnsafe('DROP TRIGGER fail_trainer_activation_audit ON "PlatformAuditLog"');
     await master.$executeRawUnsafe('DROP FUNCTION fail_trainer_activation_audit()');
     const recovered = await service.enroll(access as never, input);
+    if (recovered.status !== 'COMPLETE') throw new Error('Expected trainer activation recovery to complete');
     expect(recovered).toMatchObject({ status: 'COMPLETE', replayed: true, operationId: incomplete.id });
     expect(recovered.temporaryPassword).toBe('Trainer-activation-password');
     expect(await tenants[0].trainer.count({ where: { email: input.email } })).toBe(1);
