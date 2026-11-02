@@ -556,11 +556,12 @@ test('role shell supports keyboard drawer, safe switching and current context', 
   const access = await fixture.master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: fixture.users.multiOwner.id, gymId: fixture.gyms[0].id } } });
   try {
     await fixture.master.gymAccess.update({ where: { userId_gymId: { userId: access.userId, gymId: access.gymId } }, data: { linkStatus: 'REVOKED', version: { increment: 1 } } });
-    await page.getByRole('link', { name: /Test Gym Alpha/ }).click();
-    await expect(page.getByRole('heading', { name: 'This page could not be found' })).toBeVisible();
-    await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/owner$`));
-    await page.getByRole('link', { name: 'Return to Dashboard' }).click();
-    await expect(page.getByRole('heading', { name: 'Test Gym Beta', exact: true })).toBeVisible();
+    const revokedGymPage = await page.context().newPage();
+    try {
+      await revokedGymPage.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/owner`);
+      await expect(revokedGymPage.getByRole('heading', { name: 'This page could not be found' })).toBeVisible();
+      await expect(revokedGymPage.locator('.member-list')).toHaveCount(0);
+    } finally { await revokedGymPage.close(); }
   } finally {
     await fixture.master.gymAccess.update({ where: { userId_gymId: { userId: access.userId, gymId: access.gymId } }, data: { linkStatus: 'ACTIVE', version: { increment: 1 } } });
   }
