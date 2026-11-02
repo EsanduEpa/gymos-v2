@@ -1,6 +1,6 @@
 # GYMOS-MIG-031 — partial implementation evidence
 
-Status: **In Progress; not Verified or Completed.** Working tree on branch `codex/segment-05-member-enrollment`, based on `origin/main` at `97b16a7`.
+Status: **In Progress; not Verified or Completed.** Code and API recovery tests are committed on branch `codex/segment-05-member-enrollment` at `e1e4b1c`, based on `origin/main` at `97b16a7`. The browser run used `0994b1c`; the later commit only adds API recovery coverage and documentation.
 
 ## Implemented and locally checked
 

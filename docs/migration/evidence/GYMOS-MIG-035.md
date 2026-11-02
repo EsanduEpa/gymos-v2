@@ -1,6 +1,6 @@
 # GYMOS-MIG-035 — partial journey evidence
 
-Status: **In Progress; not Verified or Completed.** Working tree on branch `codex/segment-05-member-enrollment`, based on `origin/main` at `97b16a7`.
+Status: **In Progress; not Verified or Completed.** Partial browser journey passed on commit `0994b1c` on branch `codex/segment-05-member-enrollment`, based on `origin/main` at `97b16a7`. The later commit `e1e4b1c` adds API recovery coverage and documentation only.
 
 ## Passing partial journey
 

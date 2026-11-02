@@ -5,6 +5,18 @@ and 07 work, retain the outstanding Segment 05 requirements, and return to them
 when their prerequisites have verified evidence. This records scheduling only;
 it does not waive scope, mark acceptance complete, or authorize a merge.
 
+## Prerequisite evidence audit — 2 November 2026
+
+`git fetch origin --prune` completed before this audit. The refreshed remote
+contains `main` and Segment 01–05 branches; no Segment 06 or Segment 07 task
+branch is present. Tracker rows for GYMOS-MIG-036, 040 and 043 are **Not
+Started**, no task evidence files for those IDs exist under
+`docs/migration/evidence/`, and `git log --all` contains no commits identifying
+those tasks. Therefore none of the three foundations is verified in this
+checkout; their expected behavior cannot be treated as delivered by inference.
+Continue work independent of those prerequisites and keep dependent acceptance
+incomplete until each owning task has passing evidence.
+
 ## Ownership and return checklist
 
 | Outstanding requirement | Future provider | Work still owned by Segment 05 | Return gate |
