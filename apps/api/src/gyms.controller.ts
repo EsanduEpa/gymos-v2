@@ -29,7 +29,9 @@ import { memberEnrollmentConsentInputSchema, memberEnrollmentConsentResultSchema
   memberRegistrationInputSchema, updateGymPublicProfileSchema, updateGymThemeSchema } from '@gymos/contracts';
 import { gymLocalDate } from './membership-rules.js';
 import { MemberEnrollmentService } from './member-enrollment.service.js';
+import { TrainerEnrollmentService } from './trainer-enrollment.service.js';
 import { identityFromAuthorization } from './auth-token.js';
+import { trainerRegistrationInputSchema } from '@gymos/contracts';
 
 const createMemberInput = z.strictObject({
   fullName: z.string().trim().min(2).max(120),
@@ -43,6 +45,7 @@ export class GymsController {
     private readonly database: DatabaseService,
     private readonly tenantGate: TenantSchemaGateService,
     @Optional() private readonly memberEnrollment?: MemberEnrollmentService,
+    @Optional() private readonly trainerEnrollment?: TrainerEnrollmentService,
   ) {}
 
   private async assertCurrentOwnerAccess(access: NonNullable<GymRequest['gymAccess']>, source: MasterPrisma.TransactionClient = this.database.master): Promise<void> {
@@ -348,6 +351,18 @@ export class GymsController {
     return this.memberEnrollment.enroll(access, parsed.data);
   }
 
+  @Post(':slug/trainer-registrations')
+  @UseGuards(GymAccessGuard)
+  async registerTrainer(@Req() request: GymRequest, @Body() body: unknown) {
+    const access = request.gymAccess;
+    if (!access) throw new InternalServerErrorException('Gym context missing');
+    if (access.role !== 'OWNER') throw new ForbiddenException('Only gym owners can register trainers');
+    const parsed = trainerRegistrationInputSchema.safeParse(body);
+    if (!parsed.success) throw new UnprocessableEntityException('Enter valid trainer details');
+    if (!this.trainerEnrollment) throw new InternalServerErrorException('Trainer enrollment is unavailable');
+    return this.trainerEnrollment.enroll(access, parsed.data);
+  }
+
   @Post(':slug/member-enrollments/:operationId/consent')
   async memberEnrollmentConsent(@Req() request: Request, @Param('slug') slug: string,
     @Param('operationId') operationId: string, @Body() body: unknown) {
@@ -356,6 +371,19 @@ export class GymsController {
     const parsed = memberEnrollmentConsentInputSchema.safeParse(body);
     if (!parsed.success) throw new UnprocessableEntityException('Enter a valid consent decision and current password');
     const result = await this.memberEnrollment.consent(slug, operationId, {
+      identityId: identity.userId, authVersion: identity.authVersion, ...parsed.data,
+    });
+    return memberEnrollmentConsentResultSchema.parse(result);
+  }
+
+  @Post(':slug/trainer-enrollments/:operationId/consent')
+  async trainerEnrollmentConsent(@Req() request: Request, @Param('slug') slug: string,
+    @Param('operationId') operationId: string, @Body() body: unknown) {
+    if (!this.trainerEnrollment) throw new InternalServerErrorException('Trainer enrollment is unavailable');
+    const identity = await identityFromAuthorization(request.headers.authorization);
+    const parsed = memberEnrollmentConsentInputSchema.safeParse(body);
+    if (!parsed.success) throw new UnprocessableEntityException('Enter a valid consent decision and current password');
+    const result = await this.trainerEnrollment.consent(slug, operationId, {
       identityId: identity.userId, authVersion: identity.authVersion, ...parsed.data,
     });
     return memberEnrollmentConsentResultSchema.parse(result);

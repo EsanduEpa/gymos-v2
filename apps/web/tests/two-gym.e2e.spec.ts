@@ -455,6 +455,49 @@ test('full member enrollment hands off a one-time credential and enforces first-
   } finally { await memberContext.close(); }
 });
 
+test('trainer registration hands off a one-time credential and requires a password change', async ({ page, browser }) => {
+  const email = `browser-trainer-${environment.runId}@example.test`;
+  const trainerCounts = await Promise.all(fixture.tenants.map(tenant => tenant.trainer.count()));
+  await openGymWithTestSession(page, fixture.users.ownerA.id, fixture.gyms[0].slug);
+  await page.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/owner/trainers/new`);
+  await expect(page.getByRole('heading', { name: 'Register a trainer' })).toBeVisible();
+  await page.getByLabel('Full name').fill('Browser Enrollment Trainer');
+  await page.getByLabel('Email address').fill(email);
+  await page.getByLabel('Phone').fill('+94112223345');
+  await page.getByLabel('Level').selectOption('LEVEL_2');
+  await page.getByLabel('Years of experience').fill('5');
+  await page.getByLabel('Specialisations').fill('Strength, Mobility');
+  await page.getByLabel('Shift start').fill('08:00');
+  await page.getByLabel('Shift end').fill('17:00');
+  await page.getByLabel('Bio').fill('Browser-created trainer profile.');
+  await page.getByRole('button', { name: 'Register trainer' }).click();
+  await expect(page.getByText('Copy the one-time temporary password')).toBeVisible();
+  const temporaryPassword = await page.getByLabel('Temporary password').inputValue();
+  expect(temporaryPassword.length).toBeGreaterThanOrEqual(20);
+  expect(JSON.stringify(await fixture.master.operation.findMany({ where: { kind: 'REGISTER_TRAINER' } }))).not.toContain(temporaryPassword);
+  const identity = await fixture.master.user.findUniqueOrThrow({ where: { email } });
+  expect(identity.mustChangePassword).toBe(true);
+  expect(await fixture.tenants[0].trainer.count({ where: { email, level: 'LEVEL_2', yearsExperience: 5 } })).toBe(1);
+  expect(await fixture.tenants[1].trainer.count()).toBe(trainerCounts[1]);
+
+  const trainerContext = await browser.newContext();
+  try {
+    const trainerPage = await trainerContext.newPage();
+    await loginWithPassword(trainerPage, email, temporaryPassword);
+    await expect(trainerPage).toHaveURL(/\/change-password$/);
+    const replacement = randomBytes(24).toString('base64url');
+    await trainerPage.getByLabel('Temporary password').fill(temporaryPassword);
+    await trainerPage.locator('#newPassword').fill(replacement);
+    await trainerPage.getByLabel('Confirm new password').fill(replacement);
+    await trainerPage.getByRole('button', { name: 'Update password' }).click();
+    await expect(trainerPage.locator('.ui-feedback-success')).toContainText('Password updated');
+    await trainerPage.getByRole('button', { name: 'Continue to sign in' }).click();
+    await loginWithPassword(trainerPage, email, replacement);
+    await expect(trainerPage).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/trainer$`));
+    expect((await fixture.master.user.findUniqueOrThrow({ where: { id: identity.id } })).mustChangePassword).toBe(false);
+  } finally { await trainerContext.close(); }
+});
+
 test('V1 Classic branding stays readable and keeps identical geometry at approved widths', async ({ page }) => {
   test.setTimeout(120_000);
   await mkdir(classicEvidenceDirectory, { recursive: true });

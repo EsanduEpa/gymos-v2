@@ -43,7 +43,7 @@ This matrix assigns every authoritative task and every V1 route responsibility t
 | GYMOS-MIG-033 | Member status/hold release | O04 status action | recoverable member status command | 05 | GYMOS-MIG-033 | NOT STARTED |
 | GYMOS-MIG-034 | Session packs/balance | O04; `actions/packs.ts` | pack/hold ledger projection | 05 | GYMOS-MIG-034 | NOT STARTED |
 | GYMOS-MIG-035 | Enrollment recovery journey | O03→O04 | two-gym browser/integration evidence | 05 | GYMOS-MIG-035 | NOT STARTED |
-| GYMOS-MIG-036 | Trainer registration | O06; `actions/trainers.ts` | trainer enrollment saga/API/UI | 06 | GYMOS-MIG-036 | NOT STARTED |
+| GYMOS-MIG-036 | Trainer registration | O06; `actions/trainers.ts` | trainer enrollment saga/API/UI | 06 | GYMOS-MIG-036 | IN PROGRESS |
 | GYMOS-MIG-037 | Trainer roster/profile/shifts | O05/O07 | trainer queries/status/shift UI | 06 | GYMOS-MIG-037 | NOT STARTED |
 | GYMOS-MIG-038 | Trainer deactivate/reactivate | O07 | recoverable trainer status command | 06 | GYMOS-MIG-038 | NOT STARTED |
 | GYMOS-MIG-039 | Member trainer directory | M01 | member-safe trainer query/UI | 06 | GYMOS-MIG-039 | NOT STARTED |

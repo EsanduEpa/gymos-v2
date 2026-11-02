@@ -32,6 +32,11 @@ enum TrainerStatus {
   DEACTIVATED
 }
 
+enum TrainerLevel {
+  LEVEL_1
+  LEVEL_2
+}
+
 model Member {
   id                    String                  @id @default(cuid())
   fullName              String
@@ -81,6 +86,14 @@ model SessionPack {
 model Trainer {
   id                    String                   @id @default(cuid())
   fullName              String
+  email                 String?                  @unique
+  phone                 String?
+  level                 TrainerLevel?
+  specialisations       String[]                 @default([])
+  yearsExperience       Int?
+  shiftStart            String?
+  shiftEnd              String?
+  bio                   String?
   identityId            String?                  @unique
   registrationState     TrainerRegistrationState @default(PENDING)
   enrollmentOperationId String?                  @unique

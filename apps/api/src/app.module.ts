@@ -26,6 +26,7 @@ import { TenantRegistryService } from './tenancy/tenant-registry.service.js';
 import { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js';
 import { ConfigurationController } from './configuration.controller.js';
 import { MemberEnrollmentService } from './member-enrollment.service.js';
+import { TrainerEnrollmentService } from './trainer-enrollment.service.js';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { MemberEnrollmentService } from './member-enrollment.service.js';
     AppService,
     DatabaseService,
     MemberEnrollmentService,
+    TrainerEnrollmentService,
     CredentialService,
     GymAccessGuard,
     GymProvisioningService,

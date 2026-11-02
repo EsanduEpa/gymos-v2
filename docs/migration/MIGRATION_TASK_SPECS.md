@@ -2717,7 +2717,7 @@ High
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+In Progress.
 
 ## Task ID: GYMOS-MIG-032
 
@@ -2806,7 +2806,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+In Progress.
 
 ## Task ID: GYMOS-MIG-033
 
@@ -3070,7 +3070,7 @@ High
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+In Progress.
 
 ## Task ID: GYMOS-MIG-036
 
@@ -3155,7 +3155,7 @@ High
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+In Progress.
 
 ## Task ID: GYMOS-MIG-037
 

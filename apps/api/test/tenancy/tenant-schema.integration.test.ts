@@ -8,6 +8,7 @@ import { PrismaClient as TenantClient } from '../../src/generated/tenant/client.
 import type { DatabaseService } from '../../src/database.service.js';
 import { GymsController } from '../../src/gyms.controller.js';
 import { MemberEnrollmentService } from '../../src/member-enrollment.service.js';
+import { TrainerEnrollmentService } from '../../src/trainer-enrollment.service.js';
 import type { CredentialService } from '../../src/identity/credential.service.js';
 import { GymAccessGuard, type GymRequest } from '../../src/gym-access.guard.js';
 import { OperationConflictError } from '../../src/operations/primitives.js';
@@ -639,6 +640,71 @@ it('retries the same durable enrollment after the tenant transaction fails befor
     await tenants[0].$executeRawUnsafe('DROP TRIGGER IF EXISTS fail_member_term_insert ON "MembershipTerm"');
     await tenants[0].$executeRawUnsafe('DROP FUNCTION IF EXISTS fail_member_term_insert()');
   }
+});
+
+it('registers a typed trainer once and reuses an existing identity only after verified consent', async () => {
+  const ownerAccess = await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: actorId, gymId: gymIds[0] } } });
+  const access = { ...(await context(0)), slug: `schema-0-${run.runId}`, role: 'OWNER', identityId: actorId,
+    identityVersion: 0, accessVersion: ownerAccess.version, actor: null } as const;
+  let deliveries = 0;
+  const credential = { issueTemporaryCredential: async () => {
+    deliveries++;
+    return deliveries === 1 ? { status: 'ISSUED' as const, temporaryPassword: 'Synthetic-trainer-password', deliveryVersion: 0,
+      expiresAt: new Date(Date.now() + 86_400_000) } : { status: 'ALREADY_ISSUED' as const, deliveryVersion: 0 };
+  } } as unknown as CredentialService;
+  const service = new TrainerEnrollmentService({ master } as DatabaseService, gateFor(), credential);
+  const input = { fullName: 'Synthetic Trainer', email: `trainer-${run.runId}@example.test`, phone: '+94112223345', level: 'LEVEL_2' as const,
+    yearsExperience: 8, specialisations: ['Strength', 'Mobility'], shiftStart: '09:00', shiftEnd: '18:00', bio: 'Synthetic profile',
+    idempotencyKey: 'trainer-registration-0001' };
+  const beforeBeta = await tenants[1].trainer.count();
+  const created = await service.enroll(access as never, input);
+  if (created.status !== 'COMPLETE') throw new Error('Expected trainer registration to complete');
+  expect(created.temporaryPassword).toBe('Synthetic-trainer-password');
+  const identity = await master.user.findUniqueOrThrow({ where: { email: input.email } });
+  const link = await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: identity.id, gymId: gymIds[0] } } });
+  const [trainer, receipt, operation] = await Promise.all([
+    tenants[0].trainer.findUniqueOrThrow({ where: { id: created.trainerId } }),
+    tenants[0].commandReceipt.findUniqueOrThrow({ where: { sourceMasterOperationId: created.operationId } }),
+    master.operation.findUniqueOrThrow({ where: { id: created.operationId } }),
+  ]);
+  expect(trainer).toMatchObject({ fullName: input.fullName, email: input.email, phone: input.phone, level: 'LEVEL_2',
+    yearsExperience: 8, specialisations: ['Strength', 'Mobility'], shiftStart: '09:00', shiftEnd: '18:00', bio: input.bio,
+    identityId: identity.id, registrationState: 'COMPLETE', enrollmentOperationId: created.operationId, status: 'ACTIVE' });
+  expect([link.role, link.linkStatus, link.actorKind, link.tenantActorId, operation.state, receipt.state, receipt.resourceType, receipt.resourceId])
+    .toEqual(['TRAINER', 'ACTIVE', 'TRAINER', created.trainerId, 'COMPLETE', 'COMMITTED', 'TRAINER', created.trainerId]);
+  expect(await tenants[1].trainer.count()).toBe(beforeBeta);
+  const replay = await service.enroll(access as never, input);
+  if (replay.status !== 'COMPLETE') throw new Error('Expected trainer replay to remain complete');
+  expect(replay.temporaryPassword).toBeUndefined();
+  expect(await tenants[0].trainer.count({ where: { identityId: identity.id } })).toBe(1);
+  expect(deliveries).toBe(2);
+
+  const existingPassword = `trainer-consent-${run.runId}`;
+  const existing = await master.user.create({ data: { email: `reused-trainer-${run.runId}@example.test`,
+    passwordHash: await argon2.hash(existingPassword, { type: argon2.argon2id }) } });
+  const otherGymOwner = await master.gymAccess.create({ data: { userId: existing.id, gymId: gymIds[1], role: 'OWNER', linkStatus: 'ACTIVE' } });
+  const reusedInput = { ...input, email: existing.email, idempotencyKey: 'trainer-registration-0002' };
+  const pending = await service.enroll(access as never, reusedInput);
+  expect(pending).toMatchObject({ status: 'PENDING', consentRequired: true });
+  if (pending.status !== 'PENDING') throw new Error('Expected trainer consent to remain pending');
+  await expect(service.consent(access.slug, pending.operationId, { identityId: existing.id, authVersion: existing.authVersion,
+    currentPassword: 'wrong', decision: 'ACCEPT' })).rejects.toThrow('Identity verification failed');
+  await service.consent(access.slug, pending.operationId, { identityId: existing.id, authVersion: existing.authVersion,
+    currentPassword: existingPassword, decision: 'ACCEPT' });
+  const reused = await service.enroll(access as never, reusedInput);
+  if (reused.status !== 'COMPLETE') throw new Error('Expected consented trainer enrollment to complete');
+  expect(reused.temporaryPassword).toBeUndefined();
+  expect(reused.credentialDeliveryVersion).toBeUndefined();
+  expect((await master.user.findUniqueOrThrow({ where: { id: existing.id } })).passwordHash).toBe(existing.passwordHash);
+  expect(await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: existing.id, gymId: gymIds[1] } } }))
+    .toMatchObject({ role: 'OWNER', linkStatus: 'ACTIVE', version: otherGymOwner.version });
+  expect(await tenants[0].trainer.count({ where: { identityId: existing.id } })).toBe(1);
+
+  const roleConflict = await master.user.create({ data: { email: `member-role-${run.runId}@example.test`, passwordHash: 'fixture-not-a-login-hash' } });
+  await master.gymAccess.create({ data: { userId: roleConflict.id, gymId: gymIds[0], role: 'MEMBER', linkStatus: 'PENDING' } });
+  await expect(service.enroll(access as never, { ...input, email: roleConflict.email, idempotencyKey: 'trainer-registration-0003' }))
+    .rejects.toThrow('already has a role');
+  expect(await tenants[0].trainer.count({ where: { identityId: roleConflict.id } })).toBe(0);
 });
 
 it('recovers a lost Master observation by rereading actual tenant evidence', async () => {

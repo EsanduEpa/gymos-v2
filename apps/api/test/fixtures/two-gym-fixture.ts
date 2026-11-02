@@ -261,6 +261,9 @@ export async function seedTwoGymFixture(environment: Environment) {
     const trainer = await tenants[0].trainer.create({
       data: {
         fullName: 'Trainer Alpha',
+        email: trainerUser.email,
+        phone: '+94110000001',
+        level: 'LEVEL_1',
         identityId: trainerUser.id,
         registrationState: 'COMPLETE',
         enrollmentOperationId: `trainer_${environment.runId}`,

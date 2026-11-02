@@ -148,7 +148,7 @@ it('reuses one self-verified identity with distinct roles/actor IDs across gyms 
   }
   const member = await tenants[0].member.create({ data: { fullName: 'Synthetic Member', identityId: user.id,
     registrationState: 'COMPLETE', enrollmentOperationId: bindings[0].enrollmentOperationId } });
-  const trainer = await tenants[1].trainer.create({ data: { fullName: 'Synthetic Trainer', identityId: user.id,
+  const trainer = await tenants[1].trainer.create({ data: { fullName: 'Synthetic Trainer', email: user.email, phone: '+94110000002', level: 'LEVEL_1', identityId: user.id,
     registrationState: 'COMPLETE', enrollmentOperationId: bindings[1].enrollmentOperationId } });
   expect(new Set([user.id, member.id, trainer.id]).size).toBe(3);
   const access = await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: user.id, gymId: a.id } } });
