@@ -11,7 +11,7 @@ export class CommandReceiptFoundationService {
 
   async execute(input: {
     masterGymId: string; actorIdentityId: string; commandKind: string; idempotencyKey: string;
-    normalizedIntent: unknown; sourceMasterOperationId?: string; supportContextId?: string;
+    normalizedIntent: unknown; sourceMasterOperationId?: string; supportContextId?: string; protectedFingerprint?: string;
   }, effects: (tx: Tx, receipt: CommandReceipt) => Promise<{
     result: SafeResult; audits: AuditInput[]; resourceType?: string; resourceId?: string;
   }>) {
@@ -21,7 +21,7 @@ export class CommandReceiptFoundationService {
     const digest = requestDigest({ commandVersion: '1', masterGymId: input.masterGymId,
       actorIdentityId: input.actorIdentityId, commandKind: input.commandKind,
       supportContextId: input.supportContextId ?? null,
-      sourceMasterOperationId: input.sourceMasterOperationId ?? null, intent: input.normalizedIntent });
+      sourceMasterOperationId: input.sourceMasterOperationId ?? null, intent: input.normalizedIntent }, input.protectedFingerprint);
     return this.tenant.$transaction(async tx => {
       // Lock EVERY unique claim in sorted order, including source operation, so
       // concurrent retries with another key cannot create a second local actor.

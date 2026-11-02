@@ -6,6 +6,8 @@ import { PrismaClient as MasterClient } from '../../src/generated/master/client.
 import { PrismaClient as TenantClient } from '../../src/generated/tenant/client.js';
 import type { DatabaseService } from '../../src/database.service.js';
 import { GymsController } from '../../src/gyms.controller.js';
+import { MemberEnrollmentService } from '../../src/member-enrollment.service.js';
+import type { CredentialService } from '../../src/identity/credential.service.js';
 import { GymAccessGuard, type GymRequest } from '../../src/gym-access.guard.js';
 import { OperationConflictError } from '../../src/operations/primitives.js';
 import type { TenantDatabaseService } from '../../src/tenant-database.service.js';
@@ -407,18 +409,82 @@ it('publishes only active actors with matching completed Master operation, tenan
 });
 
 it('preserves member list/create behavior and maps duplicate email to a safe conflict', async () => {
+  await tenants[0].gymConfiguration.update({ where: { id: 'current' }, data: { timezone: 'Asia/Colombo' } });
   const ownerAccess = await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: actorId, gymId: gymIds[0] } } });
   const access = { ...(await context(0)), slug: `schema-0-${run.runId}`, role: 'OWNER',
     identityId: actorId, identityVersion: 0, accessVersion: ownerAccess.version, actor: null };
   const request = { gymAccess: access } as GymRequest;
   const controller = new GymsController({ master } as DatabaseService, gateFor());
-  const rows = await controller.members(request);
-  expect(rows).toHaveLength(3);
+  const rows = await controller.members(request, {});
+  // A COMPLETE tenant actor is visible only after its Master operation is published.
+  expect(rows.items).toHaveLength(2);
+  expect(rows.totalCount).toBe(2);
   await expect(controller.createMember(request, { fullName: 'Duplicate member', email: 'a@example.test' }))
     .rejects.toBeInstanceOf(ConflictException);
   expect(await tenants[0].member.count()).toBe(3);
-  expect(() => controller.members({ gymAccess: { ...access, role: 'TRAINER' } } as GymRequest))
-    .toThrow(ForbiddenException);
+  const fixed = new Date();
+  await tenants[0].member.createMany({ data: Array.from({ length: 125 }, (_, index) => ({
+    fullName: `Paged Member ${String(index + 1).padStart(3, '0')}`, email: `paged-member-${index + 1}@example.test`,
+    createdAt: fixed, updatedAt: fixed,
+  })) });
+  const deepPage = await controller.members(request, { page: '5', pageSize: '25', q: 'Paged Member', status: 'ACTIVE' });
+  expect(deepPage.page).toBe(5);
+  expect(deepPage.totalCount).toBe(125);
+  expect(deepPage.items).toHaveLength(25);
+  const clampedPage = await controller.members(request, { page: '999', pageSize: '25', q: 'Paged Member' });
+  expect(clampedPage.page).toBe(5);
+  expect(clampedPage.totalPages).toBe(5);
+  await expect(controller.members({ gymAccess: { ...access, role: 'TRAINER' } } as GymRequest, {}))
+    .rejects.toBeInstanceOf(ForbiddenException);
+});
+
+it('commits a full owner enrollment once, keeps the credential one-time, and rejects identity reuse without consent', async () => {
+  await tenants[0].gymConfiguration.update({ where: { id: 'current' }, data: { timezone: 'Asia/Colombo', currency: 'LKR' } });
+  const plan = await tenants[0].membershipPlan.create({ data: { name: 'Enrollment Plan', price: '1234.50', currency: 'LKR', durationDays: 30 } });
+  const ownerAccess = await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: actorId, gymId: gymIds[0] } } });
+  const access = { ...(await context(0)), slug: `schema-0-${run.runId}`, role: 'OWNER', identityId: actorId,
+    identityVersion: 0, accessVersion: ownerAccess.version, actor: null } as const;
+  let deliveries = 0;
+  const credential = { issueTemporaryCredential: async () => {
+    deliveries++;
+    return deliveries === 1 ? { status: 'ISSUED' as const, temporaryPassword: 'Synthetic-one-time', deliveryVersion: 0,
+      expiresAt: new Date(Date.now() + 86_400_000) } : { status: 'ALREADY_ISSUED' as const, deliveryVersion: 0 };
+  } } as unknown as CredentialService;
+  const service = new MemberEnrollmentService({ master } as DatabaseService, gateFor(), credential);
+  const input = { fullName: 'Synthetic Enrolled Member', email: `enrolled-${run.runId}@example.test`, phone: '+94112223344',
+    dateOfBirth: '1995-06-15', emergencyContact: 'Synthetic Contact · +94110000000', healthNotes: 'Synthetic private note',
+    membershipPlanId: plan.id, idempotencyKey: 'member-enrollment-0001' };
+  const otherGymCount = await tenants[1].member.count();
+  const first = await service.enroll(access as never, input);
+  expect(first.status).toBe('COMPLETE');
+  expect(first.temporaryPassword).toBe('Synthetic-one-time');
+  expect(first.term.agreedPrice).toBe('1234.5');
+  expect(first.term.endDateExclusive).toBe('2026-12-02');
+  const [memberCount, termCount, operation, link] = await Promise.all([
+    tenants[0].member.count({ where: { email: input.email } }),
+    tenants[0].membershipTerm.count({ where: { memberId: first.memberId } }),
+    master.operation.findUniqueOrThrow({ where: { id: first.operationId } }),
+    master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: (await master.user.findUniqueOrThrow({ where: { email: input.email } })).id, gymId: gymIds[0] } } }),
+  ]);
+  expect([memberCount, termCount, operation.state, link.linkStatus, link.tenantActorId]).toEqual([1, 1, 'COMPLETE', 'ACTIVE', first.memberId]);
+  expect(await tenants[1].member.count()).toBe(otherGymCount);
+  const controller = new GymsController({ master } as DatabaseService, gateFor());
+  const profile = await controller.memberDetail({ gymAccess: access } as GymRequest, first.memberId);
+  expect(profile.healthNotes).toBe('Synthetic private note');
+  const directory = await controller.members({ gymAccess: access } as GymRequest, { q: 'Synthetic Enrolled' });
+  expect(JSON.stringify(directory)).not.toContain('healthNotes');
+  await expect(controller.memberDetail({ gymAccess: { ...access, role: 'TRAINER' } } as GymRequest, first.memberId))
+    .rejects.toBeInstanceOf(ForbiddenException);
+  const replay = await service.enroll(access as never, input);
+  expect(replay.replayed).toBe(true);
+  expect(replay.temporaryPassword).toBeUndefined();
+  expect(await tenants[0].membershipTerm.count({ where: { memberId: first.memberId } })).toBe(1);
+  expect(deliveries).toBe(2);
+  await expect(service.enroll(access as never, { ...input, idempotencyKey: 'member-enrollment-0002' }))
+    .rejects.toBeInstanceOf(ConflictException);
+  await expect(service.enroll(access as never, { ...input, email: `different-${run.runId}@example.test`, idempotencyKey: 'member-enrollment-0001' }))
+    .rejects.toBeInstanceOf(ConflictException);
+  expect(await tenants[0].member.count({ where: { email: { startsWith: 'different-' } } })).toBe(0);
 });
 
 it('recovers a lost Master observation by rereading actual tenant evidence', async () => {

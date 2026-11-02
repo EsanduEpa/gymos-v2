@@ -1,0 +1,71 @@
+import { z } from 'zod';
+const idSchema = z.string().min(1).max(128).regex(/^[A-Za-z0-9_:-]+$/);
+const isoInstantSchema = z.iso.datetime({ offset: true });
+const localDateSchema = z.iso.date();
+const versionSchema = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
+const nonnegativeDecimalStringSchema = z.string().max(128).regex(/^(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/);
+const pageQuerySchema = z.strictObject({
+  page: z.union([z.number(), z.string().regex(/^[1-9][0-9]*$/)]).transform(Number).pipe(z.number().int().min(1)).default(1),
+  pageSize: z.union([z.number(), z.string().regex(/^[1-9][0-9]*$/)]).transform(Number).pipe(z.number().int().min(1).max(100)).default(25),
+});
+function pageSchema<T extends z.ZodType>(item: T) {
+  return z.strictObject({ items: z.array(item).max(100), page: z.number().int().min(1), pageSize: z.number().int().min(1).max(100),
+    totalCount: z.number().int().nonnegative(), totalPages: z.number().int().nonnegative(), asOf: isoInstantSchema }).superRefine((value, ctx) => {
+      if (value.totalPages !== Math.ceil(value.totalCount / value.pageSize)) ctx.addIssue({ code: 'custom', message: 'Incorrect totalPages', path: ['totalPages'] });
+      const remaining = Math.max(0, value.totalCount - (value.page - 1) * value.pageSize);
+      if (value.items.length !== Math.min(value.pageSize, remaining)) ctx.addIssue({ code: 'custom', message: 'Page rows do not match totals', path: ['items'] });
+    });
+}
+
+export const memberStatusSchema = z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']);
+const optionalText = (max: number) => z.string().trim().max(max).nullable().optional();
+
+export const memberRegistrationInputSchema = z.strictObject({
+  fullName: z.string().trim().min(2).max(120),
+  email: z.email().max(254),
+  phone: z.string().trim().min(1).max(40),
+  dateOfBirth: localDateSchema,
+  emergencyContact: optionalText(240),
+  healthNotes: optionalText(4000),
+  membershipPlanId: idSchema,
+  idempotencyKey: z.string().min(16).max(128).regex(/^[\x21-\x7e]+$/),
+});
+
+export const memberListQuerySchema = pageQuerySchema.extend({
+  q: z.string().trim().max(120).optional(),
+  status: memberStatusSchema.optional(),
+});
+
+export const memberListItemSchema = z.strictObject({
+  id: idSchema, fullName: z.string().min(2).max(120), email: z.email().max(254).nullable(),
+  status: memberStatusSchema, registrationState: z.enum(['BASIC', 'PENDING', 'COMPLETE', 'FAILED']),
+  currentTerm: z.strictObject({ id: idSchema, planName: z.string().max(80), startDate: localDateSchema,
+    endDateExclusive: localDateSchema, agreedPrice: nonnegativeDecimalStringSchema, currency: z.enum(['LKR', 'USD']) }).nullable(),
+  createdAt: isoInstantSchema,
+});
+export const memberListSchema = pageSchema(memberListItemSchema);
+
+export const memberDetailSchema = z.strictObject({
+  id: idSchema, fullName: z.string().min(2).max(120), email: z.email().max(254).nullable(),
+  phone: z.string().max(40).nullable(), dateOfBirth: localDateSchema.nullable(),
+  emergencyContact: z.string().max(240).nullable(), healthNotes: z.string().max(4000).nullable(),
+  status: memberStatusSchema, registrationState: z.enum(['BASIC', 'PENDING', 'COMPLETE', 'FAILED']), version: versionSchema,
+  memberships: z.array(z.strictObject({ id: idSchema, planName: z.string().max(80), startDate: localDateSchema,
+    endDateExclusive: localDateSchema, agreedPrice: nonnegativeDecimalStringSchema, currency: z.enum(['LKR', 'USD']) })).max(100),
+  sessionPacks: z.array(z.strictObject({ id: idSchema, issuedCredits: z.number().int().min(1).max(1000), availableCredits: z.number().int().min(0).max(1000),
+    price: nonnegativeDecimalStringSchema, currency: z.enum(['LKR', 'USD']), startDate: localDateSchema, endDateExclusive: localDateSchema,
+    status: z.enum(['ACTIVE', 'EXPIRED', 'DEPLETED']) })).max(100),
+  recentSessions: z.array(z.strictObject({ id: idSchema, scheduledStart: isoInstantSchema, state: z.string().min(1).max(40) })).max(5),
+  asOf: isoInstantSchema,
+});
+
+export const memberRegistrationResultSchema = z.strictObject({ operationId: idSchema, memberId: idSchema,
+  term: z.strictObject({ id: idSchema, planName: z.string().max(80), startDate: localDateSchema, endDateExclusive: localDateSchema,
+    agreedPrice: nonnegativeDecimalStringSchema, currency: z.enum(['LKR', 'USD']) }),
+  status: z.enum(['COMPLETE', 'PENDING']), replayed: z.boolean(),
+  temporaryPassword: z.string().min(1).max(128).optional(),
+  credentialDeliveryVersion: versionSchema.optional(), credentialExpiresAt: isoInstantSchema.optional() });
+
+export type MemberRegistrationInput = z.infer<typeof memberRegistrationInputSchema>;
+export type MemberListItem = z.infer<typeof memberListItemSchema>;
+export type MemberDetail = z.infer<typeof memberDetailSchema>;

@@ -7,9 +7,11 @@ import {
   Get,
   InternalServerErrorException,
   NotFoundException,
+  Optional,
   Param,
   Patch,
   Post,
+  Query,
   Req,
   ServiceUnavailableException,
   UnprocessableEntityException,
@@ -22,7 +24,9 @@ import type { Prisma as MasterPrisma } from './generated/master/client.js';
 import { GymAccessGuard, type GymRequest } from './gym-access.guard.js';
 import { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js';
 import { appendMasterVersionAudit } from './operations/transaction-audit.js';
-import { updateGymPublicProfileSchema, updateGymThemeSchema } from '@gymos/contracts';
+import { memberListQuerySchema, memberListSchema, memberRegistrationInputSchema, updateGymPublicProfileSchema, updateGymThemeSchema } from '@gymos/contracts';
+import { gymLocalDate } from './membership-rules.js';
+import { MemberEnrollmentService } from './member-enrollment.service.js';
 
 const createMemberInput = z.strictObject({
   fullName: z.string().trim().min(2).max(120),
@@ -35,6 +39,7 @@ export class GymsController {
   constructor(
     private readonly database: DatabaseService,
     private readonly tenantGate: TenantSchemaGateService,
+    @Optional() private readonly memberEnrollment?: MemberEnrollmentService,
   ) {}
 
   private async assertCurrentOwnerAccess(access: NonNullable<GymRequest['gymAccess']>, source: MasterPrisma.TransactionClient = this.database.master): Promise<void> {
@@ -189,7 +194,7 @@ export class GymsController {
 
   @Get(':slug/members')
   @UseGuards(GymAccessGuard)
-  members(@Req() request: GymRequest) {
+  async members(@Req() request: GymRequest, @Query() query: unknown) {
     const access = request.gymAccess;
     if (!access) {
       throw new InternalServerErrorException('Gym context missing');
@@ -201,17 +206,89 @@ export class GymsController {
       throw new ForbiddenException('Member list access denied');
     }
 
-    return this.tenantGate.withVerifiedTenant(access, (tenant) =>
-      tenant.member.findMany({
-        select: {
-          id: true,
-          fullName: true,
-          email: true,
-          status: true,
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 100,
-      }));
+    const parsed = memberListQuerySchema.safeParse(query);
+    if (!parsed.success) throw new UnprocessableEntityException('Enter a valid member search and page');
+    return this.tenantGate.withVerifiedTenant(access, async tenant => {
+      const configuration = await tenant.gymConfiguration.findUnique({ where: { id: 'current' }, select: { timezone: true } });
+      if (!configuration?.timezone) throw new ServiceUnavailableException('Gym timezone is unavailable');
+      const asOf = new Date();
+      const asOfLocalDate = gymLocalDate(configuration.timezone, asOf);
+      const publishedOperations = await this.database.master.operation.findMany({ where: { gymId: access.gymId, kind: 'REGISTER_MEMBER', state: 'COMPLETE' }, select: { id: true } });
+      const where: Prisma.MemberWhereInput = {
+        AND: [
+          { OR: [{ registrationState: 'BASIC' }, { registrationState: 'COMPLETE', enrollmentOperationId: { in: publishedOperations.map(row => row.id) } }] },
+          ...(parsed.data.status ? [{ status: parsed.data.status }] : []),
+          ...(parsed.data.q ? [{ OR: [
+          { fullName: { contains: parsed.data.q, mode: 'insensitive' as const } },
+          { email: { contains: parsed.data.q, mode: 'insensitive' as const } },
+          ] }] : []),
+        ],
+      };
+      const [totalCount, rows] = await Promise.all([
+        tenant.member.count({ where }),
+        tenant.member.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          skip: (parsed.data.page - 1) * parsed.data.pageSize, take: parsed.data.pageSize,
+          select: { id: true, fullName: true, email: true, status: true, registrationState: true, createdAt: true,
+            memberships: { where: { startDate: { lte: new Date(`${asOfLocalDate}T00:00:00.000Z`) }, endDateExclusive: { gt: new Date(`${asOfLocalDate}T00:00:00.000Z`) } },
+              orderBy: [{ startDate: 'desc' }, { id: 'desc' }], take: 1,
+              select: { id: true, startDate: true, endDateExclusive: true, agreedPrice: true, currency: true, planNameSnapshot: true } } },
+        }),
+      ]);
+      const totalPages = Math.ceil(totalCount / parsed.data.pageSize);
+      const page = Math.min(parsed.data.page, Math.max(totalPages, 1));
+      const items = page === parsed.data.page ? rows : await tenant.member.findMany({ where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * parsed.data.pageSize, take: parsed.data.pageSize,
+        select: { id: true, fullName: true, email: true, status: true, registrationState: true, createdAt: true,
+          memberships: { where: { startDate: { lte: new Date(`${asOfLocalDate}T00:00:00.000Z`) }, endDateExclusive: { gt: new Date(`${asOfLocalDate}T00:00:00.000Z`) } },
+            orderBy: [{ startDate: 'desc' }, { id: 'desc' }], take: 1,
+            select: { id: true, startDate: true, endDateExclusive: true, agreedPrice: true, currency: true, planNameSnapshot: true } } },
+      });
+      return memberListSchema.parse({ items: items.map(member => ({
+        id: member.id, fullName: member.fullName, email: member.email, status: member.status,
+        registrationState: member.registrationState, createdAt: member.createdAt.toISOString(),
+        currentTerm: member.memberships[0] ? { id: member.memberships[0].id,
+          planName: member.memberships[0].planNameSnapshot, startDate: member.memberships[0].startDate.toISOString().slice(0, 10),
+          endDateExclusive: member.memberships[0].endDateExclusive.toISOString().slice(0, 10),
+          agreedPrice: member.memberships[0].agreedPrice.toString(), currency: member.memberships[0].currency as 'LKR' | 'USD' } : null,
+      })), page, pageSize: parsed.data.pageSize, totalCount, totalPages, asOf: asOf.toISOString() });
+    });
+  }
+
+  @Get(':slug/members/:memberId')
+  @UseGuards(GymAccessGuard)
+  async memberDetail(@Req() request: GymRequest, @Param('memberId') memberId: string) {
+    const access = request.gymAccess;
+    if (!access) throw new InternalServerErrorException('Gym context missing');
+    if (access.role !== 'OWNER') throw new ForbiddenException('Member profile access denied');
+    return this.tenantGate.withVerifiedTenant(access, async tenant => {
+      const member = await tenant.member.findFirst({ where: { id: memberId, registrationState: { in: ['BASIC', 'COMPLETE'] } },
+        select: { id: true, enrollmentOperationId: true, fullName: true, email: true, phone: true, dateOfBirth: true, emergencyContact: true,
+          healthNotes: true, status: true, registrationState: true, version: true,
+          memberships: { orderBy: [{ startDate: 'desc' }, { id: 'desc' }], take: 100,
+            select: { id: true, planNameSnapshot: true, startDate: true, endDateExclusive: true, agreedPrice: true, currency: true } },
+          sessionPacks: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 0,
+            select: { id: true } } },
+      });
+      if (!member) throw new NotFoundException('Member not found');
+      if (member.registrationState === 'COMPLETE') {
+        const published = await this.database.master.operation.findFirst({ where: { id: member.enrollmentOperationId ?? '',
+          gymId: access.gymId, kind: 'REGISTER_MEMBER', state: 'COMPLETE', tenantActorId: member.id }, select: { id: true } });
+        if (!published) throw new NotFoundException('Member not found');
+      }
+      const config = await tenant.gymConfiguration.findUnique({ where: { id: 'current' }, select: { timezone: true } });
+      if (!config?.timezone) throw new ServiceUnavailableException('Gym timezone is unavailable');
+      const asOf = new Date();
+      return {
+        id: member.id, fullName: member.fullName, email: member.email, phone: member.phone,
+        dateOfBirth: member.dateOfBirth?.toISOString().slice(0, 10) ?? null,
+        emergencyContact: member.emergencyContact, healthNotes: member.healthNotes,
+        status: member.status, registrationState: member.registrationState, version: member.version,
+        memberships: member.memberships.map(term => ({ id: term.id, planName: term.planNameSnapshot,
+          startDate: term.startDate.toISOString().slice(0, 10), endDateExclusive: term.endDateExclusive.toISOString().slice(0, 10),
+          agreedPrice: term.agreedPrice.toString(), currency: term.currency })),
+        sessionPacks: [], recentSessions: [], asOf: asOf.toISOString(),
+      };
+    });
   }
 
   @Post(':slug/members')
@@ -254,5 +331,17 @@ export class GymsController {
       }
       throw error;
     }
+  }
+
+  @Post(':slug/member-registrations')
+  @UseGuards(GymAccessGuard)
+  async registerMember(@Req() request: GymRequest, @Body() body: unknown) {
+    const access = request.gymAccess;
+    if (!access) throw new InternalServerErrorException('Gym context missing');
+    if (access.role !== 'OWNER') throw new ForbiddenException('Only gym owners can register members');
+    const parsed = memberRegistrationInputSchema.safeParse(body);
+    if (!parsed.success) throw new UnprocessableEntityException('Enter valid member details and a membership plan');
+    if (!this.memberEnrollment) throw new InternalServerErrorException('Member enrollment is unavailable');
+    return this.memberEnrollment.enroll(access, parsed.data);
   }
 }

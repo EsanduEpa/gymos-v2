@@ -3,7 +3,7 @@ import { OwnerGymPage } from '@/components/navigation/owner-gym-page';
 import { SupportOwnerPage } from '@/components/platform/support-owner-page';
 import { currentSupportCookie } from '@/lib/support-context';
 import { LoadingState } from '@/components/ui';
-type Props={params:Promise<{slug:string}>;searchParams:Promise<{error?:string;created?:string}>};
+type Props={params:Promise<{slug:string}>;searchParams:Promise<{error?:string;created?:string;q?:string;status?:string;page?:string}>};
 async function OwnerContent(props:Props){
  const context=await currentSupportCookie();
  if(context){const {slug}=await props.params;return <SupportOwnerPage slug={slug}/>;}

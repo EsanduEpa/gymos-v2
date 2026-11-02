@@ -98,9 +98,10 @@ Do not stretch the current basic member endpoint into enrollment without operati
 
 ## 11. Progress and handoff
 
-- **Status:** NOT STARTED
-- **Completed:** none
-- **Remaining:** 031–035
-- **Next recommended task:** GYMOS-MIG-031 after task 040's prerequisite ordering is planned; 032 may follow 031 before 033/034.
-- **Files/tests/issues/blockers/decisions:** _fill during execution_
+- **Status:** IN PROGRESS — automated implementation and owner acceptance are incomplete.
+- **Completed:** none. Tasks 031 and 032 have partial code and passing targeted verification; neither meets its full Definition of Done.
+- **Remaining:** finish 031/032; implement prerequisite tasks 036, 040 (which itself depends on 036), and 043 in their owning scopes; then implement 033/034 and complete 035. Do not mark dependent work complete early.
+- **Verification to date:** `pnpm --dir packages/contracts build` and `pnpm --dir packages/contracts test` (26/26); `pnpm --dir packages/api-client build`; API and web TypeScript checks; `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/api exec vitest run --config vitest.config.tenancy-integration.ts --disableConsoleIntercept` (21/21, disposable DB harness cleaned 8 databases and its container). Evidence: `docs/migration/evidence/GYMOS-MIG-031.md`, `GYMOS-MIG-032.md`.
+- **Files/tests/issues/blockers/decisions:** existing identity consent is not implemented; no status command/hold release, complete session-pack ledger, session aggregate, notification/audit read slice, forced-change UI journey, or full fault-injection/two-gym acceptance. These are explicit remaining requirements, not waived scope.
+- **Next recommended task:** GYMOS-MIG-036 (trainer enrollment) in its owning Segment 06 scope, followed by GYMOS-MIG-040; task 043 also requires 040. Then resume 033/034/035.
 

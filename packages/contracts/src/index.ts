@@ -1,5 +1,6 @@
 import { z } from 'zod';
 export * from './configuration.js';
+export * from './members.js';
 
 // Transport syntax only: feature schemas own business bounds, currency support,
 // rounding and authorization. No Prisma-generated types cross this boundary.

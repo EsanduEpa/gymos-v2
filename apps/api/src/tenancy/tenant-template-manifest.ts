@@ -66,7 +66,7 @@ export const TENANT_TEMPLATE_V2: TenantTemplateManifest = Object.freeze({
       GymConfiguration: [...TENANT_TEMPLATE_V1.postconditions.columns.GymConfiguration, 'currency', 'timezone'] },
   },
 });
-export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
+export const TENANT_TEMPLATE_V3: TenantTemplateManifest = Object.freeze({
   ...TENANT_TEMPLATE_V2,
   version: 'tenant-2026-10-31.1',
   migrations: [...TENANT_TEMPLATE_V2.migrations, {
@@ -98,7 +98,29 @@ export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
     },
   },
 });
-export const TENANT_MANIFESTS: readonly TenantTemplateManifest[] = [TENANT_TEMPLATE_V1, TENANT_TEMPLATE_V2, TENANT_TEMPLATE_MANIFEST];
+export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
+  ...TENANT_TEMPLATE_V3,
+  version: 'tenant-2026-11-02.1',
+  migrations: [...TENANT_TEMPLATE_V3.migrations, {
+    name: '20261102010000_member_profiles_and_session_packs', checksum: '146a672ecf9cd025d4cba62aad73b4f0a2e714ce6c9f2efd3aed5b9940209d2c',
+  }],
+  postconditions: {
+    ...TENANT_TEMPLATE_V3.postconditions,
+    tables: [...TENANT_TEMPLATE_V3.postconditions.tables, 'SessionPack'],
+    types: [...TENANT_TEMPLATE_V3.postconditions.types, 'SessionPackStatus'],
+    indexes: [...TENANT_TEMPLATE_V3.postconditions.indexes, 'SessionPack_pkey', 'SessionPack_commandReceiptId_key',
+      'SessionPack_actorIdentityId_idempotencyKey_key', 'SessionPack_memberId_endDateExclusive_createdAt_id_idx'],
+    constraints: [...TENANT_TEMPLATE_V3.postconditions.constraints, 'SessionPack_pkey', 'SessionPack_memberId_fkey',
+      'SessionPack_credits_check', 'SessionPack_price_check', 'SessionPack_currency_check', 'SessionPack_validity_check',
+      'SessionPack_version_check', 'SessionPack_key_check', 'SessionPack_receipt_format_check'],
+    columns: { ...TENANT_TEMPLATE_V3.postconditions.columns,
+      Member: [...TENANT_TEMPLATE_V3.postconditions.columns.Member, 'phone', 'dateOfBirth', 'emergencyContact', 'healthNotes'],
+      SessionPack: ['actorIdentityId', 'commandReceiptId', 'createdAt', 'currency', 'endDateExclusive', 'id', 'idempotencyKey',
+        'issuedCredits', 'memberId', 'price', 'requestDigest', 'startDate', 'status', 'validityDays', 'version'],
+    },
+  },
+});
+export const TENANT_MANIFESTS: readonly TenantTemplateManifest[] = [TENANT_TEMPLATE_V1, TENANT_TEMPLATE_V2, TENANT_TEMPLATE_V3, TENANT_TEMPLATE_MANIFEST];
 export function reviewedTenantManifest(version: string | null, digest: string | null) {
   return TENANT_MANIFESTS.find(manifest => manifest.version === version && tenantManifestDigest(manifest) === digest);
 }
