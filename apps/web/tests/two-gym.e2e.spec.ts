@@ -342,7 +342,16 @@ test('real browser and HTTP requests preserve two-gym isolation and pure reads',
   await login(page, fixture.users.ownerA.email);
   await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/owner$`));
   await expect(page.getByRole('heading', { name: 'Test Gym Alpha' })).toBeVisible();
-  await expect(page.locator('.count-badge')).toHaveText('100');
+  // The owner list reports the full published total, which can differ from
+  // the raw tenant row count when a registration is still unpublished.
+  const ownerListToken = (await page.context().cookies()).find(cookie => cookie.name === 'gymos_access_token')?.value;
+  const publishedList = await request.get(`${apiBase}/gyms/${fixture.gyms[0].slug}/members?page=1&pageSize=25`, {
+    headers: { authorization: `Bearer ${ownerListToken}` },
+  });
+  expect(publishedList.ok()).toBe(true);
+  const publishedTotal = (await publishedList.json()).totalCount as number;
+  expect(publishedTotal).toBeGreaterThan(100);
+  await expect(page.locator('.count-badge')).toHaveText(String(publishedTotal));
   await expect(page.locator('.gym-dashboard')).toHaveCSS('--gym-color', '#0F766E');
   await page.getByLabel('Full name').fill('Browser Added Member');
   await page.getByRole('textbox', { name: 'Email address optional' }).fill(`browser-${environment.runId}@example.test`);

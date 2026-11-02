@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { CSSProperties } from 'react';
 import { notFound, redirect } from 'next/navigation';
 import { resolveGymBrandColors } from '@gymos/theme-tokens';
-import { memberListSchema, configurationReadSchema } from '@gymos/contracts';
+import { configurationReadSchema } from '@gymos/contracts';
 import { DashboardChrome } from '@/components/navigation/dashboard-chrome';
 import { MemberRegistrationForm } from '@/components/members/member-registration-form';
 import { Card, CardHeader, Feedback } from '@/components/ui';

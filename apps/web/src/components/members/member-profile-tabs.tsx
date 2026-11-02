@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { MemberDetail } from '@gymos/contracts';
-import { Card, CardHeader, EmptyState, StatusBadge, Tabs } from '@/components/ui';
+import { Card, EmptyState, StatusBadge, Tabs } from '@/components/ui';
 
 const items = [{ id: 'overview', label: 'Overview' }, { id: 'sessions', label: 'Attendance' }, { id: 'history', label: 'Membership & Packs' }];
 
