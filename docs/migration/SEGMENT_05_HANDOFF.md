@@ -5,12 +5,12 @@ Status: **In progress. No Segment 05 task is complete.** Branch `codex/segment-0
 ## Implemented partial slices
 
 - Tasks 031 and 032 remain In Progress; 035 now has partial browser coverage. Evidence: [031](evidence/GYMOS-MIG-031.md), [032](evidence/GYMOS-MIG-032.md), [035](evidence/GYMOS-MIG-035.md).
-- Verified local checks: workspace typecheck, lint and build; contract tests (26/26); disposable tenancy integration suite (22/22), including consent/refusal and post-tenant-commit recovery; full disposable Playwright suite (12/12), including enrollment, one-time credential handoff, forced password change and unchanged second gym. No shared/local demonstration database was used. The harnesses cleaned 8 and 7 disposable databases respectively, plus their containers/manifests.
+- Verified local checks: workspace typecheck, lint and build; contract tests (26/26); disposable tenancy integration suite (23/23), including consent/refusal, tenant rollback retry and post-tenant-commit recovery; full disposable Playwright suite (12/12), including enrollment, one-time credential handoff, forced password change and unchanged second gym. No shared/local demonstration database was used. The harnesses cleaned 8 and 7 disposable databases respectively, plus their containers/manifests.
 - Member identity rows, profile and term commit use the existing durable operation/receipt foundation. Exact price and exclusive end date are snapshotted; no payment is recorded. Pending operation rows stay out of the owner roster.
 
 ## Required work before Segment 05 completion
 
-- Task 031: complete credential-loss/reissue behavior, checkpoint recovery matrix, owner-revocation/concurrency cases and full two-gym verification. Consent/reuse, decline, new-member forced-change journey and one post-tenant/pre-activation recovery point now pass.
+- Task 031: complete credential-loss/reissue behavior, remaining checkpoint recovery matrix, owner-revocation/concurrency cases and full two-gym verification. Consent/reuse, decline, new-member forced-change journey, tenant rollback retry and post-tenant/pre-activation recovery now pass.
 - Task 032: complete role-specific projections and UI verification; task 040 must supply complete session and pack history.
 - Task 033: depends on task 040 and task 043; status/hold release command is not implemented.
 - Task 034: depends on task 040; pack issuance and held/consumed/released balance ledger are not implemented. The profile labels this history unavailable.

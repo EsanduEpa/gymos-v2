@@ -603,6 +603,44 @@ it('recovers member enrollment when Master activation is lost after the tenant r
   }
 });
 
+it('retries the same durable enrollment after the tenant transaction fails before commit', async () => {
+  await tenants[0].gymConfiguration.update({ where: { id: 'current' }, data: { timezone: 'Asia/Colombo', currency: 'LKR' } });
+  const plan = await tenants[0].membershipPlan.create({ data: { name: 'Tenant Retry Plan', price: '10.25', currency: 'LKR', durationDays: 7 } });
+  const ownerAccess = await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: actorId, gymId: gymIds[0] } } });
+  const access = { ...(await context(0)), slug: `schema-0-${run.runId}`, role: 'OWNER', identityId: actorId,
+    identityVersion: 0, accessVersion: ownerAccess.version, actor: null } as const;
+  const credential = ({ issueTemporaryCredential: async () => ({ status: 'ISSUED' as const,
+    temporaryPassword: 'Synthetic-tenant-retry-password', deliveryVersion: 0, expiresAt: new Date(Date.now() + 86_400_000) }) }
+  ) as unknown as CredentialService;
+  const service = new MemberEnrollmentService({ master } as DatabaseService, gateFor(), credential);
+  const input = { fullName: 'Tenant Retry Member', email: `tenant-retry-${run.runId}@example.test`, phone: '+94112223344',
+    dateOfBirth: '1995-06-15', membershipPlanId: plan.id, idempotencyKey: 'member-tenant-retry-0001' };
+  await tenants[0].$executeRawUnsafe(`CREATE FUNCTION fail_member_term_insert() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN RAISE EXCEPTION 'injected tenant enrollment failure'; END $$`);
+  await tenants[0].$executeRawUnsafe(`CREATE TRIGGER fail_member_term_insert BEFORE INSERT ON "MembershipTerm"
+    FOR EACH ROW EXECUTE FUNCTION fail_member_term_insert()`);
+  try {
+    await expect(service.enroll(access as never, input)).rejects.toThrow();
+    const incomplete = await master.operation.findFirstOrThrow({ where: { actorIdentityId: actorId,
+      kind: 'REGISTER_MEMBER', idempotencyKey: input.idempotencyKey } });
+    expect(['MASTER_PREPARED', 'FAILED_RETRYABLE']).toContain(incomplete.state);
+    expect(await tenants[0].member.count({ where: { email: input.email } })).toBe(0);
+    expect(await tenants[0].membershipTerm.count({ where: { member: { email: input.email } } })).toBe(0);
+    expect(await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: incomplete.subjectIdentityId!, gymId: gymIds[0] } } }))
+      .toMatchObject({ role: 'MEMBER', linkStatus: 'PENDING', enrollmentOperationId: incomplete.id });
+    await tenants[0].$executeRawUnsafe('DROP TRIGGER fail_member_term_insert ON "MembershipTerm"');
+    await tenants[0].$executeRawUnsafe('DROP FUNCTION fail_member_term_insert()');
+    const recovered = await service.enroll(access as never, input);
+    expect(recovered).toMatchObject({ status: 'COMPLETE', replayed: true, operationId: incomplete.id });
+    expect(await tenants[0].member.count({ where: { email: input.email } })).toBe(1);
+    expect(await tenants[0].membershipTerm.count({ where: { member: { email: input.email } } })).toBe(1);
+    expect(await master.operation.findUniqueOrThrow({ where: { id: incomplete.id } })).toMatchObject({ state: 'COMPLETE' });
+  } finally {
+    await tenants[0].$executeRawUnsafe('DROP TRIGGER IF EXISTS fail_member_term_insert ON "MembershipTerm"');
+    await tenants[0].$executeRawUnsafe('DROP FUNCTION IF EXISTS fail_member_term_insert()');
+  }
+});
+
 it('recovers a lost Master observation by rereading actual tenant evidence', async () => {
   const before = await master.gym.findUniqueOrThrow({ where: { id: gymIds[0] } });
   await master.gym.update({ where: { id: gymIds[0] }, data: {
