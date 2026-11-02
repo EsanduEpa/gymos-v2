@@ -1,6 +1,6 @@
 # GYMOS-MIG-036 — partial trainer enrollment evidence
 
-Status: **In Progress; not Verified or Completed.** Implementation commit `7d9a1dd` on branch `codex/segment-05-member-enrollment`, based on `origin/main` at `97b16a7`. Commands and test results below were run against the exact source and test files in that commit (the evidence metadata update is docs-only).
+Status: **In Progress; not Verified or Completed.** Implementation commit `7d9a1dd` plus recovery/consent test commit recorded in the current branch history, based on `origin/main` at `97b16a7`. The tenancy integration results below include those added test cases; their source has not yet been committed at the time of this edit.
 
 ## Implemented and locally checked
 
@@ -8,7 +8,7 @@ Status: **In Progress; not Verified or Completed.** Implementation commit `7d9a1
 - Newly created identities receive the established one-time credential flow; existing identities preserve their credential and receive none.
 - Added tenant constraints for complete trainer registration fields and paired/valid local shift times. Updated tenant template manifest and disposable fixtures accordingly.
 - `pnpm typecheck:workspace` passed; `pnpm lint:workspace` passed; `pnpm build:workspace` passed. Exit code 0 for each combined command.
-- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/api exec vitest run --config vitest.config.tenancy-integration.ts --disableConsoleIntercept` passed **24/24**. Disposable harness cleaned 8 databases and its container. Coverage includes typed registration, replay without secret disclosure, identity consent/password preservation, same-gym role conflict and second-gym isolation.
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/api exec vitest run --config vitest.config.tenancy-integration.ts --disableConsoleIntercept` passed **26/26**. Disposable harness cleaned 8 databases and its container. Coverage includes typed registration, replay without secret disclosure, identity consent/decline and password preservation, same-gym role conflict, second-gym isolation, rollback-before-tenant-commit retry, and Master activation audit failure/retry after tenant receipt commit.
 - `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web test:e2e --grep 'trainer registration hands off'` passed **1/1** in Chromium against guarded disposable databases. It covered owner creation, one-time credential, forced password change, login into the trainer route and unchanged second-gym trainer count. Harness cleaned 6 databases, its container and manifest. Captures/results remain under ignored `apps/web/test-results/`.
 - All database tests used disposable databases. The existing local demo database was not used.
 

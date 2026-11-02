@@ -705,6 +705,93 @@ it('registers a typed trainer once and reuses an existing identity only after ve
   await expect(service.enroll(access as never, { ...input, email: roleConflict.email, idempotencyKey: 'trainer-registration-0003' }))
     .rejects.toThrow('already has a role');
   expect(await tenants[0].trainer.count({ where: { identityId: roleConflict.id } })).toBe(0);
+
+  const decliningIdentity = await master.user.create({ data: { email: `declined-trainer-${run.runId}@example.test`,
+    passwordHash: await argon2.hash(existingPassword, { type: argon2.argon2id }) } });
+  const declineInput = { ...input, email: decliningIdentity.email, idempotencyKey: 'trainer-registration-0004' };
+  const declinePending = await service.enroll(access as never, declineInput);
+  if (declinePending.status !== 'PENDING') throw new Error('Expected trainer consent to remain pending');
+  expect(await service.consent(access.slug, declinePending.operationId, { identityId: decliningIdentity.id,
+    authVersion: decliningIdentity.authVersion, currentPassword: existingPassword, decision: 'DECLINE' }))
+    .toMatchObject({ status: 'CONSENT_DECLINED' });
+  expect(await master.operation.findUniqueOrThrow({ where: { id: declinePending.operationId } }))
+    .toMatchObject({ state: 'FAILED_FINAL', errorCode: 'CONSENT_DECLINED' });
+  expect(await master.gymAccess.findUnique({ where: { userId_gymId: { userId: decliningIdentity.id, gymId: gymIds[0] } } })).toBeNull();
+  expect(await tenants[0].trainer.count({ where: { email: decliningIdentity.email } })).toBe(0);
+});
+
+it('recovers trainer enrollment after its tenant actor transaction rolls back', async () => {
+  const ownerAccess = await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: actorId, gymId: gymIds[0] } } });
+  const access = { ...(await context(0)), slug: `schema-0-${run.runId}`, role: 'OWNER', identityId: actorId,
+    identityVersion: 0, accessVersion: ownerAccess.version, actor: null } as const;
+  const credential = ({ issueTemporaryCredential: async () => ({ status: 'ISSUED' as const, temporaryPassword: 'Trainer-retry-password',
+    deliveryVersion: 0, expiresAt: new Date(Date.now() + 86_400_000) }) }) as unknown as CredentialService;
+  const service = new TrainerEnrollmentService({ master } as DatabaseService, gateFor(), credential);
+  const input = { fullName: 'Retry Trainer', email: `trainer-retry-${run.runId}@example.test`, phone: '+94112223346', level: 'LEVEL_1' as const,
+    yearsExperience: null, specialisations: [], shiftStart: null, shiftEnd: null, bio: null, idempotencyKey: 'trainer-tenant-retry-01' };
+  await tenants[0].$executeRawUnsafe(`CREATE FUNCTION fail_trainer_actor_insert() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN RAISE EXCEPTION 'injected trainer insert rollback'; END $$`);
+  await tenants[0].$executeRawUnsafe(`CREATE TRIGGER fail_trainer_actor_insert BEFORE INSERT ON "Trainer"
+    FOR EACH ROW EXECUTE FUNCTION fail_trainer_actor_insert()`);
+  try {
+    await expect(service.enroll(access as never, input)).rejects.toThrow();
+    const incomplete = await master.operation.findFirstOrThrow({ where: { actorIdentityId: actorId, kind: 'REGISTER_TRAINER', idempotencyKey: input.idempotencyKey } });
+    expect(['MASTER_PREPARED', 'FAILED_RETRYABLE']).toContain(incomplete.state);
+    expect(await tenants[0].trainer.count({ where: { email: input.email } })).toBe(0);
+    expect(await tenants[0].commandReceipt.count({ where: { sourceMasterOperationId: incomplete.id } })).toBe(0);
+    expect(await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: incomplete.subjectIdentityId!, gymId: gymIds[0] } } }))
+      .toMatchObject({ role: 'TRAINER', linkStatus: 'PENDING', enrollmentOperationId: incomplete.id });
+    await tenants[0].$executeRawUnsafe('DROP TRIGGER fail_trainer_actor_insert ON "Trainer"');
+    await tenants[0].$executeRawUnsafe('DROP FUNCTION fail_trainer_actor_insert()');
+    const recovered = await service.enroll(access as never, input);
+    expect(recovered).toMatchObject({ status: 'COMPLETE', replayed: true, operationId: incomplete.id, temporaryPassword: 'Trainer-retry-password' });
+    expect(await tenants[0].trainer.count({ where: { email: input.email } })).toBe(1);
+    expect(await tenants[0].commandReceipt.count({ where: { sourceMasterOperationId: incomplete.id } })).toBe(1);
+    expect(await master.operation.findUniqueOrThrow({ where: { id: incomplete.id } })).toMatchObject({ state: 'COMPLETE' });
+  } finally {
+    await tenants[0].$executeRawUnsafe('DROP TRIGGER IF EXISTS fail_trainer_actor_insert ON "Trainer"');
+    await tenants[0].$executeRawUnsafe('DROP FUNCTION IF EXISTS fail_trainer_actor_insert()');
+  }
+});
+
+it('recovers trainer enrollment when Master activation fails after the tenant receipt commits', async () => {
+  const ownerAccess = await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: actorId, gymId: gymIds[0] } } });
+  const access = { ...(await context(0)), slug: `schema-0-${run.runId}`, role: 'OWNER', identityId: actorId,
+    identityVersion: 0, accessVersion: ownerAccess.version, actor: null } as const;
+  let deliveries = 0;
+  const credential = ({ issueTemporaryCredential: async () => {
+    deliveries++;
+    return { status: 'ISSUED' as const, temporaryPassword: 'Trainer-activation-password', deliveryVersion: 0,
+      expiresAt: new Date(Date.now() + 86_400_000) };
+  } }) as unknown as CredentialService;
+  const service = new TrainerEnrollmentService({ master } as DatabaseService, gateFor(), credential);
+  const input = { fullName: 'Activation Retry Trainer', email: `trainer-activation-${run.runId}@example.test`, phone: '+94112223347', level: 'LEVEL_2' as const,
+    yearsExperience: 4, specialisations: ['Rehab'], shiftStart: null, shiftEnd: null, bio: null, idempotencyKey: 'trainer-activation-retry-01' };
+  await master.$executeRawUnsafe(`CREATE FUNCTION fail_trainer_activation_audit() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN IF NEW."eventCode" = 'TRAINER_ACCESS_ACTIVATED' THEN RAISE EXCEPTION 'injected trainer activation failure'; END IF; RETURN NEW; END $$`);
+  await master.$executeRawUnsafe(`CREATE TRIGGER fail_trainer_activation_audit BEFORE INSERT ON "PlatformAuditLog"
+    FOR EACH ROW EXECUTE FUNCTION fail_trainer_activation_audit()`);
+  try {
+    await expect(service.enroll(access as never, input)).rejects.toThrow();
+    const incomplete = await master.operation.findFirstOrThrow({ where: { actorIdentityId: actorId, kind: 'REGISTER_TRAINER', idempotencyKey: input.idempotencyKey } });
+    expect(incomplete).toMatchObject({ state: 'TENANT_COMMITTED', step: 'TENANT_REGISTRATION_COMMITTED' });
+    expect(await tenants[0].trainer.count({ where: { email: input.email } })).toBe(1);
+    expect(await tenants[0].commandReceipt.count({ where: { sourceMasterOperationId: incomplete.id } })).toBe(1);
+    expect(await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: incomplete.subjectIdentityId!, gymId: gymIds[0] } } }))
+      .toMatchObject({ role: 'TRAINER', linkStatus: 'PENDING', enrollmentOperationId: incomplete.id });
+    await master.$executeRawUnsafe('DROP TRIGGER fail_trainer_activation_audit ON "PlatformAuditLog"');
+    await master.$executeRawUnsafe('DROP FUNCTION fail_trainer_activation_audit()');
+    const recovered = await service.enroll(access as never, input);
+    expect(recovered).toMatchObject({ status: 'COMPLETE', replayed: true, operationId: incomplete.id });
+    expect(recovered.temporaryPassword).toBe('Trainer-activation-password');
+    expect(await tenants[0].trainer.count({ where: { email: input.email } })).toBe(1);
+    expect(await tenants[0].commandReceipt.count({ where: { sourceMasterOperationId: incomplete.id } })).toBe(1);
+    expect(await master.operation.findUniqueOrThrow({ where: { id: incomplete.id } })).toMatchObject({ state: 'COMPLETE' });
+    expect(deliveries).toBe(1);
+  } finally {
+    await master.$executeRawUnsafe('DROP TRIGGER IF EXISTS fail_trainer_activation_audit ON "PlatformAuditLog"');
+    await master.$executeRawUnsafe('DROP FUNCTION IF EXISTS fail_trainer_activation_audit()');
+  }
 });
 
 it('recovers a lost Master observation by rereading actual tenant evidence', async () => {
