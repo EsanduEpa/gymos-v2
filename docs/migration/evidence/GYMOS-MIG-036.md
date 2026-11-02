@@ -1,6 +1,6 @@
 # GYMOS-MIG-036 — partial trainer enrollment evidence
 
-Status: **In Progress; not Verified or Completed.** Local changes are based on branch `codex/segment-05-member-enrollment` at `701258e` (`origin/main` baseline `97b16a7`). Evidence below was captured from the uncommitted working tree; it must be re-recorded against the pushed revision before any task status advances beyond In Progress.
+Status: **In Progress; not Verified or Completed.** Implementation commit `7d9a1dd` on branch `codex/segment-05-member-enrollment`, based on `origin/main` at `97b16a7`. Commands and test results below were run against the exact source and test files in that commit (the evidence metadata update is docs-only).
 
 ## Implemented and locally checked
 
