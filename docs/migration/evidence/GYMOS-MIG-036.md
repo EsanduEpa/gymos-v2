@@ -1,6 +1,6 @@
 # GYMOS-MIG-036 — partial trainer enrollment evidence
 
-Status: **In Progress; not Verified or Completed.** Implementation commit `7d9a1dd` plus recovery/consent test commit recorded in the current branch history, based on `origin/main` at `97b16a7`. The tenancy integration results below include those added test cases; their source has not yet been committed at the time of this edit.
+Status: **In Progress; not Verified or Completed.** Verified source and test revision `cba880c` on branch `codex/segment-05-member-enrollment`, based on `origin/main` at `97b16a7`. Hosted checks will be run against the final pushed revision before task evidence is treated as review-ready.
 
 ## Implemented and locally checked
 
