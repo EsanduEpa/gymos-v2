@@ -38,15 +38,15 @@ Working checklist created 3 November 2026 from the segment plans and task specs.
 - [ ] Visible Chrome review is performed in the correct app window for owner, trainer and member journeys. The visible Chrome app is available, but CUA cannot attach to or show the test application window; no owner-observed review is claimed.
 - [ ] Evidence names commands, exit codes, disposable environment/cleanup, screenshots actually reviewed, and whether review was agent-performed or owner-observed.
 - [x] Commit `abfab90` is pushed to `codex/segment-06-management`; no merge or deployment occurred.
-- [ ] Draft PR creation and hosted checks remain pending because GitHub's rendered page was blank in the controllable Chrome window and `gh` is unavailable.
+- [x] Draft PR #8 is open on `codex/segment-06-management`; [ ] its hosted checks must finish successfully before the hosted release gate is closed.
 
 ## Review checkpoint — 3 November 2026
 
-- **Source revision:** `abfab90` on `codex/segment-06-management`, pushed to `origin`. The remaining working-tree changes are documentation that records the final checkpoint and the external browser/PR blocker.
+- **Source revision:** implementation commit `abfab90` and evidence refresh `d69dcea` are pushed to `codex/segment-06-management`.
 - **Final workspace checks on `abfab90`:** `pnpm lint:workspace`, `pnpm typecheck:workspace`, `pnpm build:workspace`, `git diff --check` — exit 0.
 - **Focused guarded suites:** contract tests 50/50; booking 3/3; request/accept/decline 4/4; member lifecycle 1/1 plus routed controller guard 1/1; pack issuance/balance 1/1; session lifecycle 3/3; cancellation/no-show 5/5 plus exact cutoff/grace 2/2; session reads 5/5; C63 2/2; coaching Tasks 050–052 4/4. The two-gym trainer/member directory-to-request Playwright journey passed 1/1. Individual commands and persisted-effect assertions are in task evidence.
 - **Additional headed review evidence:** the role session/read journey passed 1/1, and a second Chrome-channel run of the directory/request/accept/decline journey passed 1/1. The guarded harnesses reported cleanup of six disposable databases, the container and run manifest. These are agent-performed automated browser checks; no owner-observed review is claimed.
-- **Visible review and PR status:** CUA still lists no browser-control provider. Native Chrome showed the existing GitHub page, and navigation to the new comparison left a blank rendered content area. `gh` is unavailable. The source branch is pushed, but a draft PR and hosted checks are not yet available.
+- **Visible review and PR status:** CUA still lists no browser-control provider, so owner-visible review is paused pending Chrome/Codex restart. `gh` is unavailable, but the pushed branch is now tracked by draft [PR #8](https://github.com/EsanduEpa/gymos-v2/pull/8). GitHub reported 11 hosted check runs queued or in progress at creation; no hosted result is yet claimed.
 - **Scope boundary:** the owner approved storing trainer decline reasons with member-only visibility. The owner also chose to preserve Segment 08 ownership of Task 049. No Task 049 code was included; Task 048 remains gated on Task 049.
 
 ## Isolated browser rerun — 3 November 2026
