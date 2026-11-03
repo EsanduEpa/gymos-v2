@@ -36,9 +36,9 @@ Supporting graph for [Master Plan §13](MIGRATION_EXECUTION_PLAN.md#13-task-depe
 | [GYMOS-MIG-030](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-030) | GYMOS-MIG-018, GYMOS-MIG-028, GYMOS-MIG-029, GYMOS-MIG-083 | DB migration required; coordinated client/API; DEC-07 |
 | [GYMOS-MIG-031](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-031) | GYMOS-MIG-017, GYMOS-MIG-018, GYMOS-MIG-023, GYMOS-MIG-028, GYMOS-MIG-030, GYMOS-MIG-078, GYMOS-MIG-080, GYMOS-MIG-083 | DB migration required; coordinated client/API; DEC-02 DEC-04 DEC-07 |
 | [GYMOS-MIG-032](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-032) | GYMOS-MIG-013, GYMOS-MIG-018, GYMOS-MIG-030, GYMOS-MIG-031 | DB migration required; coordinated client/API; no unresolved decision assigned |
-| [GYMOS-MIG-033](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-033) | GYMOS-MIG-004, GYMOS-MIG-018, GYMOS-MIG-031, GYMOS-MIG-040, GYMOS-MIG-043, GYMOS-MIG-078, GYMOS-MIG-080, GYMOS-MIG-084 | DB migration required; coordinated client/API; DEC-02 DEC-04 DEC-08 |
-| [GYMOS-MIG-034](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-034) | GYMOS-MIG-018, GYMOS-MIG-030, GYMOS-MIG-031, GYMOS-MIG-040, GYMOS-MIG-082, GYMOS-MIG-083, GYMOS-MIG-084 | DB migration required; coordinated client/API; DEC-06 DEC-07 DEC-08 |
-| [GYMOS-MIG-035](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-035) | GYMOS-MIG-007, GYMOS-MIG-020, GYMOS-MIG-031, GYMOS-MIG-032, GYMOS-MIG-034 | No Prisma change; coordinated client/API; no unresolved decision assigned |
+| [GYMOS-MIG-033](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-033) | GYMOS-MIG-004, GYMOS-MIG-018, GYMOS-MIG-031, GYMOS-MIG-032, GYMOS-MIG-040, GYMOS-MIG-043, GYMOS-MIG-078, GYMOS-MIG-080, GYMOS-MIG-084 | DB migration required; coordinated client/API; DEC-02 DEC-04 DEC-08 |
+| [GYMOS-MIG-034](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-034) | GYMOS-MIG-018, GYMOS-MIG-030, GYMOS-MIG-031, GYMOS-MIG-032, GYMOS-MIG-040, GYMOS-MIG-082, GYMOS-MIG-083, GYMOS-MIG-084 | DB migration required; coordinated client/API; DEC-06 DEC-07 DEC-08 |
+| [GYMOS-MIG-035](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-035) | GYMOS-MIG-007, GYMOS-MIG-020, GYMOS-MIG-031, GYMOS-MIG-032 | No Prisma change; coordinated client/API; no unresolved decision assigned |
 | [GYMOS-MIG-036](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-036) | GYMOS-MIG-017, GYMOS-MIG-018, GYMOS-MIG-023, GYMOS-MIG-027, GYMOS-MIG-078, GYMOS-MIG-080, GYMOS-MIG-083 | DB migration required; coordinated client/API; DEC-02 DEC-04 DEC-07 |
 | [GYMOS-MIG-037](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-037) | GYMOS-MIG-013, GYMOS-MIG-018, GYMOS-MIG-029, GYMOS-MIG-036, GYMOS-MIG-083, GYMOS-MIG-085 | DB migration required; coordinated client/API; DEC-07 DEC-09 |
 | [GYMOS-MIG-038](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-038) | GYMOS-MIG-004, GYMOS-MIG-018, GYMOS-MIG-036, GYMOS-MIG-040, GYMOS-MIG-043, GYMOS-MIG-078, GYMOS-MIG-080, GYMOS-MIG-084 | DB migration required; coordinated client/API; DEC-02 DEC-04 DEC-08 |
@@ -47,7 +47,7 @@ Supporting graph for [Master Plan §13](MIGRATION_EXECUTION_PLAN.md#13-task-depe
 | [GYMOS-MIG-041](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-041) | GYMOS-MIG-013, GYMOS-MIG-018, GYMOS-MIG-034, GYMOS-MIG-037, GYMOS-MIG-040, GYMOS-MIG-043, GYMOS-MIG-083, GYMOS-MIG-084 | DB migration required; coordinated client/API; DEC-07 DEC-08 |
 | [GYMOS-MIG-042](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-042) | GYMOS-MIG-013, GYMOS-MIG-018, GYMOS-MIG-034, GYMOS-MIG-039, GYMOS-MIG-040, GYMOS-MIG-043, GYMOS-MIG-080, GYMOS-MIG-083, GYMOS-MIG-084 | DB migration required; coordinated client/API; DEC-04 DEC-07 DEC-08 |
 | [GYMOS-MIG-043](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-043) | GYMOS-MIG-004, GYMOS-MIG-013, GYMOS-MIG-018, GYMOS-MIG-040, GYMOS-MIG-080, GYMOS-MIG-085 | DB migration required; coordinated client/API; DEC-04 DEC-09 |
-| [GYMOS-MIG-044](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-044) | GYMOS-MIG-013, GYMOS-MIG-018, GYMOS-MIG-041, GYMOS-MIG-042, GYMOS-MIG-043, GYMOS-MIG-083, GYMOS-MIG-085 | No Prisma change; coordinated client/API; DEC-07 DEC-09 |
+| [GYMOS-MIG-044](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-044) | GYMOS-MIG-013, GYMOS-MIG-018, GYMOS-MIG-032, GYMOS-MIG-041, GYMOS-MIG-042, GYMOS-MIG-043, GYMOS-MIG-083, GYMOS-MIG-085 | No Prisma change; coordinated client/API; DEC-07 DEC-09 |
 | [GYMOS-MIG-045](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-045) | GYMOS-MIG-040, GYMOS-MIG-044, GYMOS-MIG-083, GYMOS-MIG-084 | DB migration required; coordinated client/API; DEC-07 DEC-08 |
 | [GYMOS-MIG-046](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-046) | GYMOS-MIG-029, GYMOS-MIG-040, GYMOS-MIG-045, GYMOS-MIG-082, GYMOS-MIG-083, GYMOS-MIG-084 | DB migration required; coordinated client/API; DEC-06 DEC-07 DEC-08 |
 | [GYMOS-MIG-047](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-047) | GYMOS-MIG-033, GYMOS-MIG-038, GYMOS-MIG-040, GYMOS-MIG-044, GYMOS-MIG-045, GYMOS-MIG-083, GYMOS-MIG-084 | DB migration required; coordinated client/API; DEC-07 DEC-08 |
@@ -315,6 +315,7 @@ flowchart TD
   T004 --> T033
   T018 --> T033
   T031 --> T033
+  T032 --> T033
   T040 --> T033
   T043 --> T033
   T078 --> T033
@@ -323,6 +324,7 @@ flowchart TD
   T018 --> T034
   T030 --> T034
   T031 --> T034
+  T032 --> T034
   T040 --> T034
   T082 --> T034
   T083 --> T034
@@ -331,7 +333,6 @@ flowchart TD
   T020 --> T035
   T031 --> T035
   T032 --> T035
-  T034 --> T035
   T017 --> T036
   T018 --> T036
   T023 --> T036
@@ -393,6 +394,7 @@ flowchart TD
   T085 --> T043
   T013 --> T044
   T018 --> T044
+  T032 --> T044
   T041 --> T044
   T042 --> T044
   T043 --> T044

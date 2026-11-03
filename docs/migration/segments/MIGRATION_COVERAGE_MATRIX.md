@@ -40,8 +40,8 @@ This matrix assigns every authoritative task and every V1 route responsibility t
 | GYMOS-MIG-030 | Membership eligibility/renewal | `Membership`, expiry action | membership terms/service | 04 | GYMOS-MIG-030 | COMPLETED |
 | GYMOS-MIG-031 | Member registration | O03; `actions/members.ts` | member enrollment saga/API/UI | 05 | GYMOS-MIG-031 | IN PROGRESS |
 | GYMOS-MIG-032 | Member list/profile | O02/O04 | member query/detail/UI | 05 | GYMOS-MIG-032 | IN PROGRESS |
-| GYMOS-MIG-033 | Member status/hold release | O04 status action | recoverable member status command | 05 | GYMOS-MIG-033 | NOT STARTED |
-| GYMOS-MIG-034 | Session packs/balance | O04; `actions/packs.ts` | pack/hold ledger projection | 05 | GYMOS-MIG-034 | NOT STARTED |
+| GYMOS-MIG-033 | Member status/hold release | O04 status action | recoverable member status command | 07 | GYMOS-MIG-033 | NOT STARTED |
+| GYMOS-MIG-034 | Session packs/balance | O04; `actions/packs.ts` | pack/hold ledger projection | 07 | GYMOS-MIG-034 | NOT STARTED |
 | GYMOS-MIG-035 | Enrollment recovery journey | O03→O04 | two-gym browser/integration evidence | 05 | GYMOS-MIG-035 | NOT STARTED |
 | GYMOS-MIG-036 | Trainer registration | O06; `actions/trainers.ts` | trainer enrollment saga/API/UI | 06 | GYMOS-MIG-036 | IN PROGRESS |
 | GYMOS-MIG-037 | Trainer roster/profile/shifts | O05/O07 | trainer queries/status/shift UI | 06 | GYMOS-MIG-037 | NOT STARTED |
@@ -51,7 +51,7 @@ This matrix assigns every authoritative task and every V1 route responsibility t
 | GYMOS-MIG-041 | Owner booking | O09; `bookSession` | atomic booking API/UI | 07 | GYMOS-MIG-041 | NOT STARTED |
 | GYMOS-MIG-042 | Request + accept/decline | M02/T01 | request/response commands/UI | 07 | GYMOS-MIG-042 | NOT STARTED |
 | GYMOS-MIG-043 | Notifications/audit reads | bell; notification/audit actions | selected-gym notification/audit module | 07 | GYMOS-MIG-043 | NOT STARTED |
-| GYMOS-MIG-044 | Session read views | O08/T01/M03 | role projections/pages | 07 | GYMOS-MIG-044 | NOT STARTED |
+| GYMOS-MIG-044 | Session read views | O08/T01/M03 and member profile | role projections/pages and recent-session panel | 07 | GYMOS-MIG-044 | NOT STARTED |
 | GYMOS-MIG-045 | Start/shared notes | T01; session actions | guarded lifecycle commands | 07 | GYMOS-MIG-045 | NOT STARTED |
 | GYMOS-MIG-046 | Complete exactly once | `endSession` | settlement transaction/receipt | 07 | GYMOS-MIG-046 | NOT STARTED |
 | GYMOS-MIG-047 | No-show/cancellation | O08/M03 session actions | quoted terminal commands | 07 | GYMOS-MIG-047 | NOT STARTED |
@@ -108,7 +108,7 @@ This matrix assigns every authoritative task and every V1 route responsibility t
 | O01 | `/owner` | 08 / 058 | Honest live metrics and refresh |
 | O02 | `/owner/members` | 05 / 032 | Paged member roster |
 | O03 | `/owner/members/new` | 05 / 031 | Full enrollment + one-time credential handoff |
-| O04 | `/owner/members/[id]` | 05 / 032–034 | Profile/tabs/status/pack; deferred fake payment/receipt removed |
+| O04 | `/owner/members/[id]` | 05 / 032; 07 / 033–034 | Member profile/terms; status and pack panels consume Segment07 lifecycle services; deferred fake payment/receipt removed |
 | O05 | `/owner/trainers` | 06 / 037 | Trainer roster |
 | O06 | `/owner/trainers/new` | 06 / 036 | Trainer enrollment/handoff |
 | O07 | `/owner/trainers/[id]` | 06 / 037,038 | Profile, shifts, status |

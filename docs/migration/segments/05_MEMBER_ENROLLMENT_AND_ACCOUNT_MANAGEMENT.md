@@ -2,16 +2,16 @@
 
 ## Execution instructions for AI agents
 
-Read O02–O04 and tasks 031–035; verify auth/config/member eligibility and session aggregate prerequisites; treat current V2 POST member as basic contact only; implement recoverable enrollment and sanitized projections; test two-gym and failure checkpoints before marking complete.
+Read O02–O04 and tasks 031, 032 and 035; treat current V2 POST member as basic contact only; implement recoverable enrollment and sanitized roster/profile projections; test two-gym and failure checkpoints before marking complete. Session lifecycle tasks 033/034 are owned by Segment 07.
 
 ## 1. Segment overview
 
-- **Capability:** owner-assisted member enrollment, account/profile, membership, status, and session packs.
+- **Capability:** owner-assisted member enrollment, roster/profile and membership-term history.
 - **Objective:** migrate O02/O03/O04 without raw user leakage, fake payments, or partial enrollment.
-- **Result:** owner can register a member with one-time credential handoff, browse/search/profile, manage status and packs, and recover interrupted enrollment.
+- **Result:** owner can register a member with one-time credential handoff, browse/search/profile and recover interrupted enrollment.
 - **Priority / complexity:** High / Large.
-- **Dependencies:** segments 02–04; task 040 session/hold base before 033/034; DEC-02/04/06/07/08.
-- **In scope:** GYMOS-MIG-031–035.
+- **Dependencies:** segments 02–04; DEC-02/04/07; session history and trainer health projections are owned by later segments.
+- **In scope:** GYMOS-MIG-031, 032 and 035. Tasks 033 and 034 are reassigned to Segment 07; task IDs and dependency edges are retained.
 - **Out of scope:** facility check-in, progress UI, real payment capture/refunds/receipts, self-registration, arbitrary profile editing not in V1.
 
 ## 2. Current V1 implementation
@@ -25,11 +25,11 @@ Current V2 GET/POST `/gyms/:slug/members` handles only id/fullName/nullable emai
 
 ## 3. Target V2 implementation
 
-Use Master operation for identity/access publication and tenant transaction/receipt for `Member`, profile, initial MembershipTerm, and optional initial pack only when specified. Generate credentials via segment 02; publish only after reciprocal proof. Reads return sanitized role-specific DTOs. List uses server pagination/filter and full totals. Status command is versioned/recoverable and releases eligible future holds through session service. Pack issuance creates an exact-value entitlement ledger/projection; it does not claim cash receipt.
+Use Master operation for identity/access publication and tenant transaction/receipt for `Member`, profile and initial MembershipTerm. Pack issuance is task034 in Segment07. Generate credentials via segment 02; publish only after reciprocal proof. Reads return sanitized role-specific DTOs. List uses server pagination/filter and full totals. Status command is versioned/recoverable and releases eligible future holds through session service. Pack issuance creates an exact-value entitlement ledger/projection; it does not claim cash receipt.
 
 ## 4. V1 to V2 UI migration
 
-Preserve O02 filters/table/pager/empty hint; O03 field layout and full-form→one-time-handoff replacement; O04 banner, tabs, confirmation and pack modal. Normalize nullable email safely. Preserve “Attendance” layout while label/copy must honestly mean recent PT sessions. Remove/hide deferred desk-payment and fake receipt controls per approved MVP; billing may show derived membership/pack operational rows explicitly labeled, never PAID. Keep drafts and errors visible on failure; close/reset only on verified success.
+Preserve O02 filters/table/pager/empty hint; O03 field layout and full-form→one-time-handoff replacement; O04 member banner/profile/term history. Status and pack panels consume Segment07 tasks033/034. Normalize nullable email safely. Preserve “Attendance” layout while label/copy must honestly mean recent PT sessions. Remove/hide deferred desk-payment and fake receipt controls per approved MVP; billing may show derived membership/pack operational rows explicitly labeled, never PAID. Keep drafts and errors visible on failure; close/reset only on verified success.
 
 ## 5. Backend and database migration
 
@@ -48,17 +48,21 @@ Tenant `Member` is extended with approved profile fields and registration state;
 
 - **Prerequisites:** 013,018,030,031. **Sources:** O02/O04 pages/clients and direct Prisma reads.
 - **Targets:** member list/detail query APIs/DTOs and web routes.
-- **Instructions:** explicit selects; q/status/cursor-or-page contract; accurate totals; current term and pack projections; last-five sessions; bounded derived billing; role-specific health fields; safe 404.
+- **Instructions:** explicit selects; q/status/cursor-or-page contract; accurate totals; current membership-term history and bounded derived membership billing; role-safe fields; safe 404.
 - **Acceptance/test:** >100 records, filters/page clamp/null email, empty/loading/error, owner/support/member/trainer projections, foreign IDs, forbidden-key recursive check. **[ ]**
 
-### GYMOS-MIG-033 — recoverable member status and hold release
+### GYMOS-MIG-033 — moved to Segment 07
+
+Recoverable member status changes and session hold release are session-lifecycle behavior. Ownership moves to Segment 07; dependencies remain 031, 032, 040, 043 and the existing platform foundations. See the Segment 07 task specification.
 
 - **Prerequisites:** 004,018,031,040,043,078,080,084. **Sources:** O04 status UI, `updateMemberStatus`, known expiry defect.
 - **Targets:** member status command/service/receipt/audit/notification and UI dialog.
 - **Instructions:** allowed transitions with version/reason; separate identity access from membership terms; release/cancel future holds per policy atomically/recoverably; return actual result; retain dialog/error on failure.
 - **Acceptance/test:** stale/repeat/concurrent command, future/active/terminal sessions, notification outage, foreign member, no partial published result. **[ ]**
 
-### GYMOS-MIG-034 — session-pack issuance and balance projection
+### GYMOS-MIG-034 — moved to Segment 07
+
+Session-pack issuance, hold-aware balances and pack history are session credit lifecycle behavior. Ownership moves to Segment 07; dependencies remain 031, 032, 040 and the existing money/configuration foundations. See the Segment 07 task specification.
 
 - **Prerequisites:** 018,030,031,040,082–084. **Sources:** O04 pack modal, `issueSessionPack`, SessionPack/pricing.
 - **Targets:** tenant pack/hold ledger/schema, command/query APIs and profile UI.
@@ -67,10 +71,10 @@ Tenant `Member` is extended with approved profile fields and registration state;
 
 ### GYMOS-MIG-035 — enrollment and recovery journey
 
-- **Prerequisites:** 007,020,031,032,034. **Sources:** O03→O04 workflow, harness.
+- **Prerequisites:** 007,020,031,032. **Sources:** O03→O04 workflow, harness.
 - **Targets:** API/Playwright/fault evidence only unless defects found.
-- **Instructions:** run new/reused member through login forced change, role entry, owner roster/profile/pack; inject each cross-plane failure and resume; prove other gym unchanged.
-- **Acceptance/test:** exactly one identity/access/actor/term/pack as expected; one-time secret absent after handoff; repair states hidden from normal lists; screenshots and persisted counts recorded. **[ ]**
+- **Instructions:** run new/reused member through login forced change, role entry, owner roster/profile; inject each cross-plane failure and resume; prove other gym unchanged.
+- **Acceptance/test:** exactly one identity/access/actor/term as expected; one-time secret absent after handoff; repair states hidden from normal lists; screenshots and persisted counts recorded. **[ ]**
 
 ## 7. Security and multi-tenancy checklist
 
@@ -86,23 +90,24 @@ Run contract/client tests, member service unit tests, owned identity/operation/t
 
 ## 9. Definition of done
 
-- [ ] O02–O04 required behavior exists; deferred mock payment/receipt is absent/honest.
-- [ ] Registration and status operations recover safely.
-- [ ] List/profile are complete, paged, sanitized, role-limited, and isolated.
-- [ ] Pack balances conserve under concurrency.
-- [ ] All five tasks pass and current basic-contact data receives an explicit compatibility treatment.
+- [ ] Tasks 031, 032 and 035 meet their full task specifications with linked passing evidence.
+- [ ] Enrollment/recovery is durable and recoverable; roster/profile is paged, sanitized, role-limited and tenant-isolated.
+- [ ] The full enrollment/login/recovery journey passes in two gyms, including failure paths.
+- [ ] Basic-contact records are clearly distinguished from enrolled members; deferred payment/receipt controls are absent or honest.
+- [ ] Required owner acceptance is recorded separately from automated verification.
+
+Tasks 033 and 034 are not Segment 05 exit criteria. They remain required migration tasks in Segment 07 and must pass before their downstream consumers (including booking and session race proofs) can complete.
 
 ## 10. Agent checkpoints
 
-Do not stretch the current basic member endpoint into enrollment without operation/identity semantics. Do not implement 033/034 before task 040 establishes holds/transitions. Stop on unresolved health/profile ownership.
+Do not stretch the current basic member endpoint into enrollment without operation/identity semantics. Do not pull status/hold release or pack lifecycle back into this segment. Stop on unresolved member-profile privacy requirements; trainer-confirmed health projection is task050.
 
 ## 11. Progress and handoff
 
 - **Status:** IN PROGRESS — automated implementation and owner acceptance are incomplete.
-- **Completed:** none. Tasks 031, 032 and 035 have partial code and passing targeted verification; none meets its full Definition of Done.
-- **Remaining:** finish 031/032; implement prerequisite tasks 036, 040 (which itself depends on 036), and 043 in their owning scopes; then implement 033/034 and complete 035. Do not mark dependent work complete early.
-- **Verification to date:** `pnpm typecheck:workspace`, `pnpm lint:workspace`, `pnpm build:workspace`, and `pnpm --dir packages/contracts test` (26/26); owned disposable tenancy integration tests (23/23, including identity consent/refusal, tenant rollback retry, and recovery after a tenant commit); owned disposable Playwright suite (12/12, including new-member registration, one-time handoff, forced first-login password change, and two-gym isolation). Test evidence: `docs/migration/evidence/GYMOS-MIG-031.md`, `GYMOS-MIG-032.md`, and `GYMOS-MIG-035.md`.
-- **Files/tests/issues/blockers/decisions:** 036, 040 and 043 have no completion evidence in this checkout or on refreshed origin branches; tracker status is Not Started. Consent/refusal and one credential recovery segment are implemented, but task 031 still lacks the full credential-loss, checkpoint, concurrency and two-gym matrix. Task 032 lacks sessions/packs and complete role-specific acceptance. No status/hold-release command or member pack ledger exists. Do not begin dependent tasks 033/034 or claim 035 complete before the required providers pass.
-- **Scheduling — owner instruction, 2 November 2026:** wait for task 036 in Segment 06, then tasks 040/043 in Segment 07. Outstanding member requirements remain assigned to 031–035; follow the [recorded ownership and return checklist](../SEGMENT_05_FOLLOW_UP.md). This is a scheduling hold, not completed or removed scope.
-- **Next recommended task:** resolve and verify task 036 in Segment 06, then 040 and 043 in Segment 07, since no actual completion evidence is currently present. Continue independent 031 and 032 acceptance work meanwhile. Do not wait for every Segment 07 task: 041/042 depend on 034, and 047 depends on 033.
+- **Owned tasks:** 031, 032 and 035 (3 total); all remain In Progress until their full acceptance evidence passes.
+- **Moved to Segment 07:** 033 (recoverable member status/hold release) and 034 (pack issuance/balances). Their specifications, prerequisites and downstream dependency edges remain active.
+- **Current evidence:** see task-specific evidence linked from the tracker. Do not infer completion from partial code or PR checks.
+- **Out-of-scope profile extensions:** session-history panel is task044; confirmed-trainer health projection is task050. Member term history and safe member/owner/support projections remain in task032.
+- **Next recommended task:** close the Segment 05 exit checklist in [SEGMENT_05_EXIT_CHECKLIST.md](../SEGMENT_05_EXIT_CHECKLIST.md). Segment 06 may proceed independently on tasks036–039 after this segment’s exit gate; trainer coaching tasks050–052 remain gated by their actual session/relationship dependencies.
 

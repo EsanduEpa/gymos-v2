@@ -1,24 +1,26 @@
 # Segment 05 handoff — Member Enrollment and Account Management
 
-Status: **In progress. No Segment 05 task is complete.** Branch `codex/segment-05-member-enrollment` is based on `origin/main` at `97b16a7`.
+Status: **In progress.** Segment 05 owns tasks 031, 032 and 035. None is marked complete by this scope update. The actionable exit gate is [SEGMENT_05_EXIT_CHECKLIST.md](SEGMENT_05_EXIT_CHECKLIST.md).
 
-## Implemented partial slices
+## Segment 05 work remaining
 
-- Tasks 031 and 032 remain In Progress; 035 now has partial browser coverage. Evidence: [031](evidence/GYMOS-MIG-031.md), [032](evidence/GYMOS-MIG-032.md), [035](evidence/GYMOS-MIG-035.md).
-- Verified local checks: workspace typecheck, lint and build; contract tests (26/26); disposable tenancy integration suite (23/23), including consent/refusal, tenant rollback retry and post-tenant-commit recovery; full disposable Playwright suite (12/12), including enrollment, one-time credential handoff, forced password change and unchanged second gym. No shared/local demonstration database was used. The harnesses cleaned 8 and 7 disposable databases respectively, plus their containers/manifests.
-- Member identity rows, profile and term commit use the existing durable operation/receipt foundation. Exact price and exclusive end date are snapshotted; no payment is recorded. Pending operation rows stay out of the owner roster.
+- **031 — enrollment and account recovery:** finish full credential-loss/reissue, checkpoint, concurrency, idempotency and two-gym failure-path acceptance. Keep identity-consent/refusal, one-time credential and forced-change requirements.
+- **032 — roster and profile:** finish paging, membership-term history, role-safe projections, privacy/tenant denials and browser states. Session history belongs to 044, pack history to 034, and confirmed-trainer health projection to 050.
+- **035 — integrated journey:** prove enrollment/login/recovery across two isolated gyms, including durable recovery and persisted effect counts. Pack issuance and session history are not this task’s acceptance.
 
-## Required work before Segment 05 completion
+Use the task evidence links in the tracker. Partial code and passing PR checks do not complete a task. Record task owner acceptance separately from automated verification.
 
-- Task 031: complete credential-loss/reissue behavior, remaining checkpoint recovery matrix, owner-revocation/concurrency cases and full two-gym verification. Consent/reuse, decline, new-member forced-change journey, tenant rollback retry and post-tenant/pre-activation recovery now pass.
-- Task 032: complete role-specific projections and UI verification; task 040 must supply complete session and pack history.
-- Task 033: depends on task 040 and task 043; status/hold release command is not implemented.
-- Task 034: depends on task 040; pack issuance and held/consumed/released balance ledger are not implemented. The profile labels this history unavailable.
-- Task 035: full cross-role browser and recovery journey is not complete; current evidence covers a new identity and first-login forced password change only.
-- Prerequisites must be delivered in their owning scopes: task 036 (Segment 06 trainer enrollment), then task 040 (Segment 07 session aggregate/holds), and task 043 (Segment 07 notifications/audit reads, dependent on 040). Do not remove these dependencies.
+## Reassigned work and preserved dependencies
 
-## Next recommended task
+- **033** recoverable member status changes and release future session holds → Segment 07. It still depends on 031, 032, 040, 043 and the platform foundations in its task specification.
+- **034** exact-value pack issuance and hold-aware balances → Segment 07. It still depends on 031, 032, 040 and the listed configuration/platform foundations; Segment 07 booking tasks 041/042 depend on it.
+- **044** owns owner/trainer/member session views and the recent-session member-profile panel.
+- **050** owns confirmed-client roster/profile health projection under its privacy contract.
 
-Owner scheduling instruction (2 November 2026): verify actual completion evidence for **GYMOS-MIG-036** in Segment 06, then **GYMOS-MIG-040** and **GYMOS-MIG-043** in Segment 07. None currently has completion evidence in the refreshed checkout. Retain and resume all outstanding member work using the [follow-up checklist](SEGMENT_05_FOLLOW_UP.md). Tasks 031/032/035 remain In Progress; 033/034 remain Not Started. No Segment 05 completion or owner acceptance is implied.
+This reallocation changes ownership and schedule, not required product behavior. No dependency was waived. Tasks 036/040/043 are not automatic blockers for closing 031/032/035 unless a direct dependency is present in that task’s specification. Segment 06 may start at the Segment 05 exit gate; its own task dependencies still apply.
 
-Return at these task gates rather than after all of Segment 07: its booking tasks 041/042 need task 034, and task 047 needs task 033. Existing owner acceptance remains outstanding for prior segments. Do not merge any PR without the user's explicit authorization for that PR.
+## Verification and data safeguards
+
+Use disposable, owned databases only. Do not reset, delete, reseed or test against the existing local demonstration database. Preserve local changes and evidence screenshots; archive modified reviewed screenshots before restoring committed references. Routine generated captures belong in ignored `apps/web/test-results/`.
+
+No PR merge is authorized by this handoff. The user must explicitly authorize the specific PR before merge.

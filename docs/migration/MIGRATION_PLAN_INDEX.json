@@ -1,6 +1,6 @@
 {
   "planning_date": "2026-10-23",
-  "last_synchronized": "2026-10-30",
+  "last_synchronized": "2026-11-03",
   "authoritative": "MIGRATION_EXECUTION_PLAN.md + MIGRATION_TASK_SPECS.md",
   "tasks": [
     {
@@ -947,8 +947,8 @@
         "C10"
       ],
       "module": "members",
-      "scope": "Replace100-row list cap with stable page/search/status/full-filter totals. Migrate all member fields/profile tabs, last sessions with truthful bounds, membership history and independently paged derived entitlement/pack history. Basic/unlinked, pending recovery, previously active historical and operational people are explicitly labeled/separately counted. Use agreed prices rather than current plan price; no PAID badge, receipt or cash total. Preserve profile missing/empty states and navigation.",
-      "tests": "With125+ records search reaches beyond100 and totals match filters; separate history pagers do not overwrite each other. Owner-only health and recovery DTO fields absent for other roles; password/database fields absent recursively.",
+      "scope": "Replace100-row list cap with stable page/search/status/full-filter totals. Migrate member fields/profile and membership-term history. Basic/unlinked, pending recovery, previously active historical and operational people are explicitly labeled/separately counted. Use agreed term prices; no PAID badge, receipt or cash total. Session history moves to044; session-pack issuance, balances and pack history move to034; confirmed-trainer health projection belongs to050. Preserve profile missing/empty states and navigation.",
+      "tests": "With125+ records search reaches beyond100 and totals match filters; membership-term history is stable. Owner-only health/recovery DTO fields absent from member/self/support projections; password/database fields absent recursively. Session-history paging is verified by044, pack history by034, confirmed-trainer health by050.",
       "db": "Tenant profile/search/history indexes; no payment ledger required for C10 derived history.",
       "decisions": "",
       "complexity": "Medium",
@@ -958,12 +958,13 @@
     {
       "n": 33,
       "id": "GYMOS-MIG-033",
-      "phase": 5,
+      "phase": 7,
       "name": "Make member status changes recoverable and release future holds",
       "deps": [
         4,
         18,
         31,
+        32,
         40,
         43,
         78,
@@ -988,12 +989,13 @@
     {
       "n": 34,
       "id": "GYMOS-MIG-034",
-      "phase": 5,
+      "phase": 7,
       "name": "Migrate session-pack issuance and balance projection",
       "deps": [
         18,
         30,
         31,
+        32,
         40,
         82,
         83,
@@ -1023,24 +1025,21 @@
         7,
         20,
         31,
-        32,
-        34
+        32
       ],
       "features": [
         "O02",
         "O03",
-        "O04",
         "A02"
       ],
       "contracts": [
         "C09",
         "C10",
-        "C12",
-        "C19"
+        "C12"
       ],
       "module": "testing",
-      "scope": "Integrate owner registration, retained error draft, one-time credential display/copy/continue, forced password change and member role entry in two gyms. Test existing-login verified reuse and current basic-member behavior separately. Inject tenant commit before lost Master activation/response and exercise authorized operation recovery. Compare member forms/profile states with V1 fixtures.",
-      "tests": "One identity with separate actor IDs works across gyms without password reset; no pending actor leaks to list/options; repeated recovery creates no extra member/term/pack/audit. Clipboard failure is visible and secret cleared on exit. Evidence includes persisted counts and UI/API results.",
+      "scope": "Integrate owner registration, retained error draft, one-time credential display/copy/continue, forced password change and member role entry in two gyms. Test verified existing-login reuse and current basic-member behavior separately. Inject tenant commit before lost Master activation/response and exercise authorized operation recovery. Verify the paged member roster/profile from task032. Pack issuance and session-history views are outside this task and are verified by Segment07 tasks034/044.",
+      "tests": "One identity with separate actor IDs works across gyms without password reset; no pending actor leaks to owner roster; repeated recovery creates no extra member/term/audit. Clipboard failure is visible and secret cleared on exit. Evidence includes persisted counts and UI/API results.",
       "db": "None",
       "decisions": "",
       "complexity": "High",
@@ -1310,6 +1309,7 @@
       "deps": [
         13,
         18,
+        32,
         41,
         42,
         43,
@@ -1327,7 +1327,7 @@
         "C63"
       ],
       "module": "sessions",
-      "scope": "Migrate daily filters/date arrows/Today/pagination, monthly member view/More overlay, trainer schedule/live timer and member pending/history cards. C63 separates lifetime pack totals from month bookings and independent full-filter totals. Show command affordances from server policy/version/time, display inline errors and retain dialogs. Timer is display-only; pure reads never settle sessions. Refresh reads within approved cross-role bound.",
+      "scope": "Migrate daily filters/date arrows/Today/pagination, monthly member view/More overlay, trainer schedule/live timer and member pending/history cards and bounded recent-session panel on the member profile. C63 separates lifetime pack totals from month bookings and independent full-filter totals. Show command affordances from server policy/version/time, display inline errors and retain dialogs. Timer is display-only; pure reads never settle sessions. Refresh reads within approved cross-role bound.",
       "tests": "All three roles see same version/asOf and correct gym, month/date/filter totals; >100 rows handled; stale poll cannot overwrite newer state; timer initializes/resets correctly. Screens preserve meaningful tabs/notes and distinguish empty from unavailable.",
       "db": "None",
       "decisions": "DEC-07 DEC-09",

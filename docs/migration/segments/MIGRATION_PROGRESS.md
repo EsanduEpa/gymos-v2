@@ -10,25 +10,18 @@ Evidence baseline: 31 October 2026. Counts come from [`../MIGRATION_TASK_TRACKER
 | 02 | Identity, Authentication, and Application Shell | COMPLETED | 6 | 6 | 0 | No implementation/policy blocker; owner review and foundation/merge dependency remain | 01 | 013/020 locally and hosted verified; 016–019 preserved; limited DEC-11 web policy approved; provider/release scope stays open in 087 |
 | 03 | Platform Administration and Tenant Lifecycle | COMPLETED | 6 | 6 | 0 | Owner manual acceptance and explicit merge authorization pending | 01, 02 | Tasks021–026 locally/hosted verified; [handoff](../SEGMENT_03_HANDOFF.md); task 087 remains open |
 | 04 | Gym Configuration and Membership Rules | COMPLETED | 5 | 5 | 0 | Owner manual acceptance and explicit merge authorization pending | 01–03 | Tasks 015,027–030 automated verification complete at `c9af453`; all 11 hosted checks passed; [handoff](../SEGMENT_04_HANDOFF.md) |
-| 05 | Member Enrollment and Account Management | IN PROGRESS | 5 | 0 | 5 | 031/032 partial; 033/034 wait for 040; 040 depends on 036; 033 also waits for 043 (which depends on 040) | 02–04, 06/036, 07/040/043 | Targeted local checks pass for partial 031/032 implementation; no task is complete; [handoff](../SEGMENT_05_HANDOFF.md) |
+| 05 | Member Enrollment and Account Management | IN PROGRESS | 3 | 0 | 3 | 031/032/035 partial; exit requires their full evidence and owner acceptance; session-history panel 044 and trainer health projection 050 are later scope | 02–04 | Partial task evidence only; [exit checklist](../SEGMENT_05_EXIT_CHECKLIST.md) and [handoff](../SEGMENT_05_HANDOFF.md) |
 | 06 | Trainer Management and Coaching | IN PROGRESS | 7 | 0 | 7 | 036 partial; trainer-directory/booking consumers plus 040/043 remain outstanding | 02–05, 07 | Trainer typed enrollment/API/UI, 26/26 disposable DB integration, forced-change and selected-gym 403/422 Chromium coverage pass locally; owner acceptance and task completion not recorded; [036 evidence](../evidence/GYMOS-MIG-036.md) |
-| 07 | PT Sessions, Notifications, and Lifecycle | NOT STARTED | 9 | 0 | 9 | People/config prerequisites and upstream segments 02–06 | 02, 04–06 | No V2 session aggregate currently exists; DEC-06/07/08/09 are approved |
+| 07 | PT Sessions, Notifications, and Lifecycle | NOT STARTED | 11 | 0 | 11 | People/config prerequisites; 033/034 also require their listed member foundations and 040/043 | 02, 04–06 | Session lifecycle segment now owns member status/hold release (033) and pack issuance/balances (034); DEC-06/07/08/09 are approved |
 | 08 | Finance, Dashboards, Analytics, and Exports | NOT STARTED | 10 | 0 | 10 | DEC-06/08/09; upstream lifecycle data | 03–07 | No V2 feature implementation verified |
 | 09 | Scope Closure, Parity, and Quality Gates | NOT STARTED | 5 | 0 | 5 | All web segments; credential containment for security gate | 01–08 | V1 baseline fixtures exist; final parity not run |
 | 10 | Deployment, Recovery, and Controlled Release | NOT STARTED | 6 | 0 | 6 | DEC-11, configured provider/remote, segments 01–09 | 01–03, 09 | Local restore is not managed-environment DR |
 | 11 | Mobile Applications | NOT STARTED | 6 | 0 | 6 | DEC-12 and stable web/API lifecycle | 07–10 | No mobile app exists |
 | **Total** |  |  | **88** | **40** | **48** |  |  |  |
 
-## Segment 05 scheduling follow-up — 2 November 2026
+## Segment 05 scope and exit gate — 3 November 2026
 
-The owner requested waiting for the relevant Segment 06/07 prerequisites.
-Verify 036 → 040 → 043, then return to unfinished member tasks 031–035 using the
-[ownership and return checklist](../SEGMENT_05_FOLLOW_UP.md). Completion counts
-and task statuses are unchanged by this scheduling record. Member-specific
-consent/recovery, profile integration, status/hold release, pack issuance and
-end-to-end acceptance remain required. Return before Segment 07 booking tasks
-041/042, which depend on 034; waiting for the entire segment would create a
-scheduling cycle.
+Segment 05 owns tasks031,032,035. Tasks033 and034 are moved to Segment07 with IDs and dependency edges retained because they implement session status/hold and credit/pack lifecycle. Task044 owns recent-session views; task050 owns confirmed-trainer health projections. No task status changed by this scope update. See the [exit checklist](../SEGMENT_05_EXIT_CHECKLIST.md).
 
 ## Update protocol
 
