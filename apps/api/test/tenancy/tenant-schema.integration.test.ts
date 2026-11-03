@@ -9,6 +9,7 @@ import type { DatabaseService } from '../../src/database.service.js';
 import { GymsController } from '../../src/gyms.controller.js';
 import { MemberEnrollmentService } from '../../src/member-enrollment.service.js';
 import { TrainerEnrollmentService } from '../../src/trainer-enrollment.service.js';
+import { isOperationalActor } from '../../src/identity/publication-policy.js';
 import type { CredentialService } from '../../src/identity/credential.service.js';
 import { GymAccessGuard, type GymRequest } from '../../src/gym-access.guard.js';
 import { OperationConflictError } from '../../src/operations/primitives.js';
@@ -462,7 +463,7 @@ it('commits a full owner enrollment once and requires authenticated explicit con
   expect(first.status).toBe('COMPLETE');
   expect(first.temporaryPassword).toBe('Synthetic-one-time');
   expect(first.term.agreedPrice).toBe('1234.5');
-  expect(first.term.endDateExclusive).toBe('2026-12-02');
+  expect((Date.parse(`${first.term.endDateExclusive}T00:00:00Z`) - Date.parse(`${first.term.startDate}T00:00:00Z`)) / 86_400_000).toBe(30);
   const [memberCount, termCount, operation, link] = await Promise.all([
     tenants[0].member.count({ where: { email: input.email } }),
     tenants[0].membershipTerm.count({ where: { memberId: first.memberId } }),
@@ -779,6 +780,12 @@ it('recovers trainer enrollment when Master activation fails after the tenant re
     expect(await tenants[0].commandReceipt.count({ where: { sourceMasterOperationId: incomplete.id } })).toBe(1);
     expect(await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: incomplete.subjectIdentityId!, gymId: gymIds[0] } } }))
       .toMatchObject({ role: 'TRAINER', linkStatus: 'PENDING', enrollmentOperationId: incomplete.id });
+    const pendingActor = await tenants[0].trainer.findUniqueOrThrow({ where: { email: input.email } });
+    const pendingGym = await master.gym.findUniqueOrThrow({ where: { id: gymIds[0] } });
+    const pendingAccess = await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: incomplete.subjectIdentityId!, gymId: gymIds[0] } } });
+    expect(isOperationalActor({ identityId: incomplete.subjectIdentityId!, gymId: gymIds[0], gymStatus: pendingGym.status,
+      bindingVerified: true, operationComplete: incomplete.state === 'COMPLETE', access: pendingAccess,
+      actor: { ...pendingActor, kind: 'TRAINER' } })).toBe(false);
     await master.$executeRawUnsafe('DROP TRIGGER fail_trainer_activation_audit ON "PlatformAuditLog"');
     await master.$executeRawUnsafe('DROP FUNCTION fail_trainer_activation_audit()');
     const recovered = await service.enroll(access as never, input);
@@ -789,6 +796,11 @@ it('recovers trainer enrollment when Master activation fails after the tenant re
     expect(await tenants[0].commandReceipt.count({ where: { sourceMasterOperationId: incomplete.id } })).toBe(1);
     expect(await master.operation.findUniqueOrThrow({ where: { id: incomplete.id } })).toMatchObject({ state: 'COMPLETE' });
     expect(deliveries).toBe(1);
+    const activeAccess = await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: incomplete.subjectIdentityId!, gymId: gymIds[0] } } });
+    const activeOperation = await master.operation.findUniqueOrThrow({ where: { id: incomplete.id } });
+    expect(isOperationalActor({ identityId: incomplete.subjectIdentityId!, gymId: gymIds[0], gymStatus: pendingGym.status,
+      bindingVerified: true, operationComplete: activeOperation.state === 'COMPLETE', access: activeAccess,
+      actor: { ...pendingActor, kind: 'TRAINER' } })).toBe(true);
   } finally {
     await master.$executeRawUnsafe('DROP TRIGGER IF EXISTS fail_trainer_activation_audit ON "PlatformAuditLog"');
     await master.$executeRawUnsafe('DROP FUNCTION IF EXISTS fail_trainer_activation_audit()');
