@@ -15,9 +15,10 @@ Segment 05 now owns **GYMOS-MIG-031, 032 and 035**. All three are still in progr
 
 - [x] 031: existing-identity acceptance/refusal, lost reissue response/API recovery, revoked-secret rejection, forced password change, tenant rollback and post-tenant/pre-activation recovery have evidence. Chromium covers consent, credential replacement, first login and gym isolation.
 - [x] 031: original delivery version zero can be acknowledged without reissue (Chromium, 1/1).
+- [x] 031: Master preparation rollback, tenant commit before Master checkpoint recovery, owner-revoked retry denial, acknowledgment/reissue race, invalid date/foreign-plan/strict DTO no-effect cases, and recursive serialized secret checks pass in disposable identity/tenancy integration suites.
 - [x] 032: owner roster paging beyond 100 and membership-term profile paging beyond 100 have disposable integration evidence; browser verifies page navigation.
 - [x] 035: new-member and explicitly consented existing-identity browser journeys pass in disposable two-gym fixtures.
-- [ ] 031 remaining fault boundaries, owner revocation/concurrency races, and broad validation/redaction matrix.
+- [ ] 031: automated acceptance evidence is complete; record project-owner manual acceptance and verify the latest hosted PR checks/review before closing the task.
 - [ ] 032 remaining role projection/foreign-ID/privacy matrix and accessible empty/loading/error browser states.
 - [ ] 035 injected-failure browser recovery and complete repeated-recovery/pending-publication effects.
 - [ ] Independent owner manual acceptance for 031/032/035.

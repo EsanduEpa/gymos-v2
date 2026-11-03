@@ -24,6 +24,13 @@ export class MemberEnrollmentService {
   ) {}
 
   private async assertOwner(tx: Prisma.TransactionClient, access: NonNullable<GymRequest['gymAccess']>) {
+    // These locks make the authorization check a real ordering point with
+    // concurrent owner removal and identity revocation. A stale request that
+    // starts after either change sees the new state; a change that starts
+    // later waits for this bounded Master transaction to finish.
+    await tx.$queryRaw`SELECT "id" FROM "Gym" WHERE "id" = ${access.gymId} FOR SHARE`;
+    await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${access.identityId} FOR SHARE`;
+    await tx.$queryRaw`SELECT "userId" FROM "GymAccess" WHERE "userId" = ${access.identityId} AND "gymId" = ${access.gymId} FOR SHARE`;
     const [user, link, gym, clock] = await Promise.all([
       tx.user.findUnique({ where: { id: access.identityId }, select: { authVersion: true, mustChangePassword: true, credentialExpiresAt: true } }),
       tx.gymAccess.findUnique({ where: { userId_gymId: { userId: access.identityId, gymId: access.gymId } }, select: { role: true, linkStatus: true, version: true } }),
@@ -39,6 +46,26 @@ export class MemberEnrollmentService {
 
   async enroll(access: NonNullable<GymRequest['gymAccess']>, input: MemberRegistrationInput) {
     if (access.role !== 'OWNER') throw new ForbiddenException('Only gym owners can register members');
+    // Replays do not execute Operation.claim's prepare callback, so authorize
+    // every attempt before reading tenant data or resuming an external effect.
+    await this.database.master.$transaction(tx => this.assertOwner(tx, access));
+    const existingOperation = await this.database.master.operation.findFirst({ where: { actorIdentityId: access.identityId,
+      kind: 'REGISTER_MEMBER', gymId: access.gymId, scopeKey: `gym:${access.gymId}`, idempotencyKey: input.idempotencyKey }, select: { id: true } });
+    if (!existingOperation) {
+      // Reject invalid gym-local plan/date input before creating a durable
+      // Master operation or a pending identity. The tenant transaction below
+      // repeats these checks under row locks to handle changes after preflight.
+      await this.tenantGate.withVerifiedTenant(access, async tenant => {
+        await tenant.$queryRaw`SELECT "id" FROM "GymConfiguration" WHERE "id" = 'current' FOR SHARE`;
+        const configuration = await tenant.gymConfiguration.findUnique({ where: { id: 'current' } });
+        if (!configuration?.currency || !configuration.timezone) throw new UnprocessableEntityException('Gym configuration needs a currency and timezone');
+        await tenant.$queryRaw`SELECT "id" FROM "MembershipPlan" WHERE "id" = ${input.membershipPlanId} FOR SHARE`;
+        const plan = await tenant.membershipPlan.findUnique({ where: { id: input.membershipPlanId } });
+        if (!plan || plan.status !== 'ACTIVE' || plan.currency !== configuration.currency) throw new UnprocessableEntityException('Choose an active membership plan for this gym currency');
+        const [clock] = await tenant.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
+        if (input.dateOfBirth > gymLocalDate(configuration.timezone, clock!.now)) throw new UnprocessableEntityException('Date of birth cannot be in the future');
+      });
+    }
     const email = normalizeIdentityEmail(input.email);
     const fingerprintKey = process.env.JWT_SECRET;
     if (!fingerprintKey || fingerprintKey.length < 32) throw new ServiceUnavailableException('Member enrollment is unavailable');
@@ -97,6 +124,9 @@ export class MemberEnrollmentService {
     if (operation.gymId !== access.gymId || operation.actorIdentityId !== access.identityId || !operation.subjectIdentityId) {
       throw new OperationIntegrityError('Member enrollment operation binding is incomplete');
     }
+    // Also covers COMPLETE replay: revoked owners must not read enrollment
+    // outcomes or trigger credential handoff by replaying an old request.
+    await this.database.master.$transaction(tx => this.assertOwner(tx, access));
     const memberIdentityId = operation.subjectIdentityId;
     if (operation.state === 'FAILED_FINAL' || operation.state === 'REPAIR_REQUIRED') {
       throw new ConflictException('Enrollment requires owner recovery before it can continue');

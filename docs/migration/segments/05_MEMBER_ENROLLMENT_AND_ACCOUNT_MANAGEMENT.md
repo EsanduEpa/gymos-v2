@@ -104,10 +104,10 @@ Do not stretch the current basic member endpoint into enrollment without operati
 
 ## 11. Progress and handoff
 
-- **Status:** IN PROGRESS — automated implementation and owner acceptance are incomplete.
+- **Status:** IN PROGRESS — task031 automated acceptance now has passing recovery, revocation, concurrency, validation/redaction and two-gym evidence; 032/035 work and owner acceptance remain incomplete.
 - **Owned tasks:** 031, 032 and 035 (3 total); all remain In Progress until their full acceptance evidence passes.
 - **Moved to Segment 07:** 033 (recoverable member status/hold release) and 034 (pack issuance/balances). Their specifications, prerequisites and downstream dependency edges remain active.
-- **Current evidence:** see task-specific evidence linked from the tracker. Do not infer completion from partial code or PR checks.
+- **Current evidence:** see task-specific evidence linked from the tracker. Task031 remains In Progress pending separate owner acceptance and latest PR checks/review; do not infer completion from passing tests alone.
 - **Out-of-scope profile extensions:** session-history panel is task044; confirmed-trainer health projection is task050. Member term history and safe member/owner/support projections remain in task032.
 - **Next recommended task:** close the Segment 05 exit checklist in [SEGMENT_05_EXIT_CHECKLIST.md](../SEGMENT_05_EXIT_CHECKLIST.md). Segment 06 may proceed independently on tasks036–039 after this segment’s exit gate; trainer coaching tasks050–052 remain gated by their actual session/relationship dependencies.
 

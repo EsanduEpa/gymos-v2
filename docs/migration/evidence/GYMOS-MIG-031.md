@@ -17,7 +17,7 @@ Status: **In Progress; not Verified or Completed.** Code and API recovery tests 
 - `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web exec playwright test` passed **12/12**, including the new member enrollment/first-login journey. The browser harness reported cleanup of **7 disposable databases**, its container and manifest. Generated screenshots are routed to ignored `apps/web/test-results/`.
 - All database-backed checks used guarded disposable databases; no existing local GymOS database was used.
 
-## Remaining acceptance work
+## Remaining acceptance work at evidence revision `e1e4b1c`
 
 - Credential delivery-loss/reissue recovery is not yet proven end to end. Fault coverage now proves retry after tenant rollback and after tenant commit/before Master activation; it does not cover every other checkpoint or owner-revocation/concurrent-change race.
 - Full digest/idempotency and durable-recovery matrices, all task-specific role/privacy/foreign-ID cases, and complete two-gym failure-path acceptance remain outstanding. Task 031 remains In Progress; no owner acceptance is recorded.
@@ -33,10 +33,31 @@ Code and tests added in commit `41a6ad5` on `codex/segment-05-member-enrollment`
 - `pnpm --dir packages/contracts build`, API/web TypeScript checks, focused web ESLint, `pnpm --dir apps/api build`, `pnpm --dir apps/web build`, and `git diff --check` — **exit 0**.
 - The browser and integration harnesses used owned disposable databases; final runs cleaned 6 browser databases plus container/manifest and 8 tenancy databases plus container. Generated captures remain under ignored `apps/web/test-results/`. No local demo database was used.
 
-Still incomplete: failure injection at every enrollment checkpoint, owner-access revocation and concurrent mutation races, broad digest/validation and recursive-secret cases, and the complete two-gym failure/recovery matrix. These follow-up passes do not satisfy all 031 acceptance criteria. Owner manual acceptance is not recorded.
+At that revision, failure injection at every enrollment checkpoint, owner-access revocation and concurrent mutation races, broad digest/validation and recursive-secret cases, and the complete two-gym failure/recovery matrix remained incomplete. The new evidence below closes the automated 031 items; owner manual acceptance is still not recorded.
 
 ## Original credential acknowledgment follow-up — 3 November 2026
 
-Commit `5d9cf8a` fixes the owner form’s handoff guard to accept delivery version `0` (checking specifically for `undefined`) and adds a browser case proving the original credential can be acknowledged without reissue. `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web exec playwright test -g "original version-zero"` passed **1/1** in Chromium; the fixture asserted version zero before acknowledgment, an acknowledgment timestamp after, and exactly one member. The full lost-credential browser flow passed **1/1** after this fix as well. Web typecheck and focused ESLint passed. This closes the original version-zero handoff defect only; the remaining fault/concurrency/privacy matrix remains open.
+Commit `5d9cf8a` fixes the owner form’s handoff guard to accept delivery version `0` (checking specifically for `undefined`) and adds a browser case proving the original credential can be acknowledged without reissue. `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web exec playwright test -g "original version-zero"` passed **1/1** in Chromium; the fixture asserted version zero before acknowledgment, an acknowledgment timestamp after, and exactly one member. The full lost-credential browser flow passed **1/1** after this fix as well. Web typecheck and focused ESLint passed. At that revision, the remaining fault/concurrency/privacy matrix was still open.
 
 Final current-code browser run: `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web exec playwright test -g "original version-zero|full member enrollment hands off|existing identity explicitly consents"` — **3/3 passed**; cleanup removed 6 disposable databases, the container and manifest. The latest commit is pushed to the existing PR branch. Hosted check state remains unverified: unauthenticated GitHub REST access returned 404 for this private repository, `gh` is unavailable, and the browser-access host is unavailable in this session. No owner manual acceptance is recorded.
+
+## Recovery boundaries, revocation, concurrency and redaction — 3 November 2026
+
+The implementation now revalidates the owner and selected gym on every retry, including completed-operation replay. Owner identity, gym and access rows are locked for the authorization transaction so an in-flight owner revocation has a defined ordering with enrollment and credential issue/reissue/acknowledgment. Invalid gym-local plan and future DOB input is preflighted before a new durable operation or pending identity is created; the tenant write repeats these checks under row locks. Existing operations skip that duplicate preflight and still pass through their immutable digest and current authorization checks.
+
+New disposable integration cases prove:
+
+- Failure while writing the Master preparation audit rolls back the operation and new identity together; no tenant member is written.
+- Failure after the tenant member, membership term, audit and committed receipt persist but before the Master tenant checkpoint is recorded recovers the same receipt and completes with one member, one term and one receipt.
+- Failure after Master preparation followed by owner access revocation rejects retry before tenant writes; the member access remains PENDING/unpublished, has no tenant actor, and Gym B remains unchanged.
+- Concurrent owner acknowledgment and lost-handoff reissue have one winner under the operation lock; delivery version, auth version and audit event counts match the winner. An advisory-lock barrier also proves in-flight reissue completes before a concurrent owner revocation; a later reissue after revocation fails without changing the delivery or member password hash.
+- Invalid email/unknown credential fields, future DOB and a plan from another gym produce no new user, operation, tenant member or term. Serialized operation, receipt and audit evidence contains neither health notes nor the one-time credential.
+
+Verification on the working revision (all database-backed suites used owned disposable PostgreSQL and cleaned their resources):
+
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/api exec vitest run --config vitest.config.identity.ts test/identity/identity.integration.test.ts --disableConsoleIntercept` — **13/13 passed**, exit 0; cleanup dropped 4 disposable databases and its container.
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/api exec vitest run --config vitest.config.tenancy-integration.ts test/tenancy/tenant-schema.integration.test.ts --disableConsoleIntercept` — **29/29 passed**, exit 0; cleanup dropped 8 disposable databases and its container.
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web exec playwright test tests/two-gym.e2e.spec.ts --grep 'original version-zero|full member enrollment hands off|existing identity explicitly consents'` — **3/3 passed**, exit 0; cleanup dropped 6 disposable databases, its container and manifest.
+- `pnpm --dir apps/api exec tsc --noEmit`, focused API Oxlint, and `git diff --check` — exit 0.
+
+The automated acceptance gaps previously listed for 031 now have passing evidence. Status remains **In Progress** until the required project-owner manual acceptance is recorded and the latest PR revision’s hosted checks/review findings are verified. No owner acceptance is inferred from these tests.

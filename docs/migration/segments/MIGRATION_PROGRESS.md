@@ -27,6 +27,8 @@ Verification addendum — 3 November 2026: commit `41a6ad5` adds passing disposa
 
 Commit `5d9cf8a` additionally fixed and browser-verified acknowledgment of initial credential version zero. Segment 05 remains in progress; latest PR checks are not yet observable from this session.
 
+031 verification addendum — 3 November 2026: disposable identity tests **13/13**, tenant enrollment/recovery tests **29/29**, and two-gym Chromium enrollment journeys **3/3** passed. Added atomic rollback on Master preparation failure, receipt recovery when the Master checkpoint response is lost, owner-revoked retry denial and in-flight revocation ordering, acknowledgment/reissue concurrency, preflight validation with zero persisted effects, and operation/receipt/audit secret-redaction assertions. Task031 remains In Progress pending separate owner manual acceptance and latest hosted PR checks/review; evidence: [GYMOS-MIG-031](../evidence/GYMOS-MIG-031.md).
+
 ## Update protocol
 
 After verifying a task, update its authoritative tracker/evidence first, then this table and the owning segment handoff. Record exact revision, environment, commands/exit codes, fixtures, success and negative cases, screenshots where applicable, skipped checks, and residual risk. `IMPLEMENTED` without passing evidence is not `COMPLETED` or `VERIFIED`.

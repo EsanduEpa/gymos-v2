@@ -4,7 +4,7 @@ Status: **In progress.** Segment 05 owns tasks 031, 032 and 035. None is marked 
 
 ## Segment 05 work remaining
 
-- **031 — enrollment and account recovery:** existing-identity consent/refusal, original credential acknowledgment, and credential reissue after lost response now have API/browser evidence. Finish remaining checkpoint, owner-revocation/concurrency, validation/redaction and two-gym failure-path acceptance.
+- **031 — enrollment and account recovery:** automated acceptance now covers Master preparation rollback, tenant commit before Master checkpoint recovery, owner-revoked retry denial, acknowledgment/reissue concurrency, strict validation/no-effect cases, durable secret redaction, and the existing two-gym enrollment/recovery journeys. Evidence and commands are in [031](evidence/GYMOS-MIG-031.md). Project-owner manual acceptance and latest hosted PR checks/review are still pending; the task remains In Progress until those are recorded.
 - **032 — roster and profile:** owner roster and membership-term histories now page past 100 with API/browser evidence. Finish safe role projections, foreign-ID/privacy denials and loading/error/empty accessibility. Session history belongs to 044, pack history to 034, and confirmed-trainer health projection to 050.
 - **035 — integrated journey:** new and reused-identity browser journeys now pass across two isolated gyms, including forced change and unchanged second-gym effects. Finish browser-injected durable recovery, repeated-recovery/pending publication effects, and full role/accessibility evidence. Pack issuance and session history are not this task’s acceptance.
 

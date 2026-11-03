@@ -457,3 +457,133 @@ it('logout atomically revokes every current identity session including restricte
   expect((await master.user.findUniqueOrThrow({ where: { id: user.id } })).authVersion).toBe(user.authVersion + 2);
   expect(await master.$transaction([master.user.count(), master.gymAccess.count(), master.operation.count()])).toEqual(before);
 });
+
+it('serializes the owner acknowledgement and credential-reissue race to one delivery outcome', async () => {
+  const owner = await fixtureIdentity('credential-race-owner@example.test');
+  const subject = await fixtureIdentity('credential-race-member@example.test');
+  const gym = await master.gym.findFirstOrThrow({ where: { databaseName: run.tenantNames[0], status: 'ACTIVE' } });
+  await master.gymAccess.create({ data: { userId: owner.id, gymId: gym.id, role: 'OWNER', linkStatus: 'ACTIVE' } });
+  const operationId = `race_${randomBytes(8).toString('hex')}`;
+  const member = await tenants[0].member.create({ data: { fullName: 'Credential Race Member', identityId: subject.id,
+    registrationState: 'COMPLETE', enrollmentOperationId: operationId } });
+  await master.operation.create({ data: { id: operationId, kind: 'REGISTER_MEMBER', actorIdentityId: owner.id,
+    scopeKey: `gym:${gym.id}`, idempotencyKey: `credential-race-${randomBytes(8).toString('hex')}`,
+    requestDigest: `d1:${'d'.repeat(64)}`, gymId: gym.id, subjectIdentityId: subject.id, tenantActorId: member.id,
+    state: 'COMPLETE', step: 'MASTER_ACTIVATED', safeResult: { operationId, memberId: member.id } } });
+  await master.gymAccess.create({ data: { userId: subject.id, gymId: gym.id, role: 'MEMBER', linkStatus: 'ACTIVE',
+    actorKind: 'MEMBER', tenantActorId: member.id, enrollmentOperationId: operationId } });
+  const credentials = new CredentialService({ master } as DatabaseService);
+  const issued = await credentials.issueTemporaryCredential({ actorIdentityId: owner.id, gymId: gym.id, operationId });
+  expect(issued.status).toBe('ISSUED');
+  const attempts = await Promise.allSettled([
+    credentials.acknowledgeTemporaryCredential({ actorIdentityId: owner.id, gymId: gym.id, operationId, deliveryVersion: 0 }),
+    credentials.reissueForOperation({ actorIdentityId: owner.id, gymId: gym.id, operationId, expectedVersion: 0,
+      idempotencyKey: 'credential-race-reissue-01', reason: 'LOST_HANDOFF' }),
+  ]);
+  expect(attempts.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+  const delivery = await master.credentialDelivery.findUniqueOrThrow({ where: { operationId } });
+  const subjectAfter = await master.user.findUniqueOrThrow({ where: { id: subject.id } });
+  if (delivery.acknowledgedAt) {
+    expect(delivery.version).toBe(0);
+    expect(subjectAfter.authVersion).toBe(1);
+  } else {
+    expect(delivery.version).toBe(1);
+    expect(delivery.lastReissueKey).toBe('credential-race-reissue-01');
+    expect(subjectAfter.authVersion).toBe(2);
+  }
+  expect(await master.platformAuditLog.count({ where: { operationId,
+    eventCode: { in: ['TEMPORARY_CREDENTIAL_ISSUED', 'TEMPORARY_CREDENTIAL_REISSUED'] } } })).toBe(delivery.version + 1);
+});
+
+it('rejects credential reissue after the issuing owner is revoked without rotating the member secret', async () => {
+  const owner = await fixtureIdentity('credential-revoked-owner@example.test');
+  const subject = await fixtureIdentity('credential-revoked-member@example.test');
+  const gym = await master.gym.findFirstOrThrow({ where: { databaseName: run.tenantNames[0], status: 'ACTIVE' } });
+  const ownerLink = await master.gymAccess.create({ data: { userId: owner.id, gymId: gym.id, role: 'OWNER', linkStatus: 'ACTIVE' } });
+  const operationId = `revoked_credential_${randomBytes(8).toString('hex')}`;
+  const member = await tenants[0].member.create({ data: { fullName: 'Revoked Owner Member', identityId: subject.id,
+    registrationState: 'COMPLETE', enrollmentOperationId: operationId } });
+  await master.operation.create({ data: { id: operationId, kind: 'REGISTER_MEMBER', actorIdentityId: owner.id,
+    scopeKey: `gym:${gym.id}`, idempotencyKey: `credential-revoked-${randomBytes(8).toString('hex')}`,
+    requestDigest: `d1:${'e'.repeat(64)}`, gymId: gym.id, subjectIdentityId: subject.id, tenantActorId: member.id,
+    state: 'COMPLETE', step: 'MASTER_ACTIVATED', safeResult: { operationId, memberId: member.id } } });
+  await master.gymAccess.create({ data: { userId: subject.id, gymId: gym.id, role: 'MEMBER', linkStatus: 'ACTIVE',
+    actorKind: 'MEMBER', tenantActorId: member.id, enrollmentOperationId: operationId } });
+  const credentials = new CredentialService({ master } as DatabaseService);
+  const issued = await credentials.issueTemporaryCredential({ actorIdentityId: owner.id, gymId: gym.id, operationId });
+  expect(issued.status).toBe('ISSUED');
+  const before = await master.user.findUniqueOrThrow({ where: { id: subject.id } });
+  await master.gymAccess.update({ where: { userId_gymId: { userId: owner.id, gymId: gym.id } },
+    data: { linkStatus: 'REVOKED', version: { increment: 1 } } });
+  await expect(credentials.reissueForOperation({ actorIdentityId: owner.id, gymId: gym.id, operationId,
+    expectedVersion: 0, idempotencyKey: 'revoked-owner-reissue-01', reason: 'LOST_HANDOFF' })).rejects.toThrow('Owner access required');
+  expect(await master.credentialDelivery.findUniqueOrThrow({ where: { operationId } })).toMatchObject({ version: 0, acknowledgedAt: null });
+  expect((await master.user.findUniqueOrThrow({ where: { id: subject.id } })).passwordHash).toBe(before.passwordHash);
+  expect((await master.user.findUniqueOrThrow({ where: { id: subject.id } })).authVersion).toBe(before.authVersion);
+  expect((await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: owner.id, gymId: gym.id } } })).version)
+    .toBe(ownerLink.version + 1);
+});
+
+it('orders an in-flight credential reissue before a concurrent owner revocation', async () => {
+  const owner = await fixtureIdentity('credential-owner-race@example.test');
+  const subject = await fixtureIdentity('credential-member-race@example.test');
+  const gym = await master.gym.findFirstOrThrow({ where: { databaseName: run.tenantNames[0], status: 'ACTIVE' } });
+  await master.gymAccess.create({ data: { userId: owner.id, gymId: gym.id, role: 'OWNER', linkStatus: 'ACTIVE' } });
+  const operationId = `owner_revoke_race_${randomBytes(8).toString('hex')}`;
+  const member = await tenants[0].member.create({ data: { fullName: 'Owner Revocation Race Member', identityId: subject.id,
+    registrationState: 'COMPLETE', enrollmentOperationId: operationId } });
+  await master.operation.create({ data: { id: operationId, kind: 'REGISTER_MEMBER', actorIdentityId: owner.id,
+    scopeKey: `gym:${gym.id}`, idempotencyKey: `owner-revoke-race-${randomBytes(8).toString('hex')}`,
+    requestDigest: `d1:${'f'.repeat(64)}`, gymId: gym.id, subjectIdentityId: subject.id, tenantActorId: member.id,
+    state: 'COMPLETE', step: 'MASTER_ACTIVATED', safeResult: { operationId, memberId: member.id } } });
+  await master.gymAccess.create({ data: { userId: subject.id, gymId: gym.id, role: 'MEMBER', linkStatus: 'ACTIVE',
+    actorKind: 'MEMBER', tenantActorId: member.id, enrollmentOperationId: operationId } });
+  const credentials = new CredentialService({ master } as DatabaseService);
+  expect((await credentials.issueTemporaryCredential({ actorIdentityId: owner.id, gymId: gym.id, operationId })).status).toBe('ISSUED');
+
+  const advisoryKey = 99531101;
+  const gate = await run.connect(run.masterName);
+  await gate.query('SELECT pg_advisory_lock($1)', [advisoryKey]);
+  await master.$executeRawUnsafe(`CREATE FUNCTION wait_member_credential_reissue() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN IF NEW."eventCode" = 'TEMPORARY_CREDENTIAL_REISSUED' THEN PERFORM pg_advisory_xact_lock(${advisoryKey}); END IF; RETURN NEW; END $$`);
+  await master.$executeRawUnsafe(`CREATE TRIGGER wait_member_credential_reissue BEFORE INSERT ON "PlatformAuditLog"
+    FOR EACH ROW EXECUTE FUNCTION wait_member_credential_reissue()`);
+  let revocationFinished = false;
+  try {
+    const reissue = credentials.reissueForOperation({ actorIdentityId: owner.id, gymId: gym.id, operationId,
+      expectedVersion: 0, idempotencyKey: 'owner-revoke-race-reissue', reason: 'LOST_HANDOFF' });
+    const deadline = Date.now() + 5_000;
+    let reissueBlocked = false;
+    while (Date.now() < deadline) {
+      const waiting = await gate.query(`SELECT count(*)::int AS count FROM pg_stat_activity
+        WHERE datname = current_database() AND wait_event_type = 'Lock' AND wait_event = 'advisory'
+          AND pid <> pg_backend_pid()`);
+      if (waiting.rows[0]?.count > 0) { reissueBlocked = true; break; }
+      await new Promise(resolve => setTimeout(resolve, 25));
+    }
+    expect(reissueBlocked).toBe(true);
+    const revocation = master.gymAccess.update({ where: { userId_gymId: { userId: owner.id, gymId: gym.id } },
+      data: { linkStatus: 'REVOKED', version: { increment: 1 } } }).finally(() => { revocationFinished = true; });
+    let revocationBlocked = false;
+    const revokeDeadline = Date.now() + 5_000;
+    while (Date.now() < revokeDeadline) {
+      const waiting = await gate.query(`SELECT count(*)::int AS count FROM pg_stat_activity
+        WHERE datname = current_database() AND wait_event_type = 'Lock' AND query ILIKE '%UPDATE%GymAccess%'`);
+      if (waiting.rows[0]?.count > 0) { revocationBlocked = true; break; }
+      await new Promise(resolve => setTimeout(resolve, 25));
+    }
+    expect(revocationBlocked).toBe(true);
+    expect(revocationFinished).toBe(false);
+    await gate.query('SELECT pg_advisory_unlock($1)', [advisoryKey]);
+    const reissued = await reissue;
+    expect(reissued).toMatchObject({ status: 'ISSUED', deliveryVersion: 1 });
+    const revoked = await revocation;
+    expect(revoked).toMatchObject({ linkStatus: 'REVOKED', version: 1 });
+    expect(await master.credentialDelivery.findUniqueOrThrow({ where: { operationId } })).toMatchObject({ version: 1, authVersion: 2 });
+  } finally {
+    await gate.query('SELECT pg_advisory_unlock($1)', [advisoryKey]).catch(() => undefined);
+    await master.$executeRawUnsafe('DROP TRIGGER IF EXISTS wait_member_credential_reissue ON "PlatformAuditLog"');
+    await master.$executeRawUnsafe('DROP FUNCTION IF EXISTS wait_member_credential_reissue()');
+    await gate.end();
+  }
+});
