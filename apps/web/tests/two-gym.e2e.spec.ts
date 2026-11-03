@@ -919,6 +919,11 @@ test('platform registry supports audited read-only gym selection, switching, exi
   await page.getByRole('textbox',{name:/^Support reason/}).fill('Synthetic second-gym diagnosis');
   await page.getByRole('button',{name:'Enter support',exact:true}).click();
   await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[1].slug}/owner$`));
+  // A support-context broadcast can redirect an older Alpha document while
+  // the Beta navigation is still streaming. Read the new context from a fresh
+  // document so no stale shell state can satisfy the Beta assertions.
+  await page.goto('about:blank');
+  await page.goto(`${webBase}/gyms/${fixture.gyms[1].slug}/owner`);
   await expect(page.locator('.support-banner')).toContainText('Viewing Test Gym Beta');
   await expect(page.locator('.support-banner')).toBeVisible();
   await expect(page.getByRole('heading',{name:'Test Gym Beta',exact:true})).toBeVisible();
