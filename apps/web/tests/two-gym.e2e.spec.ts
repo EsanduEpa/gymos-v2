@@ -587,8 +587,10 @@ test('trainer registration enforces owner and selected-gym access, then hands of
   expect((await request.post(`${apiBase}/gyms/${fixture.gyms[0].slug}/trainer-registrations`, { headers: { authorization: `Bearer ${bearer}` }, data: { ...registration, email, idempotencyKey: `invalid-trainer-${environment.runId}`, shiftStart: '08:00' } })).status()).toBe(422);
   expect(await Promise.all([fixture.master.user.count(), fixture.master.gymAccess.count(), fixture.master.operation.count()])).toEqual(beforeDenied);
   expect(await Promise.all(fixture.tenants.map(tenant => tenant.trainer.count()))).toEqual(trainerCounts);
-  await openGymWithTestSession(page, fixture.users.ownerA.id, fixture.gyms[0].slug);
-  await page.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/owner/trainers/new`);
+  // Open the final destination directly. The gym root redirects owner sessions
+  // to /owner, so navigating there and immediately calling goto again races
+  // with that client redirect in CI.
+  await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${fixture.gyms[0].slug}/owner/trainers/new`);
   await expect(page.getByRole('heading', { name: 'Register a trainer' })).toBeVisible();
   await page.getByLabel('Full name').fill('Browser Enrollment Trainer');
   await page.getByLabel('Email address').fill(email);

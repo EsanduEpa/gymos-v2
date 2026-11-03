@@ -24,7 +24,7 @@ Segment 05 now owns **GYMOS-MIG-031, 032 and 035**. All three are still in progr
 - [ ] Independent owner manual acceptance for 031/032/035.
 - [ ] Latest PR hosted checks (11 required) and review findings.
 
-Hosted-check access note: this session could push to the existing private PR branch, but its unauthenticated GitHub REST check-run request returned 404; `gh` is not installed and the browser-access host is unavailable. The 11 latest-revision checks therefore remain unverified and need an authenticated GitHub Actions view.
+Hosted-check update — 3 November 2026: GitHub Actions for `3bfeb3c` reports **10/11** required checks passing. Browser isolation failed only in the Segment 06 trainer-registration browser case: the test navigated to the gym root (which redirects owners to `/owner`) and immediately navigated again, interrupting the first `page.goto`. Opening the final trainer-registration route directly fixes the navigation race; its targeted disposable Chromium test passes locally. Push this test-only correction and verify all 11 hosted checks on the resulting latest revision. The existing local demo database was not used.
 
 Evidence: [031](evidence/GYMOS-MIG-031.md), [032](evidence/GYMOS-MIG-032.md), [035](evidence/GYMOS-MIG-035.md). These partial passes do not make Segment 05 ready to hand off.
 

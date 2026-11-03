@@ -61,3 +61,5 @@ Verification on the working revision (all database-backed suites used owned disp
 - `pnpm --dir apps/api exec tsc --noEmit`, focused API Oxlint, and `git diff --check` — exit 0.
 
 The automated acceptance gaps previously listed for 031 now have passing evidence. Status remains **In Progress** until the required project-owner manual acceptance is recorded and the latest PR revision’s hosted checks/review findings are verified. No owner acceptance is inferred from these tests.
+
+The hosted run on `3bfeb3c` has 10/11 required checks passing. The remaining Browser isolation check fails in the unrelated Segment 06 trainer-registration browser case because its test navigates to the gym root, then to the trainer form while the owner redirect is still in flight. The test now opens its final trainer route directly; the focused disposable Chromium test passed **1/1** locally with cleanup of 6 databases, its container and manifest. This harness correction does not change 031 behavior. It must be pushed and all hosted checks reverified before closing 031. Project-owner manual acceptance is also still not recorded.
