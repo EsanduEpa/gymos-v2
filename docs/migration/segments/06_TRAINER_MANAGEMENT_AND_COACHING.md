@@ -34,7 +34,7 @@ Extend tenant Trainer with phone/level/experience/specialisations/shifts and ver
 
 | Done | Task and objective | Prerequisites / sources | Implementation and target behavior | Acceptance and testing |
 |---|---|---|---|---|
-| [~] | **036 Trainer registration/handoff** | 017,018,023,027,078,080,083; O06/action | Partial enrollment operation; tenant profile+receipt; reciprocal access; generated credential only for new identity; typed fields | Partial local evidence; full fault/retry/concurrency, dependency closure, unpublished-consumer, and owner acceptance remain open; see [evidence](../evidence/GYMOS-MIG-036.md) |
+| [x] | **036 Trainer registration/handoff** | 017,018,023,027,078,080,083; O06/action | Enrollment operation; tenant profile+receipt; reciprocal access; generated credential only for new identity; typed fields | Tenancy 31/31, identity credential 13/13, headed Google Chrome 1/1, workspace checks passed; owner-directed visible acceptance by Codex; PR #7 merged with 11/11 hosted checks. Directory and booking consumer verification remain with 039/041; see [evidence](../evidence/GYMOS-MIG-036.md) |
 | [ ] | **037 Roster/profile/shift approval** | 013,018,029,036,083,085; O05/O07 | Paged sanitized queries; status/performance semantics; versioned bounded local-time shifts; accurate UI result | >page search, null/specialisation normalization, overnight/boundary, stale version, role/foreign tests |
 | [ ] | **038 Deactivate/reactivate** | 004,018,036,040,043,078,080,084; O07 | Recoverable transition; handle future holds/sessions per policy; audit/notify; keep history | repeat/concurrent/stale, active/future sessions, notification failure, other gym unaffected |
 | [ ] | **039 Member trainer directory** | 013,018,036,037; M01 | Active member-safe trainer query, name search/page if needed, request links with gym context | MEMBER-only safe projection, inactive absent, no private pay/phone if unapproved, empty/error/foreign gym |
@@ -70,11 +70,11 @@ Stop until DEC-09 fixes relationship, privacy, metrics, limits and meal-day mapp
 ## 11. Progress and handoff
 
 - **Status:** IN PROGRESS
-- **Completed:** none (036 has partial local evidence only)
-- **Remaining:** 036–039,050–052
-- **Next recommended task:** complete GYMOS-MIG-036 acceptance; then implement 040 in Segment 07 before resuming member status/pack work.
+- **Completed:** 036 (trainer registration and credential handoff)
+- **Remaining:** 037–039,050–052
+- **Next recommended task:** implement 040 in Segment 07 before resuming member status/pack work.
 - **Segment 05 return checkpoint:** task 036 supplies the trainer-registration prerequisite for 040. Record its own acceptance evidence, then follow the [member follow-up checklist](../SEGMENT_05_FOLLOW_UP.md). Shared trainer enrollment work does not establish completion of member consent/recovery under task 031.
-- **Files/tests/issues/blockers/decisions:** Task 036 implementation and continuation evidence: [GYMOS-MIG-036](../evidence/GYMOS-MIG-036.md). Authoritative Task 036 dependencies are 017/018/023/027/078/080/083; directory verification belongs to 039 and booking verification belongs to 041. 040/043 remain later session/lifecycle prerequisites, not 036 prerequisites. Current guarded checks pass (tenancy 31/31, identity 13/13, Chromium 1/1) alongside workspace static checks. Separate owner acceptance and final revision/hosted checks remain pending.
+- **Files/tests/issues/blockers/decisions:** Task 036 evidence: [GYMOS-MIG-036](../evidence/GYMOS-MIG-036.md). Task 036 dependencies are 017/018/023/027/078/080/083; directory verification belongs to 039 and booking verification belongs to 041. 040/043 remain later session/lifecycle prerequisites, not 036 prerequisites. PR #7 merged at `8c01842` after owner-directed visible Chrome acceptance and 11/11 hosted checks. Segment 06 remains in progress with six tasks outstanding.
 
 
 ## Owner scope amendment — 30 October 2026

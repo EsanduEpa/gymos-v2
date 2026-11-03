@@ -2,6 +2,8 @@
 
 > **Segment 04 automated completion — 31 October 2026 at `c9af453`:** Segments 01–04 completed (23/6/6/5 tasks); **40/88 completed, 48 remaining**. All 11 hosted checks passed in [run 41210839760](https://github.com/EsanduEpa/gymos-v2/actions/runs/41210839760). [Segment 04 handoff](../SEGMENT_04_HANDOFF.md). Owner manual acceptance for Segments 02–04 remains pending; PRs #1–4 remain draft/unmerged under the manual safeguard.
 
+> **Current progress — 3 November 2026:** 44/88 tasks completed. Segment 06 has 1/7 complete: GYMOS-MIG-036 merged in PR #7 (`8c01842`) with 11/11 hosted checks; tasks 037–039 and 050–052 remain.
+
 Evidence baseline: 31 October 2026. Counts come from [`../MIGRATION_TASK_TRACKER.md`](../MIGRATION_TASK_TRACKER.md); **Completed** means linked verification exists. Planning documents alone never advance status.
 
 | Segment | Name | Status | Total | Verified completed | Remaining | Blockers | Dependencies | Last verification note |
@@ -11,7 +13,7 @@ Evidence baseline: 31 October 2026. Counts come from [`../MIGRATION_TASK_TRACKER
 | 03 | Platform Administration and Tenant Lifecycle | COMPLETED | 6 | 6 | 0 | Owner manual acceptance and explicit merge authorization pending | 01, 02 | Tasks021–026 locally/hosted verified; [handoff](../SEGMENT_03_HANDOFF.md); task 087 remains open |
 | 04 | Gym Configuration and Membership Rules | COMPLETED | 5 | 5 | 0 | Owner manual acceptance and explicit merge authorization pending | 01–03 | Tasks 015,027–030 automated verification complete at `c9af453`; all 11 hosted checks passed; [handoff](../SEGMENT_04_HANDOFF.md) |
 | 05 | Member Enrollment and Account Management | COMPLETED | 3 | 3 | 0 | None in Segment 05; deferred 033/034, 044 and 050 retain their owning-segment dependencies | 02–04 | 031/032/035 accepted at `bab9b97`; disposable tenancy 30/30, Chromium 19/19, agent manual visual review under owner delegation; 11/11 hosted checks and [handoff](../SEGMENT_05_HANDOFF.md) |
-| 06 | Trainer Management and Coaching | IN PROGRESS | 7 | 0 | 7 | 036 owner-directed visible acceptance passed; focused PR/hosted checks remain; tasks 037–039 and 050–052 remain | 02–05, 07 | Current checkout plus uncommitted tests: tenancy 31/31, identity 13/13, headed Google Chrome 1/1; workspace typecheck/lint/build pass. 040/043 are not 036 dependencies and gate later session-dependent work. [036 evidence](../evidence/GYMOS-MIG-036.md) |
+| 06 | Trainer Management and Coaching | IN PROGRESS | 7 | 1 | 6 | Task 036 completed and merged; tasks 037–039 and 050–052 remain | 02–05, 07 | PR #7 merged at `8c01842`; all 11 hosted checks passed. Task 036 tenancy 31/31, identity 13/13, headed Google Chrome 1/1; workspace typecheck/lint/build passed. 040/043 are not 036 dependencies and gate later session-dependent work. [036 evidence](../evidence/GYMOS-MIG-036.md) |
 | 07 | PT Sessions, Notifications, and Lifecycle | NOT STARTED | 11 | 0 | 11 | People/config prerequisites; 033/034 also require their listed member foundations and 040/043 | 02, 04–06 | Session lifecycle segment now owns member status/hold release (033) and pack issuance/balances (034); DEC-06/07/08/09 are approved |
 | 08 | Finance, Dashboards, Analytics, and Exports | NOT STARTED | 10 | 0 | 10 | DEC-06/08/09; upstream lifecycle data | 03–07 | No V2 feature implementation verified |
 | 09 | Scope Closure, Parity, and Quality Gates | NOT STARTED | 5 | 0 | 5 | All web segments; credential containment for security gate | 01–08 | V1 baseline fixtures exist; final parity not run |
