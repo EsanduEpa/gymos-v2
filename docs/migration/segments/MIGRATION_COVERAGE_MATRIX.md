@@ -43,7 +43,7 @@ This matrix assigns every authoritative task and every V1 route responsibility t
 | GYMOS-MIG-033 | Member status/hold release | O04 status action | recoverable member status command | 07 | GYMOS-MIG-033 | NOT STARTED |
 | GYMOS-MIG-034 | Session packs/balance | O04; `actions/packs.ts` | pack/hold ledger projection | 07 | GYMOS-MIG-034 | NOT STARTED |
 | GYMOS-MIG-035 | Enrollment recovery journey | O03→O04 | two-gym browser/integration evidence | 05 | GYMOS-MIG-035 | COMPLETED |
-| GYMOS-MIG-036 | Trainer registration | O06; `actions/trainers.ts` | trainer enrollment saga/API/UI | 06 | GYMOS-MIG-036 | IN PROGRESS |
+| GYMOS-MIG-036 | Trainer registration | O06; `actions/trainers.ts` | trainer enrollment saga/API/UI | 06 | GYMOS-MIG-036 | COMPLETED |
 | GYMOS-MIG-037 | Trainer roster/profile/shifts | O05/O07 | trainer queries/status/shift UI | 06 | GYMOS-MIG-037 | NOT STARTED |
 | GYMOS-MIG-038 | Trainer deactivate/reactivate | O07 | recoverable trainer status command | 06 | GYMOS-MIG-038 | NOT STARTED |
 | GYMOS-MIG-039 | Member trainer directory | M01 | member-safe trainer query/UI | 06 | GYMOS-MIG-039 | NOT STARTED |
@@ -142,4 +142,4 @@ Additional interfaces: L01/L02/X01–X03 belong to segments 01/02/09; H01 belong
 - **Conflicts:** approved addenda override stale pre-start completion, fake DeskPayment/receipt/subscription billing, expanded theme, and meal-day assumptions. See `../MIGRATION_DECISIONS.md`.
 - **Coverage conclusion:** all 88 original task IDs have one unique segment assignment; all 29/29 route responsibilities have a static owner. Runtime/visual/functional parity is not yet proven and must not be described as 100% migrated.
 
-Segment 06 continuation — 3 November 2026: Task 036 remains IN PROGRESS. Publication policy is tested inside 036; positive directory consumer verification is owned by 039 and booking eligibility by 041. Tasks 040/043 are later session/lifecycle prerequisites for 038/booking behavior, not prerequisites for 036. Current continuation checks and Docker socket limitation are recorded in [036 evidence](../evidence/GYMOS-MIG-036.md).
+Segment 06 closeout — 3 November 2026: Task 036 completed in PR #7 (`8c01842`); all 11 hosted checks passed. Publication policy is tested inside 036; positive directory consumer verification is owned by 039 and booking eligibility by 041. Tasks 040/043 are later session/lifecycle prerequisites for 038/booking behavior, not prerequisites for 036. See [036 evidence](../evidence/GYMOS-MIG-036.md).

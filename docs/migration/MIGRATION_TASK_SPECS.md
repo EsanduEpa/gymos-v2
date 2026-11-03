@@ -3153,7 +3153,7 @@ High
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-In Progress.
+Completed in PR #7, merged at `8c01842` on 3 November 2026; all 11 hosted checks passed. See [GYMOS-MIG-036 evidence](evidence/GYMOS-MIG-036.md). Positive directory and booking consumer checks remain assigned to tasks 039 and 041.
 
 ## Task ID: GYMOS-MIG-037
 

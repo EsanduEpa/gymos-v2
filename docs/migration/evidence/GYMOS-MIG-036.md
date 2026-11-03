@@ -1,6 +1,8 @@
-# GYMOS-MIG-036 — partial trainer enrollment evidence
+# GYMOS-MIG-036 — trainer enrollment acceptance evidence
 
-Status: **In Progress; not Verified or Completed.** Verified source and test revision `9390772` on branch `codex/segment-05-member-enrollment`, based on `origin/main` at `97b16a7`. Hosted checks are being run against this revision.
+Status: **Completed** in merged PR [#7](https://github.com/EsanduEpa/gymos-v2/pull/7), merge commit `8c01842` (3 November 2026). The PR head was `5a3c5c1`, based on Segment 05 merge `d256443`. All 11 hosted checks passed in [run 41601301681](https://github.com/EsanduEpa/gymos-v2/actions/runs/41601301681). This completion applies to Task 036 only; Segment 06 remains In Progress.
+
+Earlier partial evidence below records implementation/runtime results at `9390772` and is superseded where this final acceptance record provides newer evidence.
 
 ## Implemented and locally checked
 
@@ -13,7 +15,9 @@ Status: **In Progress; not Verified or Completed.** Verified source and test rev
 - The expanded Chromium scenario `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web test:e2e --grep 'trainer registration enforces owner'` passed **1/1** at `9390772`. OWNER access to the wrong gym and MEMBER access to trainer registration return403; malformed paired-shift input returns422; all rejected attempts leave Master identity/access/operation and both gyms' Trainer counts unchanged. The earlier full Chromium run passed13/13 before this scenario was expanded; the updated scenario itself was rerun directly.
 - All database tests used disposable databases. The existing local demo database was not used.
 
-## Remaining acceptance work
+## Remaining acceptance work at partial revision `9390772` (superseded)
+
+The items below describe the earlier partial state and have since been addressed or reassigned as shown in the final acceptance record. They are retained as history, not current blockers.
 
 - Trainer directory and booking-option consumers do not yet exist under their owning downstream tasks, so their safe projections cannot be positively verified here. The pending-vs-active publication policy is covered, but consuming read acceptance remains open.
 - Task 036 dependency closure is not verified: task 040 implementation/evidence is absent and task 043 evidence is absent. The refreshed remote has no pre-existing task-040/043 implementation to reuse.
@@ -54,4 +58,4 @@ The responsive form was visually inspected during the browser run. A screenshot 
 
 On 3 November 2026, the project owner explicitly requested that Codex run the trainer acceptance journey in visible Google Chrome while the owner watched, then finish and merge the Segment 06 PR. Codex ran the same guarded two-gym Chromium acceptance journey with `channel: 'chrome'` and `headless: false`; it passed 1/1 and cleaned six disposable databases, its container and manifest. This is **owner-directed visible browser acceptance performed by Codex**; it is not described as an independently executed owner browser session. The visible test confirmed owner/role/gym denials, zero-effect invalid form, successful handoff, forced password change and second-gym isolation.
 
-036 remains **In Progress** until the focused PR has current hosted checks. Runtime and static acceptance checks pass on the current checkout plus uncommitted changes. Directory/booking consumer verification remains with 039/041. Segment 06 remains **IN PROGRESS** because its other tasks are not complete. After 036 acceptance, the next scheduled implementation task is GYMOS-MIG-040 in Segment 07, before returning to member status/pack work; do not implement 040/043 under 036.
+036 is **Completed** by merged PR #7 at `8c01842`, with owner-directed visible browser acceptance and 11/11 hosted checks. Directory/booking consumer verification remains with 039/041. Segment 06 remains **IN PROGRESS** because tasks 037–039 and 050–052 are not complete. The next scheduled implementation task is GYMOS-MIG-040 in Segment 07, before returning to member status/pack work; do not implement 040/043 under 036.
