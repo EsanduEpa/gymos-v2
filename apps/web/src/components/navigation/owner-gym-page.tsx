@@ -38,13 +38,13 @@ async function GymPageContent({
       headers: { authorization: `Bearer ${token}` }, cache: 'no-store',
     });
   } catch {
-    throw new Error('Gym unavailable');
+    membersResponse = new Response(null, { status: 503 });
   }
   if (membersResponse.status === 401) redirect('/login');
   if (membersResponse.status === 403 || membersResponse.status === 404) notFound();
-  if (!membersResponse.ok) throw new Error('Gym unavailable');
-  const memberPage = memberListSchema.parse(await membersResponse.json());
-  const members = memberPage.items;
+  const parsed = membersResponse.ok ? memberListSchema.safeParse(await membersResponse.json().catch(() => null)) : null;
+  const memberPage = parsed?.success ? parsed.data : null;
+  const members = memberPage?.items ?? [];
   const { error, created } = filters;
   const brand = resolveGymBrandColors(theme.primaryColor);
   const style = {
@@ -63,18 +63,21 @@ async function GymPageContent({
         {created ? <Feedback tone="success">Member added to {gym.name}.</Feedback> : null}
         {error ? <Feedback tone="error">{messages[String(error)] ?? 'This request could not be completed.'}</Feedback> : null}
         <div className="dashboard-grid">
-          <Card>
+          {memberPage ? <Card>
             <CardHeader eyebrow="MEMBERSHIP" title="Members" action={<span className="count-badge">{memberPage.totalCount}</span>} />
             <form method="get" className="member-directory-filters" role="search">
-              <label className="ui-field"><span className="ui-field-label">Search members</span><input name="q" defaultValue={filters.q ?? ''} maxLength={120} placeholder="Name or email"/></label>
+              <label className="ui-field"><span className="ui-field-label">Search members</span><input name="q" defaultValue={filters.q ?? ''} maxLength={120} placeholder="Name, email or phone"/></label>
               <label className="ui-field"><span className="ui-field-label">Status</span><select name="status" defaultValue={filters.status ?? ''}><option value="">All statuses</option><option value="ACTIVE">Active</option><option value="SUSPENDED">Suspended</option><option value="INACTIVE">Inactive</option></select></label>
               <button className="ui-button ui-button-secondary" type="submit">Apply filters</button>
             </form>
-            {members.length === 0 ? <EmptyState title="No members yet." hint="Add the first member to this gym." /> : (
+            <p>{memberPage.summary.operational} operational accounts · {memberPage.summary.basic} basic contacts · {memberPage.summary.historical} historical accounts in this result.</p>
+            <p>{memberPage.summary.statuses.ACTIVE} active · {memberPage.summary.statuses.INACTIVE} inactive · {memberPage.summary.statuses.SUSPENDED} suspended in this result.</p>
+            <p>{memberPage.summary.pendingEnrollments} pending enrollments in this gym. Pending accounts are hidden until recovery finishes.</p>
+            {members.length === 0 ? <EmptyState title={filters.q || filters.status ? 'No matching members.' : 'No members yet.'} hint={filters.q || filters.status ? 'Change or clear the filters to see more members.' : 'Add the first member to this gym.'} /> : (
               <div className="member-list">
                 {members.map((member) => <a className="member-row" key={member.id} href={`/gyms/${encodeURIComponent(slug)}/owner/members/${encodeURIComponent(member.id)}`}>
                   <span className="member-avatar">{member.fullName.slice(0, 1).toUpperCase()}</span>
-                  <div><strong>{member.fullName}</strong><small>{member.currentTerm?.planName ?? 'No active membership'} · {member.email ?? 'No email added'}</small></div>
+                  <div><strong>{member.fullName}</strong><small>{member.currentTerm?.planName ?? 'No active membership'} · {member.email ?? 'No email added'}</small><small>{member.accountState === 'BASIC' ? 'Basic contact · no login account' : member.accountState === 'OPERATIONAL' ? 'Operational account' : 'Historical account · access unavailable'}</small></div>
                   <StatusBadge status={member.status} className="member-status" />
                 </a>)}
               </div>
@@ -83,7 +86,7 @@ async function GymPageContent({
               <a className="ui-button ui-button-secondary" aria-disabled={memberPage.page <= 1} href={memberPage.page > 1 ? `?${new URLSearchParams({ ...(filters.q ? { q: filters.q } : {}), ...(filters.status ? { status: filters.status } : {}), page: String(memberPage.page - 1) })}` : undefined}>Previous</a>
               <a className="ui-button ui-button-secondary" aria-disabled={memberPage.page >= memberPage.totalPages} href={memberPage.page < memberPage.totalPages ? `?${new URLSearchParams({ ...(filters.q ? { q: filters.q } : {}), ...(filters.status ? { status: filters.status } : {}), page: String(memberPage.page + 1) })}` : undefined}>Next</a>
             </div></div>
-          </Card>
+          </Card> : <Card><CardHeader eyebrow="MEMBERSHIP" title="Members unavailable"/><Feedback tone="error">The member list could not be loaded. No changes were made.</Feedback><a className="ui-button ui-button-secondary" href={`?${query.toString()}`}>Retry member list</a></Card>}
           <Card>
             <CardHeader eyebrow="GROW YOUR COMMUNITY" title="Add a member" action={<span className="panel-icon">＋</span>} />
             <form action={createMemberForGym} className="stack-form">

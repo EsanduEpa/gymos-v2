@@ -980,3 +980,65 @@ it('recovers a lost Master observation by rereading actual tenant evidence', asy
     .toBe(operationIds[0]);
   expect(cleared.version).toBe(before.version + 1);
 });
+
+it('projects only published members with filtered totals and denies foreign or non-owner reads without writes', async () => {
+  const ownerLink = await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: actorId, gymId: gymIds[0] } } });
+  const access = { ...(await context(0)), slug: `schema-0-${run.runId}`, role: 'OWNER', identityId: actorId,
+    identityVersion: 0, accessVersion: ownerLink.version, actor: null } as const;
+  const controller = new GymsController({ master } as DatabaseService, gateFor());
+  const request = { gymAccess: access } as GymRequest;
+  const enrolled = await tenants[0].member.findFirstOrThrow({ where: { fullName: 'Synthetic Enrolled Member' } });
+  const phoneContact = await tenants[0].member.create({ data: { fullName: 'Phone Search Contact', phone: '+94119999888' } });
+  const foreign = await tenants[1].member.create({ data: { fullName: 'Foreign profile', email: `foreign-profile-${run.runId}@example.test` } });
+  const unpublished = await tenants[0].member.findFirstOrThrow({ where: { fullName: 'Tenant Complete but Master Pending' } });
+  const before = await Promise.all([
+    master.platformAuditLog.count(), master.operation.count(), tenants[0].auditLog.count(),
+    tenants[0].membershipTerm.count(), tenants[0].commandReceipt.count(), tenants[1].auditLog.count(),
+  ]);
+
+  const phone = await controller.members(request, { q: '+94119999888' });
+  expect(phone.items).toHaveLength(1);
+  expect(phone.items[0]).toMatchObject({ id: phoneContact.id, accountState: 'BASIC' });
+  expect(phone.summary).toMatchObject({ basic: 1, operational: 0, historical: 0 });
+  expect(phone.summary.pendingEnrollments).toBeGreaterThanOrEqual(1);
+  expect(phone.summary.statuses.ACTIVE).toBe(1);
+  expect((await controller.members(request, { q: enrolled.email! })).summary).toMatchObject({ basic: 0, operational: 1, historical: 0 });
+  const filtered = await controller.members(request, { q: 'Paged Member', status: 'ACTIVE', page: '3', pageSize: '25' });
+  expect(filtered).toMatchObject({ totalCount: 125, page: 3, totalPages: 5 });
+  expect(filtered.summary).toMatchObject({ basic: 125, operational: 0, historical: 0 });
+  expect(filtered.summary.statuses).toEqual({ ACTIVE: 125, INACTIVE: 0, SUSPENDED: 0 });
+  expect(filtered.items).toHaveLength(25);
+  expect(filtered.items.every(member => member.accountState === 'BASIC')).toBe(true);
+  const none = await controller.members(request, { q: 'no-match-012345', status: 'SUSPENDED' });
+  expect(none.items).toEqual([]);
+  expect(none.totalCount).toBe(0);
+  expect(none.summary).toMatchObject({ basic: 0, operational: 0, historical: 0 });
+  expect((await controller.memberDetail(request, enrolled.id)).accountState).toBe('OPERATIONAL');
+
+  await master.gymAccess.update({ where: { userId_gymId: { userId: enrolled.identityId!, gymId: gymIds[0] } }, data: { linkStatus: 'REVOKED', version: { increment: 1 } } });
+  try {
+    expect((await controller.memberDetail(request, enrolled.id)).accountState).toBe('HISTORICAL');
+    expect((await controller.members(request, { q: enrolled.email! })).summary).toMatchObject({ operational: 0, historical: 1 });
+  } finally {
+    await master.gymAccess.update({ where: { userId_gymId: { userId: enrolled.identityId!, gymId: gymIds[0] } }, data: { linkStatus: 'ACTIVE', version: { increment: 1 } } });
+  }
+
+  for (const role of ['MEMBER', 'TRAINER', 'SUPPORT'] as const) {
+    const denied = { gymAccess: { ...access, role } } as GymRequest;
+    await expect(controller.members(denied, {})).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(controller.memberDetail(denied, enrolled.id)).rejects.toBeInstanceOf(ForbiddenException);
+  }
+  for (const id of [foreign.id, unpublished.id, 'missing-member-id']) {
+    await expect(controller.memberDetail(request, id)).rejects.toMatchObject({ status: 404, message: 'Member not found' });
+  }
+  await expect(controller.members(request, { page: '-1' })).rejects.toBeInstanceOf(UnprocessableEntityException);
+  await expect(controller.memberDetail(request, enrolled.id, { pageSize: '1000' })).rejects.toBeInstanceOf(UnprocessableEntityException);
+  const ownerDetail = await controller.memberDetail(request, enrolled.id);
+  expect(ownerDetail.healthNotes).toBe('Synthetic private note');
+  expect(JSON.stringify(await controller.members(request, {}))).not.toContain('Synthetic private note');
+  const after = await Promise.all([
+    master.platformAuditLog.count(), master.operation.count(), tenants[0].auditLog.count(),
+    tenants[0].membershipTerm.count(), tenants[0].commandReceipt.count(), tenants[1].auditLog.count(),
+  ]);
+  expect(after).toEqual(before);
+});

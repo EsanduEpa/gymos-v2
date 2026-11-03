@@ -123,8 +123,8 @@ test('member enrollment and paged projections enforce strict profile bounds and 
   assert.deepEqual(memberEnrollmentConsentResultSchema.parse({ operationId: 'operation-123', status: 'CONSENT_RECORDED', replayed: true }),
     { operationId: 'operation-123', status: 'CONSENT_RECORDED', replayed: true });
   const data = { items: [{ id: 'member-1', fullName: 'Synthetic Member', email: null, status: 'ACTIVE', registrationState: 'COMPLETE',
-    createdAt: asOf, currentTerm: { id: 'term-1', planName: 'Monthly', startDate: '2026-10-01', endDateExclusive: '2026-11-01',
-      agreedPrice: '0.00', currency: 'LKR' } }], page: 1, pageSize: 25, totalCount: 1, totalPages: 1, asOf };
+    accountState: 'OPERATIONAL', createdAt: asOf, currentTerm: { id: 'term-1', planName: 'Monthly', startDate: '2026-10-01', endDateExclusive: '2026-11-01',
+      agreedPrice: '0.00', currency: 'LKR' } }], page: 1, pageSize: 25, totalCount: 1, totalPages: 1, asOf, summary: { basic: 0, operational: 1, historical: 0, pendingEnrollments: 0, statuses: { ACTIVE: 1, INACTIVE: 0, SUSPENDED: 0 } } };
   assert.deepEqual(memberListSchema.parse(data), data);
   assert.equal(memberListSchema.safeParse({ ...data, items: [{ ...data.items[0], password: 'secret' }] }).success, false);
   assert.equal(memberListSchema.safeParse({ ...data, totalCount: 100, totalPages: 4 }).success, false);

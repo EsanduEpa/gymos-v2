@@ -10,7 +10,10 @@ const pageQuerySchema = z.strictObject({
 });
 function pageSchema<T extends z.ZodType>(item: T) {
   return z.strictObject({ items: z.array(item).max(100), page: z.number().int().min(1), pageSize: z.number().int().min(1).max(100),
-    totalCount: z.number().int().nonnegative(), totalPages: z.number().int().nonnegative(), asOf: isoInstantSchema }).superRefine((value, ctx) => {
+    totalCount: z.number().int().nonnegative(), totalPages: z.number().int().nonnegative(), asOf: isoInstantSchema,
+  summary: z.strictObject({ basic: z.number().int().nonnegative(), operational: z.number().int().nonnegative(),
+    historical: z.number().int().nonnegative(), pendingEnrollments: z.number().int().nonnegative(),
+    statuses: z.strictObject({ ACTIVE: z.number().int().nonnegative(), INACTIVE: z.number().int().nonnegative(), SUSPENDED: z.number().int().nonnegative() }) }), }).superRefine((value, ctx) => {
       if (value.totalPages !== Math.ceil(value.totalCount / value.pageSize)) ctx.addIssue({ code: 'custom', message: 'Incorrect totalPages', path: ['totalPages'] });
       const remaining = Math.max(0, value.totalCount - (value.page - 1) * value.pageSize);
       if (value.items.length !== Math.min(value.pageSize, remaining)) ctx.addIssue({ code: 'custom', message: 'Page rows do not match totals', path: ['items'] });
@@ -37,9 +40,11 @@ export const memberListQuerySchema = pageQuerySchema.extend({
 });
 export const memberHistoryQuerySchema = pageQuerySchema.pick({ page: true, pageSize: true });
 
+export const memberAccountStateSchema = z.enum(['BASIC', 'OPERATIONAL', 'HISTORICAL']);
 export const memberListItemSchema = z.strictObject({
   id: idSchema, fullName: z.string().min(2).max(120), email: z.email().max(254).nullable(),
   status: memberStatusSchema, registrationState: z.enum(['BASIC', 'PENDING', 'COMPLETE', 'FAILED']),
+  accountState: memberAccountStateSchema,
   currentTerm: z.strictObject({ id: idSchema, planName: z.string().max(80), startDate: localDateSchema,
     endDateExclusive: localDateSchema, agreedPrice: nonnegativeDecimalStringSchema, currency: z.enum(['LKR', 'USD']) }).nullable(),
   createdAt: isoInstantSchema,
@@ -48,6 +53,7 @@ export const memberListSchema = pageSchema(memberListItemSchema);
 
 export const memberDetailSchema = z.strictObject({
   id: idSchema, fullName: z.string().min(2).max(120), email: z.email().max(254).nullable(),
+  accountState: memberAccountStateSchema, joinedAt: isoInstantSchema,
   phone: z.string().max(40).nullable(), dateOfBirth: localDateSchema.nullable(),
   emergencyContact: z.string().max(240).nullable(), healthNotes: z.string().max(4000).nullable(),
   status: memberStatusSchema, registrationState: z.enum(['BASIC', 'PENDING', 'COMPLETE', 'FAILED']), version: versionSchema,

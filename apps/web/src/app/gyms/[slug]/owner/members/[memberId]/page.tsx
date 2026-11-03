@@ -4,7 +4,7 @@ import { resolveGymBrandColors } from '@gymos/theme-tokens';
 import { memberDetailSchema } from '@gymos/contracts';
 import { DashboardChrome } from '@/components/navigation/dashboard-chrome';
 import { MemberProfileTabs } from '@/components/members/member-profile-tabs';
-import { Card, CardHeader, Feedback } from '@/components/ui';
+import { Card, Feedback } from '@/components/ui';
 import { apiUrl, SESSION_COOKIE } from '@/lib/gymos';
 import { requireGymContext } from '@/lib/gym-context';
 import { cookies } from 'next/headers';
@@ -27,7 +27,7 @@ export default async function MemberProfilePage({ params, searchParams }: { para
   const brand = resolveGymBrandColors(theme.primaryColor);
   const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
   return <DashboardChrome identityId={session.identityId} key={`${session.identityId}:${gym.id}:${gym.role}`} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'} style={style}>
-    {!parsed?.success ? <Card><CardHeader eyebrow="MEMBER PROFILE" title="Profile unavailable"/><Feedback tone="error">The profile could not be loaded. No changes were made.</Feedback><a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/owner/members/${encodeURIComponent(memberId)}`}>Retry</a></Card> : <>
+    {!parsed?.success ? <Card><h1>Profile unavailable</h1><Feedback tone="error">The profile could not be loaded. No changes were made.</Feedback><a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/owner/members/${encodeURIComponent(memberId)}`}>Retry</a></Card> : <>
       <div className="gym-banner"><div><span className="eyebrow">MEMBER PROFILE</span><h1>{parsed.data.fullName}</h1><p>{parsed.data.email ?? 'No email'} · {parsed.data.phone ?? 'No phone'}</p></div><a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/owner`}>Back to members</a></div>
       <MemberProfileTabs member={parsed.data} slug={slug}/>
     </>}

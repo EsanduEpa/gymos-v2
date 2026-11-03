@@ -8,7 +8,7 @@ import { notFound, redirect } from 'next/navigation';
 import { apiUrl, SESSION_COOKIE } from '@/lib/gymos';
 
 export type MemberRegistrationActionState = {
-  error?: string; idempotencyKey: string;
+  error?: string; idempotencyKey: string; attempt?: number;
   result?: ReturnType<typeof memberRegistrationResultSchema.parse>;
 };
 
@@ -48,12 +48,13 @@ export async function memberEnrollmentConsentAction(slug: string, operationId: s
 export async function registerMemberAction(slug: string, previous: MemberRegistrationActionState, formData: FormData): Promise<MemberRegistrationActionState> {
   const keyValue = formData.get('idempotencyKey');
   const idempotencyKey = typeof keyValue === 'string' ? keyValue : previous.idempotencyKey;
+  const reply = { idempotencyKey, attempt: (previous.attempt ?? 0) + 1 };
   const parsed = memberRegistrationInputSchema.safeParse({
     fullName: formData.get('fullName'), email: formData.get('email'), phone: formData.get('phone'),
     dateOfBirth: formData.get('dateOfBirth'), emergencyContact: formData.get('emergencyContact') || null,
     healthNotes: formData.get('healthNotes') || null, membershipPlanId: formData.get('membershipPlanId'), idempotencyKey,
   });
-  if (!parsed.success) return { idempotencyKey, error: parsed.error.issues[0]?.message ?? 'Check the member details and try again.' };
+  if (!parsed.success) return { ...reply, error: parsed.error.issues[0]?.message ?? 'Check the member details and try again.' };
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) redirect('/login');
   let response: Response;
@@ -63,17 +64,17 @@ export async function registerMemberAction(slug: string, previous: MemberRegistr
       body: JSON.stringify(parsed.data), cache: 'no-store',
     });
   } catch {
-    return { idempotencyKey, error: 'The outcome is unknown. Keep this request key and retry with the same details to recover the enrollment.' };
+    return { ...reply, error: 'The outcome is unknown. Keep this request key and retry with the same details to recover the enrollment.' };
   }
   if (response.status === 401) redirect('/login?error=expired');
   if (response.status === 403 || response.status === 404) notFound();
-  if (response.status === 409) return { idempotencyKey, error: 'This identity or request key conflicts with an existing enrollment. Existing people must consent before joining this gym.' };
-  if (response.status === 422 || response.status === 400) return { idempotencyKey, error: 'Check the membership plan and profile values.' };
-  if (!response.ok) return { idempotencyKey, error: 'Enrollment is pending recovery. Retry with the same details and request key.' };
+  if (response.status === 409) return { ...reply, error: 'This identity or request key conflicts with an existing enrollment. Existing people must consent before joining this gym.' };
+  if (response.status === 422 || response.status === 400) return { ...reply, error: 'Check the membership plan and profile values.' };
+  if (!response.ok) return { ...reply, error: 'Enrollment is pending recovery. Retry with the same details and request key.' };
   const result = memberRegistrationResultSchema.safeParse(await response.json().catch(() => null));
-  if (!result.success) return { idempotencyKey, error: 'Enrollment may have committed, but the result could not be confirmed. Keep the same request key and recover before starting another.' };
+  if (!result.success) return { ...reply, error: 'Enrollment may have committed, but the result could not be confirmed. Keep the same request key and recover before starting another.' };
   revalidatePath(`/gyms/${encodeURIComponent(slug)}/owner/members`);
-  return { idempotencyKey, result: result.data };
+  return { ...reply, result: result.data };
 }
 
 export async function acknowledgeMemberCredential(slug: string, operationId: string, deliveryVersion: number) {

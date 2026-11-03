@@ -10,8 +10,10 @@ import { Button, Card, CardHeader, Feedback } from '@/components/ui';
 export function MemberRegistrationForm({ slug, plans, initialRequestKey }: { slug: string; plans: MembershipPlan[]; initialRequestKey: string }) {
   const router = useRouter();
   const [state, action, pending] = useActionState(registerMemberAction.bind(null, slug), { idempotencyKey: initialRequestKey } satisfies MemberRegistrationActionState);
+  const [requestKey, setRequestKey] = useState(initialRequestKey);
   const [draft, setDraft] = useState({ fullName: '', email: '', phone: '', dateOfBirth: '', emergencyContact: '', healthNotes: '', membershipPlanId: '' });
   const [replacement, setReplacement] = useState<{ password?: string; version: number } | null>(null);
+  const [handoffComplete, setHandoffComplete] = useState(false);
   const [copied, setCopied] = useState(false);
   const [handoffError, setHandoffError] = useState('');
   const [busy, startTransition] = useTransition();
@@ -19,7 +21,7 @@ export function MemberRegistrationForm({ slug, plans, initialRequestKey }: { slu
   const updateDraft = (field: keyof typeof draft, value: string) => setDraft(current => ({ ...current, [field]: value }));
   const result = state.result;
   const completed = result?.status === 'COMPLETE' ? result : null;
-  const password = replacement ? replacement.password : completed?.temporaryPassword;
+  const password = handoffComplete ? undefined : replacement ? replacement.password : completed?.temporaryPassword;
   const deliveryVersion = replacement?.version ?? completed?.credentialDeliveryVersion;
   const operationId = result?.operationId;
 
@@ -29,6 +31,9 @@ export function MemberRegistrationForm({ slug, plans, initialRequestKey }: { slu
     startTransition(async () => {
       const response = await acknowledgeMemberCredential(slug, completed.operationId, deliveryVersion);
       if (!response.ok) { setHandoffError(response.error); return; }
+      setHandoffComplete(true);
+      setReplacement({ version: deliveryVersion });
+      setCopied(false);
       router.push(`/gyms/${encodeURIComponent(slug)}/owner/members/${encodeURIComponent(completed.memberId)}`);
     });
   }
@@ -51,6 +56,7 @@ export function MemberRegistrationForm({ slug, plans, initialRequestKey }: { slu
         setHandoffError('A replacement was issued, but its one-time password could not be recovered. Issue another replacement to revoke it and receive a new password.');
         return;
       }
+      setHandoffComplete(false);
       setCopied(false);
       setReplacement({ password: response.result.temporaryPassword, version: response.result.deliveryVersion });
     });
@@ -77,14 +83,15 @@ export function MemberRegistrationForm({ slug, plans, initialRequestKey }: { slu
         membershipPlanId: String(submitted.get('membershipPlanId') ?? ''),
       });
     }}>
-      <input type="hidden" name="idempotencyKey" value={state.idempotencyKey} />
+      <label className="ui-field"><span className="ui-field-label">Enrollment reference</span><input name="idempotencyKey" value={requestKey} minLength={16} maxLength={128} required readOnly={pending || Boolean(state.error || state.result)} onChange={event => setRequestKey(event.currentTarget.value)} aria-describedby="enrollment-reference-hint"/></label>
+      <p id="enrollment-reference-hint" className="ui-field-hint">Keep this reference until enrollment is confirmed. After closing this page, use the same reference and member details to recover an uncertain result.</p>
       <label className="ui-field"><span className="ui-field-label">Full name</span><input name="fullName" autoComplete="name" minLength={2} maxLength={120} required value={draft.fullName} onChange={event => updateDraft('fullName', event.currentTarget.value)} /></label>
       <label className="ui-field"><span className="ui-field-label">Email address</span><input name="email" type="email" autoComplete="email" maxLength={254} required value={draft.email} onChange={event => updateDraft('email', event.currentTarget.value)} /></label>
       <label className="ui-field"><span className="ui-field-label">Phone</span><input name="phone" type="tel" autoComplete="tel" maxLength={40} required value={draft.phone} onChange={event => updateDraft('phone', event.currentTarget.value)} /></label>
       <label className="ui-field"><span className="ui-field-label">Date of birth</span><input name="dateOfBirth" type="date" required value={draft.dateOfBirth} onChange={event => updateDraft('dateOfBirth', event.currentTarget.value)} /></label>
       <label className="ui-field"><span className="ui-field-label">Emergency contact <small>optional</small></span><input name="emergencyContact" maxLength={240} value={draft.emergencyContact} onChange={event => updateDraft('emergencyContact', event.currentTarget.value)} /></label>
       <label className="ui-field"><span className="ui-field-label">Health notes <small>owner and confirmed trainer only</small></span><textarea name="healthNotes" maxLength={4000} rows={5} value={draft.healthNotes} onChange={event => updateDraft('healthNotes', event.currentTarget.value)} /></label>
-      <label className="ui-field"><span className="ui-field-label">Initial membership plan</span><select key={state.result?.status ?? 'draft'} name="membershipPlanId" required value={draft.membershipPlanId} onChange={event => updateDraft('membershipPlanId', event.currentTarget.value)}>
+      <label className="ui-field"><span className="ui-field-label">Initial membership plan</span><select key={`${state.attempt ?? 0}:${state.result?.status ?? 'draft'}`} name="membershipPlanId" required value={draft.membershipPlanId} onChange={event => updateDraft('membershipPlanId', event.currentTarget.value)}>
         <option value="" disabled>Select a plan</option>{plans.map(plan => <option key={plan.id} value={plan.id}>{plan.name} · {plan.price} {plan.currency} · {plan.durationDays} days</option>)}
       </select></label>
       {plans.length === 0 ? <Feedback tone="error">Create an active membership plan before registering a member.</Feedback> : null}
@@ -98,7 +105,7 @@ export function MemberRegistrationForm({ slug, plans, initialRequestKey }: { slu
       <Button type="button" pending={busy} disabled={busy} onClick={continueToProfile}>{copied ? 'Continue to member profile' : 'I have recorded the password'}</Button>
       {handoffError ? <Feedback tone="error">{handoffError}</Feedback> : null}
     </div> : <div className="stack-form" aria-live="polite">
-      <Feedback tone="success">{completed && !completed.credentialDeliveryVersion
+      <Feedback tone="success">{completed && completed.credentialDeliveryVersion === undefined
         ? 'The existing identity accepted the gym link. No password was created, changed or shared.'
         : 'Member and initial membership are committed. The one-time password is not replayable; issue a replacement if the handoff was lost.'}</Feedback>
       {completed ? <p>Membership: {completed.term.planName}, {completed.term.startDate} through {completed.term.endDateExclusive} (end date exclusive). Agreed value: {completed.term.agreedPrice} {completed.term.currency}.</p> : null}

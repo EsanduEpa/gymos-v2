@@ -25,7 +25,7 @@ import type { Prisma as MasterPrisma } from './generated/master/client.js';
 import { GymAccessGuard, type GymRequest } from './gym-access.guard.js';
 import { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js';
 import { appendMasterVersionAudit } from './operations/transaction-audit.js';
-import { memberEnrollmentConsentInputSchema, memberEnrollmentConsentResultSchema, memberHistoryQuerySchema, memberListQuerySchema, memberListSchema,
+import { memberDetailSchema, memberEnrollmentConsentInputSchema, memberEnrollmentConsentResultSchema, memberHistoryQuerySchema, memberListQuerySchema, memberListSchema,
   memberRegistrationInputSchema, updateGymPublicProfileSchema, updateGymThemeSchema } from '@gymos/contracts';
 import { gymLocalDate } from './membership-rules.js';
 import { MemberEnrollmentService } from './member-enrollment.service.js';
@@ -214,50 +214,54 @@ export class GymsController {
 
     const parsed = memberListQuerySchema.safeParse(query);
     if (!parsed.success) throw new UnprocessableEntityException('Enter a valid member search and page');
-    return this.tenantGate.withVerifiedTenant(access, async tenant => {
-      const configuration = await tenant.gymConfiguration.findUnique({ where: { id: 'current' }, select: { timezone: true } });
+    await this.assertCurrentOwnerAccess(access);
+    const [published, activeLinks, pendingEnrollments] = await Promise.all([
+      this.database.master.operation.findMany({ where: { gymId: access.gymId, kind: 'REGISTER_MEMBER', state: 'COMPLETE', tenantCommandReceiptId: { not: null } },
+        select: { id: true, tenantActorId: true, subjectIdentityId: true } }),
+      this.database.master.gymAccess.findMany({ where: { gymId: access.gymId, role: 'MEMBER', actorKind: 'MEMBER', linkStatus: 'ACTIVE' },
+        select: { userId: true, tenantActorId: true, enrollmentOperationId: true } }),
+      this.database.master.operation.count({ where: { gymId: access.gymId, kind: 'REGISTER_MEMBER', state: { notIn: ['COMPLETE', 'FAILED_FINAL'] } } }),
+    ]);
+    const publishedTuples = published.filter(row => row.tenantActorId && row.subjectIdentityId).map(row => ({
+      id: row.tenantActorId!, identityId: row.subjectIdentityId!, enrollmentOperationId: row.id, registrationState: 'COMPLETE' as const,
+    }));
+    const activeActorIds = new Set(activeLinks.filter(link => published.some(operation => operation.id === link.enrollmentOperationId
+      && operation.tenantActorId === link.tenantActorId && operation.subjectIdentityId === link.userId)).map(link => link.tenantActorId!));
+    return this.tenantGate.withVerifiedTenant(access, tenant => tenant.$transaction(async tx => {
+      const configuration = await tx.gymConfiguration.findUnique({ where: { id: 'current' }, select: { timezone: true } });
       if (!configuration?.timezone) throw new ServiceUnavailableException('Gym timezone is unavailable');
       const asOf = new Date();
-      const asOfLocalDate = gymLocalDate(configuration.timezone, asOf);
-      const publishedOperations = await this.database.master.operation.findMany({ where: { gymId: access.gymId, kind: 'REGISTER_MEMBER', state: 'COMPLETE' }, select: { id: true } });
-      const where: Prisma.MemberWhereInput = {
-        AND: [
-          { OR: [{ registrationState: 'BASIC' }, { registrationState: 'COMPLETE', enrollmentOperationId: { in: publishedOperations.map(row => row.id) } }] },
-          ...(parsed.data.status ? [{ status: parsed.data.status }] : []),
-          ...(parsed.data.q ? [{ OR: [
-          { fullName: { contains: parsed.data.q, mode: 'insensitive' as const } },
-          { email: { contains: parsed.data.q, mode: 'insensitive' as const } },
-          ] }] : []),
-        ],
-      };
-      const [totalCount, rows] = await Promise.all([
-        tenant.member.count({ where }),
-        tenant.member.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-          skip: (parsed.data.page - 1) * parsed.data.pageSize, take: parsed.data.pageSize,
-          select: { id: true, fullName: true, email: true, status: true, registrationState: true, createdAt: true,
-            memberships: { where: { startDate: { lte: new Date(`${asOfLocalDate}T00:00:00.000Z`) }, endDateExclusive: { gt: new Date(`${asOfLocalDate}T00:00:00.000Z`) } },
-              orderBy: [{ startDate: 'desc' }, { id: 'desc' }], take: 1,
-              select: { id: true, startDate: true, endDateExclusive: true, agreedPrice: true, currency: true, planNameSnapshot: true } } },
-        }),
-      ]);
+      const localDay = new Date(`${gymLocalDate(configuration.timezone, asOf)}T00:00:00.000Z`);
+      const where: Prisma.MemberWhereInput = { AND: [
+        { OR: [{ registrationState: 'BASIC' }, ...publishedTuples] },
+        ...(parsed.data.status ? [{ status: parsed.data.status }] : []),
+        ...(parsed.data.q ? [{ OR: ['fullName', 'email', 'phone'].map(field => ({ [field]: { contains: parsed.data.q, mode: 'insensitive' } })) }] : []),
+      ] };
+      const totalCount = await tx.member.count({ where });
       const totalPages = Math.ceil(totalCount / parsed.data.pageSize);
       const page = Math.min(parsed.data.page, Math.max(totalPages, 1));
-      const items = page === parsed.data.page ? rows : await tenant.member.findMany({ where,
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * parsed.data.pageSize, take: parsed.data.pageSize,
-        select: { id: true, fullName: true, email: true, status: true, registrationState: true, createdAt: true,
-          memberships: { where: { startDate: { lte: new Date(`${asOfLocalDate}T00:00:00.000Z`) }, endDateExclusive: { gt: new Date(`${asOfLocalDate}T00:00:00.000Z`) } },
-            orderBy: [{ startDate: 'desc' }, { id: 'desc' }], take: 1,
-            select: { id: true, startDate: true, endDateExclusive: true, agreedPrice: true, currency: true, planNameSnapshot: true } } },
-      });
+      const [items, basic, operational, statuses] = await Promise.all([
+        tx.member.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * parsed.data.pageSize, take: parsed.data.pageSize,
+          select: { id: true, fullName: true, email: true, status: true, registrationState: true, createdAt: true,
+            memberships: { where: { startDate: { lte: localDay }, endDateExclusive: { gt: localDay } }, orderBy: [{ startDate: 'desc' }, { id: 'desc' }], take: 1,
+              select: { id: true, startDate: true, endDateExclusive: true, agreedPrice: true, currency: true, planNameSnapshot: true } } } }),
+        tx.member.count({ where: { AND: [where, { registrationState: 'BASIC' }] } }),
+        tx.member.count({ where: { AND: [where, { registrationState: 'COMPLETE', status: 'ACTIVE', id: { in: [...activeActorIds] } }] } }),
+        tx.member.groupBy({ by: ['status'], where, _count: { _all: true } }),
+      ]);
       return memberListSchema.parse({ items: items.map(member => ({
-        id: member.id, fullName: member.fullName, email: member.email, status: member.status,
-        registrationState: member.registrationState, createdAt: member.createdAt.toISOString(),
-        currentTerm: member.memberships[0] ? { id: member.memberships[0].id,
-          planName: member.memberships[0].planNameSnapshot, startDate: member.memberships[0].startDate.toISOString().slice(0, 10),
-          endDateExclusive: member.memberships[0].endDateExclusive.toISOString().slice(0, 10),
-          agreedPrice: member.memberships[0].agreedPrice.toString(), currency: member.memberships[0].currency as 'LKR' | 'USD' } : null,
-      })), page, pageSize: parsed.data.pageSize, totalCount, totalPages, asOf: asOf.toISOString() });
-    });
+        id: member.id, fullName: member.fullName, email: member.email, status: member.status, registrationState: member.registrationState,
+        accountState: member.registrationState === 'BASIC' ? 'BASIC' : member.status === 'ACTIVE' && activeActorIds.has(member.id) ? 'OPERATIONAL' : 'HISTORICAL',
+        createdAt: member.createdAt.toISOString(), currentTerm: member.memberships[0] ? {
+          id: member.memberships[0].id, planName: member.memberships[0].planNameSnapshot,
+          startDate: member.memberships[0].startDate.toISOString().slice(0, 10), endDateExclusive: member.memberships[0].endDateExclusive.toISOString().slice(0, 10),
+          agreedPrice: member.memberships[0].agreedPrice.toString(), currency: member.memberships[0].currency,
+        } : null,
+      })), page, pageSize: parsed.data.pageSize, totalCount, totalPages, asOf: asOf.toISOString(),
+        summary: { basic, operational, historical: totalCount - basic - operational, pendingEnrollments,
+          statuses: Object.fromEntries(['ACTIVE', 'INACTIVE', 'SUSPENDED'].map(status => [status, statuses.find(row => row.status === status)?._count._all ?? 0])) },
+      });
+    }, { isolationLevel: 'RepeatableRead' }));
   }
 
   @Get(':slug/members/:memberId')
@@ -266,11 +270,12 @@ export class GymsController {
     const access = request.gymAccess;
     if (!access) throw new InternalServerErrorException('Gym context missing');
     if (access.role !== 'OWNER') throw new ForbiddenException('Member profile access denied');
+    await this.assertCurrentOwnerAccess(access);
     const parsedPage = memberHistoryQuerySchema.safeParse(query ?? {});
     if (!parsedPage.success) throw new UnprocessableEntityException('Enter a valid membership history page');
     return this.tenantGate.withVerifiedTenant(access, async tenant => {
       const member = await tenant.member.findFirst({ where: { id: memberId, registrationState: { in: ['BASIC', 'COMPLETE'] } },
-        select: { id: true, enrollmentOperationId: true, fullName: true, email: true, phone: true, dateOfBirth: true, emergencyContact: true,
+        select: { id: true, identityId: true, createdAt: true, enrollmentOperationId: true, fullName: true, email: true, phone: true, dateOfBirth: true, emergencyContact: true,
           healthNotes: true, status: true, registrationState: true, version: true,
           sessionPacks: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 0,
             select: { id: true } } },
@@ -278,9 +283,10 @@ export class GymsController {
       if (!member) throw new NotFoundException('Member not found');
       if (member.registrationState === 'COMPLETE') {
         const published = await this.database.master.operation.findFirst({ where: { id: member.enrollmentOperationId ?? '',
-          gymId: access.gymId, kind: 'REGISTER_MEMBER', state: 'COMPLETE', tenantActorId: member.id }, select: { id: true } });
+          gymId: access.gymId, kind: 'REGISTER_MEMBER', state: 'COMPLETE', tenantActorId: member.id, subjectIdentityId: member.identityId, tenantCommandReceiptId: { not: null } }, select: { id: true } });
         if (!published) throw new NotFoundException('Member not found');
       }
+      const activeLink = member.identityId ? await this.database.master.gymAccess.findFirst({ where: { gymId: access.gymId, userId: member.identityId, role: 'MEMBER', actorKind: 'MEMBER', linkStatus: 'ACTIVE', tenantActorId: member.id, enrollmentOperationId: member.enrollmentOperationId }, select: { userId: true } }) : null;
       const config = await tenant.gymConfiguration.findUnique({ where: { id: 'current' }, select: { timezone: true } });
       if (!config?.timezone) throw new ServiceUnavailableException('Gym timezone is unavailable');
       const asOf = new Date();
@@ -291,7 +297,9 @@ export class GymsController {
         orderBy: [{ startDate: 'desc' }, { id: 'desc' }], skip: (membershipPage - 1) * parsedPage.data.pageSize,
         take: parsedPage.data.pageSize,
         select: { id: true, planNameSnapshot: true, startDate: true, endDateExclusive: true, agreedPrice: true, currency: true } });
-      return {
+      return memberDetailSchema.parse({
+        accountState: member.registrationState === 'BASIC' ? 'BASIC' : activeLink && member.status === 'ACTIVE' ? 'OPERATIONAL' : 'HISTORICAL',
+        joinedAt: member.createdAt.toISOString(),
         id: member.id, fullName: member.fullName, email: member.email, phone: member.phone,
         dateOfBirth: member.dateOfBirth?.toISOString().slice(0, 10) ?? null,
         emergencyContact: member.emergencyContact, healthNotes: member.healthNotes,
@@ -301,7 +309,7 @@ export class GymsController {
           agreedPrice: term.agreedPrice.toString(), currency: term.currency })),
         membershipPage, membershipPageSize: parsedPage.data.pageSize, membershipTotalCount, membershipTotalPages,
         sessionPacks: [], recentSessions: [], asOf: asOf.toISOString(),
-      };
+      });
     });
   }
 
