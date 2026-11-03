@@ -455,9 +455,23 @@ test('full member enrollment hands off a one-time credential and enforces first-
   } finally { await memberContext.close(); }
 });
 
-test('trainer registration hands off a one-time credential and requires a password change', async ({ page, browser }) => {
+test('trainer registration enforces owner and selected-gym access, then hands off a one-time credential', async ({ page, browser, request }) => {
   const email = `browser-trainer-${environment.runId}@example.test`;
   const trainerCounts = await Promise.all(fixture.tenants.map(tenant => tenant.trainer.count()));
+  const beforeDenied = await Promise.all([fixture.master.user.count(), fixture.master.gymAccess.count(), fixture.master.operation.count()]);
+  const registration = { fullName: 'Denied Trainer', email: `denied-${email}`, phone: '+94112223348', level: 'LEVEL_1', yearsExperience: null,
+    specialisations: [], shiftStart: null, shiftEnd: null, bio: null, idempotencyKey: `denied-trainer-${environment.runId}` };
+  await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${fixture.gyms[0].slug}`);
+  let bearer = (await page.context().cookies()).find(cookie => cookie.name === 'gymos_access_token')?.value;
+  expect((await request.post(`${apiBase}/gyms/${fixture.gyms[1].slug}/trainer-registrations`, { headers: { authorization: `Bearer ${bearer}` }, data: registration })).status()).toBe(403);
+  await openWithTestSession(page, fixture.users.memberUser.id, `/gyms/${fixture.gyms[0].slug}`);
+  bearer = (await page.context().cookies()).find(cookie => cookie.name === 'gymos_access_token')?.value;
+  expect((await request.post(`${apiBase}/gyms/${fixture.gyms[0].slug}/trainer-registrations`, { headers: { authorization: `Bearer ${bearer}` }, data: registration })).status()).toBe(403);
+  await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${fixture.gyms[0].slug}`);
+  bearer = (await page.context().cookies()).find(cookie => cookie.name === 'gymos_access_token')?.value;
+  expect((await request.post(`${apiBase}/gyms/${fixture.gyms[0].slug}/trainer-registrations`, { headers: { authorization: `Bearer ${bearer}` }, data: { ...registration, email, idempotencyKey: `invalid-trainer-${environment.runId}`, shiftStart: '08:00' } })).status()).toBe(422);
+  expect(await Promise.all([fixture.master.user.count(), fixture.master.gymAccess.count(), fixture.master.operation.count()])).toEqual(beforeDenied);
+  expect(await Promise.all(fixture.tenants.map(tenant => tenant.trainer.count()))).toEqual(trainerCounts);
   await openGymWithTestSession(page, fixture.users.ownerA.id, fixture.gyms[0].slug);
   await page.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/owner/trainers/new`);
   await expect(page.getByRole('heading', { name: 'Register a trainer' })).toBeVisible();
