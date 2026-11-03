@@ -67,6 +67,13 @@ export class CredentialService {
       throw new ForbiddenException('Credential operation unavailable');
     }
 
+    // Serialize owner revocation against credential issue/reissue/acknowledge.
+    // The operation row is already locked by the caller; these shared locks
+    // establish the authorization side of that same bounded transaction.
+    await tx.$queryRaw`SELECT "id" FROM "Gym" WHERE "id" = ${input.gymId} FOR SHARE`;
+    await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${input.actorIdentityId} FOR SHARE`;
+    await tx.$queryRaw`SELECT "userId" FROM "GymAccess" WHERE "userId" = ${input.actorIdentityId} AND "gymId" = ${input.gymId} FOR SHARE`;
+
     const [gym, access] = await Promise.all([
       tx.gym.findUnique({ where: { id: input.gymId }, select: { status: true } }),
       tx.gymAccess.findUnique({

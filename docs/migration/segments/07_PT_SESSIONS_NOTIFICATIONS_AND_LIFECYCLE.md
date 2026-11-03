@@ -6,12 +6,12 @@ This is the highest-risk business segment. Read session-state tables, DEF-02–0
 
 ## 1. Segment overview
 
-- **Capability:** PT booking/request, credit holds, role views, start/notes/complete/no-show/cancel, notifications and audit.
+- **Capability:** PT booking/request, member status/hold release, pack issuance/balances, credit holds, role views, start/notes/complete/no-show/cancel, notifications and audit.
 - **Objective:** migrate the complete session lifecycle with exact-once financial effects and V1 UI parity.
 - **Result:** owner/member/trainer workflows share one authoritative session aggregate; concurrent/repeated commands cannot overbook, overdraw, or double-settle.
 - **Priority / complexity:** Critical / Large.
 - **Dependencies:** segments 02,04–06; DEC-04/06/07/08/09.
-- **In scope:** GYMOS-MIG-040–048.
+- **In scope:** GYMOS-MIG-033, GYMOS-MIG-034 and GYMOS-MIG-040–048. Task049 remains owned by its finance/operational value segment.
 - **Out of scope:** facility class scheduling/check-in, arbitrary status edits, payment capture/refunds, global inbox/push.
 
 ## 2. Current V1 implementation
@@ -37,6 +37,18 @@ Tenant session aggregate stores member/trainer, gym-local scheduled instant, dur
 Proposed tenant models include Session, CreditHold/Pack ledger, unique Settlement/Origin records, notifications and audit relations, plus indexes/exclusion strategy approved by DEC-08. All commands require Idempotency-Key and request digest; local transaction order is fixed. DTOs use decimal strings and ISO instants/local-date context. Query APIs paginate and project by role. Master operation is used only where a cross-plane effect exists; ordinary session settlement remains one tenant transaction/receipt.
 
 ## 6. Detailed tasks
+
+### 033 — member status lifecycle and future hold release (reassigned from Segment 05)
+
+- **Prerequisites:** 004,018,031,032,040,043,078,080,084.
+- **Instructions:** versioned/recoverable status command; release/cancel eligible future holds once; preserve settled history and recover cross-plane publication safely.
+- **Acceptance/tests:** stale/repeat/concurrent commands, notification outage, foreign member, future/active/terminal sessions and no interim access; preserve dialog/error on failure. **[ ]**
+
+### 034 — member session-pack issuance and balance projection (reassigned from Segment 05)
+
+- **Prerequisites:** 018,030,031,032,040,082–084.
+- **Instructions:** exact immutable issue values and receipt/audit; derive available/held/consumed/expired balances from credit movements and active holds; no payment receipt.
+- **Acceptance/tests:** zero/negative/precision/expiry, concurrent last credit and duplicate issue, historical packs, owner-only/foreign member and conservation invariant. **[ ]**
 
 ### 040 — session aggregate, holds, transition constraints
 
@@ -113,13 +125,14 @@ Add unit/state/property tests, owned real-Postgres integration tests with barrie
 
 ## 10. Agent checkpoints
 
-Stop until DEC-06/07/08 and required people/config fields are approved. Implement task 040 before 033/034/038 consumers, then return to owning segments. Do not weaken invariants to match a V1 defect.
+Stop until DEC-06/07/08 and required people/config fields are approved. Implement task 040 before 033/034/038 consumers. Tasks 033 and 034 are owned here and were moved from Segment 05 to keep session lifecycle ownership coherent. Do not weaken invariants to match a V1 defect.
 
 ## 11. Progress and handoff
 
 - **Status:** NOT STARTED
 - **Completed:** none
-- **Remaining:** 040–048
+- **Remaining:** 033, 034 and 040–048
 - **Next recommended task:** GYMOS-MIG-040.
+- **Segment 05 coordination:** its exit gate is tasks031/032/035 and is documented in [the exit checklist](../SEGMENT_05_EXIT_CHECKLIST.md). Task033 and034 are owned in this segment. Complete 040 before their session-hold/credit consumers; complete 034 before booking tasks041/042 and 033 before task047.
 - **Files/tests/issues/blockers/decisions:** _fill during execution_
 

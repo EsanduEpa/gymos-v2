@@ -32,6 +32,11 @@ enum TrainerStatus {
   DEACTIVATED
 }
 
+enum TrainerLevel {
+  LEVEL_1
+  LEVEL_2
+}
+
 model Member {
   id                    String                  @id @default(cuid())
   fullName              String
@@ -41,14 +46,54 @@ model Member {
   registrationState     MemberRegistrationState @default(BASIC)
   enrollmentOperationId String?                 @unique
   version               Int                     @default(0)
+  phone                 String?
+  dateOfBirth           DateTime?               @db.Date
+  emergencyContact      String?
+  healthNotes           String?
+  sessionPacks          SessionPack[]
   memberships           MembershipTerm[]
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
 }
 
+enum SessionPackStatus {
+  ACTIVE
+  EXPIRED
+  DEPLETED
+}
+
+model SessionPack {
+  id                    String            @id @default(cuid())
+  memberId              String
+  member                Member            @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  issuedCredits         Int
+  price                 Decimal           @db.Decimal(19, 4)
+  currency              String
+  validityDays          Int
+  startDate             DateTime          @db.Date
+  endDateExclusive      DateTime          @db.Date
+  status                SessionPackStatus @default(ACTIVE)
+  version               Int               @default(0)
+  commandReceiptId      String            @unique
+  actorIdentityId       String
+  idempotencyKey        String
+  requestDigest         String
+  createdAt             DateTime          @default(now()) @db.Timestamptz(3)
+  @@unique([actorIdentityId, idempotencyKey])
+  @@index([memberId, endDateExclusive, createdAt, id])
+}
+
 model Trainer {
   id                    String                   @id @default(cuid())
   fullName              String
+  email                 String?                  @unique
+  phone                 String?
+  level                 TrainerLevel?
+  specialisations       String[]                 @default([])
+  yearsExperience       Int?
+  shiftStart            String?
+  shiftEnd              String?
+  bio                   String?
   identityId            String?                  @unique
   registrationState     TrainerRegistrationState @default(PENDING)
   enrollmentOperationId String?                  @unique

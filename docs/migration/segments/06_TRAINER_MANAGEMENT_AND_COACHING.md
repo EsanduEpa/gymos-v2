@@ -34,7 +34,7 @@ Extend tenant Trainer with phone/level/experience/specialisations/shifts and ver
 
 | Done | Task and objective | Prerequisites / sources | Implementation and target behavior | Acceptance and testing |
 |---|---|---|---|---|
-| [ ] | **036 Trainer registration/handoff** | 017,018,023,027,078,080,083; O06/action | Enrollment operation; tenant profile+receipt; reciprocal access; generated credential only for new identity; typed fields | New/reuse/conflict/fault/retry/secret redaction/two-gym tests |
+| [~] | **036 Trainer registration/handoff** | 017,018,023,027,078,080,083; O06/action | Partial enrollment operation; tenant profile+receipt; reciprocal access; generated credential only for new identity; typed fields | Partial local evidence; full fault/retry/concurrency, dependency closure, unpublished-consumer, and owner acceptance remain open; see [evidence](../evidence/GYMOS-MIG-036.md) |
 | [ ] | **037 Roster/profile/shift approval** | 013,018,029,036,083,085; O05/O07 | Paged sanitized queries; status/performance semantics; versioned bounded local-time shifts; accurate UI result | >page search, null/specialisation normalization, overnight/boundary, stale version, role/foreign tests |
 | [ ] | **038 Deactivate/reactivate** | 004,018,036,040,043,078,080,084; O07 | Recoverable transition; handle future holds/sessions per policy; audit/notify; keep history | repeat/concurrent/stale, active/future sessions, notification failure, other gym unaffected |
 | [ ] | **039 Member trainer directory** | 013,018,036,037; M01 | Active member-safe trainer query, name search/page if needed, request links with gym context | MEMBER-only safe projection, inactive absent, no private pay/phone if unapproved, empty/error/foreign gym |
@@ -69,10 +69,11 @@ Stop until DEC-09 fixes relationship, privacy, metrics, limits and meal-day mapp
 
 ## 11. Progress and handoff
 
-- **Status:** NOT STARTED
-- **Completed:** none
+- **Status:** IN PROGRESS
+- **Completed:** none (036 has partial local evidence only)
 - **Remaining:** 036–039,050–052
-- **Next recommended task:** GYMOS-MIG-036; execute 050 only after sessions establish confirmed relationships.
+- **Next recommended task:** complete GYMOS-MIG-036 acceptance; then implement 040 in Segment 07 before resuming member status/pack work.
+- **Segment 05 return checkpoint:** task 036 supplies the trainer-registration prerequisite for 040. Record its own acceptance evidence, then follow the [member follow-up checklist](../SEGMENT_05_FOLLOW_UP.md). Shared trainer enrollment work does not establish completion of member consent/recovery under task 031.
 - **Files/tests/issues/blockers/decisions:** _fill during execution_
 
 

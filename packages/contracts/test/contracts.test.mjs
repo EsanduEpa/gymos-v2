@@ -9,6 +9,8 @@ import {
 import { existingEndpointContracts } from '../dist/legacy.js';
 import { changePasswordInputSchema, credentialAcknowledgementInputSchema, credentialAcknowledgementResultSchema, credentialIssueInputSchema, credentialReissueInputSchema, credentialReissueResultSchema } from '../dist/credentials.js';
 import { createMembershipPlanSchema, gymConfigurationSchema, updateGymThemeSchema } from '../dist/configuration.js';
+import { memberEnrollmentConsentInputSchema, memberEnrollmentConsentResultSchema, memberListQuerySchema, memberListSchema,
+  memberRegistrationInputSchema, memberRegistrationResultSchema } from '../dist/members.js';
 
 const asOf = '2026-10-23T00:00:00.000Z';
 const identity = {
@@ -103,6 +105,29 @@ test('pagination preserves full-filter totals, zero rows and out-of-range pages'
   assert.ok(schema.safeParse({ items: [], page: 6, pageSize: 25, totalCount: 101, totalPages: 5, asOf }).success);
   assert.ok(schema.safeParse({ items: [], page: 1, pageSize: 25, totalCount: 0, totalPages: 0, asOf }).success);
   assert.equal(schema.safeParse({ items: [], page: 1, pageSize: 25, totalCount: 101, totalPages: 1, asOf }).success, false);
+});
+test('member enrollment and paged projections enforce strict profile bounds and safe monetary strings', () => {
+  const input = { fullName: 'Synthetic Member', email: 'member@example.test', phone: '+94112223344', dateOfBirth: '1995-06-15',
+    emergencyContact: null, healthNotes: 'Synthetic note', membershipPlanId: 'plan-1', idempotencyKey: 'member-enrollment-001' };
+  assert.deepEqual(memberRegistrationInputSchema.parse(input), input);
+  assert.equal(memberRegistrationInputSchema.safeParse({ ...input, dateOfBirth: '2026-02-30' }).success, false);
+  assert.equal(memberRegistrationInputSchema.safeParse({ ...input, healthNotes: 'x'.repeat(4001) }).success, false);
+  assert.equal(memberRegistrationInputSchema.safeParse({ ...input, passwordHash: 'never accepted' }).success, false);
+  assert.deepEqual(memberListQuerySchema.parse({ page: '2', q: '  alex  ', status: 'ACTIVE' }), { page: 2, pageSize: 25, q: 'alex', status: 'ACTIVE' });
+  const pendingEnrollment = { operationId: 'operation-123', status: 'PENDING', replayed: false, consentRequired: true };
+  assert.deepEqual(memberRegistrationResultSchema.parse(pendingEnrollment), pendingEnrollment);
+  assert.equal(memberRegistrationResultSchema.safeParse({ ...pendingEnrollment, memberId: 'member-123' }).success, false);
+  const consentInput = { decision: 'ACCEPT', currentPassword: 'private-current-password' };
+  assert.deepEqual(memberEnrollmentConsentInputSchema.parse(consentInput), consentInput);
+  assert.equal(memberEnrollmentConsentInputSchema.safeParse({ ...consentInput, token: 'not-accepted' }).success, false);
+  assert.deepEqual(memberEnrollmentConsentResultSchema.parse({ operationId: 'operation-123', status: 'CONSENT_RECORDED', replayed: true }),
+    { operationId: 'operation-123', status: 'CONSENT_RECORDED', replayed: true });
+  const data = { items: [{ id: 'member-1', fullName: 'Synthetic Member', email: null, status: 'ACTIVE', registrationState: 'COMPLETE',
+    accountState: 'OPERATIONAL', createdAt: asOf, currentTerm: { id: 'term-1', planName: 'Monthly', startDate: '2026-10-01', endDateExclusive: '2026-11-01',
+      agreedPrice: '0.00', currency: 'LKR' } }], page: 1, pageSize: 25, totalCount: 1, totalPages: 1, asOf, summary: { basic: 0, operational: 1, historical: 0, pendingEnrollments: 0, statuses: { ACTIVE: 1, INACTIVE: 0, SUSPENDED: 0 } } };
+  assert.deepEqual(memberListSchema.parse(data), data);
+  assert.equal(memberListSchema.safeParse({ ...data, items: [{ ...data.items[0], password: 'secret' }] }).success, false);
+  assert.equal(memberListSchema.safeParse({ ...data, totalCount: 100, totalPages: 4 }).success, false);
 });
 test('command results and errors have safe allowlisted envelopes', () => {
   const schema = commandSchema(z.strictObject({ id: z.string() }));

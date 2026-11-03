@@ -3,6 +3,7 @@ import { ConflictException, ForbiddenException, UnauthorizedException } from '@n
 import argon2 from 'argon2';
 import { Prisma, type PrismaClient, type GymRole } from '../generated/master/client.js';
 import { normalizeIdentityEmail } from './email.js';
+import { appendMasterAudit } from '../operations/transaction-audit.js';
 
 type Binding = { gymId: string; role: GymRole; enrollmentOperationId: string };
 function checkBinding(binding: Binding) {
@@ -31,6 +32,7 @@ export class IdentityFoundationService {
 
   async issueEnrollmentProof(input: Binding & {
     authenticatedIdentityId: string;
+    authenticatedAuthVersion: number;
     currentPassword: string;
   }) {
     checkBinding(input);
@@ -41,7 +43,7 @@ export class IdentityFoundationService {
         await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${input.authenticatedIdentityId} FOR SHARE`;
         const user = await tx.user.findUnique({ where: { id: input.authenticatedIdentityId } });
         const [{ now }] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS "now"`;
-        if (!user || user.mustChangePassword || (user.credentialExpiresAt !== null && user.credentialExpiresAt <= now)
+        if (!user || user.authVersion !== input.authenticatedAuthVersion || user.mustChangePassword || (user.credentialExpiresAt !== null && user.credentialExpiresAt <= now)
           || !(await argon2.verify(user.passwordHash, input.currentPassword))) {
           throw new UnauthorizedException('Identity verification failed');
         }
@@ -59,6 +61,77 @@ export class IdentityFoundationService {
       throw error;
     }
     return { token, expiresIn: 600 };
+  }
+
+  /** Authenticate and consume consent in one Master transaction. The plaintext
+   * proof never leaves this call, so a crash cannot strand an unconsumable proof. */
+  async consentEnrollment(input: Binding & {
+    authenticatedIdentityId: string;
+    authenticatedAuthVersion: number;
+    currentPassword: string;
+    decision: 'ACCEPT' | 'DECLINE';
+  }) {
+    checkBinding(input);
+    const token = input.decision === 'ACCEPT' ? randomBytes(32).toString('base64url') : null;
+    const tokenHash = token ? digest(token) : null;
+    try {
+      return await this.master.$transaction(async tx => {
+        await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${input.authenticatedIdentityId} FOR UPDATE`;
+        const user = await tx.user.findUnique({ where: { id: input.authenticatedIdentityId } });
+        const [{ now }] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS "now"`;
+        if (!user || user.globalRole !== 'USER' || user.authVersion !== input.authenticatedAuthVersion
+          || user.mustChangePassword || (user.credentialExpiresAt !== null && user.credentialExpiresAt <= now)
+          || !(await argon2.verify(user.passwordHash, input.currentPassword))) {
+          throw new UnauthorizedException('Identity verification failed');
+        }
+        await tx.$queryRaw`SELECT "id" FROM "Operation" WHERE "id" = ${input.enrollmentOperationId} FOR UPDATE`;
+        const operation = await tx.operation.findUnique({ where: { id: input.enrollmentOperationId } });
+        if (!operation || operation.kind !== (input.role === 'MEMBER' ? 'REGISTER_MEMBER' : 'REGISTER_TRAINER')
+          || operation.gymId !== input.gymId || operation.subjectIdentityId !== user.id) {
+          throw new ForbiddenException('Enrollment consent is unavailable');
+        }
+        const gym = await tx.gym.findUnique({ where: { id: input.gymId }, select: { status: true } });
+        if (!gym || gym.status !== 'ACTIVE') throw new ForbiddenException('Gym unavailable');
+        const proofKey = { identityId: user.id, gymId: input.gymId, role: input.role, enrollmentOperationId: operation.id };
+        const prior = await tx.enrollmentProof.findUnique({ where: { identityId_gymId_role_enrollmentOperationId: proofKey } });
+        const accessKey = { userId: user.id, gymId: input.gymId };
+        const priorAccess = await tx.gymAccess.findUnique({ where: { userId_gymId: accessKey } });
+        if (prior?.consumedAt && priorAccess?.enrollmentOperationId === operation.id && priorAccess.role === input.role) {
+          return { status: 'CONSENT_RECORDED' as const, replayed: true };
+        }
+        if (operation.state === 'FAILED_FINAL' && operation.errorCode === 'CONSENT_DECLINED') {
+          return { status: 'CONSENT_DECLINED' as const, replayed: true };
+        }
+        if (operation.state === 'COMPLETE') throw new ConflictException('Enrollment is already complete');
+        if (operation.state === 'FAILED_FINAL' || operation.state === 'REPAIR_REQUIRED') throw new ConflictException('Enrollment cannot be changed');
+        if (input.decision === 'DECLINE') {
+          if (priorAccess) throw new ConflictException('Enrollment already has a prepared gym role');
+          const changed = await tx.operation.updateMany({ where: { id: operation.id, version: operation.version,
+            state: operation.state, leaseToken: null }, data: { state: 'FAILED_FINAL', errorCode: 'CONSENT_DECLINED',
+            step: 'CONSENT_DECLINED', version: { increment: 1 } } });
+          if (changed.count !== 1) throw new ConflictException('Enrollment changed; try again');
+          await appendMasterAudit(tx, { actorIdentityId: user.id, operationId: operation.id, gymId: input.gymId,
+            stepCode: 'CONSENT_DECLINED', eventCode: 'ENROLLMENT_CONSENT_DECLINED', resourceType: 'IDENTITY', resourceId: user.id,
+            transition: { from: 'PENDING', to: 'DECLINED' } });
+          return { status: 'CONSENT_DECLINED' as const, replayed: false };
+        }
+        if (priorAccess) {
+          throw new ConflictException('Identity already has a role in this gym');
+        }
+        if (!token || !tokenHash) throw new Error('Consent proof generation failed');
+        await tx.enrollmentProof.create({ data: { ...proofKey, tokenHash, authVersion: user.authVersion,
+          issuedAt: now, expiresAt: new Date(now.getTime() + 10 * 60_000), consumedAt: now } });
+        await tx.gymAccess.create({ data: { ...accessKey, role: input.role, linkStatus: 'PENDING',
+          enrollmentOperationId: operation.id, actorKind: input.role === 'MEMBER' ? 'MEMBER' : 'TRAINER' } });
+        await appendMasterAudit(tx, { actorIdentityId: user.id, operationId: operation.id, gymId: input.gymId,
+          stepCode: 'CONSENT_RECORDED', eventCode: 'ENROLLMENT_CONSENT_RECORDED', resourceType: 'IDENTITY', resourceId: user.id,
+          transition: { from: 'UNLINKED', to: 'CONSENTED' } });
+        return { status: 'CONSENT_RECORDED' as const, replayed: false };
+      });
+    } catch (error) {
+      if (isUniqueConflict(error)) throw new ConflictException('Identity already has a role in this gym');
+      throw error;
+    }
   }
 
 // This verifies a live consent nonce. After expiry, recovery must use the

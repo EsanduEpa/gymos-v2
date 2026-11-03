@@ -159,10 +159,11 @@ async function legacy(slug: string) {
     });
   });
   await run.registerProvisionedDatabase(operation);
+  // The fixture intentionally installs the immutable V1 tenant template.
+  // Use only columns present in that historical schema; the generated current
+  // Prisma Member.create writes nullable profile columns that V1 does not have.
   await tenants.withDatabase(operation.databaseName!, (tenant) =>
-    tenant.member.create({
-      data: { fullName: 'Retained synthetic legacy member' },
-    }),
+    tenant.$executeRaw`INSERT INTO "Member" ("id", "fullName", "email", "status", "identityId", "registrationState", "enrollmentOperationId", "version", "createdAt", "updatedAt") VALUES (${randomUUID()}, 'Retained synthetic legacy member', NULL, 'ACTIVE', NULL, 'BASIC', NULL, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
   );
   return master.gym.findUniqueOrThrow({ where: { id: operation.gymId! } });
 }

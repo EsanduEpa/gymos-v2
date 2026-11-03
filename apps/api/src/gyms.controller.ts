@@ -7,14 +7,17 @@ import {
   Get,
   InternalServerErrorException,
   NotFoundException,
+  Optional,
   Param,
   Patch,
   Post,
+  Query,
   Req,
   ServiceUnavailableException,
   UnprocessableEntityException,
   UseGuards,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { z } from 'zod';
 import { DatabaseService } from './database.service.js';
 import { Prisma } from './generated/tenant/client.js';
@@ -22,7 +25,13 @@ import type { Prisma as MasterPrisma } from './generated/master/client.js';
 import { GymAccessGuard, type GymRequest } from './gym-access.guard.js';
 import { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js';
 import { appendMasterVersionAudit } from './operations/transaction-audit.js';
-import { updateGymPublicProfileSchema, updateGymThemeSchema } from '@gymos/contracts';
+import { memberDetailSchema, memberEnrollmentConsentInputSchema, memberEnrollmentConsentResultSchema, memberHistoryQuerySchema, memberListQuerySchema, memberListSchema,
+  memberRegistrationInputSchema, updateGymPublicProfileSchema, updateGymThemeSchema } from '@gymos/contracts';
+import { gymLocalDate } from './membership-rules.js';
+import { MemberEnrollmentService } from './member-enrollment.service.js';
+import { TrainerEnrollmentService } from './trainer-enrollment.service.js';
+import { identityFromAuthorization } from './auth-token.js';
+import { trainerRegistrationInputSchema } from '@gymos/contracts';
 
 const createMemberInput = z.strictObject({
   fullName: z.string().trim().min(2).max(120),
@@ -35,6 +44,8 @@ export class GymsController {
   constructor(
     private readonly database: DatabaseService,
     private readonly tenantGate: TenantSchemaGateService,
+    @Optional() private readonly memberEnrollment?: MemberEnrollmentService,
+    @Optional() private readonly trainerEnrollment?: TrainerEnrollmentService,
   ) {}
 
   private async assertCurrentOwnerAccess(access: NonNullable<GymRequest['gymAccess']>, source: MasterPrisma.TransactionClient = this.database.master): Promise<void> {
@@ -189,7 +200,7 @@ export class GymsController {
 
   @Get(':slug/members')
   @UseGuards(GymAccessGuard)
-  members(@Req() request: GymRequest) {
+  async members(@Req() request: GymRequest, @Query() query: unknown) {
     const access = request.gymAccess;
     if (!access) {
       throw new InternalServerErrorException('Gym context missing');
@@ -201,17 +212,105 @@ export class GymsController {
       throw new ForbiddenException('Member list access denied');
     }
 
-    return this.tenantGate.withVerifiedTenant(access, (tenant) =>
-      tenant.member.findMany({
-        select: {
-          id: true,
-          fullName: true,
-          email: true,
-          status: true,
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 100,
-      }));
+    const parsed = memberListQuerySchema.safeParse(query);
+    if (!parsed.success) throw new UnprocessableEntityException('Enter a valid member search and page');
+    await this.assertCurrentOwnerAccess(access);
+    const [published, activeLinks, pendingEnrollments] = await Promise.all([
+      this.database.master.operation.findMany({ where: { gymId: access.gymId, kind: 'REGISTER_MEMBER', state: 'COMPLETE', tenantCommandReceiptId: { not: null } },
+        select: { id: true, tenantActorId: true, subjectIdentityId: true } }),
+      this.database.master.gymAccess.findMany({ where: { gymId: access.gymId, role: 'MEMBER', actorKind: 'MEMBER', linkStatus: 'ACTIVE' },
+        select: { userId: true, tenantActorId: true, enrollmentOperationId: true } }),
+      this.database.master.operation.count({ where: { gymId: access.gymId, kind: 'REGISTER_MEMBER', state: { notIn: ['COMPLETE', 'FAILED_FINAL'] } } }),
+    ]);
+    const publishedTuples = published.filter(row => row.tenantActorId && row.subjectIdentityId).map(row => ({
+      id: row.tenantActorId!, identityId: row.subjectIdentityId!, enrollmentOperationId: row.id, registrationState: 'COMPLETE' as const,
+    }));
+    const activeActorIds = new Set(activeLinks.filter(link => published.some(operation => operation.id === link.enrollmentOperationId
+      && operation.tenantActorId === link.tenantActorId && operation.subjectIdentityId === link.userId)).map(link => link.tenantActorId!));
+    return this.tenantGate.withVerifiedTenant(access, tenant => tenant.$transaction(async tx => {
+      const configuration = await tx.gymConfiguration.findUnique({ where: { id: 'current' }, select: { timezone: true } });
+      if (!configuration?.timezone) throw new ServiceUnavailableException('Gym timezone is unavailable');
+      const asOf = new Date();
+      const localDay = new Date(`${gymLocalDate(configuration.timezone, asOf)}T00:00:00.000Z`);
+      const where: Prisma.MemberWhereInput = { AND: [
+        { OR: [{ registrationState: 'BASIC' }, ...publishedTuples] },
+        ...(parsed.data.status ? [{ status: parsed.data.status }] : []),
+        ...(parsed.data.q ? [{ OR: ['fullName', 'email', 'phone'].map(field => ({ [field]: { contains: parsed.data.q, mode: 'insensitive' } })) }] : []),
+      ] };
+      const totalCount = await tx.member.count({ where });
+      const totalPages = Math.ceil(totalCount / parsed.data.pageSize);
+      const page = Math.min(parsed.data.page, Math.max(totalPages, 1));
+      const [items, basic, operational, statuses] = await Promise.all([
+        tx.member.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * parsed.data.pageSize, take: parsed.data.pageSize,
+          select: { id: true, fullName: true, email: true, status: true, registrationState: true, createdAt: true,
+            memberships: { where: { startDate: { lte: localDay }, endDateExclusive: { gt: localDay } }, orderBy: [{ startDate: 'desc' }, { id: 'desc' }], take: 1,
+              select: { id: true, startDate: true, endDateExclusive: true, agreedPrice: true, currency: true, planNameSnapshot: true } } } }),
+        tx.member.count({ where: { AND: [where, { registrationState: 'BASIC' }] } }),
+        tx.member.count({ where: { AND: [where, { registrationState: 'COMPLETE', status: 'ACTIVE', id: { in: [...activeActorIds] } }] } }),
+        tx.member.groupBy({ by: ['status'], where, _count: { _all: true } }),
+      ]);
+      return memberListSchema.parse({ items: items.map(member => ({
+        id: member.id, fullName: member.fullName, email: member.email, status: member.status, registrationState: member.registrationState,
+        accountState: member.registrationState === 'BASIC' ? 'BASIC' : member.status === 'ACTIVE' && activeActorIds.has(member.id) ? 'OPERATIONAL' : 'HISTORICAL',
+        createdAt: member.createdAt.toISOString(), currentTerm: member.memberships[0] ? {
+          id: member.memberships[0].id, planName: member.memberships[0].planNameSnapshot,
+          startDate: member.memberships[0].startDate.toISOString().slice(0, 10), endDateExclusive: member.memberships[0].endDateExclusive.toISOString().slice(0, 10),
+          agreedPrice: member.memberships[0].agreedPrice.toString(), currency: member.memberships[0].currency,
+        } : null,
+      })), page, pageSize: parsed.data.pageSize, totalCount, totalPages, asOf: asOf.toISOString(),
+        summary: { basic, operational, historical: totalCount - basic - operational, pendingEnrollments,
+          statuses: Object.fromEntries(['ACTIVE', 'INACTIVE', 'SUSPENDED'].map(status => [status, statuses.find(row => row.status === status)?._count._all ?? 0])) },
+      });
+    }, { isolationLevel: 'RepeatableRead' }));
+  }
+
+  @Get(':slug/members/:memberId')
+  @UseGuards(GymAccessGuard)
+  async memberDetail(@Req() request: GymRequest, @Param('memberId') memberId: string, @Query() query: unknown = {}) {
+    const access = request.gymAccess;
+    if (!access) throw new InternalServerErrorException('Gym context missing');
+    if (access.role !== 'OWNER') throw new ForbiddenException('Member profile access denied');
+    await this.assertCurrentOwnerAccess(access);
+    const parsedPage = memberHistoryQuerySchema.safeParse(query ?? {});
+    if (!parsedPage.success) throw new UnprocessableEntityException('Enter a valid membership history page');
+    return this.tenantGate.withVerifiedTenant(access, async tenant => {
+      const member = await tenant.member.findFirst({ where: { id: memberId, registrationState: { in: ['BASIC', 'COMPLETE'] } },
+        select: { id: true, identityId: true, createdAt: true, enrollmentOperationId: true, fullName: true, email: true, phone: true, dateOfBirth: true, emergencyContact: true,
+          healthNotes: true, status: true, registrationState: true, version: true,
+          sessionPacks: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 0,
+            select: { id: true } } },
+      });
+      if (!member) throw new NotFoundException('Member not found');
+      if (member.registrationState === 'COMPLETE') {
+        const published = await this.database.master.operation.findFirst({ where: { id: member.enrollmentOperationId ?? '',
+          gymId: access.gymId, kind: 'REGISTER_MEMBER', state: 'COMPLETE', tenantActorId: member.id, subjectIdentityId: member.identityId, tenantCommandReceiptId: { not: null } }, select: { id: true } });
+        if (!published) throw new NotFoundException('Member not found');
+      }
+      const activeLink = member.identityId ? await this.database.master.gymAccess.findFirst({ where: { gymId: access.gymId, userId: member.identityId, role: 'MEMBER', actorKind: 'MEMBER', linkStatus: 'ACTIVE', tenantActorId: member.id, enrollmentOperationId: member.enrollmentOperationId }, select: { userId: true } }) : null;
+      const config = await tenant.gymConfiguration.findUnique({ where: { id: 'current' }, select: { timezone: true } });
+      if (!config?.timezone) throw new ServiceUnavailableException('Gym timezone is unavailable');
+      const asOf = new Date();
+      const membershipTotalCount = await tenant.membershipTerm.count({ where: { memberId } });
+      const membershipTotalPages = Math.ceil(membershipTotalCount / parsedPage.data.pageSize);
+      const membershipPage = Math.min(parsedPage.data.page, Math.max(1, membershipTotalPages));
+      const memberships = await tenant.membershipTerm.findMany({ where: { memberId },
+        orderBy: [{ startDate: 'desc' }, { id: 'desc' }], skip: (membershipPage - 1) * parsedPage.data.pageSize,
+        take: parsedPage.data.pageSize,
+        select: { id: true, planNameSnapshot: true, startDate: true, endDateExclusive: true, agreedPrice: true, currency: true } });
+      return memberDetailSchema.parse({
+        accountState: member.registrationState === 'BASIC' ? 'BASIC' : activeLink && member.status === 'ACTIVE' ? 'OPERATIONAL' : 'HISTORICAL',
+        joinedAt: member.createdAt.toISOString(),
+        id: member.id, fullName: member.fullName, email: member.email, phone: member.phone,
+        dateOfBirth: member.dateOfBirth?.toISOString().slice(0, 10) ?? null,
+        emergencyContact: member.emergencyContact, healthNotes: member.healthNotes,
+        status: member.status, registrationState: member.registrationState, version: member.version,
+        memberships: memberships.map(term => ({ id: term.id, planName: term.planNameSnapshot,
+          startDate: term.startDate.toISOString().slice(0, 10), endDateExclusive: term.endDateExclusive.toISOString().slice(0, 10),
+          agreedPrice: term.agreedPrice.toString(), currency: term.currency })),
+        membershipPage, membershipPageSize: parsedPage.data.pageSize, membershipTotalCount, membershipTotalPages,
+        sessionPacks: [], recentSessions: [], asOf: asOf.toISOString(),
+      });
+    });
   }
 
   @Post(':slug/members')
@@ -254,5 +353,55 @@ export class GymsController {
       }
       throw error;
     }
+  }
+
+  @Post(':slug/member-registrations')
+  @UseGuards(GymAccessGuard)
+  async registerMember(@Req() request: GymRequest, @Body() body: unknown) {
+    const access = request.gymAccess;
+    if (!access) throw new InternalServerErrorException('Gym context missing');
+    if (access.role !== 'OWNER') throw new ForbiddenException('Only gym owners can register members');
+    const parsed = memberRegistrationInputSchema.safeParse(body);
+    if (!parsed.success) throw new UnprocessableEntityException('Enter valid member details and a membership plan');
+    if (!this.memberEnrollment) throw new InternalServerErrorException('Member enrollment is unavailable');
+    return this.memberEnrollment.enroll(access, parsed.data);
+  }
+
+  @Post(':slug/trainer-registrations')
+  @UseGuards(GymAccessGuard)
+  async registerTrainer(@Req() request: GymRequest, @Body() body: unknown) {
+    const access = request.gymAccess;
+    if (!access) throw new InternalServerErrorException('Gym context missing');
+    if (access.role !== 'OWNER') throw new ForbiddenException('Only gym owners can register trainers');
+    const parsed = trainerRegistrationInputSchema.safeParse(body);
+    if (!parsed.success) throw new UnprocessableEntityException('Enter valid trainer details');
+    if (!this.trainerEnrollment) throw new InternalServerErrorException('Trainer enrollment is unavailable');
+    return this.trainerEnrollment.enroll(access, parsed.data);
+  }
+
+  @Post(':slug/member-enrollments/:operationId/consent')
+  async memberEnrollmentConsent(@Req() request: Request, @Param('slug') slug: string,
+    @Param('operationId') operationId: string, @Body() body: unknown) {
+    if (!this.memberEnrollment) throw new InternalServerErrorException('Member enrollment is unavailable');
+    const identity = await identityFromAuthorization(request.headers.authorization);
+    const parsed = memberEnrollmentConsentInputSchema.safeParse(body);
+    if (!parsed.success) throw new UnprocessableEntityException('Enter a valid consent decision and current password');
+    const result = await this.memberEnrollment.consent(slug, operationId, {
+      identityId: identity.userId, authVersion: identity.authVersion, ...parsed.data,
+    });
+    return memberEnrollmentConsentResultSchema.parse(result);
+  }
+
+  @Post(':slug/trainer-enrollments/:operationId/consent')
+  async trainerEnrollmentConsent(@Req() request: Request, @Param('slug') slug: string,
+    @Param('operationId') operationId: string, @Body() body: unknown) {
+    if (!this.trainerEnrollment) throw new InternalServerErrorException('Trainer enrollment is unavailable');
+    const identity = await identityFromAuthorization(request.headers.authorization);
+    const parsed = memberEnrollmentConsentInputSchema.safeParse(body);
+    if (!parsed.success) throw new UnprocessableEntityException('Enter a valid consent decision and current password');
+    const result = await this.trainerEnrollment.consent(slug, operationId, {
+      identityId: identity.userId, authVersion: identity.authVersion, ...parsed.data,
+    });
+    return memberEnrollmentConsentResultSchema.parse(result);
   }
 }

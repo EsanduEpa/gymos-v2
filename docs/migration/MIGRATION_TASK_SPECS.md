@@ -2717,7 +2717,7 @@ High
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+Completed. See [task evidence](evidence/GYMOS-MIG-031.md) and [Segment 05 handoff](SEGMENT_05_HANDOFF.md).
 
 ## Task ID: GYMOS-MIG-032
 
@@ -2740,7 +2740,7 @@ V1 source behavior and deviations are enumerated for O02, O04 in the Traceabilit
 [GYMOS-MIG-013](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-013), [GYMOS-MIG-018](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-018), [GYMOS-MIG-030](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-030), [GYMOS-MIG-031](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-031)
 
 ### Implementation Scope
-Replace100-row list cap with stable page/search/status/full-filter totals. Migrate all member fields/profile tabs, last sessions with truthful bounds, membership history and independently paged derived entitlement/pack history. Basic/unlinked, pending recovery, previously active historical and operational people are explicitly labeled/separately counted. Use agreed prices rather than current plan price; no PAID badge, receipt or cash total. Preserve profile missing/empty states and navigation.
+Replace100-row list cap with stable page/search/status/full-filter totals. Migrate member fields/profile tabs and membership-term history. Basic/unlinked, pending recovery, previously active historical and operational people are explicitly labeled/separately counted. Use agreed term prices rather than current plan price; no PAID badge, receipt or cash total. Preserve profile missing/empty states and navigation. Session history moves to task044; session-pack issuance, balances and pack history move to task034; confirmed-trainer health projection belongs to task050. Segment05 still enforces safe member/owner/support projections for surfaces it owns.
 
 ### Files to Inspect
 - [/Users/esanduepa/Desktop/Projects/gymos/app/(dashboard)/owner/members/page.tsx](</Users/esanduepa/Desktop/Projects/gymos/app/(dashboard)/owner/members/page.tsx>)
@@ -2777,10 +2777,10 @@ Enforce mapped contract roles and current gym access in NestJS, then local resou
 Use strict runtime DTOs and mapped field schemas. Successful reads200, creates201 or explicitly documented202 pending; errors401 expired/invalid,403 forbidden,404 missing/foreign resource,409 stale/version/idempotency/collision conflict,422 field validation,429 rate limit,503 dependency unavailable. Unknown post-commit outcome resolves operation/receipt before retry; no generic failure that encourages duplicate financial effects. No GET writes.
 
 ### Testing Requirements
-With125+ records search reaches beyond100 and totals match filters; separate history pagers do not overwrite each other. Owner-only health and recovery DTO fields absent for other roles; password/database fields absent recursively. Run targeted unit/runtime-validator, real database integration and API role/tenant negative cases for changed boundaries; real-browser E2E/visual checks for changed screens. No unrelated broad suite repetition after passing checks.
+With125+ records search reaches beyond100 and totals match filters; membership-term history has stable paging and agrees with the full filtered result. Owner-only health and recovery DTO fields are absent from member/self/support projections; password/database fields are absent recursively. Session-history paging is verified by task044, pack history by task034, and confirmed-trainer health projection by task050. Run targeted unit/runtime-validator, real database integration and API role/tenant negative cases for changed boundaries; real-browser E2E/visual checks for changed screens. No unrelated broad suite repetition after passing checks.
 
 ### Acceptance Criteria
-- With125+ records search reaches beyond100 and totals match filters; separate history pagers do not overwrite each other. Owner-only health and recovery DTO fields absent for other roles; password/database fields absent recursively.
+- With125+ records search reaches beyond100 and totals match filters; membership-term history paging is stable. Owner-only health and recovery DTO fields are absent from member/self/support projections; password/database fields are absent recursively.
 - Success and rejected/failure cases include persisted effect counts and role/gym-safe UI/API behavior; changed reads are pure and sanitized.
 - Evidence identifies revision, environment/fixtures, commands/exit codes and any skipped or unavailable verification.
 
@@ -2806,7 +2806,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+Completed. See [task evidence](evidence/GYMOS-MIG-032.md) and [Segment 05 handoff](SEGMENT_05_HANDOFF.md).
 
 ## Task ID: GYMOS-MIG-033
 
@@ -2814,7 +2814,7 @@ Not Started.
 Make member status changes recoverable and release future holds
 
 ### Phase
-5 — Member management
+7 — Sessions, scheduling and settlement (member account lifecycle slice)
 
 ### Objective
 Make member status changes recoverable and release future holds. Deliver the concrete outcomes in Implementation Scope and Acceptance Criteria.
@@ -2826,7 +2826,7 @@ V1 source behavior and deviations are enumerated for O04 in the Traceability App
 [UI map](UI_MIGRATION_MAP.md) §§2–7,10,13,16,18 for O04; [Functionality map](FUNCTIONALITY_MIGRATION_MAP.md) §§2–3,10–12,14.1,15; [Database map](DATABASE_MIGRATION_MAP.md) §§4,6–9,11–14.1; [API register](MIGRATION_TRACEABILITY.md#api-contract-register) for C14. Read task-specific mapped source rows and decisions: DEC-02 DEC-04 DEC-08
 
 ### Dependencies
-[GYMOS-MIG-004](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-004), [GYMOS-MIG-018](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-018), [GYMOS-MIG-031](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-031), [GYMOS-MIG-040](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-040), [GYMOS-MIG-043](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-043), [GYMOS-MIG-078](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-078), [GYMOS-MIG-080](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-080), [GYMOS-MIG-084](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-084)
+[GYMOS-MIG-004](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-004), [GYMOS-MIG-018](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-018), [GYMOS-MIG-031](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-031), [GYMOS-MIG-032](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-032), [GYMOS-MIG-040](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-040), [GYMOS-MIG-043](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-043), [GYMOS-MIG-078](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-078), [GYMOS-MIG-080](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-080), [GYMOS-MIG-084](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-084)
 
 ### Implementation Scope
 Migrate status confirmation with strict enum/version/reason. On suspension/deactivation revoke future eligibility, cancel affected pending/future confirmed sessions and release held credits free, preserving settled history. Master access and tenant profile updates need operation/checkpoints and denied interim state; never assume atomic cross-database change. Retain reactivation policy and owner history. UI keeps dialog/error on rejection.
@@ -2902,7 +2902,7 @@ Not Started.
 Migrate session-pack issuance and balance projection
 
 ### Phase
-5 — Member management
+7 — Sessions, scheduling and settlement (member account lifecycle slice)
 
 ### Objective
 Migrate session-pack issuance and balance projection. Deliver the concrete outcomes in Implementation Scope and Acceptance Criteria.
@@ -2914,7 +2914,7 @@ V1 source behavior and deviations are enumerated for O04 in the Traceability App
 [UI map](UI_MIGRATION_MAP.md) §§2–7,10,13,16,18 for O04; [Functionality map](FUNCTIONALITY_MIGRATION_MAP.md) §§2–3,10–12,14.1,15; [Database map](DATABASE_MIGRATION_MAP.md) §§4,6–9,11–14.1; [API register](MIGRATION_TRACEABILITY.md#api-contract-register) for C19. Read task-specific mapped source rows and decisions: DEC-06 DEC-07 DEC-08
 
 ### Dependencies
-[GYMOS-MIG-018](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-018), [GYMOS-MIG-030](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-030), [GYMOS-MIG-031](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-031), [GYMOS-MIG-040](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-040), [GYMOS-MIG-082](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-082), [GYMOS-MIG-083](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-083), [GYMOS-MIG-084](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-084)
+[GYMOS-MIG-018](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-018), [GYMOS-MIG-030](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-030), [GYMOS-MIG-031](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-031), [GYMOS-MIG-032](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-032), [GYMOS-MIG-040](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-040), [GYMOS-MIG-082](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-082), [GYMOS-MIG-083](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-083), [GYMOS-MIG-084](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-084)
 
 ### Implementation Scope
 Migrate Issue Pack dialog with positive integer count/duration, exact nonnegative price/currency and expiry. Persist agreed price/total and immutable origin; balance derives from credit movements plus active holds. Show available/held/consumed/expired unused separately; no payment recorded. Preserve90-day/default form behavior only where reviewed, and do not claim fixed450 is a dynamic rate. Issuance is owner-only idempotent receipt+audit.
@@ -2995,16 +2995,16 @@ Verify member enrollment and recovery journey
 Verify member enrollment and recovery journey. Deliver the concrete outcomes in Implementation Scope and Acceptance Criteria.
 
 ### Current State
-V1 source behavior and deviations are enumerated for O02, O03, O04, A02 in the Traceability Appendix. V2 source-existing surface is limited to E01–E08 plus diagnostic GET/; all other mapped C responsibilities are proposed/partial. Current readiness and preserved services are in Master Plan §5.
+V1 source behavior and deviations are enumerated for O02, O03, A02 in the Traceability Appendix. V2 source-existing surface is limited to E01–E08 plus diagnostic GET/; all other mapped C responsibilities are proposed/partial. Current readiness and preserved services are in Master Plan §5.
 
 ### Required Inputs
-[UI map](UI_MIGRATION_MAP.md) §§2–7,10,13,16,18 for O02, O03, O04, A02; [Functionality map](FUNCTIONALITY_MIGRATION_MAP.md) §§2–3,10–12,14.1,15; [Database map](DATABASE_MIGRATION_MAP.md) §§4,6–9,11–14.1; [API register](MIGRATION_TRACEABILITY.md#api-contract-register) for C09, C10, C12, C19. Read task-specific mapped source rows and decisions: No additional unresolved decision assigned; honor approved map §14.1.
+[UI map](UI_MIGRATION_MAP.md) §§2–7,10,13,16,18 for O02, O03, A02; [Functionality map](FUNCTIONALITY_MIGRATION_MAP.md) §§2–3,10–12,14.1,15; [Database map](DATABASE_MIGRATION_MAP.md) §§4,6–9,11–14.1; [API register](MIGRATION_TRACEABILITY.md#api-contract-register) for C09, C10, C12. Read task-specific mapped source rows and decisions: No additional unresolved decision assigned; honor approved map §14.1.
 
 ### Dependencies
-[GYMOS-MIG-007](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-007), [GYMOS-MIG-020](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-020), [GYMOS-MIG-031](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-031), [GYMOS-MIG-032](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-032), [GYMOS-MIG-034](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-034)
+[GYMOS-MIG-007](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-007), [GYMOS-MIG-020](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-020), [GYMOS-MIG-031](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-031), [GYMOS-MIG-032](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-032)
 
 ### Implementation Scope
-Integrate owner registration, retained error draft, one-time credential display/copy/continue, forced password change and member role entry in two gyms. Test existing-login verified reuse and current basic-member behavior separately. Inject tenant commit before lost Master activation/response and exercise authorized operation recovery. Compare member forms/profile states with V1 fixtures.
+Integrate owner registration, retained error draft, one-time credential display/copy/continue, forced password change and member role entry in two gyms. Test existing-login verified reuse and current basic-member behavior separately. Inject tenant commit before lost Master activation/response and exercise authorized operation recovery. Verify the paged member roster/profile from task032. Pack issuance, pack balances and session-history views are verified by their Segment07 owning tasks (034/044), not this Segment05 journey.
 
 ### Files to Inspect
 - [/Users/esanduepa/Desktop/Projects/gymos/app/(dashboard)/owner/members/page.tsx](</Users/esanduepa/Desktop/Projects/gymos/app/(dashboard)/owner/members/page.tsx>)
@@ -3012,9 +3012,7 @@ Integrate owner registration, retained error draft, one-time credential display/
 - [/Users/esanduepa/Desktop/Projects/gymos/app/(dashboard)/owner/members/[id]/page.tsx](</Users/esanduepa/Desktop/Projects/gymos/app/(dashboard)/owner/members/[id]/page.tsx>)
 - [/Users/esanduepa/Desktop/Projects/gymos/app/(auth)/change-password/page.tsx](</Users/esanduepa/Desktop/Projects/gymos/app/(auth)/change-password/page.tsx>)
 - [/Users/esanduepa/Desktop/Projects/gymos/app/actions/account.ts](</Users/esanduepa/Desktop/Projects/gymos/app/actions/account.ts>)
-- [/Users/esanduepa/Desktop/Projects/gymos/app/actions/financials.ts](</Users/esanduepa/Desktop/Projects/gymos/app/actions/financials.ts>)
 - [/Users/esanduepa/Desktop/Projects/gymos/app/actions/members.ts](</Users/esanduepa/Desktop/Projects/gymos/app/actions/members.ts>)
-- [/Users/esanduepa/Desktop/Projects/gymos/app/actions/packs.ts](</Users/esanduepa/Desktop/Projects/gymos/app/actions/packs.ts>)
 - [/Users/esanduepa/Desktop/Projects/gymos-v2/apps/api/src/app.module.ts](</Users/esanduepa/Desktop/Projects/gymos-v2/apps/api/src/app.module.ts>)
 - [/Users/esanduepa/Desktop/Projects/gymos-v2/apps/web/src/lib/gymos.ts](</Users/esanduepa/Desktop/Projects/gymos-v2/apps/web/src/lib/gymos.ts>)
 - [/Users/esanduepa/Desktop/Projects/gymos-v2/apps/api/src/app.controller.spec.ts](</Users/esanduepa/Desktop/Projects/gymos-v2/apps/api/src/app.controller.spec.ts>)
@@ -3041,10 +3039,10 @@ Enforce mapped contract roles and current gym access in NestJS, then local resou
 Use strict runtime DTOs and mapped field schemas. Successful reads200, creates201 or explicitly documented202 pending; errors401 expired/invalid,403 forbidden,404 missing/foreign resource,409 stale/version/idempotency/collision conflict,422 field validation,429 rate limit,503 dependency unavailable. Unknown post-commit outcome resolves operation/receipt before retry; no generic failure that encourages duplicate financial effects. No GET writes.
 
 ### Testing Requirements
-One identity with separate actor IDs works across gyms without password reset; no pending actor leaks to list/options; repeated recovery creates no extra member/term/pack/audit. Clipboard failure is visible and secret cleared on exit. Evidence includes persisted counts and UI/API results. Run targeted unit/runtime-validator, real database integration and API role/tenant negative cases for changed boundaries; real-browser E2E/visual checks for changed screens. No unrelated broad suite repetition after passing checks.
+One identity with separate actor IDs works across gyms without password reset; pending member recovery never leaks into the owner roster; repeated recovery creates no extra member/term/audit. Clipboard failure is visible and secret cleared on exit. Pack effects are outside this task and are verified by task034. Evidence includes persisted counts and UI/API results. Run targeted unit/runtime-validator, real database integration and API role/tenant negative cases for changed boundaries; real-browser E2E/visual checks for changed screens. No unrelated broad suite repetition after passing checks.
 
 ### Acceptance Criteria
-- One identity with separate actor IDs works across gyms without password reset; no pending actor leaks to list/options; repeated recovery creates no extra member/term/pack/audit. Clipboard failure is visible and secret cleared on exit. Evidence includes persisted counts and UI/API results.
+- One identity with separate actor IDs works across gyms without password reset; no pending actor leaks to list/options; repeated recovery creates no extra member/term/audit. Clipboard failure is visible and secret cleared on exit. Evidence includes persisted counts and UI/API results.
 - Success and rejected/failure cases include persisted effect counts and role/gym-safe UI/API behavior; changed reads are pure and sanitized.
 - Evidence identifies revision, environment/fixtures, commands/exit codes and any skipped or unavailable verification.
 
@@ -3070,7 +3068,7 @@ High
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+Completed. See [task evidence](evidence/GYMOS-MIG-035.md) and [Segment 05 handoff](SEGMENT_05_HANDOFF.md).
 
 ## Task ID: GYMOS-MIG-036
 
@@ -3126,10 +3124,10 @@ Enforce mapped contract roles and current gym access in NestJS, then local resou
 Use strict runtime DTOs and mapped field schemas. Successful reads200, creates201 or explicitly documented202 pending; errors401 expired/invalid,403 forbidden,404 missing/foreign resource,409 stale/version/idempotency/collision conflict,422 field validation,429 rate limit,503 dependency unavailable. Unknown post-commit outcome resolves operation/receipt before retry; no generic failure that encourages duplicate financial effects. No GET writes.
 
 ### Testing Requirements
-New trainer forced-change login and verified existing login reuse work; same-gym role conflict rejected; failures resume one actor/access/audit. Unpublished trainer never appears in member directory or booking options. Run targeted unit/runtime-validator, real database integration and API role/tenant negative cases for changed boundaries; real-browser E2E/visual checks for changed screens. No unrelated broad suite repetition after passing checks.
+New trainer forced-change login and verified existing login reuse work; same-gym role conflict rejected; failures resume one actor/access/audit. Directory publication is verified by task039 and booking eligibility by task041. Run targeted unit/runtime-validator, real database integration and API role/tenant negative cases for changed boundaries; real-browser E2E/visual checks for changed screens. No unrelated broad suite repetition after passing checks.
 
 ### Acceptance Criteria
-- New trainer forced-change login and verified existing login reuse work; same-gym role conflict rejected; failures resume one actor/access/audit. Unpublished trainer never appears in member directory or booking options.
+- New trainer forced-change login and verified existing login reuse work; same-gym role conflict rejected; failures resume one actor/access/audit. Directory publication is verified by task039 and booking eligibility by task041.
 - Success and rejected/failure cases include persisted effect counts and role/gym-safe UI/API behavior; changed reads are pure and sanitized.
 - Evidence identifies revision, environment/fixtures, commands/exit codes and any skipped or unavailable verification.
 
@@ -3155,7 +3153,7 @@ High
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+In Progress.
 
 ## Task ID: GYMOS-MIG-037
 
@@ -3378,10 +3376,10 @@ Enforce mapped contract roles and current gym access in NestJS, then local resou
 Use strict runtime DTOs and mapped field schemas. Successful reads200, creates201 or explicitly documented202 pending; errors401 expired/invalid,403 forbidden,404 missing/foreign resource,409 stale/version/idempotency/collision conflict,422 field validation,429 rate limit,503 dependency unavailable. Unknown post-commit outcome resolves operation/receipt before retry; no generic failure that encourages duplicate financial effects. No GET writes.
 
 ### Testing Requirements
-Member entry succeeds without GET/members; pending/deactivated trainers hidden; cross-gym trainer URL404; long names/narrow cards preserve V1 hierarchy. Server authorization checked independently of visible request link. Run targeted unit/runtime-validator, real database integration and API role/tenant negative cases for changed boundaries; real-browser E2E/visual checks for changed screens. No unrelated broad suite repetition after passing checks.
+Member entry succeeds without GET/members; pending/unpublished/deactivated trainers hidden; cross-gym trainer URL404; long names/narrow cards preserve V1 hierarchy. Server authorization checked independently of visible request link. Run targeted unit/runtime-validator, real database integration and API role/tenant negative cases for changed boundaries; real-browser E2E/visual checks for changed screens. No unrelated broad suite repetition after passing checks.
 
 ### Acceptance Criteria
-- Member entry succeeds without GET/members; pending/deactivated trainers hidden; cross-gym trainer URL404; long names/narrow cards preserve V1 hierarchy. Server authorization checked independently of visible request link.
+- Member entry succeeds without GET/members; pending/unpublished/deactivated trainers hidden; cross-gym trainer URL404; long names/narrow cards preserve V1 hierarchy. Server authorization checked independently of visible request link.
 - Success and rejected/failure cases include persisted effect counts and role/gym-safe UI/API behavior; changed reads are pure and sanitized.
 - Evidence identifies revision, environment/fixtures, commands/exit codes and any skipped or unavailable verification.
 
@@ -3550,10 +3548,10 @@ Enforce mapped contract roles and current gym access in NestJS, then local resou
 Use strict runtime DTOs and mapped field schemas. Successful reads200, creates201 or explicitly documented202 pending; errors401 expired/invalid,403 forbidden,404 missing/foreign resource,409 stale/version/idempotency/collision conflict,422 field validation,429 rate limit,503 dependency unavailable. Unknown post-commit outcome resolves operation/receipt before retry; no generic failure that encourages duplicate financial effects. No GET writes.
 
 ### Testing Requirements
-Last credit raced by two bookings permits one; touching intervals versus real overlap follows reviewed rule. Inactive/expired/foreign actors, insufficient credit and stale options return useful errors without extra effects. Run targeted unit/runtime-validator, real database integration and API role/tenant negative cases for changed boundaries; real-browser E2E/visual checks for changed screens. No unrelated broad suite repetition after passing checks.
+Last credit raced by two bookings permits one; touching intervals versus real overlap follows reviewed rule. Inactive, expired, unpublished or foreign trainers/members, insufficient credit and stale options return useful errors without extra effects. Run targeted unit/runtime-validator, real database integration and API role/tenant negative cases for changed boundaries; real-browser E2E/visual checks for changed screens. No unrelated broad suite repetition after passing checks.
 
 ### Acceptance Criteria
-- Last credit raced by two bookings permits one; touching intervals versus real overlap follows reviewed rule. Inactive/expired/foreign actors, insufficient credit and stale options return useful errors without extra effects.
+- Last credit raced by two bookings permits one; touching intervals versus real overlap follows reviewed rule. Inactive, expired, unpublished or foreign trainers/members, insufficient credit and stale options return useful errors without extra effects.
 - Success and rejected/failure cases include persisted effect counts and role/gym-safe UI/API behavior; changed reads are pure and sanitized.
 - Evidence identifies revision, environment/fixtures, commands/exit codes and any skipped or unavailable verification.
 
@@ -3770,10 +3768,10 @@ V1 source behavior and deviations are enumerated for O08, T01, M03 in the Tracea
 [UI map](UI_MIGRATION_MAP.md) §§2–7,10,13,16,18 for O08, T01, M03; [Functionality map](FUNCTIONALITY_MIGRATION_MAP.md) §§2–3,10–12,14.1,15; [Database map](DATABASE_MIGRATION_MAP.md) §§4,6–9,11–14.1; [API register](MIGRATION_TRACEABILITY.md#api-contract-register) for C20, C37, C63. Read task-specific mapped source rows and decisions: DEC-07 DEC-09
 
 ### Dependencies
-[GYMOS-MIG-013](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-013), [GYMOS-MIG-018](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-018), [GYMOS-MIG-041](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-041), [GYMOS-MIG-042](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-042), [GYMOS-MIG-043](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-043), [GYMOS-MIG-083](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-083), [GYMOS-MIG-085](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-085)
+[GYMOS-MIG-013](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-013), [GYMOS-MIG-018](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-018), [GYMOS-MIG-032](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-032), [GYMOS-MIG-041](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-041), [GYMOS-MIG-042](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-042), [GYMOS-MIG-043](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-043), [GYMOS-MIG-083](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-083), [GYMOS-MIG-085](MIGRATION_TASK_SPECS.md#task-id-gymos-mig-085)
 
 ### Implementation Scope
-Migrate daily filters/date arrows/Today/pagination, monthly member view/More overlay, trainer schedule/live timer and member pending/history cards. C63 separates lifetime pack totals from month bookings and independent full-filter totals. Show command affordances from server policy/version/time, display inline errors and retain dialogs. Timer is display-only; pure reads never settle sessions. Refresh reads within approved cross-role bound.
+Migrate daily filters/date arrows/Today/pagination, monthly member view/More overlay, trainer schedule/live timer and member pending/history cards and the bounded recent-session panel on the member profile. C63 separates lifetime pack totals from month bookings and independent full-filter totals. Show command affordances from server policy/version/time, display inline errors and retain dialogs. Timer is display-only; pure reads never settle sessions. Refresh reads within approved cross-role bound.
 
 ### Files to Inspect
 - [/Users/esanduepa/Desktop/Projects/gymos/app/(dashboard)/owner/sessions/page.tsx](</Users/esanduepa/Desktop/Projects/gymos/app/(dashboard)/owner/sessions/page.tsx>)
@@ -3805,10 +3803,10 @@ Enforce mapped contract roles and current gym access in NestJS, then local resou
 Use strict runtime DTOs and mapped field schemas. Successful reads200, creates201 or explicitly documented202 pending; errors401 expired/invalid,403 forbidden,404 missing/foreign resource,409 stale/version/idempotency/collision conflict,422 field validation,429 rate limit,503 dependency unavailable. Unknown post-commit outcome resolves operation/receipt before retry; no generic failure that encourages duplicate financial effects. No GET writes.
 
 ### Testing Requirements
-All three roles see same version/asOf and correct gym, month/date/filter totals; >100 rows handled; stale poll cannot overwrite newer state; timer initializes/resets correctly. Screens preserve meaningful tabs/notes and distinguish empty from unavailable. Run targeted unit/runtime-validator, real database integration and API role/tenant negative cases for changed boundaries; real-browser E2E/visual checks for changed screens. No unrelated broad suite repetition after passing checks.
+All three roles see same version/asOf and correct gym, month/date/filter totals; member profile recent-session panel agrees with the session read API; >100 rows handled; stale poll cannot overwrite newer state; timer initializes/resets correctly. Screens preserve meaningful tabs/notes and distinguish empty from unavailable. Run targeted unit/runtime-validator, real database integration and API role/tenant negative cases for changed boundaries; real-browser E2E/visual checks for changed screens. No unrelated broad suite repetition after passing checks.
 
 ### Acceptance Criteria
-- All three roles see same version/asOf and correct gym, month/date/filter totals; >100 rows handled; stale poll cannot overwrite newer state; timer initializes/resets correctly. Screens preserve meaningful tabs/notes and distinguish empty from unavailable.
+- All three roles see same version/asOf and correct gym, month/date/filter totals; member profile recent-session panel agrees with the session read API; >100 rows handled; stale poll cannot overwrite newer state; timer initializes/resets correctly. Screens preserve meaningful tabs/notes and distinguish empty from unavailable.
 - Success and rejected/failure cases include persisted effect counts and role/gym-safe UI/API behavior; changed reads are pure and sanitized.
 - Evidence identifies revision, environment/fixtures, commands/exit codes and any skipped or unavailable verification.
 
