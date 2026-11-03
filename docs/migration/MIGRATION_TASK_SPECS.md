@@ -1330,7 +1330,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+In Progress. Additive tenant aggregate/hold/ledger schema, named transition helpers, transactional reservation/release/consume primitives, lock ordering, bounded deadlock/serialization retry and guarded concurrency integration coverage are present. This is a foundation only: booking/request consumers, full mapped command receipts/authorization paths and remaining acceptance are pending. See [GYMOS-MIG-040 evidence](evidence/GYMOS-MIG-040.md).
 
 ## Task ID: GYMOS-MIG-016
 
@@ -2368,7 +2368,7 @@ High
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+In Progress. Typed notification contracts/client, recipient-bound source-event helper, selected-gym reads/marks, owner audit paging and responsive bell are implemented. Guarded two-gym API and browser checks pass. Booking/session event producers and remaining acceptance are pending. See [GYMOS-MIG-043 evidence](evidence/GYMOS-MIG-043.md).
 
 ## Task ID: GYMOS-MIG-028
 
@@ -2455,7 +2455,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+Completed.
 
 ## Task ID: GYMOS-MIG-029
 
@@ -2541,7 +2541,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+Completed.
 
 ## Task ID: GYMOS-MIG-030
 
@@ -2894,7 +2894,7 @@ High
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+In Progress. Owner-only member status and resumable future-session/hold reconciliation are implemented with additive Master intent migration, tenant receipt/audit/notification, member profile form and guarded failure/retry tests. Foreign-member/two-gym fixture, headed UI and hosted acceptance remain. See [GYMOS-MIG-033 evidence](evidence/GYMOS-MIG-033.md).
 
 ## Task ID: GYMOS-MIG-034
 
@@ -2981,7 +2981,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+In Progress. Owner-only pack issuance, selected-member balance projection and the member-profile form are implemented on the Task 040 ledger. Guarded integration verifies zero price, concurrent same-key replay, owner/member and two-gym boundaries, and a pure expired-unused read. Pack-specific failure-injection/conflicting-key acceptance and the Task 040 dependency gate remain open. See [GYMOS-MIG-034 evidence](evidence/GYMOS-MIG-034.md).
 
 ## Task ID: GYMOS-MIG-035
 
@@ -3239,7 +3239,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+In Progress. Owner roster/profile and audited shift approval are implemented and pass disposable API and responsive browser checks. Session summary now returns latest ten sessions, truthful all-state total and `hasMore`, completion counts and distinct confirmed-client count. Booking/request integration and committed hosted checks remain; see [GYMOS-MIG-037 evidence](evidence/GYMOS-MIG-037.md).
 
 ## Task ID: GYMOS-MIG-038
 
@@ -3324,7 +3324,7 @@ High
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+In Progress. Trainer-specific Master intent, tenant status receipt/audit, owner resume flow, resumable future-session cancellation/hold release and member notification are implemented. A guarded PostgreSQL test covers notification rollback, access-fence blocking/revocation, retry, reactivation and cross-gym isolation. Booking/request consumers and their deactivation races remain; see [GYMOS-MIG-038 evidence](evidence/GYMOS-MIG-038.md).
 
 ## Task ID: GYMOS-MIG-039
 
@@ -3405,7 +3405,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+In Progress. Member-safe directory API and responsive page pass two-gym disposable integration and browser checks. The selected-gym request link awaits the Task 042 request route; see [GYMOS-MIG-039 evidence](evidence/GYMOS-MIG-039.md).
 
 ## Task ID: GYMOS-MIG-040
 
@@ -3492,7 +3492,7 @@ High
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+In Progress. Additive tenant aggregate/hold/ledger schema, named transition helpers, transactional reservation/release/consume primitives and guarded concurrency integration coverage are present. This is a foundation only: booking/request consumers, full mapped command receipts/authorization paths and the remaining acceptance matrix are pending. See [GYMOS-MIG-040 evidence](evidence/GYMOS-MIG-040.md).
 
 ## Task ID: GYMOS-MIG-041
 
@@ -3577,7 +3577,7 @@ High
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+In Progress. Owner booking options/command, immutable allocated-credit hold, tenant receipt/audit/member notification, access fence, contracts/client and owner form are implemented. Guarded API integration passed 3/3; final headed browser/API integration and downstream acceptance remain. See [GYMOS-MIG-041 evidence](evidence/GYMOS-MIG-041.md).
 
 ## Task ID: GYMOS-MIG-042
 
@@ -3663,7 +3663,7 @@ High
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+In Progress. Member pending requests without holds and assigned-trainer accept/decline commands, access fence, receipt/audit/notification, contracts/client and role pages are implemented. Guarded tests are being repaired for last-credit fixture isolation and notification failure rollback. Decline-reason capture awaits the owner’s visibility decision. See [GYMOS-MIG-042 evidence](evidence/GYMOS-MIG-042.md).
 
 ## Task ID: GYMOS-MIG-043
 
@@ -3748,7 +3748,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+In Progress. Typed notification contracts/client, recipient-bound source-event helper, selected-gym reads/marks, owner audit paging and responsive bell are implemented. Guarded two-gym API and browser checks pass. Booking/session event producers and remaining acceptance are pending. See [GYMOS-MIG-043 evidence](evidence/GYMOS-MIG-043.md).
 
 ## Task ID: GYMOS-MIG-044
 
@@ -3832,7 +3832,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-Not Started.
+In Progress. Role-safe owner/trainer/member session read APIs, timezone-aware filters, page projections, read-only recent-session view and responsive role pages are implemented; guarded API tests passed 3/3. C63 owner month/member overview and final browser/dependency acceptance remain. See [GYMOS-MIG-044 evidence](evidence/GYMOS-MIG-044.md).
 
 ## Task ID: GYMOS-MIG-045
 

@@ -47,7 +47,7 @@ Proposed tenant models include Session, CreditHold/Pack ledger, unique Settlemen
 ### 034 — member session-pack issuance and balance projection (reassigned from Segment 05)
 
 - **Prerequisites:** 018,030,031,032,040,082–084.
-- **Instructions:** exact immutable issue values and receipt/audit; derive available/held/consumed/expired balances from credit movements and active holds; no payment receipt.
+- **Instructions:** exact immutable issue values and receipt/audit; derive available/held/consumed/expired balances from credit movements and active holds; no payment receipt. Partial owner issuance/form and balance projection implemented; see [034 evidence](../evidence/GYMOS-MIG-034.md).
 - **Acceptance/tests:** zero/negative/precision/expiry, concurrent last credit and duplicate issue, historical packs, owner-only/foreign member and conservation invariant. **[ ]**
 
 ### 040 — session aggregate, holds, transition constraints
@@ -129,10 +129,11 @@ Stop until DEC-06/07/08 and required people/config fields are approved. Implemen
 
 ## 11. Progress and handoff
 
-- **Status:** NOT STARTED
-- **Completed:** none
-- **Remaining:** 033, 034 and 040–048
-- **Next recommended task:** GYMOS-MIG-040.
-- **Segment 05 coordination:** its exit gate is tasks031/032/035 and is documented in [the exit checklist](../SEGMENT_05_EXIT_CHECKLIST.md). Task033 and034 are owned in this segment. Complete 040 before their session-hold/credit consumers; complete 034 before booking tasks041/042 and 033 before task047.
-- **Files/tests/issues/blockers/decisions:** _fill during execution_
+- **Status:** IN PROGRESS (0/11 tasks marked complete; implementation and targeted evidence exist for 033/034/040–047)
+- **Completed:** none. Verified implementation is not marked complete until task dependency, hosted and owner-visible review gates close.
+- **In progress:** 033/034 and 040–047. Guarded suites cover recovery, pack allocation, booking/request, notifications, role reads/C63, start/completion/pay correction and quote-first cancellation/no-show.
+- **Remaining:** final cross-task review, owner-visible Chrome, hosted checks, and Task 048's barrier race suite. Task 048 depends on Task 049; the owner confirmed Task 049 remains in the finance/operational value segment, so 048 stays gated and no finance scope is added here.
+- **Next recommended work:** prepare the focused reviewable revision/PR and run hosted checks when repository access permits; complete owner-visible browser review when the CUA host can attach to Chrome. Revisit Task 048 only after its Segment 08 dependency is complete.
+- **Segment 05 coordination:** its exit gate is tasks031/032/035 and is documented in [the exit checklist](../SEGMENT_05_EXIT_CHECKLIST.md). Tasks033 and034 are owned here; their status changes preserve existing Segment 05 completion.
+- **Files/tests/issues/blockers/decisions:** See [033–034](../evidence/GYMOS-MIG-033.md), [040](../evidence/GYMOS-MIG-040.md), [043](../evidence/GYMOS-MIG-043.md), [044](../evidence/GYMOS-MIG-044.md), and [045–047](../evidence/GYMOS-MIG-045.md). Changes are uncommitted on `codex/segment-06-management` based on `7c09fd4`; no hosted PR checks have run. Guarded disposable PostgreSQL/browser harnesses cleaned their owned databases, containers and manifests. The demo database and V1 were not used.
 

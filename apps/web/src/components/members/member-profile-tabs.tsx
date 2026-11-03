@@ -3,10 +3,12 @@
 import { useState } from 'react';
 import type { MemberDetail } from '@gymos/contracts';
 import { Card, EmptyState, StatusBadge, Tabs } from '@/components/ui';
+import { SessionPackPanel } from '@/components/members/session-pack-panel';
+import { MemberLifecycleForm } from '@/components/members/member-lifecycle-form';
 
 const items = [{ id: 'overview', label: 'Overview' }, { id: 'sessions', label: 'Attendance' }, { id: 'history', label: 'Membership & Packs' }];
 
-export function MemberProfileTabs({ member, slug }: { member: MemberDetail; slug: string }) {
+export function MemberProfileTabs({ member, slug, requestKey }: { member: MemberDetail; slug: string; requestKey: string }) {
   const [active, setActive] = useState(() => typeof window !== 'undefined' && window.location.hash === '#history' ? 'history' : 'overview');
   return <section className="member-profile-tabs">
     <Card>
@@ -21,6 +23,7 @@ export function MemberProfileTabs({ member, slug }: { member: MemberDetail; slug
         </dl>
         <div><h3>Health notes</h3><p>{member.healthNotes || 'No health notes have been added.'}</p><small>Private gym information.</small></div>
         <div><h3>Current registration</h3><p><StatusBadge status={member.registrationState}/></p></div>
+        {member.registrationState === 'COMPLETE' ? <MemberLifecycleForm slug={slug} memberId={member.id} status={member.status} version={member.version} initialRequestKey={requestKey}/> : null}
       </div> : null}
       {active === 'sessions' ? <div id="panel-sessions" role="tabpanel" aria-labelledby="tab-sessions" tabIndex={0} className="member-profile-panel">
         {member.recentSessions.length ? <ol>{member.recentSessions.map(session => <li key={session.id}>{session.scheduledStart} · {session.state}</li>)}</ol>
@@ -37,11 +40,8 @@ export function MemberProfileTabs({ member, slug }: { member: MemberDetail; slug
           {member.membershipPage > 1 ? <a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/owner/members/${encodeURIComponent(member.id)}?membershipPage=${member.membershipPage - 1}&membershipPageSize=${member.membershipPageSize}#history`}>Previous membership page</a> : null}
           {member.membershipPage < member.membershipTotalPages ? <a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/owner/members/${encodeURIComponent(member.id)}?membershipPage=${member.membershipPage + 1}&membershipPageSize=${member.membershipPageSize}#history`}>Next membership page</a> : null}
         </nav> : null}
-        <h3>Session-pack balance</h3>
-        {member.sessionPacks.length ? <div className="member-history-list">{member.sessionPacks.map(pack => <article key={pack.id}>
-          <div><strong>{pack.issuedCredits} sessions issued</strong><small>{pack.startDate} to the day before {pack.endDateExclusive}</small></div>
-          <span>{pack.availableCredits} available<small>{pack.price} {pack.currency} · entitlement only</small></span>
-        </article>)}</div> : <EmptyState title="Pack history will appear when the session credit ledger is available."/>}
+        <SessionPackPanel slug={slug} memberId={member.id} status={member.status} currency={member.gymCurrency}
+          packs={member.sessionPacks} requestKey={requestKey}/>
       </div> : null}
     </Card>
   </section>;

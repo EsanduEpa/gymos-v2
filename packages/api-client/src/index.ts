@@ -3,6 +3,14 @@ import type { z } from 'zod';
 export * from './configuration.js';
 export * from './members.js';
 export * from './trainers.js';
+export * from './notifications.js';
+export * from './packs.js';
+export * from './session-booking.js';
+export * from './session-reads.js';
+export * from './session-requests.js';
+export * from './session-lifecycle.js';
+export * from './member-lifecycle.js';
+export * from './coaching.js';
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 type Fetcher = (input: string, init: RequestInit) => Promise<Response>;

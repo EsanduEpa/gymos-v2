@@ -27,12 +27,30 @@ import { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js
 import { ConfigurationController } from './configuration.controller.js';
 import { MemberEnrollmentService } from './member-enrollment.service.js';
 import { TrainerEnrollmentService } from './trainer-enrollment.service.js';
+import { TrainersController } from './trainers.controller.js';
+import { PacksController } from './packs.controller.js';
+import { NotificationsController } from './notifications.controller.js';
+import { TrainerLifecycleService } from './trainer-lifecycle.service.js';
+import { SessionBookingController } from './sessions/booking.controller.js';
+import { SessionBookingService } from './sessions/booking.service.js';
+import { SessionReadsController } from './sessions/session-reads.controller.js';
+import { SessionReadsService } from './sessions/session-reads.service.js';
+import { SessionRequestsController } from './sessions/session-requests.controller.js';
+import { SessionRequestsService } from './sessions/session-requests.service.js';
+import { MemberSessionOverviewController } from './sessions/member-session-overview.controller.js';
+import { MemberSessionOverviewService } from './sessions/member-session-overview.service.js';
+import { CoachingController } from './coaching/coaching.controller.js';
+import { CoachingService } from './coaching/coaching.service.js';
+import { MemberLifecycleController } from './member-lifecycle.controller.js';
+import { MemberLifecycleService } from './member-lifecycle.service.js';
+import { SessionLifecycleController } from './sessions/session-lifecycle.controller.js';
+import { SessionLifecycleService } from './sessions/session-lifecycle.service.js';
 
 @Module({
   imports: [
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
   ],
-  controllers: [AppController, AdminController, AuthController, CredentialsController, CredentialReissueController, GymsController, ConfigurationController, ProvisioningOwnerController, SupportSessionController, GymLifecycleController],
+  controllers: [AppController, AdminController, AuthController, CredentialsController, CredentialReissueController, GymsController, TrainersController, PacksController, NotificationsController, ConfigurationController, ProvisioningOwnerController, SupportSessionController, GymLifecycleController, SessionBookingController, SessionReadsController, SessionRequestsController, MemberSessionOverviewController, CoachingController, MemberLifecycleController, SessionLifecycleController],
   providers: [
     AppService,
     DatabaseService,
@@ -50,6 +68,14 @@ import { TrainerEnrollmentService } from './trainer-enrollment.service.js';
     TenantDatabaseService,
     TenantRegistryService,
     TenantSchemaGateService,
+    TrainerLifecycleService,
+    SessionBookingService,
+    SessionReadsService,
+    SessionRequestsService,
+    MemberSessionOverviewService,
+    CoachingService,
+    MemberLifecycleService,
+    SessionLifecycleService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: SupportScopeGuard },
   ],

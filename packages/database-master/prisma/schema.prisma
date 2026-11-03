@@ -145,6 +145,8 @@ enum OperationKind {
   REGISTER_TRAINER
   UPDATE_GYM_PROFILE
   CHANGE_ACCESS
+  CHANGE_TRAINER_ACCESS
+  CHANGE_MEMBER_STATUS
   ROLLOUT_TENANT_SCHEMA
 }
 
@@ -161,6 +163,8 @@ enum OperationState {
 model Operation {
   provisioningIntent ProvisioningIntent?
   lifecycleIntent GymLifecycleIntent?
+  trainerLifecycleIntent TrainerLifecycleIntent?
+  memberLifecycleIntent MemberLifecycleIntent?
   schemaRolloutTarget SchemaRolloutTarget?
   id                            String              @id @default(cuid())
   kind                          OperationKind
@@ -320,6 +324,32 @@ model GymLifecycleIntent {
   target String
   reason String
   createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model TrainerLifecycleIntent {
+  operationId          String    @id
+  operation            Operation @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  trainerId            String
+  expectedAccessVersion Int
+  expectedTrainerVersion Int
+  targetStatus         String
+  reason               String
+  createdAt            DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([trainerId, createdAt])
+}
+
+model MemberLifecycleIntent {
+  operationId           String    @id
+  operation             Operation @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  memberId              String
+  expectedAccessVersion Int
+  expectedMemberVersion Int
+  targetStatus          String
+  reason                String
+  createdAt             DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([memberId, createdAt])
 }
 
 model SchemaRollout {

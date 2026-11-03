@@ -85,6 +85,8 @@ export const stepSequences = {
   REGISTER_MEMBER: ['MASTER_PREPARED', 'TENANT_REGISTRATION_COMMITTED', 'MASTER_ACTIVATED'],
   REGISTER_TRAINER: ['MASTER_PREPARED', 'TENANT_REGISTRATION_COMMITTED', 'MASTER_ACTIVATED'],
   CHANGE_ACCESS: ['ADMISSION_BLOCKED', 'POOLS_DRAINED', 'LIFECYCLE_APPLIED'],
+  CHANGE_TRAINER_ACCESS: ['TRAINER_ACCESS_PREPARED', 'TRAINER_STATUS_APPLIED', 'TRAINER_SESSIONS_RECONCILED', 'TRAINER_ACCESS_FINALIZED'],
+  CHANGE_MEMBER_STATUS: ['MEMBER_ACCESS_PREPARED', 'MEMBER_STATUS_APPLIED', 'MEMBER_SESSIONS_RECONCILED', 'MEMBER_ACCESS_FINALIZED'],
   ROLLOUT_TENANT_SCHEMA: ['SCHEMA_ADMISSION_BLOCKED', 'SCHEMA_APPLIED', 'SCHEMA_BOUND', 'SCHEMA_COMPLETE'],
 } as const;
 export type SupportedKind = keyof typeof stepSequences;
@@ -92,16 +94,23 @@ export type StepCode = typeof stepSequences[SupportedKind][number];
 export type StepEvidence = {
   gymId?: string; databaseName?: string; subjectIdentityId?: string; ownerThemeId?: string;
   tenantActorId?: string; tenantCommandReceiptId?: string; tenantMembershipId?: string;
+  trainerId?: string; targetStatus?: string; expectedTrainerVersion?: number; expectedAccessVersion?: number;
+  memberId?: string; expectedMemberVersion?: number;
   intendedTenantTemplateVersion?: string; intendedTenantManifestDigest?: string;
   appliedTenantTemplateVersion?: string; appliedTenantManifestDigest?: string;
 };
 export type CompletedStep = { completedAt: string; evidence: StepEvidence };
 export type CompletedSteps = Partial<Record<StepCode, CompletedStep>>;
-const evidenceKeys = new Set(['gymId', 'databaseName', 'subjectIdentityId', 'ownerThemeId', 'tenantActorId', 'tenantCommandReceiptId', 'tenantMembershipId', 'intendedTenantTemplateVersion', 'intendedTenantManifestDigest', 'appliedTenantTemplateVersion', 'appliedTenantManifestDigest']);
+const evidenceKeys = new Set(['gymId', 'databaseName', 'subjectIdentityId', 'ownerThemeId', 'tenantActorId', 'tenantCommandReceiptId', 'tenantMembershipId', 'trainerId', 'targetStatus', 'expectedTrainerVersion', 'expectedAccessVersion', 'memberId', 'expectedMemberVersion', 'intendedTenantTemplateVersion', 'intendedTenantManifestDigest', 'appliedTenantTemplateVersion', 'appliedTenantManifestDigest']);
 export function validateStepEvidence(kind: SupportedKind, step: StepCode, evidence: StepEvidence): StepEvidence {
   canonicalJson(evidence);
   for (const [key, value] of Object.entries(evidence)) {
-    if (!evidenceKeys.has(key) || typeof value !== 'string' || !value.length || value.length > 200) throw new TypeError('Invalid checkpoint evidence');
+    if (!evidenceKeys.has(key)) throw new TypeError('Invalid checkpoint evidence');
+    if (key === 'expectedTrainerVersion' || key === 'expectedMemberVersion' || key === 'expectedAccessVersion') {
+      if (!Number.isSafeInteger(value) || (value as number) < 0) throw new TypeError('Invalid checkpoint version');
+      continue;
+    }
+    if (typeof value !== 'string' || !value.length || value.length > 200) throw new TypeError('Invalid checkpoint evidence');
     if (key.endsWith('Digest') && !/^[a-f0-9]{64}$/.test(value)) throw new TypeError('Invalid manifest digest');
     if (key === 'databaseName' && !/^gymos_[a-f0-9]{32}$/.test(value)) throw new TypeError('Invalid operation database target');
   }
@@ -113,6 +122,14 @@ export function validateStepEvidence(kind: SupportedKind, step: StepCode, eviden
     MASTER_ACTIVATED: ['gymId'],
     ADMISSION_BLOCKED: ['gymId'], POOLS_DRAINED: ['gymId'], LIFECYCLE_APPLIED: ['gymId'],
     SCHEMA_ADMISSION_BLOCKED: ['gymId'], SCHEMA_APPLIED: ['appliedTenantTemplateVersion', 'appliedTenantManifestDigest'], SCHEMA_BOUND: ['gymId'], SCHEMA_COMPLETE: ['gymId'],
+    TRAINER_ACCESS_PREPARED: ['gymId', 'subjectIdentityId', 'tenantActorId', 'trainerId', 'targetStatus', 'expectedTrainerVersion', 'expectedAccessVersion'],
+    TRAINER_STATUS_APPLIED: ['gymId', 'trainerId', 'targetStatus'],
+    TRAINER_SESSIONS_RECONCILED: ['gymId', 'trainerId', 'targetStatus'],
+    TRAINER_ACCESS_FINALIZED: ['gymId', 'subjectIdentityId', 'targetStatus'],
+    MEMBER_ACCESS_PREPARED: ['gymId', 'subjectIdentityId', 'tenantActorId', 'memberId', 'targetStatus', 'expectedMemberVersion', 'expectedAccessVersion'],
+    MEMBER_STATUS_APPLIED: ['gymId', 'memberId', 'targetStatus'],
+    MEMBER_SESSIONS_RECONCILED: ['gymId', 'memberId', 'targetStatus'],
+    MEMBER_ACCESS_FINALIZED: ['gymId', 'subjectIdentityId', 'targetStatus'],
   };
   if (!(stepSequences[kind] as readonly string[]).includes(step) || (required[step] ?? []).some(key => !Object.hasOwn(evidence, key))) throw new OperationIntegrityError('Checkpoint lacks required typed evidence');
   return JSON.parse(canonicalJson(evidence));
@@ -131,8 +148,8 @@ export function appendStep(kind: SupportedKind, current: CompletedSteps, step: S
 }
 export function stateForSteps(kind: SupportedKind, steps: CompletedSteps): OperationState {
   const sequence = stepSequences[kind] as readonly StepCode[];
-  if (steps.MASTER_ACTIVATED || steps.LIFECYCLE_APPLIED || steps.SCHEMA_COMPLETE) return 'COMPLETE';
-  if (steps.TENANT_REGISTRATION_COMMITTED || steps.TENANT_BOUND || steps.POOLS_DRAINED || steps.SCHEMA_BOUND) return 'TENANT_COMMITTED';
+  if (steps.MASTER_ACTIVATED || steps.LIFECYCLE_APPLIED || steps.SCHEMA_COMPLETE || steps.TRAINER_ACCESS_FINALIZED || steps.MEMBER_ACCESS_FINALIZED) return 'COMPLETE';
+  if (steps.TENANT_REGISTRATION_COMMITTED || steps.TENANT_BOUND || steps.POOLS_DRAINED || steps.SCHEMA_BOUND || steps.TRAINER_STATUS_APPLIED || steps.TRAINER_SESSIONS_RECONCILED || steps.MEMBER_STATUS_APPLIED || steps.MEMBER_SESSIONS_RECONCILED) return 'TENANT_COMMITTED';
   if (sequence.some(step => !!steps[step])) return 'MASTER_PREPARED';
   return 'PENDING';
 }
@@ -140,11 +157,12 @@ export type SafeResult = {
   operationId?: string; state?: OperationState; step?: StepCode; version?: number;
   resourceIds?: string[]; publicationState?: 'PENDING' | 'ACTIVE' | 'FAILED';
   notificationState?: 'AVAILABLE' | 'QUEUED' | 'FAILED'; retryable?: boolean; refreshScopes?: string[];
+  notesSnapshot?: string | null;
 };
 export function safeResult(value: unknown): SafeResult {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new TypeError('Safe result must be an object');
   canonicalJson(value, true);
-  const allowed = new Set(['operationId', 'state', 'step', 'version', 'resourceIds', 'publicationState', 'notificationState', 'retryable', 'refreshScopes']);
+  const allowed = new Set(['operationId', 'state', 'step', 'version', 'resourceIds', 'publicationState', 'notificationState', 'retryable', 'refreshScopes', 'notesSnapshot']);
   for (const [key, item] of Object.entries(value)) {
     if (!allowed.has(key)) throw new TypeError('Unsafe operation result field');
     if (key === 'operationId') reference(item);
@@ -154,6 +172,7 @@ export function safeResult(value: unknown): SafeResult {
     if (key === 'retryable' && typeof item !== 'boolean') throw new TypeError('Invalid retryability');
     if (key === 'publicationState' && !['PENDING', 'ACTIVE', 'FAILED'].includes(item as string)) throw new TypeError('Invalid publication');
     if (key === 'notificationState' && !['AVAILABLE', 'QUEUED', 'FAILED'].includes(item as string)) throw new TypeError('Invalid delivery state');
+    if (key === 'notesSnapshot' && item !== null && (typeof item !== 'string' || Array.from(item).length > 4000)) throw new TypeError('Invalid notes snapshot');
     if (key === 'resourceIds' || key === 'refreshScopes') {
       if (!Array.isArray(item) || item.length > 1000) throw new TypeError('Invalid result list');
       for (const entry of item) {
