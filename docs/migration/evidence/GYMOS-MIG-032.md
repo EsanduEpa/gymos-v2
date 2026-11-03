@@ -1,6 +1,6 @@
-# GYMOS-MIG-032 — partial implementation evidence
+# GYMOS-MIG-032 — acceptance evidence
 
-Status: **In Progress; not Verified or Completed.** Evidence captured on branch `codex/segment-05-member-enrollment`, based on `origin/main` at `97b16a7`; this working revision had not yet been committed when recorded.
+Status: **Completed** for Segment 05 at code revision `bab9b97`, with final documentation and hosted PR checks recorded in [Segment 05 handoff](../SEGMENT_05_HANDOFF.md). Earlier sections below preserve historical partial-revision findings; the final acceptance section supersedes them.
 
 ## Implemented and locally checked
 
@@ -25,3 +25,14 @@ Code and tests added in commit `41a6ad5` on `codex/segment-05-member-enrollment`
 Still incomplete: role-specific member/support/trainer projections beyond explicit denial, recursive forbidden-field auditing, empty/loading/error/accessibility browser cases, foreign-resource denial matrix, and operational/pending state coverage. Session history, pack history, and confirmed-trainer health remain deliberately assigned to tasks 044, 034, and 050. Task 032 remains In Progress; owner manual acceptance is not recorded.
 
 The profile paging browser journey and API assertions above were followed by an owner-version-zero credential-flow correction in `5d9cf8a`; that correction does not change profile paging. Latest checked-in paging implementation is therefore still `41a6ad5`.
+
+## Final code-revision acceptance — 3 November 2026
+
+Revision `bab9b9776ab5afa9dd4d192764b64a70636ba02c` on PR [#6](https://github.com/EsanduEpa/gymos-v2/pull/6) adds strict BASIC/OPERATIONAL/HISTORICAL roster and profile account states, full-filter summary/status counts, gymwide pending-enrollment count, phone search, exact published operation tuple checks, and repeatable-read list snapshot. The profile shows joined date and nullable fields; session history, pack ledger/history and confirmed-trainer health remain assigned to tasks 044, 034 and 050.
+
+- Disposable tenancy integration: `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/api exec vitest run --config vitest.config.tenancy-integration.ts --disableConsoleIntercept` — **30/30, exit 0**, 8 owned databases/container cleaned. This includes 125-row page5 search/status totals; 125 term history rows, stable ordering/page clamp; phone/null search; operational/historical classification; pending/foreign/missing safe404; MEMBER/TRAINER/SUPPORT owner-endpoint denial; invalid query422; pure read counts and no health notes in the list.
+- Two-gym Chromium: `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web exec playwright test --config playwright.config.ts --reporter=line` — **19/19, exit 0**, 7 owned databases/container/manifest cleaned. Owner Beta data remains isolated; member/trainer/admin sessions receive403 on owner list/profile, owner foreign IDs receive the same404 body as missing IDs, and session projections contain no private health, credential, password hash or database field. The existing audited support session exposes only a summary and no owner member list. The browser verifies no-match empty state, explicit counts, keyboard tabs/panel focus, 320px width, dependency-error alert/retry and Suspense loading for roster/profile while tenant reads wait.
+- `pnpm --dir packages/contracts test` — **26/26, exit 0**; workspace typecheck/lint and API/web builds — **exit 0**. Owner DTOs are strict allowlists and reject recursively serialized unknown/private fields at contract boundaries. Owner profile includes private health notes only through its protected owner endpoint.
+- Agent visual review, on synthetic disposable data only: `apps/web/test-results/migration-evidence/GYMOS-MIG-032/{roster-desktop,profile-320,profile-error-320}.png`. These generated captures are intentionally Git-ignored and remain local. The review caught a clipped mobile tab; the final profile tabs wrap and all labels are visible. No real data or credential screenshot was retained.
+
+**Manual acceptance record:** owner-delegated agent visual review is recorded separately from automated assertions. The owner authorized Codex to run manual tests and merge after verification; this record does not claim an independent owner browser session. Hosted checks and final PR review are recorded in the Segment 05 handoff.

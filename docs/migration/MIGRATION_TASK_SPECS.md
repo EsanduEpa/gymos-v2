@@ -2717,7 +2717,7 @@ High
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-In Progress.
+Completed. See [task evidence](evidence/GYMOS-MIG-031.md) and [Segment 05 handoff](SEGMENT_05_HANDOFF.md).
 
 ## Task ID: GYMOS-MIG-032
 
@@ -2806,7 +2806,7 @@ Medium
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-In Progress.
+Completed. See [task evidence](evidence/GYMOS-MIG-032.md) and [Segment 05 handoff](SEGMENT_05_HANDOFF.md).
 
 ## Task ID: GYMOS-MIG-033
 
@@ -3068,7 +3068,7 @@ High
 One focused task PR with the named scope. If implementation evidence shows this exceeds a focused session, propose numbered new task IDs and split by a complete usable boundary before coding; retain this ID and dependencies as an integration gate, never silently mark partial work Completed.
 
 ### Status
-In Progress.
+Completed. See [task evidence](evidence/GYMOS-MIG-035.md) and [Segment 05 handoff](SEGMENT_05_HANDOFF.md).
 
 ## Task ID: GYMOS-MIG-036
 

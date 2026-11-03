@@ -21,7 +21,7 @@ Read O02–O04 and tasks 031, 032 and 035; treat current V2 POST member as basic
 - **O04** detail page/client + member/pack/financial actions: banner/status; Overview, last-five PT “Attendance,” derived Billing tabs; issue-pack modal; status confirmation; desk-payment dialog and receipt alert.
 - V1 direct page loads can serialize raw `User`; registration is multi-write and can partially succeed; latest-created membership/pack is mislabeled active; status errors can be ignored; billing PAID/receipt are not authoritative.
 
-Current V2 GET/POST `/gyms/:slug/members` handles only id/fullName/nullable email/status with a newest-100 cap and no identity, access, membership, phone, pagination, or detail endpoint.
+Pre-Segment-05 V2 baseline GET/POST `/gyms/:slug/members` handled only id/fullName/nullable email/status with a newest-100 cap and no identity, access, membership, phone, pagination, or detail endpoint.
 
 ## 3. Target V2 implementation
 
@@ -42,14 +42,14 @@ Tenant `Member` is extended with approved profile fields and registration state;
 - **Prerequisites:** 017,018,023,028,030,078,080,083. **Sources:** O03, `createMember`, schema/maps.
 - **Targets:** tenant Member/profile migration; proposed member enrollment Nest module/contracts/client; O03 web page.
 - **Instructions:** strict fields/bounds; canonical identity new/reuse flow; operation idempotency; tenant actor+term transaction/receipt; Master reciprocal activation; one-time credential only for new identity; no registration revenue/payment.
-- **Acceptance/test:** new/reused email, role conflict, duplicate key/digest, fault after every checkpoint, response loss, validation, cross-gym, secret redaction. **[ ]**
+- **Acceptance/test:** new/reused email, role conflict, duplicate key/digest, fault after every checkpoint, response loss, validation, cross-gym, secret redaction. **[x]**
 
 ### GYMOS-MIG-032 — paged member list and complete profile
 
 - **Prerequisites:** 013,018,030,031. **Sources:** O02/O04 pages/clients and direct Prisma reads.
 - **Targets:** member list/detail query APIs/DTOs and web routes.
 - **Instructions:** explicit selects; q/status/cursor-or-page contract; accurate totals; current membership-term history and bounded derived membership billing; role-safe fields; safe 404.
-- **Acceptance/test:** >100 records, filters/page clamp/null email, empty/loading/error, owner/support/member/trainer projections, foreign IDs, forbidden-key recursive check. **[ ]**
+- **Acceptance/test:** >100 records, filters/page clamp/null email, empty/loading/error, owner/support/member/trainer projections, foreign IDs, forbidden-key recursive check. **[x]**
 
 ### GYMOS-MIG-033 — moved to Segment 07
 
@@ -74,15 +74,15 @@ Session-pack issuance, hold-aware balances and pack history are session credit l
 - **Prerequisites:** 007,020,031,032. **Sources:** O03→O04 workflow, harness.
 - **Targets:** API/Playwright/fault evidence only unless defects found.
 - **Instructions:** run new/reused member through login forced change, role entry, owner roster/profile; inject each cross-plane failure and resume; prove other gym unchanged.
-- **Acceptance/test:** exactly one identity/access/actor/term as expected; one-time secret absent after handoff; repair states hidden from normal lists; screenshots and persisted counts recorded. **[ ]**
+- **Acceptance/test:** exactly one identity/access/actor/term as expected; one-time secret absent after handoff; repair states hidden from normal lists; screenshots and persisted counts recorded. **[x]**
 
 ## 7. Security and multi-tenancy checklist
 
-- [ ] Enrollment verifies current OWNER and trusted gym; no client actor/gym authority.
-- [ ] Raw User/password/hash/DB/health fields never leak.
-- [ ] Reused identity is verified and never password-reset/deleted as compensation.
-- [ ] Tenant actor and Master access reciprocal tuple required before publication.
-- [ ] Foreign member/plan/pack/session IDs deny safely.
+- [x] Enrollment verifies current OWNER and trusted gym; no client actor/gym authority.
+- [x] Raw User/password/hash/DB/health fields never leak.
+- [x] Reused identity is verified and never password-reset/deleted as compensation.
+- [x] Tenant actor and Master access reciprocal tuple required before publication.
+- [x] Foreign member and plan IDs deny safely; pack/session IDs remain with Segment 07.
 
 ## 8. Testing and verification
 
@@ -90,11 +90,11 @@ Run contract/client tests, member service unit tests, owned identity/operation/t
 
 ## 9. Definition of done
 
-- [ ] Tasks 031, 032 and 035 meet their full task specifications with linked passing evidence.
-- [ ] Enrollment/recovery is durable and recoverable; roster/profile is paged, sanitized, role-limited and tenant-isolated.
-- [ ] The full enrollment/login/recovery journey passes in two gyms, including failure paths.
-- [ ] Basic-contact records are clearly distinguished from enrolled members; deferred payment/receipt controls are absent or honest.
-- [ ] Required owner acceptance is recorded separately from automated verification.
+- [x] Tasks 031, 032 and 035 meet their full task specifications with linked passing evidence.
+- [x] Enrollment/recovery is durable and recoverable; roster/profile is paged, sanitized, role-limited and tenant-isolated.
+- [x] The full enrollment/login/recovery journey passes in two gyms, including failure paths.
+- [x] Basic-contact records are clearly distinguished from enrolled members; deferred payment/receipt controls are absent or honest.
+- [x] Required owner acceptance is recorded separately from automated verification.
 
 Tasks 033 and 034 are not Segment 05 exit criteria. They remain required migration tasks in Segment 07 and must pass before their downstream consumers (including booking and session race proofs) can complete.
 
@@ -104,10 +104,10 @@ Do not stretch the current basic member endpoint into enrollment without operati
 
 ## 11. Progress and handoff
 
-- **Status:** IN PROGRESS — task031 automated acceptance now has passing recovery, revocation, concurrency, validation/redaction and two-gym evidence; 032/035 work and owner acceptance remain incomplete.
-- **Owned tasks:** 031, 032 and 035 (3 total); all remain In Progress until their full acceptance evidence passes.
+- **Status:** COMPLETED — 031/032/035 acceptance passed at code revision `bab9b97`; latest hosted check and merge evidence are in the handoff.
+- **Owned tasks:** 031, 032 and 035 (3 total); all Completed.
 - **Moved to Segment 07:** 033 (recoverable member status/hold release) and 034 (pack issuance/balances). Their specifications, prerequisites and downstream dependency edges remain active.
-- **Current evidence:** see task-specific evidence linked from the tracker. Task031 remains In Progress pending separate owner acceptance and latest PR checks/review; do not infer completion from passing tests alone.
+- **Current evidence:** task evidence records automated results and owner-delegated agent manual visual acceptance separately; see the tracker and Segment 05 handoff.
 - **Out-of-scope profile extensions:** session-history panel is task044; confirmed-trainer health projection is task050. Member term history and safe member/owner/support projections remain in task032.
-- **Next recommended task:** close the Segment 05 exit checklist in [SEGMENT_05_EXIT_CHECKLIST.md](../SEGMENT_05_EXIT_CHECKLIST.md). Segment 06 may proceed independently on tasks036–039 after this segment’s exit gate; trainer coaching tasks050–052 remain gated by their actual session/relationship dependencies.
+- **Next recommended task:** continue Segment 06 at task036 (complete its remaining trainer enrollment acceptance), then follow its owned dependency order. Tasks050–052 remain gated by their actual session/relationship dependencies.
 

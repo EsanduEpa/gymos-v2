@@ -38,11 +38,11 @@ This matrix assigns every authoritative task and every V1 route responsibility t
 | GYMOS-MIG-028 | Membership plans/form | O12 Plans tab | membership-plan module/UI | 04 | GYMOS-MIG-028 | COMPLETED |
 | GYMOS-MIG-029 | Rates/pay/cancellation policy | O12 remaining tabs | configuration policy DTOs/schema | 04 | GYMOS-MIG-029 | COMPLETED |
 | GYMOS-MIG-030 | Membership eligibility/renewal | `Membership`, expiry action | membership terms/service | 04 | GYMOS-MIG-030 | COMPLETED |
-| GYMOS-MIG-031 | Member registration | O03; `actions/members.ts` | member enrollment saga/API/UI | 05 | GYMOS-MIG-031 | IN PROGRESS |
-| GYMOS-MIG-032 | Member list/profile | O02/O04 | member query/detail/UI | 05 | GYMOS-MIG-032 | IN PROGRESS |
+| GYMOS-MIG-031 | Member registration | O03; `actions/members.ts` | member enrollment saga/API/UI | 05 | GYMOS-MIG-031 | COMPLETED |
+| GYMOS-MIG-032 | Member list/profile | O02/O04 | member query/detail/UI | 05 | GYMOS-MIG-032 | COMPLETED |
 | GYMOS-MIG-033 | Member status/hold release | O04 status action | recoverable member status command | 07 | GYMOS-MIG-033 | NOT STARTED |
 | GYMOS-MIG-034 | Session packs/balance | O04; `actions/packs.ts` | pack/hold ledger projection | 07 | GYMOS-MIG-034 | NOT STARTED |
-| GYMOS-MIG-035 | Enrollment recovery journey | O03→O04 | two-gym browser/integration evidence | 05 | GYMOS-MIG-035 | IN PROGRESS |
+| GYMOS-MIG-035 | Enrollment recovery journey | O03→O04 | two-gym browser/integration evidence | 05 | GYMOS-MIG-035 | COMPLETED |
 | GYMOS-MIG-036 | Trainer registration | O06; `actions/trainers.ts` | trainer enrollment saga/API/UI | 06 | GYMOS-MIG-036 | IN PROGRESS |
 | GYMOS-MIG-037 | Trainer roster/profile/shifts | O05/O07 | trainer queries/status/shift UI | 06 | GYMOS-MIG-037 | NOT STARTED |
 | GYMOS-MIG-038 | Trainer deactivate/reactivate | O07 | recoverable trainer status command | 06 | GYMOS-MIG-038 | NOT STARTED |

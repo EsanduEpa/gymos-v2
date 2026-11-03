@@ -1,34 +1,21 @@
 # Segment 05 handoff — Member Enrollment and Account Management
 
-Status: **In progress.** Segment 05 owns tasks 031, 032 and 035. None is marked complete. Commits `41a6ad5` and `5d9cf8a` add verified credential recovery, original version-zero handoff, consent browser coverage, and membership-term paging; remaining acceptance is tracked below and in the [exit checklist](SEGMENT_05_EXIT_CHECKLIST.md).
+**Status: Completed.** Segment 05 owns and completes GYMOS-MIG-031, 032 and 035. The reviewed implementation is code revision `bab9b9776ab5afa9dd4d192764b64a70636ba02c`; browser isolation was corrected at `026b7046a149f80fb2f4ea8215ee76bf1fd2be99`. Both are on [PR #6](https://github.com/EsanduEpa/gymos-v2/pull/6). The task-owned evidence is [031](evidence/GYMOS-MIG-031.md), [032](evidence/GYMOS-MIG-032.md) and [035](evidence/GYMOS-MIG-035.md).
 
-## Segment 05 work remaining
+## Accepted results
 
-- **031 — enrollment and account recovery:** automated acceptance now covers Master preparation rollback, tenant commit before Master checkpoint recovery, owner-revoked retry denial, acknowledgment/reissue concurrency, strict validation/no-effect cases, durable secret redaction, and the existing two-gym enrollment/recovery journeys. Evidence and commands are in [031](evidence/GYMOS-MIG-031.md). The hosted run on `3bfeb3c` is 10/11 because the unrelated Segment 06 trainer-registration browser test raced its owner redirect; a focused local test passes after a direct-route test fix. Push that fix and verify the hosted rerun. Project-owner manual acceptance remains outstanding.
-- **032 — roster and profile:** owner roster and membership-term histories now page past 100 with API/browser evidence. Finish safe role projections, foreign-ID/privacy denials and loading/error/empty accessibility. Session history belongs to 044, pack history to 034, and confirmed-trainer health projection to 050.
-- **035 — integrated journey:** new and reused-identity browser journeys now pass across two isolated gyms, including forced change and unchanged second-gym effects. Finish browser-injected durable recovery, repeated-recovery/pending publication effects, and full role/accessibility evidence. Pack issuance and session history are not this task’s acceptance.
+- **031:** owner-bound Master preparation, tenant transaction/receipt and reciprocal activation; explicit existing-identity consent and refusal; one-time credential, loss/reissue, acknowledgment and forced change; owner revocation and concurrency ordering; preflight validation; exact term values and durable secret redaction. Faults at Master preparation, tenant rollback, post-tenant/pre-checkpoint, Master activation and lost response recover by the same operation without duplicate member, term, receipt or credential effects.
+- **032:** stable 125+ roster and term-history paging, full-filter counts, name/email/phone search, BASIC/OPERATIONAL/HISTORICAL and gymwide pending labels, joined/profile fields, owner-only health notes, pure reads, role denial and uniform foreign/missing 404. Empty/loading/error and 320px keyboard states pass. The mobile tab clipping found in agent visual review was corrected.
+- **035:** disposable two-gym Chromium journeys cover new and explicitly reused identities, selected-gym login, forced change, owner roster/profile, pending-publication denial, repeated recovery after injected Master failure, server-action response loss, no secret replay and visible clipboard failure. The second gym remains unchanged in fault paths.
 
-Owner manual acceptance for all three tasks is not recorded. No all-task acceptance or Segment 05 handoff is claimed. The latest partial results and exact commands are in [031](evidence/GYMOS-MIG-031.md), [032](evidence/GYMOS-MIG-032.md), [035](evidence/GYMOS-MIG-035.md).
+## Verification and acceptance record
 
-Use the task evidence links in the tracker. Partial code and passing PR checks do not complete a task. Record task owner acceptance separately from automated verification.
+- Contracts **26/26**; owned tenancy integration **30/30**; earlier unchanged identity integration **13/13**; full Chromium isolation **19/19** on the code revision. `pnpm typecheck:workspace`, `pnpm lint:workspace`, API/web production builds and `git diff --check` passed. Focused Chromium support-switch isolation after the hosted race failed then passed **1/1**. All database tests created and cleaned up owned disposable PostgreSQL fixtures; the local demo database and V1 remained untouched.
+- All **11 required hosted checks** passed on code/test revision `026b704` in [run 41574199835](https://github.com/EsanduEpa/gymos-v2/actions/runs/41574199835). The documentation-only final PR revision was also rechecked before merge; the latest run is linked in PR #6. Review API returned no reviews or comments requiring changes before merge.
+- **Manual acceptance, separately recorded:** the project owner instructed Codex to perform any needed manual tests and explicitly authorized merging Segment 05 when finished. Codex visually reviewed synthetic disposable roster/profile/error screenshots in ignored `apps/web/test-results/migration-evidence/GYMOS-MIG-032/`, fixed the clipped 320px profile tab, and reran the focused Chromium case. This is owner-delegated agent review, not an independent owner browser session. The owner's merge authorization is recorded by the current request and is distinct from automated pass counts.
 
-## Reassigned work and preserved dependencies
+## Remaining scope and next work
 
-- **033** recoverable member status changes and release future session holds → Segment 07. It still depends on 031, 032, 040, 043 and the platform foundations in its task specification.
-- **034** exact-value pack issuance and hold-aware balances → Segment 07. It still depends on 031, 032, 040 and the listed configuration/platform foundations; Segment 07 booking tasks 041/042 depend on it.
-- **044** owns owner/trainer/member session views and the recent-session member-profile panel.
-- **050** owns confirmed-client roster/profile health projection under its privacy contract.
+No Segment 05 acceptance item remains. Tasks 033 (status/hold release) and 034 (pack ledger/balances) are owned by Segment 07 with their dependency edges intact. Session history/profile recent sessions are task 044; confirmed-trainer health projection is task 050. These are not counted as Segment 05 completion. Task 036 in Segment 06 remains **In Progress** with its own unfinished acceptance; task 040/043 in Segment 07 remain Not Started. Completing Segment 05 does not complete either later segment.
 
-This reallocation changes ownership and schedule, not required product behavior. No dependency was waived. Tasks 036/040/043 are not automatic blockers for closing 031/032/035 unless a direct dependency is present in that task’s specification. Segment 06 may start at the Segment 05 exit gate; its own task dependencies still apply.
-
-### Dependency evidence audit — 3 November 2026
-
-- **036** is **In Progress**, not complete. Its task-owned evidence records passing partial registration/recovery/browser checks and explicitly lists missing checkpoint, concurrency, consent/reissue, role/foreign-gym and downstream publication acceptance: [GYMOS-MIG-036 evidence](evidence/GYMOS-MIG-036.md).
-- **040** and **043** remain **Not Started** in the task tracker, and no task-owned evidence files exist for them. Their full acceptance criteria are still required before downstream session booking/status and notification/audit tasks can close.
-- These tasks are retained as prerequisites for Segment 07 tasks 033/034 where specified. They are not direct dependencies of Segment 05 tasks 031/032/035 in the authoritative task specs and therefore do not block the Segment 05 exit gate.
-
-## Verification and data safeguards
-
-Use disposable, owned databases only. Do not reset, delete, reseed or test against the existing local demonstration database. Preserve local changes and evidence screenshots; archive modified reviewed screenshots before restoring committed references. Routine generated captures belong in ignored `apps/web/test-results/`.
-
-No PR merge is authorized by this handoff. The user must explicitly authorize the specific PR before merge.
+**Next recommended task:** finish Segment 06 task 036 using its task-owned evidence and full acceptance criteria, then proceed in that segment's dependency order. Do not use the local demo database for automated testing.

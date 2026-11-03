@@ -6,9 +6,9 @@ This record supersedes the earlier scheduling-only note that treated tasks 036, 
 
 | Capability | Owner | Status and dependency notes |
 |---|---|---|
-| Member enrollment, account recovery and credentials | Segment 05 / 031 | In Progress; full credential-loss, checkpoint, concurrency and two-gym evidence remains required. |
-| Paged member roster, role-safe profile and membership-term history | Segment 05 / 032 | In Progress; session history, pack history and trainer health projection are explicitly excluded and assigned below. |
-| Full enrollment/login/recovery journey | Segment 05 / 035 | In Progress; depends on 031/032 and the harness/auth prerequisites. Does not require pack issuance. |
+| Member enrollment, account recovery and credentials | Segment 05 / 031 | Completed; see task-owned final recovery, concurrency, browser and redaction evidence. |
+| Paged member roster, role-safe profile and membership-term history | Segment 05 / 032 | Completed; session history, pack history and trainer health projection remain assigned below. |
+| Full enrollment/login/recovery journey | Segment 05 / 035 | Completed; depends on completed 031/032 and the harness/auth prerequisites. Pack issuance remains outside this journey. |
 | Member status change and future session-hold release | Segment 07 / 033 | Moved from Segment 05; requires 031/032/040/043 and listed foundations. |
 | Exact-value pack issuance and hold-aware balances | Segment 07 / 034 | Moved from Segment 05; requires 031/032/040 and listed foundations; precedes booking tasks 041/042. |
 | Session history and recent-session profile panel | Segment 07 / 044 | Owned by session read views; 032 remains a direct prerequisite for profile integration. |
@@ -17,7 +17,7 @@ This record supersedes the earlier scheduling-only note that treated tasks 036, 
 
 ## Segment 05 close checklist
 
-Use [SEGMENT_05_EXIT_CHECKLIST.md](SEGMENT_05_EXIT_CHECKLIST.md) as the acceptance source. In short, finish 031, 032 and 035 with task-owned recovery, authorization, tenant-isolation, browser and persisted-effect evidence; then update status/evidence/coverage/progress only for results that pass. Record owner acceptance separately. Verify all required hosted PR checks on the latest revision and resolve review findings. Do not merge without explicit authorization for that PR.
+The [exit checklist](SEGMENT_05_EXIT_CHECKLIST.md) is satisfied for tasks 031, 032 and 035. The owner delegated manual-test execution to Codex and explicitly authorized the Segment 05 PR merge after completion; the handoff records the agent review separately from automated checks. All 11 hosted checks and review findings are verified at the PR merge gate.
 
 ## Operational requirements
 

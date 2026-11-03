@@ -10,14 +10,14 @@ Evidence baseline: 31 October 2026. Counts come from [`../MIGRATION_TASK_TRACKER
 | 02 | Identity, Authentication, and Application Shell | COMPLETED | 6 | 6 | 0 | No implementation/policy blocker; owner review and foundation/merge dependency remain | 01 | 013/020 locally and hosted verified; 016–019 preserved; limited DEC-11 web policy approved; provider/release scope stays open in 087 |
 | 03 | Platform Administration and Tenant Lifecycle | COMPLETED | 6 | 6 | 0 | Owner manual acceptance and explicit merge authorization pending | 01, 02 | Tasks021–026 locally/hosted verified; [handoff](../SEGMENT_03_HANDOFF.md); task 087 remains open |
 | 04 | Gym Configuration and Membership Rules | COMPLETED | 5 | 5 | 0 | Owner manual acceptance and explicit merge authorization pending | 01–03 | Tasks 015,027–030 automated verification complete at `c9af453`; all 11 hosted checks passed; [handoff](../SEGMENT_04_HANDOFF.md) |
-| 05 | Member Enrollment and Account Management | IN PROGRESS | 3 | 0 | 3 | 031/032/035 partial; exit requires their full evidence and owner acceptance; session-history panel 044 and trainer health projection 050 are later scope | 02–04 | Partial task evidence only; [exit checklist](../SEGMENT_05_EXIT_CHECKLIST.md) and [handoff](../SEGMENT_05_HANDOFF.md) |
+| 05 | Member Enrollment and Account Management | COMPLETED | 3 | 3 | 0 | None in Segment 05; deferred 033/034, 044 and 050 retain their owning-segment dependencies | 02–04 | 031/032/035 accepted at `bab9b97`; disposable tenancy 30/30, Chromium 19/19, agent manual visual review under owner delegation; 11/11 hosted checks and [handoff](../SEGMENT_05_HANDOFF.md) |
 | 06 | Trainer Management and Coaching | IN PROGRESS | 7 | 0 | 7 | 036 partial; trainer-directory/booking consumers plus 040/043 remain outstanding | 02–05, 07 | Trainer typed enrollment/API/UI, 26/26 disposable DB integration, forced-change and selected-gym 403/422 Chromium coverage pass locally; owner acceptance and task completion not recorded; [036 evidence](../evidence/GYMOS-MIG-036.md) |
 | 07 | PT Sessions, Notifications, and Lifecycle | NOT STARTED | 11 | 0 | 11 | People/config prerequisites; 033/034 also require their listed member foundations and 040/043 | 02, 04–06 | Session lifecycle segment now owns member status/hold release (033) and pack issuance/balances (034); DEC-06/07/08/09 are approved |
 | 08 | Finance, Dashboards, Analytics, and Exports | NOT STARTED | 10 | 0 | 10 | DEC-06/08/09; upstream lifecycle data | 03–07 | No V2 feature implementation verified |
 | 09 | Scope Closure, Parity, and Quality Gates | NOT STARTED | 5 | 0 | 5 | All web segments; credential containment for security gate | 01–08 | V1 baseline fixtures exist; final parity not run |
 | 10 | Deployment, Recovery, and Controlled Release | NOT STARTED | 6 | 0 | 6 | DEC-11, configured provider/remote, segments 01–09 | 01–03, 09 | Local restore is not managed-environment DR |
 | 11 | Mobile Applications | NOT STARTED | 6 | 0 | 6 | DEC-12 and stable web/API lifecycle | 07–10 | No mobile app exists |
-| **Total** |  |  | **88** | **40** | **48** |  |  |  |
+| **Total** |  |  | **88** | **43** | **45** |  |  |  |
 
 ## Segment 05 scope and exit gate — 3 November 2026
 
@@ -32,3 +32,5 @@ Commit `5d9cf8a` additionally fixed and browser-verified acknowledgment of initi
 ## Update protocol
 
 After verifying a task, update its authoritative tracker/evidence first, then this table and the owning segment handoff. Record exact revision, environment, commands/exit codes, fixtures, success and negative cases, screenshots where applicable, skipped checks, and residual risk. `IMPLEMENTED` without passing evidence is not `COMPLETED` or `VERIFIED`.
+
+Segment 05 completion addendum — 3 November 2026: tasks 031, 032 and 035 passed their acceptance evidence at code revision `bab9b97`, including 30/30 disposable tenancy tests and 19/19 Chromium two-gym journeys. Codex performed owner-delegated visual review of synthetic roster/profile/error captures; this is recorded separately from automated results and is not described as independent owner browser execution. All 11 hosted checks passed before final documentation was committed; the latest documentation revision was rechecked before PR #6 merge. Tasks 033/034, 044 and 050 remain in their owning segments. See [handoff](../SEGMENT_05_HANDOFF.md).
