@@ -1,6 +1,6 @@
 # GYMOS-MIG-041 — owner session booking
 
-Status: **In Progress; API and owner form implemented, guarded API and headed browser checks passed, full acceptance remains open.** Evidence captured 3 November 2026 from uncommitted working-tree changes. No commit or hosted checks exist.
+Status: **In Progress; API and owner form implemented, guarded API and headed browser checks passed, full acceptance remains open.** Evidence captured 3 November 2026 on `codex/segment-06-management` at the Segment 06/07 migration checkpoint. Hosted checks and owner-observed review remain open.
 
 ## Implemented
 
@@ -22,6 +22,12 @@ Status: **In Progress; API and owner form implemented, guarded API and headed br
 - `pnpm --dir apps/web exec eslint src/app/session-booking-actions.ts 'src/app/gyms/[slug]/owner/sessions/book/page.tsx' src/components/sessions/owner-session-booking-form.tsx` — exit 0.
 - `pnpm --dir apps/web exec eslint src/app/session-booking-actions.ts 'src/app/gyms/[slug]/owner/sessions/book/page.tsx' src/components/sessions/owner-session-booking-form.tsx tests/owner-session-booking.e2e.spec.ts` — exit 0.
 - The screenshot was reviewed by the agent. The CUA browser access host was unavailable, and native Chrome continued to show the existing GitHub PR #7 window. This is headed Playwright evidence, not independent or owner-observed acceptance. No hosted checks have run.
+
+### Isolated browser verification rerun — 3 November 2026
+
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web exec playwright test --config playwright.config.ts tests/owner-session-booking.e2e.spec.ts tests/notifications-bell.e2e.spec.ts --workers=1` — exit 0; 2/2 tests passed in isolated headless Chromium using separate disposable two-gym fixtures and loopback API/web servers. The booking test reverified owner booking, quoted fee, credit allocation, persisted session/hold/notification and refreshed [owner-booking-390.png](GYMOS-MIG-041/owner-booking-390.png). The notification test verified selected-gym listing, explicit read state, API failure recovery and refreshed [notifications-bell-390.png](GYMOS-MIG-043/notifications-bell-390.png).
+- Each spec reported cleanup of six owned databases, its temporary PostgreSQL container and ownership manifest. The pre-existing `gymos-v2-db-1` development container remained untouched. These are agent-run automated checks; the headless test browser is separate from the visible Chrome walkthrough.
+- Both screenshots were inspected after capture. Owner-visible walkthrough and hosted checks remain pending; this rerun does not close either acceptance gate.
 
 ## Remaining acceptance
 

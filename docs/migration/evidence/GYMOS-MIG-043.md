@@ -1,6 +1,6 @@
 # GYMOS-MIG-043 — selected-gym notifications and audit reads
 
-Status: **In Progress; minimum read/UI foundation verified, event-producing session workflows incomplete.** Evidence was captured 3 November 2026 from uncommitted working-tree changes on `codex/segment-06-management`, based on `7c09fd4`. No commit or hosted PR checks exist for this work.
+Status: **In Progress; minimum read/UI foundation verified, event-producing session workflows incomplete.** Evidence was captured 3 November 2026 on `codex/segment-06-management` at the Segment 06/07 migration checkpoint. Hosted PR checks remain open.
 
 ## Implemented foundation
 
@@ -28,3 +28,9 @@ Notification table DDL is part of the additive tenant migration with checksum `7
 - Task 033 guarded recovery and cross-gym suite passed 1/1; its in-process Nest/Supertest guard route passed 1/1. Task 047's guarded suite passed 5/5, including a cancel/no-show race with exactly one persisted terminal event, notification, settlement, movement and earning. Tasks 041/042 and 045/046 have linked guarded evidence for their producers.
 - The latest Task044 headed browser run passed 1/1 and verified role-specific read/quote controls. It was agent-performed Playwright automation and screenshot review, not owner-observed Chrome acceptance.
 - Task 043 remains In Progress pending final hosted checks and owner-visible review.
+
+## Isolated browser verification rerun — 3 November 2026
+
+- The shared one-worker Playwright command recorded in [Task 041 evidence](GYMOS-MIG-041.md) ran this notification spec in isolated headless Chromium — exit 0; 1/1 test passed. It covered notification listing, links, explicit mark-read/all-read actions, unread state after API outage and recovery, and the 390px responsive layout.
+- The two-gym fixture runner reported six owned databases dropped, its PostgreSQL container removed and its run manifest removed. The refreshed [390px bell screenshot](GYMOS-MIG-043/notifications-bell-390.png) was inspected and stays within the viewport.
+- This automated rerun is not owner-observed Chrome acceptance. Task 043 remains In Progress pending hosted checks and the visible walkthrough.

@@ -48,3 +48,9 @@ Working checklist created 3 November 2026 from the segment plans and task specs.
 - **Additional headed review evidence:** the role session/read journey passed 1/1, and a second Chrome-channel run of the directory/request/accept/decline journey passed 1/1. The guarded harnesses reported cleanup of six disposable databases, the container and run manifest. These are agent-performed automated browser checks; no owner-observed review is claimed.
 - **Visible review and PR status:** CUA still lists no browser-control provider. Native Chrome showed the existing GitHub page, and navigation to the new comparison left a blank rendered content area. `gh` is unavailable. The source branch is pushed, but a draft PR and hosted checks are not yet available.
 - **Scope boundary:** the owner approved storing trainer decline reasons with member-only visibility. The owner also chose to preserve Segment 08 ownership of Task 049. No Task 049 code was included; Task 048 remains gated on Task 049.
+
+## Isolated browser rerun — 3 November 2026
+
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web exec playwright test --config playwright.config.ts tests/owner-session-booking.e2e.spec.ts tests/notifications-bell.e2e.spec.ts --workers=1` — exit 0; 2/2 passed in headless Chromium with one worker. The suite ran the documented disposable PostgreSQL harness, synthetic two-gym fixtures, and isolated loopback API/web servers; no repository `.env` was loaded.
+- Both spec cleanups reported six owned databases dropped, the per-spec container removed, and the ownership manifest removed. The pre-existing `gymos-v2-db-1` development container was left untouched. Updated screenshots were inspected and recorded in Tasks 041 and 043 evidence.
+- This rerun adds agent-performed automated evidence only. Owner-visible review remains paused until Chrome is restarted and control confirms the intended GymOS window. Task 048 remains gated on Task 049.
