@@ -869,6 +869,34 @@ it('registers a typed trainer once and reuses an existing identity only after ve
   expect(await tenants[0].trainer.count({ where: { email: decliningIdentity.email } })).toBe(0);
 });
 
+it('serializes concurrent identical trainer registrations to one actor, receipt and activation audit', async () => {
+  const ownerAccess = await master.gymAccess.upsert({ where: { userId_gymId: { userId: actorId, gymId: gymIds[0] } },
+    create: { userId: actorId, gymId: gymIds[0], role: 'OWNER', linkStatus: 'ACTIVE' }, update: {} });
+  const access = { ...(await context(0)), slug: `schema-0-${run.runId}`, role: 'OWNER', identityId: actorId,
+    identityVersion: 0, accessVersion: ownerAccess.version, actor: null } as const;
+  const credential = ({ issueTemporaryCredential: async () => ({ status: 'ALREADY_ISSUED' as const, deliveryVersion: 0 }) }) as unknown as CredentialService;
+  const service = new TrainerEnrollmentService({ master } as DatabaseService, gateFor(), credential);
+  const input = { fullName: 'Concurrent Trainer', email: `trainer-concurrent-${run.runId}@example.test`, phone: '+94112223349', level: 'LEVEL_1' as const,
+    yearsExperience: 3, specialisations: [' Strength ', 'Mobility'], shiftStart: null, shiftEnd: null, bio: null,
+    idempotencyKey: 'trainer-concurrent-command-01' };
+  const concurrent = await Promise.allSettled([service.enroll(access as never, input), service.enroll(access as never, input)]);
+  expect(concurrent.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+  expect(concurrent.filter(result => result.status === 'rejected')).toHaveLength(1);
+  const first = concurrent.find(result => result.status === 'fulfilled');
+  if (!first || first.status !== 'fulfilled' || first.value.status !== 'COMPLETE') throw new Error('Expected one concurrent trainer registration to complete');
+  const recovered = await service.enroll(access as never, input);
+  expect(recovered).toMatchObject({ status: 'COMPLETE', trainerId: first.value.trainerId, operationId: first.value.operationId, replayed: true });
+  const [actors, receipts, audits, operations, links] = await Promise.all([
+    tenants[0].trainer.count({ where: { email: input.email } }),
+    tenants[0].commandReceipt.count({ where: { sourceMasterOperationId: first.value.operationId } }),
+    tenants[0].auditLog.count({ where: { receipt: { sourceMasterOperationId: first.value.operationId }, eventCode: 'TRAINER_REGISTERED' } }),
+    master.operation.count({ where: { id: first.value.operationId, kind: 'REGISTER_TRAINER', state: 'COMPLETE' } }),
+    master.gymAccess.count({ where: { gymId: gymIds[0], tenantActorId: first.value.trainerId, role: 'TRAINER', linkStatus: 'ACTIVE' } }),
+  ]);
+  expect([actors, receipts, audits, operations, links]).toEqual([1, 1, 1, 1, 1]);
+  expect(await tenants[1].trainer.count({ where: { email: input.email } })).toBe(0);
+});
+
 it('recovers trainer enrollment after its tenant actor transaction rolls back', async () => {
   const ownerAccess = await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: actorId, gymId: gymIds[0] } } });
   const access = { ...(await context(0)), slug: `schema-0-${run.runId}`, role: 'OWNER', identityId: actorId,
