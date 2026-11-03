@@ -23,6 +23,8 @@ Evidence baseline: 31 October 2026. Counts come from [`../MIGRATION_TASK_TRACKER
 
 Segment 05 owns tasks031,032,035. Tasks033 and034 are moved to Segment07 with IDs and dependency edges retained because they implement session status/hold and credit/pack lifecycle. Task044 owns recent-session views; task050 owns confirmed-trainer health projections. No task status changed by this scope update. See the [exit checklist](../SEGMENT_05_EXIT_CHECKLIST.md).
 
+Verification addendum — 3 November 2026: commit `41a6ad5` adds passing disposable evidence for credential reissue recovery, two-gym new/reused identity browser flows, and membership-term paging. Tasks031/032/035 remain In Progress because the exit checklist’s remaining failure, role/privacy and owner-acceptance items are not satisfied. See the task evidence and [Segment 05 handoff](../SEGMENT_05_HANDOFF.md).
+
 ## Update protocol
 
 After verifying a task, update its authoritative tracker/evidence first, then this table and the owning segment handoff. Record exact revision, environment, commands/exit codes, fixtures, success and negative cases, screenshots where applicable, skipped checks, and residual risk. `IMPLEMENTED` without passing evidence is not `COMPLETED` or `VERIFIED`.

@@ -1,12 +1,14 @@
 # Segment 05 handoff — Member Enrollment and Account Management
 
-Status: **In progress.** Segment 05 owns tasks 031, 032 and 035. None is marked complete by this scope update. The actionable exit gate is [SEGMENT_05_EXIT_CHECKLIST.md](SEGMENT_05_EXIT_CHECKLIST.md).
+Status: **In progress.** Segment 05 owns tasks 031, 032 and 035. None is marked complete. Commit `41a6ad5` adds verified credential recovery, consent browser coverage, and membership-term paging; remaining acceptance is tracked below and in the [exit checklist](SEGMENT_05_EXIT_CHECKLIST.md).
 
 ## Segment 05 work remaining
 
-- **031 — enrollment and account recovery:** finish full credential-loss/reissue, checkpoint, concurrency, idempotency and two-gym failure-path acceptance. Keep identity-consent/refusal, one-time credential and forced-change requirements.
-- **032 — roster and profile:** finish paging, membership-term history, role-safe projections, privacy/tenant denials and browser states. Session history belongs to 044, pack history to 034, and confirmed-trainer health projection to 050.
-- **035 — integrated journey:** prove enrollment/login/recovery across two isolated gyms, including durable recovery and persisted effect counts. Pack issuance and session history are not this task’s acceptance.
+- **031 — enrollment and account recovery:** existing-identity consent/refusal and credential reissue after lost response now have API/browser evidence. Finish remaining checkpoint, owner-revocation/concurrency, validation/redaction and two-gym failure-path acceptance.
+- **032 — roster and profile:** owner roster and membership-term histories now page past 100 with API/browser evidence. Finish safe role projections, foreign-ID/privacy denials and loading/error/empty accessibility. Session history belongs to 044, pack history to 034, and confirmed-trainer health projection to 050.
+- **035 — integrated journey:** new and reused-identity browser journeys now pass across two isolated gyms, including forced change and unchanged second-gym effects. Finish browser-injected durable recovery, repeated-recovery/pending publication effects, and full role/accessibility evidence. Pack issuance and session history are not this task’s acceptance.
+
+Owner manual acceptance for all three tasks is not recorded. No all-task acceptance or Segment 05 handoff is claimed. The latest partial results and exact commands are in [031](evidence/GYMOS-MIG-031.md), [032](evidence/GYMOS-MIG-032.md), [035](evidence/GYMOS-MIG-035.md).
 
 Use the task evidence links in the tracker. Partial code and passing PR checks do not complete a task. Record task owner acceptance separately from automated verification.
 

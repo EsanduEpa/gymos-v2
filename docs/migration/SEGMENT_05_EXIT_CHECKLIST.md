@@ -1,6 +1,6 @@
 # Segment 05 exit checklist — Member Enrollment and Account Management
 
-Segment 05 now owns **GYMOS-MIG-031, 032 and 035**. All three are still in progress; this checklist is a scope and acceptance aid, not evidence that any item has passed. Task 033 (member status/hold release) and 034 (session-pack issuance/balances) moved to Segment 07 because both are session-credit lifecycle behavior. Their task IDs and dependency edges remain intact.
+Segment 05 now owns **GYMOS-MIG-031, 032 and 035**. All three are still in progress; this checklist is a scope and acceptance aid, not evidence that any item has passed. Task 033 (member status/hold release) and 034 (session-pack issuance/balances) moved to Segment 07 because both are session-credit lifecycle behavior. Their task IDs and dependency edges remain intact. The latest partial verification addendum is recorded at commit `41a6ad5` (3 November 2026).
 
 ## Exit gate: required before Segment 06 starts
 
@@ -10,6 +10,19 @@ Segment 05 now owns **GYMOS-MIG-031, 032 and 035**. All three are still in progr
 - [ ] Each task’s full acceptance criteria has task-owned evidence with exact revision, disposable environment/fixtures, commands and exit codes, persisted effects, failure/negative cases, browser artifacts where applicable, and explicit skipped checks.
 - [ ] Update tracker, task evidence, coverage, progress and handoff from passing results only. Keep Codex/automated verification separate from required owner manual acceptance; record owner acceptance explicitly when given.
 - [ ] On the latest PR revision, all 11 required hosted checks pass and any review findings are resolved. The PR remains unmerged until the user authorizes that specific PR.
+
+### Partial results recorded; not exit approval
+
+- [x] 031: existing-identity acceptance/refusal, lost reissue response/API recovery, revoked-secret rejection, forced password change, tenant rollback and post-tenant/pre-activation recovery have evidence. Chromium covers consent, credential replacement, first login and gym isolation.
+- [x] 032: owner roster paging beyond 100 and membership-term profile paging beyond 100 have disposable integration evidence; browser verifies page navigation.
+- [x] 035: new-member and explicitly consented existing-identity browser journeys pass in disposable two-gym fixtures.
+- [ ] 031 remaining fault boundaries, owner revocation/concurrency races, and broad validation/redaction matrix.
+- [ ] 032 remaining role projection/foreign-ID/privacy matrix and accessible empty/loading/error browser states.
+- [ ] 035 injected-failure browser recovery and complete repeated-recovery/pending-publication effects.
+- [ ] Independent owner manual acceptance for 031/032/035.
+- [ ] Latest PR hosted checks (11 required) and review findings.
+
+Evidence: [031](evidence/GYMOS-MIG-031.md), [032](evidence/GYMOS-MIG-032.md), [035](evidence/GYMOS-MIG-035.md). These partial passes do not make Segment 05 ready to hand off.
 
 **Segment 05 is ready for Segment 06 when 031, 032 and 035 are complete with evidence and required owner acceptance is recorded.** An outstanding Segment 07 task is not a Segment 05 blocker unless it is a direct prerequisite of one of those three tasks. Segment 06 work may begin at that gate; unrelated Segment 06 tasks do not need to be complete first.
 

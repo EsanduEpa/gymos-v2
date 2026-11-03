@@ -13,3 +13,14 @@ Status: **In Progress; not Verified or Completed.** Partial browser journey pass
 
 - Tasks 031 and 032 remain In Progress; task 034 and its task 040 prerequisite are not complete. The journey does not yet cover existing-identity consent through the browser, lost/reissued credential delivery, all operation checkpoint failures, concurrent retries, every two-gym failure path, or full role-specific session/pack projections.
 - Task 035 remains In Progress. No owner acceptance is recorded.
+
+## Follow-up verification — 3 November 2026
+
+Browser tests added and locally passed on commit `41a6ad5` using disposable two-gym fixtures:
+
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web exec playwright test -g "full member enrollment hands off|existing identity explicitly consents"` — **2/2 passed**. The new-member owner flow replaced a lost one-time credential, showed the replacement once, opened the correct member profile, paged membership history, rejected login with the revoked password, enforced first-login password change, and entered the correct member workspace. The second gym’s actor count remained unchanged and cross-gym access returned 403.
+- The verified-existing-identity owner flow preserved the form values through pending consent, required private sign-in/current-password acceptance, created one member/term/active MEMBER link, created no credential delivery, preserved the existing password, and allowed explicit selection of Gym B as the member workspace.
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/api exec vitest run --config vitest.config.tenancy-integration.ts --disableConsoleIntercept` — **26/26 passed**, including persisted effect counts and 125-term profile paging. Identity integration — **10/10 passed**, including lost reissue-response recovery.
+- Contract build, API/web typechecks, focused ESLint, API/web production builds, and `git diff --check` passed. Disposable browser cleanup removed 6 databases, container and manifest; tenant integration cleanup removed 8 databases and its container.
+
+Still incomplete: browser-level injected tenant-commit/Master-activation response-loss recovery, all checkpoint/revocation/concurrency failure cases, pending-record roster suppression repeated-recovery effects, complete error/accessibility and role projection checks, and owner manual acceptance. Packs/session history are excluded and remain with Segment 07 tasks 034/044. Task 035 remains In Progress.
