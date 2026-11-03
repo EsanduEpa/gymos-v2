@@ -611,6 +611,16 @@ test('trainer registration enforces owner and selected-gym access, then hands of
   // with that client redirect in CI.
   await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${fixture.gyms[0].slug}/owner/trainers/new`);
   await expect(page.getByRole('heading', { name: 'Register a trainer' })).toBeVisible();
+  await page.setViewportSize({ width: 320, height: 700 });
+  await expect(page.getByRole('button', { name: 'Register trainer' })).toBeVisible();
+  await page.getByLabel('Years of experience').fill('-1');
+  await page.getByLabel('Full name').fill('Invalid Trainer');
+  await page.getByLabel('Email address').fill(`invalid-${email}`);
+  await page.getByLabel('Phone').fill('+94112223340');
+  await page.getByRole('button', { name: 'Register trainer' }).click();
+  expect(await page.getByLabel('Years of experience').evaluate(element => (element as HTMLInputElement).validity.rangeUnderflow)).toBe(true);
+  expect(await Promise.all([fixture.master.user.count(), fixture.master.gymAccess.count(), fixture.master.operation.count()])).toEqual(beforeDenied);
+  expect(await Promise.all(fixture.tenants.map(tenant => tenant.trainer.count()))).toEqual(trainerCounts);
   await page.getByLabel('Full name').fill('Browser Enrollment Trainer');
   await page.getByLabel('Email address').fill(email);
   await page.getByLabel('Phone').fill('+94112223345');

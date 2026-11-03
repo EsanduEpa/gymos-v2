@@ -4,6 +4,17 @@
 
 Use this shared log for issues discovered while executing migration segment files. Add one dated section per segment run. Record symptoms, impact, resolution or next action, and evidence links. Keep credentials, customer data, and other secrets out of this file.
 
+## Segment 06 — 2026-11-03
+
+| Issue | Impact | Resolution / next action | Status |
+| --- | --- | --- | --- |
+| Creating a task branch and fetching remote state failed because `.git` is read-only in this workspace. | Work proceeded on the clean existing Segment 05 branch; no new branch, commit, merge, or fresh remote observation is available. | Re-run in a writable git checkout and create the focused `codex/` branch before finalizing the change. | Open |
+| Guarded disposable tenancy and Chromium harnesses initially failed before setup because Docker API socket access was denied. | Runtime checks could not initially re-establish current-checkout evidence. | Reran with approved local Docker access: tenancy 31/31, identity credential 13/13, Chromium 1/1; all owned databases, containers and browser manifest reported cleanup. | Resolved |
+| New concurrency test initially relied on an OWNER fixture created by a different test; after isolation it exposed the expected lease conflict for the overlapping caller. | Standalone concurrency coverage was initially unreliable and clarified retry semantics. | Made the fixture self-contained; asserted one concurrent winner, safe rejected overlap, same-key retry recovery and exactly one persisted actor/receipt/audit/operation/access link. Focused test and full 31/31 tenancy file pass. | Resolved |
+| Segment 06 prose/evidence named 040/043 as Task 036 dependency closure despite authoritative task spec and dependency table excluding them. | Could incorrectly block registration or pull downstream session work into 036. | Reconciled segment, evidence, tracker and coverage: 039 owns directory consumer verification, 041 owns booking eligibility; 040/043 remain later session/lifecycle prerequisites. | Resolved |
+
+Evidence: [GYMOS-MIG-036](evidence/GYMOS-MIG-036.md), [Segment 06](segments/06_TRAINER_MANAGEMENT_AND_COACHING.md), [coverage matrix](segments/MIGRATION_COVERAGE_MATRIX.md).
+
 ## Entry template
 
 ### Segment NN — YYYY-MM-DD

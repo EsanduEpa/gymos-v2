@@ -74,7 +74,7 @@ Stop until DEC-09 fixes relationship, privacy, metrics, limits and meal-day mapp
 - **Remaining:** 036–039,050–052
 - **Next recommended task:** complete GYMOS-MIG-036 acceptance; then implement 040 in Segment 07 before resuming member status/pack work.
 - **Segment 05 return checkpoint:** task 036 supplies the trainer-registration prerequisite for 040. Record its own acceptance evidence, then follow the [member follow-up checklist](../SEGMENT_05_FOLLOW_UP.md). Shared trainer enrollment work does not establish completion of member consent/recovery under task 031.
-- **Files/tests/issues/blockers/decisions:** _fill during execution_
+- **Files/tests/issues/blockers/decisions:** Task 036 implementation and continuation evidence: [GYMOS-MIG-036](../evidence/GYMOS-MIG-036.md). Authoritative Task 036 dependencies are 017/018/023/027/078/080/083; directory verification belongs to 039 and booking verification belongs to 041. 040/043 remain later session/lifecycle prerequisites, not 036 prerequisites. Current guarded checks pass (tenancy 31/31, identity 13/13, Chromium 1/1) alongside workspace static checks. Separate owner acceptance and final revision/hosted checks remain pending.
 
 
 ## Owner scope amendment — 30 October 2026
