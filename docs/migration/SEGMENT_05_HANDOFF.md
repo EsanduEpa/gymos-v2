@@ -1,10 +1,10 @@
 # Segment 05 handoff — Member Enrollment and Account Management
 
-Status: **In progress.** Segment 05 owns tasks 031, 032 and 035. None is marked complete. Commit `41a6ad5` adds verified credential recovery, consent browser coverage, and membership-term paging; remaining acceptance is tracked below and in the [exit checklist](SEGMENT_05_EXIT_CHECKLIST.md).
+Status: **In progress.** Segment 05 owns tasks 031, 032 and 035. None is marked complete. Commits `41a6ad5` and `5d9cf8a` add verified credential recovery, original version-zero handoff, consent browser coverage, and membership-term paging; remaining acceptance is tracked below and in the [exit checklist](SEGMENT_05_EXIT_CHECKLIST.md).
 
 ## Segment 05 work remaining
 
-- **031 — enrollment and account recovery:** existing-identity consent/refusal and credential reissue after lost response now have API/browser evidence. Finish remaining checkpoint, owner-revocation/concurrency, validation/redaction and two-gym failure-path acceptance.
+- **031 — enrollment and account recovery:** existing-identity consent/refusal, original credential acknowledgment, and credential reissue after lost response now have API/browser evidence. Finish remaining checkpoint, owner-revocation/concurrency, validation/redaction and two-gym failure-path acceptance.
 - **032 — roster and profile:** owner roster and membership-term histories now page past 100 with API/browser evidence. Finish safe role projections, foreign-ID/privacy denials and loading/error/empty accessibility. Session history belongs to 044, pack history to 034, and confirmed-trainer health projection to 050.
 - **035 — integrated journey:** new and reused-identity browser journeys now pass across two isolated gyms, including forced change and unchanged second-gym effects. Finish browser-injected durable recovery, repeated-recovery/pending publication effects, and full role/accessibility evidence. Pack issuance and session history are not this task’s acceptance.
 

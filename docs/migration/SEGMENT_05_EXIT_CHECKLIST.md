@@ -1,6 +1,6 @@
 # Segment 05 exit checklist — Member Enrollment and Account Management
 
-Segment 05 now owns **GYMOS-MIG-031, 032 and 035**. All three are still in progress; this checklist is a scope and acceptance aid, not evidence that any item has passed. Task 033 (member status/hold release) and 034 (session-pack issuance/balances) moved to Segment 07 because both are session-credit lifecycle behavior. Their task IDs and dependency edges remain intact. The latest partial verification addendum is recorded at commit `41a6ad5` (3 November 2026).
+Segment 05 now owns **GYMOS-MIG-031, 032 and 035**. All three are still in progress; this checklist is a scope and acceptance aid, not evidence that any item has passed. Task 033 (member status/hold release) and 034 (session-pack issuance/balances) moved to Segment 07 because both are session-credit lifecycle behavior. Their task IDs and dependency edges remain intact. Latest implementation commits are `41a6ad5` (profile/history paging) and `5d9cf8a` (version-zero credential acknowledgment), 3 November 2026.
 
 ## Exit gate: required before Segment 06 starts
 
@@ -14,6 +14,7 @@ Segment 05 now owns **GYMOS-MIG-031, 032 and 035**. All three are still in progr
 ### Partial results recorded; not exit approval
 
 - [x] 031: existing-identity acceptance/refusal, lost reissue response/API recovery, revoked-secret rejection, forced password change, tenant rollback and post-tenant/pre-activation recovery have evidence. Chromium covers consent, credential replacement, first login and gym isolation.
+- [x] 031: original delivery version zero can be acknowledged without reissue (Chromium, 1/1).
 - [x] 032: owner roster paging beyond 100 and membership-term profile paging beyond 100 have disposable integration evidence; browser verifies page navigation.
 - [x] 035: new-member and explicitly consented existing-identity browser journeys pass in disposable two-gym fixtures.
 - [ ] 031 remaining fault boundaries, owner revocation/concurrency races, and broad validation/redaction matrix.
@@ -21,6 +22,8 @@ Segment 05 now owns **GYMOS-MIG-031, 032 and 035**. All three are still in progr
 - [ ] 035 injected-failure browser recovery and complete repeated-recovery/pending-publication effects.
 - [ ] Independent owner manual acceptance for 031/032/035.
 - [ ] Latest PR hosted checks (11 required) and review findings.
+
+Hosted-check access note: this session could push to the existing private PR branch, but its unauthenticated GitHub REST check-run request returned 404; `gh` is not installed and the browser-access host is unavailable. The 11 latest-revision checks therefore remain unverified and need an authenticated GitHub Actions view.
 
 Evidence: [031](evidence/GYMOS-MIG-031.md), [032](evidence/GYMOS-MIG-032.md), [035](evidence/GYMOS-MIG-035.md). These partial passes do not make Segment 05 ready to hand off.
 

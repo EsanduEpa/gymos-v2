@@ -25,6 +25,8 @@ Segment 05 owns tasks031,032,035. Tasks033 and034 are moved to Segment07 with ID
 
 Verification addendum — 3 November 2026: commit `41a6ad5` adds passing disposable evidence for credential reissue recovery, two-gym new/reused identity browser flows, and membership-term paging. Tasks031/032/035 remain In Progress because the exit checklist’s remaining failure, role/privacy and owner-acceptance items are not satisfied. See the task evidence and [Segment 05 handoff](../SEGMENT_05_HANDOFF.md).
 
+Commit `5d9cf8a` additionally fixed and browser-verified acknowledgment of initial credential version zero. Segment 05 remains in progress; latest PR checks are not yet observable from this session.
+
 ## Update protocol
 
 After verifying a task, update its authoritative tracker/evidence first, then this table and the owning segment handoff. Record exact revision, environment, commands/exit codes, fixtures, success and negative cases, screenshots where applicable, skipped checks, and residual risk. `IMPLEMENTED` without passing evidence is not `COMPLETED` or `VERIFIED`.

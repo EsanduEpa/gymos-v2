@@ -23,3 +23,5 @@ Code and tests added in commit `41a6ad5` on `codex/segment-05-member-enrollment`
 - API/web TypeScript checks, focused web ESLint, contract build, API build, web build, and `git diff --check` all passed.
 
 Still incomplete: role-specific member/support/trainer projections beyond explicit denial, recursive forbidden-field auditing, empty/loading/error/accessibility browser cases, foreign-resource denial matrix, and operational/pending state coverage. Session history, pack history, and confirmed-trainer health remain deliberately assigned to tasks 044, 034, and 050. Task 032 remains In Progress; owner manual acceptance is not recorded.
+
+The profile paging browser journey and API assertions above were followed by an owner-version-zero credential-flow correction in `5d9cf8a`; that correction does not change profile paging. Latest checked-in paging implementation is therefore still `41a6ad5`.
