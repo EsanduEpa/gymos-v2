@@ -17,6 +17,17 @@ checkout; their expected behavior cannot be treated as delivered by inference.
 Continue work independent of those prerequisites and keep dependent acceptance
 incomplete until each owning task has passing evidence.
 
+## Follow-up execution update — 3 November 2026
+
+Task 036 now has a partial implementation and task evidence on the active
+Segment 05 PR branch: trainer profile/consent saga and owner UI, 26/26
+disposable integration tests, and a 13/13 Chromium suite including the trainer
+forced-change journey. The recovery suite proves a pending Master link cannot
+operationalize the tenant actor before reciprocal activation. Task 036 remains
+In Progress because its full owner/API/consumer acceptance and owner review are
+not complete. No task 040 or 043 implementation/evidence exists yet. Continue
+in the order 036 → 040 → 043, then return to 031/032, 033/034 and 035.
+
 ## Ownership and return checklist
 
 | Outstanding requirement | Future provider | Work still owned by Segment 05 | Return gate |
