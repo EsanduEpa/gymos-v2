@@ -398,6 +398,29 @@ test('real browser and HTTP requests preserve two-gym isolation and pure reads',
   expect((await fixture.tenants[1].gymConfiguration.findUniqueOrThrow({ where: { id: 'current' } })).masterGymId).toBe(fixture.gyms[1].id);
 });
 
+test('owner can acknowledge the original version-zero member credential without reissuing it', async ({ page }) => {
+  const plan = await fixture.tenants[0].membershipPlan.create({ data: {
+    name: 'Original Handoff Plan', price: '0.01', currency: 'LKR', durationDays: 7,
+  } });
+  const email = `original-handoff-${environment.runId}@example.test`;
+  await openGymWithTestSession(page, fixture.users.ownerA.id, fixture.gyms[0].slug);
+  await page.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/owner/members/new`);
+  await page.getByLabel('Full name').fill('Original Handoff Member');
+  await page.getByLabel('Email address').fill(email);
+  await page.getByLabel('Phone').fill('+94112223347');
+  await page.getByLabel('Date of birth').fill('1994-02-03');
+  await page.getByLabel('Initial membership plan').selectOption(plan.id);
+  await page.getByRole('button', { name: 'Register member' }).click();
+  await expect(page.getByRole('heading', { name: 'One-time credential handoff' })).toBeVisible();
+  const delivery = await fixture.master.credentialDelivery.findFirstOrThrow({ where: { identity: { email } } });
+  expect(delivery).toMatchObject({ version: 0, acknowledgedAt: null });
+  await page.getByRole('button', { name: 'I have recorded the password' }).click();
+  await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/owner/members/(?!new$)[^/]+$`));
+  expect((await fixture.master.credentialDelivery.findUniqueOrThrow({ where: { operationId: delivery.operationId } })).acknowledgedAt)
+    .toBeInstanceOf(Date);
+  expect(await fixture.tenants[0].member.count({ where: { email } })).toBe(1);
+});
+
 test('full member enrollment hands off a one-time credential and enforces first-login password change', async ({ page, browser, request }) => {
   const plan = await fixture.tenants[0].membershipPlan.create({ data: {
     name: 'Browser Enrollment Plan', price: '0.01', currency: 'LKR', durationDays: 30,
@@ -459,7 +482,7 @@ test('full member enrollment hands off a one-time credential and enforces first-
     expect(revokedLogin.status()).toBe(401);
     await loginWithPassword(memberPage, email, temporaryPassword);
     await expect(memberPage).toHaveURL(/\/change-password$/);
-    const replacement = randomBytes(24).toString('base64url');
+    const replacement = `${randomBytes(24).toString('base64url')}!7`;
     await memberPage.getByLabel('Temporary password').fill(temporaryPassword);
     await memberPage.locator('#newPassword').fill(replacement);
     await memberPage.getByLabel('Confirm new password').fill(replacement);

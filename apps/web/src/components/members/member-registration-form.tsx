@@ -24,7 +24,7 @@ export function MemberRegistrationForm({ slug, plans, initialRequestKey }: { slu
   const operationId = result?.operationId;
 
   async function continueToProfile() {
-    if (!completed || !deliveryVersion) return;
+    if (!completed || deliveryVersion === undefined) return;
     setHandoffError('');
     startTransition(async () => {
       const response = await acknowledgeMemberCredential(slug, completed.operationId, deliveryVersion);
