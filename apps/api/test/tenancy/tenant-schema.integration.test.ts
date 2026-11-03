@@ -475,6 +475,20 @@ it('commits a full owner enrollment once and requires authenticated explicit con
   const controller = new GymsController({ master } as DatabaseService, gateFor());
   const profile = await controller.memberDetail({ gymAccess: access } as GymRequest, first.memberId);
   expect(profile.healthNotes).toBe('Synthetic private note');
+  await tenants[0].membershipTerm.createMany({ data: Array.from({ length: 124 }, (_, index) => ({
+    memberId: first.memberId, planId: plan.id, startDate: new Date(Date.UTC(2020, 0, 1 + index)),
+    endDateExclusive: new Date(Date.UTC(2020, 0, 2 + index)), agreedPrice: '1234.50', currency: 'LKR',
+    planNameSnapshot: `Historical plan ${index + 1}`, configurationVersion: 1, actorIdentityId: actorId,
+    idempotencyKey: `history-2026-${String(index + 1).padStart(4, '0')}`, requestDigest: `synthetic-history-${index + 1}`,
+  })) });
+  const firstTerms = await controller.memberDetail({ gymAccess: access } as GymRequest, first.memberId, { page: '1', pageSize: '25' });
+  const lastTerms = await controller.memberDetail({ gymAccess: access } as GymRequest, first.memberId, { page: '6', pageSize: '25' });
+  expect(firstTerms).toMatchObject({ membershipPage: 1, membershipPageSize: 25, membershipTotalCount: 125, membershipTotalPages: 5 });
+  expect(lastTerms).toMatchObject({ membershipPage: 5, membershipTotalCount: 125, membershipTotalPages: 5 });
+  expect(firstTerms.memberships).toHaveLength(25);
+  expect(lastTerms.memberships).toHaveLength(25);
+  expect(new Set([...firstTerms.memberships, ...lastTerms.memberships].map(term => term.id)).size).toBe(50);
+  expect(firstTerms.memberships[0].startDate > firstTerms.memberships.at(-1)!.startDate).toBe(true);
   const directory = await controller.members({ gymAccess: access } as GymRequest, { q: 'Synthetic Enrolled' });
   expect(JSON.stringify(directory)).not.toContain('healthNotes');
   await expect(controller.memberDetail({ gymAccess: { ...access, role: 'TRAINER' } } as GymRequest, first.memberId))
@@ -483,7 +497,7 @@ it('commits a full owner enrollment once and requires authenticated explicit con
   if (replay.status !== 'COMPLETE') throw new Error('Expected enrollment replay to remain complete');
   expect(replay.replayed).toBe(true);
   expect(replay.temporaryPassword).toBeUndefined();
-  expect(await tenants[0].membershipTerm.count({ where: { memberId: first.memberId } })).toBe(1);
+  expect(await tenants[0].membershipTerm.count({ where: { actorIdentityId: actorId, idempotencyKey: first.operationId } })).toBe(1);
   expect(deliveries).toBe(2);
   await expect(service.enroll(access as never, { ...input, idempotencyKey: 'member-enrollment-0002' }))
     .rejects.toBeInstanceOf(ConflictException);

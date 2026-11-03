@@ -414,13 +414,35 @@ test('full member enrollment hands off a one-time credential and enforces first-
   await page.getByLabel('Initial membership plan').selectOption(plan.id);
   await page.getByRole('button', { name: 'Register member' }).click();
   await expect(page.getByRole('heading', { name: 'One-time credential handoff' })).toBeVisible();
-  const temporaryPassword = await page.getByLabel('Temporary password').inputValue();
+  const lostTemporaryPassword = await page.getByLabel('Temporary password').inputValue();
+  let temporaryPassword = lostTemporaryPassword;
   expect(temporaryPassword.length).toBeGreaterThanOrEqual(20);
   expect(JSON.stringify(await fixture.master.operation.findMany({ where: { kind: 'REGISTER_MEMBER' } }))).not.toContain(temporaryPassword);
   expect(JSON.stringify(await fixture.master.credentialDelivery.findMany())).not.toContain(temporaryPassword);
+  await page.getByRole('button', { name: 'I lost this password — replace it' }).click();
+  await expect.poll(() => page.getByLabel('Temporary password').inputValue()).not.toBe(lostTemporaryPassword);
+  temporaryPassword = await page.getByLabel('Temporary password').inputValue();
+  expect(await fixture.master.credentialDelivery.findFirstOrThrow({ where: { identity: { email } } }))
+    .toMatchObject({ version: 1 });
   await page.getByRole('button', { name: 'I have recorded the password' }).click();
-  await expect(page).toHaveURL(/\/owner\/members\//);
+  await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/owner/members/(?!new$)[^/]+$`), { timeout: 10_000 });
   const identity = await fixture.master.user.findUniqueOrThrow({ where: { email } });
+  const member = await fixture.tenants[0].member.findUniqueOrThrow({ where: { email } });
+  await fixture.tenants[0].membershipTerm.createMany({ data: Array.from({ length: 25 }, (_, index) => ({
+    memberId: member.id, planId: plan.id, startDate: new Date(Date.UTC(2021, 0, index + 1)),
+    endDateExclusive: new Date(Date.UTC(2021, 0, index + 2)), agreedPrice: '0.01', currency: 'LKR',
+    planNameSnapshot: `Browser historical term ${index + 1}`, configurationVersion: 1,
+    actorIdentityId: fixture.users.ownerA.id, idempotencyKey: `browser-history-${String(index + 1).padStart(8, '0')}`,
+    requestDigest: `browser-history-digest-${index + 1}`,
+  })) });
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Browser Enrollment Member', exact: true, level: 1 })).toBeVisible({ timeout: 10_000 });
+  await page.getByRole('tab', { name: 'Membership & Packs' }).click();
+  await expect(page.getByRole('navigation', { name: 'Membership history pages' })).toContainText('26 membership terms');
+  await page.getByRole('link', { name: 'Next membership page' }).click();
+  await expect(page).toHaveURL(/membershipPage=2/);
+  await expect(page.getByText('Page 2 of 2')).toBeVisible();
+  await expect(page.getByText('Browser historical term 1', { exact: true })).toBeVisible();
   expect(identity.mustChangePassword).toBe(true);
   expect(identity.credentialExpiresAt?.getTime()).toBeGreaterThan(Date.now());
   const [alphaCount, betaCount] = await Promise.all([
@@ -433,6 +455,8 @@ test('full member enrollment hands off a one-time credential and enforces first-
   const memberContext = await browser.newContext();
   try {
     const memberPage = await memberContext.newPage();
+    const revokedLogin = await request.post(`${apiBase}/auth/login`, { data: { email, password: lostTemporaryPassword } });
+    expect(revokedLogin.status()).toBe(401);
     await loginWithPassword(memberPage, email, temporaryPassword);
     await expect(memberPage).toHaveURL(/\/change-password$/);
     const replacement = randomBytes(24).toString('base64url');
@@ -452,6 +476,74 @@ test('full member enrollment hands off a one-time credential and enforces first-
       headers: { authorization: `Bearer ${memberCookie?.value}` },
     })).status()).toBe(403);
     expect((await fixture.master.user.findUniqueOrThrow({ where: { id: identity.id } })).mustChangePassword).toBe(false);
+  } finally { await memberContext.close(); }
+});
+
+test('existing identity explicitly consents, keeps its password, and enters the selected gym as a member', async ({ page, browser }) => {
+  const plan = await fixture.tenants[1].membershipPlan.create({ data: {
+    name: 'Existing Identity Plan', price: '12.50', currency: 'LKR', durationDays: 14,
+  } });
+  const identityBefore = await fixture.master.user.findUniqueOrThrow({ where: { id: fixture.users.ownerA.id } });
+  const betaBefore = await fixture.tenants[1].member.count();
+
+  await openGymWithTestSession(page, fixture.users.ownerB.id, fixture.gyms[1].slug);
+  await page.goto(`${webBase}/gyms/${fixture.gyms[1].slug}/owner/members/new`);
+  await page.getByLabel('Full name').fill('Existing Account Member');
+  await page.getByLabel('Email address').fill(fixture.users.ownerA.email);
+  await page.getByLabel('Phone').fill('+94112223349');
+  await page.getByLabel('Date of birth').fill('1992-04-10');
+  await page.getByLabel('Initial membership plan').selectOption(plan.id);
+  await expect(page.getByLabel('Initial membership plan')).toHaveValue(plan.id);
+  await page.getByRole('button', { name: 'Register member' }).click();
+  const consentLink = page.getByRole('link', { name: 'Review enrollment consent' });
+  await expect(consentLink).toBeVisible();
+  await expect(page.getByLabel('Full name')).toHaveValue('Existing Account Member');
+  await expect(page.getByLabel('Email address')).toHaveValue(fixture.users.ownerA.email);
+  await expect(page.getByLabel('Initial membership plan')).toHaveValue(plan.id);
+  const consentPath = await consentLink.getAttribute('href');
+  if (!consentPath) throw new Error('Expected a gym-bound consent URL');
+  const operationId = consentPath.split('/').at(-1)!;
+  expect(await fixture.tenants[1].member.count()).toBe(betaBefore);
+  expect(await fixture.master.gymAccess.findUnique({ where: {
+    userId_gymId: { userId: fixture.users.ownerA.id, gymId: fixture.gyms[1].id },
+  } })).toBeNull();
+
+  const identityContext = await browser.newContext();
+  try {
+    const identityPage = await identityContext.newPage();
+    await loginWithPassword(identityPage, fixture.users.ownerA.email, fixture.password);
+    await expect(identityPage).not.toHaveURL(/\/login/);
+    await identityPage.goto(`${webBase}${consentPath}`);
+    await expect(identityPage.getByRole('heading', { name: 'Review gym enrollment' })).toBeVisible();
+    await identityPage.getByLabel('Current password').fill(fixture.password);
+    await identityPage.getByRole('button', { name: 'Accept gym enrollment' }).click();
+    await expect(identityPage.getByRole('status')).toContainText('consent is securely recorded');
+  } finally { await identityContext.close(); }
+
+  await page.getByRole('button', { name: 'Check consent and finish enrollment' }).click();
+  await expect(page.getByText('The existing identity accepted the gym link. No password was created, changed or shared.')).toBeVisible();
+  const [member, access, operation, identityAfter] = await Promise.all([
+    fixture.tenants[1].member.findFirstOrThrow({ where: { email: fixture.users.ownerA.email } }),
+    fixture.master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: {
+      userId: fixture.users.ownerA.id, gymId: fixture.gyms[1].id,
+    } } }),
+    fixture.master.operation.findUniqueOrThrow({ where: { id: operationId } }),
+    fixture.master.user.findUniqueOrThrow({ where: { id: fixture.users.ownerA.id } }),
+  ]);
+  expect(access).toMatchObject({ role: 'MEMBER', linkStatus: 'ACTIVE', tenantActorId: member.id });
+  expect(operation).toMatchObject({ state: 'COMPLETE', tenantActorId: member.id });
+  expect(identityAfter.passwordHash).toBe(identityBefore.passwordHash);
+  expect(await fixture.tenants[1].membershipTerm.count({ where: { memberId: member.id } })).toBe(1);
+  expect(await fixture.master.credentialDelivery.count({ where: { operationId } })).toBe(0);
+
+  const memberContext = await browser.newContext();
+  try {
+    const memberPage = await memberContext.newPage();
+    await loginWithPassword(memberPage, fixture.users.ownerA.email, fixture.password);
+    await expect(memberPage).toHaveURL(/\/gyms\/select$/);
+    await memberPage.getByRole('link', { name: /Test Gym Beta.*member/ }).click();
+    await expect(memberPage).toHaveURL(new RegExp(`/gyms/${fixture.gyms[1].slug}/member$`));
+    await expect(memberPage.locator('.gym-banner')).toContainText('Your member workspace.');
   } finally { await memberContext.close(); }
 });
 

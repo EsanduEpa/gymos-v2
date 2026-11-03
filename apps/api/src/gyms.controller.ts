@@ -25,7 +25,7 @@ import type { Prisma as MasterPrisma } from './generated/master/client.js';
 import { GymAccessGuard, type GymRequest } from './gym-access.guard.js';
 import { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js';
 import { appendMasterVersionAudit } from './operations/transaction-audit.js';
-import { memberEnrollmentConsentInputSchema, memberEnrollmentConsentResultSchema, memberListQuerySchema, memberListSchema,
+import { memberEnrollmentConsentInputSchema, memberEnrollmentConsentResultSchema, memberHistoryQuerySchema, memberListQuerySchema, memberListSchema,
   memberRegistrationInputSchema, updateGymPublicProfileSchema, updateGymThemeSchema } from '@gymos/contracts';
 import { gymLocalDate } from './membership-rules.js';
 import { MemberEnrollmentService } from './member-enrollment.service.js';
@@ -262,16 +262,16 @@ export class GymsController {
 
   @Get(':slug/members/:memberId')
   @UseGuards(GymAccessGuard)
-  async memberDetail(@Req() request: GymRequest, @Param('memberId') memberId: string) {
+  async memberDetail(@Req() request: GymRequest, @Param('memberId') memberId: string, @Query() query: unknown = {}) {
     const access = request.gymAccess;
     if (!access) throw new InternalServerErrorException('Gym context missing');
     if (access.role !== 'OWNER') throw new ForbiddenException('Member profile access denied');
+    const parsedPage = memberHistoryQuerySchema.safeParse(query ?? {});
+    if (!parsedPage.success) throw new UnprocessableEntityException('Enter a valid membership history page');
     return this.tenantGate.withVerifiedTenant(access, async tenant => {
       const member = await tenant.member.findFirst({ where: { id: memberId, registrationState: { in: ['BASIC', 'COMPLETE'] } },
         select: { id: true, enrollmentOperationId: true, fullName: true, email: true, phone: true, dateOfBirth: true, emergencyContact: true,
           healthNotes: true, status: true, registrationState: true, version: true,
-          memberships: { orderBy: [{ startDate: 'desc' }, { id: 'desc' }], take: 100,
-            select: { id: true, planNameSnapshot: true, startDate: true, endDateExclusive: true, agreedPrice: true, currency: true } },
           sessionPacks: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 0,
             select: { id: true } } },
       });
@@ -284,14 +284,22 @@ export class GymsController {
       const config = await tenant.gymConfiguration.findUnique({ where: { id: 'current' }, select: { timezone: true } });
       if (!config?.timezone) throw new ServiceUnavailableException('Gym timezone is unavailable');
       const asOf = new Date();
+      const membershipTotalCount = await tenant.membershipTerm.count({ where: { memberId } });
+      const membershipTotalPages = Math.ceil(membershipTotalCount / parsedPage.data.pageSize);
+      const membershipPage = Math.min(parsedPage.data.page, Math.max(1, membershipTotalPages));
+      const memberships = await tenant.membershipTerm.findMany({ where: { memberId },
+        orderBy: [{ startDate: 'desc' }, { id: 'desc' }], skip: (membershipPage - 1) * parsedPage.data.pageSize,
+        take: parsedPage.data.pageSize,
+        select: { id: true, planNameSnapshot: true, startDate: true, endDateExclusive: true, agreedPrice: true, currency: true } });
       return {
         id: member.id, fullName: member.fullName, email: member.email, phone: member.phone,
         dateOfBirth: member.dateOfBirth?.toISOString().slice(0, 10) ?? null,
         emergencyContact: member.emergencyContact, healthNotes: member.healthNotes,
         status: member.status, registrationState: member.registrationState, version: member.version,
-        memberships: member.memberships.map(term => ({ id: term.id, planName: term.planNameSnapshot,
+        memberships: memberships.map(term => ({ id: term.id, planName: term.planNameSnapshot,
           startDate: term.startDate.toISOString().slice(0, 10), endDateExclusive: term.endDateExclusive.toISOString().slice(0, 10),
           agreedPrice: term.agreedPrice.toString(), currency: term.currency })),
+        membershipPage, membershipPageSize: parsedPage.data.pageSize, membershipTotalCount, membershipTotalPages,
         sessionPacks: [], recentSessions: [], asOf: asOf.toISOString(),
       };
     });

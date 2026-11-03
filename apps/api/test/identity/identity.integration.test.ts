@@ -357,19 +357,38 @@ it('issues a one-time credential, rotates it once, and atomically changes it wit
   await expect(credentials.reissueForOperation({ ...reissueInput, idempotencyKey: 'another-reissue-key-02' }))
     .rejects.toThrow('Credential delivery version changed');
 
-  await credentials.acknowledgeTemporaryCredential({ actorIdentityId: owner.id, gymId: gym.id, operationId, deliveryVersion: 1 });
-  await expect(credentials.reissueForOperation({ ...reissueInput, expectedVersion: 1, idempotencyKey: 'after-ack-request-03' }))
+  // Simulate the owner losing the response after the replacement committed.
+  const lostResponseInput = { ...reissueInput, expectedVersion: 1, idempotencyKey: 'lost-response-reissue-03' };
+  const committedWithoutResponse = await credentials.reissueForOperation(lostResponseInput);
+  expect(committedWithoutResponse).toMatchObject({ status: 'ISSUED', deliveryVersion: 2 });
+  const recoveredVersion = await credentials.reissueForOperation(lostResponseInput);
+  expect(recoveredVersion).toEqual({ status: 'ALREADY_ISSUED', deliveryVersion: 2 });
+  // A secret is never replayed. Use the recovered version to revoke the unseen
+  // credential and obtain a new one-time value under a fresh request key.
+  const recoveredHandoff = await credentials.reissueForOperation({ ...reissueInput,
+    expectedVersion: recoveredVersion.deliveryVersion, idempotencyKey: 'recovered-handoff-04' });
+  expect(recoveredHandoff).toMatchObject({ status: 'ISSUED', deliveryVersion: 3 });
+  if (!recoveredHandoff.temporaryPassword) throw new Error('Expected replacement after lost response recovery');
+  const finalTemporaryPassword = recoveredHandoff.temporaryPassword;
+  await expect(new AuthController(database).login({ email: 'credential-new-member@example.test', password: secondSecret }))
+    .rejects.toThrow('Invalid email or password');
+  await expect(new AuthController(database).login({ email: 'credential-new-member@example.test', password: finalTemporaryPassword }))
+    .resolves.toMatchObject({ mustChangePassword: true });
+
+  await credentials.acknowledgeTemporaryCredential({ actorIdentityId: owner.id, gymId: gym.id, operationId, deliveryVersion: 3 });
+  await expect(credentials.reissueForOperation({ ...reissueInput, expectedVersion: 3, idempotencyKey: 'after-ack-request-05' }))
     .rejects.toThrow('Credential handoff was already acknowledged');
   await expect(credentials.changePassword({ identityId: subject.id, authVersion: 1, currentPassword: secondSecret,
     newPassword: 'New-member-password-42' })).rejects.toThrow('Invalid or revoked token');
-  await credentials.changePassword({ identityId: subject.id, authVersion: 2, currentPassword: secondSecret,
+  await credentials.changePassword({ identityId: subject.id, authVersion: 4, currentPassword: finalTemporaryPassword,
     newPassword: 'New-member-password-42' });
   const changed = await master.user.findUniqueOrThrow({ where: { id: subject.id } });
   expect(changed.mustChangePassword).toBe(false);
   expect(changed.credentialExpiresAt).toBeNull();
-  expect(changed.authVersion).toBe(3);
+  expect(changed.authVersion).toBe(5);
   expect(changed.passwordChangedAt).toBeInstanceOf(Date);
   expect(await argon2.verify(changed.passwordHash, secondSecret)).toBe(false);
+  expect(await argon2.verify(changed.passwordHash, finalTemporaryPassword)).toBe(false);
   expect(await argon2.verify(changed.passwordHash, 'New-member-password-42')).toBe(true);
 
   const reused = await master.user.findUniqueOrThrow({ where: { email: 'multi@example.test' } });

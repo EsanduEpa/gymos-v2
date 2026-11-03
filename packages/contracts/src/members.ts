@@ -35,6 +35,7 @@ export const memberListQuerySchema = pageQuerySchema.extend({
   q: z.string().trim().max(120).optional(),
   status: memberStatusSchema.optional(),
 });
+export const memberHistoryQuerySchema = pageQuerySchema.pick({ page: true, pageSize: true });
 
 export const memberListItemSchema = z.strictObject({
   id: idSchema, fullName: z.string().min(2).max(120), email: z.email().max(254).nullable(),
@@ -52,6 +53,8 @@ export const memberDetailSchema = z.strictObject({
   status: memberStatusSchema, registrationState: z.enum(['BASIC', 'PENDING', 'COMPLETE', 'FAILED']), version: versionSchema,
   memberships: z.array(z.strictObject({ id: idSchema, planName: z.string().max(80), startDate: localDateSchema,
     endDateExclusive: localDateSchema, agreedPrice: nonnegativeDecimalStringSchema, currency: z.enum(['LKR', 'USD']) })).max(100),
+  membershipPage: z.number().int().min(1), membershipPageSize: z.number().int().min(1).max(100),
+  membershipTotalCount: z.number().int().nonnegative(), membershipTotalPages: z.number().int().nonnegative(),
   sessionPacks: z.array(z.strictObject({ id: idSchema, issuedCredits: z.number().int().min(1).max(1000), availableCredits: z.number().int().min(0).max(1000),
     price: nonnegativeDecimalStringSchema, currency: z.enum(['LKR', 'USD']), startDate: localDateSchema, endDateExclusive: localDateSchema,
     status: z.enum(['ACTIVE', 'EXPIRED', 'DEPLETED']) })).max(100),

@@ -6,8 +6,8 @@ import { Card, EmptyState, StatusBadge, Tabs } from '@/components/ui';
 
 const items = [{ id: 'overview', label: 'Overview' }, { id: 'sessions', label: 'Attendance' }, { id: 'history', label: 'Membership & Packs' }];
 
-export function MemberProfileTabs({ member }: { member: MemberDetail }) {
-  const [active, setActive] = useState('overview');
+export function MemberProfileTabs({ member, slug }: { member: MemberDetail; slug: string }) {
+  const [active, setActive] = useState(() => typeof window !== 'undefined' && window.location.hash === '#history' ? 'history' : 'overview');
   return <section className="member-profile-tabs">
     <Card>
       <div className="ui-card-header"><div><span className="eyebrow dark">ACCOUNT</span><h2>{member.fullName}</h2></div><StatusBadge status={member.status}/></div>
@@ -30,6 +30,11 @@ export function MemberProfileTabs({ member }: { member: MemberDetail }) {
           <div><strong>{term.planName}</strong><small>{term.startDate} to the day before {term.endDateExclusive}</small></div>
           <span>{term.agreedPrice} {term.currency}<small>agreed value · no payment recorded</small></span>
         </article>)}</div> : <EmptyState title="No membership history."/>}
+        {member.membershipTotalCount > member.membershipPageSize ? <nav aria-label="Membership history pages" className="member-history-pagination">
+          <p>Page {member.membershipPage} of {member.membershipTotalPages} · {member.membershipTotalCount} membership terms</p>
+          {member.membershipPage > 1 ? <a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/owner/members/${encodeURIComponent(member.id)}?membershipPage=${member.membershipPage - 1}&membershipPageSize=${member.membershipPageSize}#history`}>Previous membership page</a> : null}
+          {member.membershipPage < member.membershipTotalPages ? <a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/owner/members/${encodeURIComponent(member.id)}?membershipPage=${member.membershipPage + 1}&membershipPageSize=${member.membershipPageSize}#history`}>Next membership page</a> : null}
+        </nav> : null}
         <h3>Session-pack balance</h3>
         {member.sessionPacks.length ? <div className="member-history-list">{member.sessionPacks.map(pack => <article key={pack.id}>
           <div><strong>{pack.issuedCredits} sessions issued</strong><small>{pack.startDate} to the day before {pack.endDateExclusive}</small></div>
