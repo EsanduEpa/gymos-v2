@@ -21,6 +21,12 @@ Use the task evidence links in the tracker. Partial code and passing PR checks d
 
 This reallocation changes ownership and schedule, not required product behavior. No dependency was waived. Tasks 036/040/043 are not automatic blockers for closing 031/032/035 unless a direct dependency is present in that task’s specification. Segment 06 may start at the Segment 05 exit gate; its own task dependencies still apply.
 
+### Dependency evidence audit — 3 November 2026
+
+- **036** is **In Progress**, not complete. Its task-owned evidence records passing partial registration/recovery/browser checks and explicitly lists missing checkpoint, concurrency, consent/reissue, role/foreign-gym and downstream publication acceptance: [GYMOS-MIG-036 evidence](evidence/GYMOS-MIG-036.md).
+- **040** and **043** remain **Not Started** in the task tracker, and no task-owned evidence files exist for them. Their full acceptance criteria are still required before downstream session booking/status and notification/audit tasks can close.
+- These tasks are retained as prerequisites for Segment 07 tasks 033/034 where specified. They are not direct dependencies of Segment 05 tasks 031/032/035 in the authoritative task specs and therefore do not block the Segment 05 exit gate.
+
 ## Verification and data safeguards
 
 Use disposable, owned databases only. Do not reset, delete, reseed or test against the existing local demonstration database. Preserve local changes and evidence screenshots; archive modified reviewed screenshots before restoring committed references. Routine generated captures belong in ignored `apps/web/test-results/`.
