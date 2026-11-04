@@ -32,18 +32,18 @@ Proposed tenant schema includes immutable OperationalEarning/RevenueOrigin as ap
 
 ## 6. Detailed tasks
 
-| Done | Task | Prerequisites and sources | Exact implementation result | Acceptance/testing |
+| Status | Task | Prerequisites and sources | Exact implementation result | Acceptance/testing |
 |---|---|---|---|---|
-| [ ] | **049 Lifecycle earnings baseline** | 032,043,046,047,082,084; session/revenue/pay actions | Unique lifecycle origins and owner/trainer-safe projections; explicit operational label/currency/asOf | one origin per terminal fact; repeat/response-loss exact; role/tenant/privacy tests |
-| [ ] | **053 Membership/pack earning** | 030,034,046,047,049,082,083; O10 Revenue/Deferred | Approved daily/session allocation with exact remainder conservation; suspension/expiry disposition | full/partial/zero/leap/timezone/expired/suspended examples sum exactly; no payment claim |
-| [ ] | **054 Expense capture/list** | 012,018,027,049; O10 expense dialog/actions | OWNER-only exact expense transaction, bounded notes/category/date, paged filters | required/invalid/precision/date/repeat/stale/foreign tests; dialog retains failure draft |
-| [ ] | **055 Budgets/variance** | 012,027,054,082; O10 budget dialog/chart | unique category+month/versioned exact budget; variance over complete window | zero semantics, duplicate/concurrent update, month boundaries, full totals, chart empty/error |
-| [ ] | **056 Payroll close/approval/adjustment** | 018,046,049,053,084; O10 Payroll/T06 | approved local period, snapshot records, close and approval distinct, immutable reasoned corrections | boundary/late completion/concurrent close/retry/config change/owner vs trainer projection; no payout claim |
-| [ ] | **057 Finance panels/P&L/charts** | 012,053–056,082,084; O10 | six honest query panels using exact DTOs; P&L definitions; exports delegated to 061 | each window/currency/asOf, full totals, no NaN/float drift, loading/empty/error/visual parity |
-| [ ] | **058 Live owner dashboard** | 013,032,037,043,044,049,053,083,085; O01 | honest stat definitions, bounded alerts/sessions/trainers, 30s+manual refresh with stale response discard | selected-gym switch, poll overlap, empty/error, time window, no physical-attendance claim, visual tests |
-| [ ] | **059 Operational analytics/platform summaries** | 024,037,044,053,058,083,085; O11/S01 | three series with approved denominators/windows; sanitized platform partial rollup | zero denominator, missing tenant, window/timezone, support scope, no cross-tenant detail leak |
-| [ ] | **060 Audit screen/taxonomy** | 013,024,043,056,080,085; O13 | stable event taxonomy, server filter/cursor, sanitized transition projections, tenant/platform scope | >page ordering, filter, duplicate key, private field redaction, support original actor, two-gym denial |
-| [ ] | **061 Authenticated scoped CSV** | 020,044,057,060,085; H02/O08/O10/O13 | authorized server download, capped snapshot, safe filename/content-type/BOM/escaping/formula defense | role/scope/date/cap, formula/newline/quote cells, stable snapshot, abort/failure UI, audit event |
+| In Progress | **049 Lifecycle earnings baseline** | 032,043,046,047,082,084; session/revenue/pay actions | Unique lifecycle origins and owner/trainer-safe projections; explicit operational label/currency/asOf | Owned DB role/isolation/replay basics pass; upstream 046/047 and browser acceptance remain |
+| In Progress | **053 Membership/pack earning** | 030,034,046,047,049,082,083; O10 Revenue/Deferred | Approved daily/session allocation with exact remainder conservation; suspension/expiry disposition | Unit/full-term accrual pass; timezone, suspension and expiry source matrix remains |
+| In Progress | **054 Expense capture/list** | 012,018,027,049; O10 expense dialog/actions | OWNER-only exact expense transaction, bounded notes/category/date, paged filters | Owned DB replay/audit/two-gym and precision cases pass; rollback fault/browser remain |
+| In Progress | **055 Budgets/variance** | 012,027,054,082; O10 budget dialog/chart | unique category+month/versioned exact budget; variance over complete window | Owned DB replay/full categories/actuals pass; concurrency and browser cases remain |
+| In Progress | **056 Payroll close/approval/adjustment** | 018,046,049,053,084; O10 Payroll/T06 | approved local period, snapshot records, close and approval distinct, immutable reasoned corrections | Owned DB trainer scope/close/approval/no-payout passes; races/correction provenance remain |
+| In Progress | **057 Finance panels/P&L/charts** | 012,053–056,082,084; O10 | six honest query panels using exact DTOs; P&L definitions; exports delegated to 061 | Owned DB reconciliation passes; visual/chart/loading/empty/error review remains |
+| In Progress | **058 Live owner dashboard** | 013,032,037,043,044,049,053,083,085; O01 | honest stat definitions, bounded alerts/sessions/trainers, 30s+manual refresh with stale response discard | Owned route/shape and role checks pass; selection/overlap/visual review remains |
+| In Progress | **059 Operational analytics/platform summaries** | 024,037,044,053,058,083,085; O11/S01 | three series with approved denominators/windows; sanitized platform partial rollup | Gym route/window checks pass; platform missing/stale/cursor and browser acceptance remain |
+| In Progress | **060 Audit screen/taxonomy** | 013,024,043,056,080,085; O13 | stable event taxonomy, server filter/cursor, sanitized transition projections, tenant/platform scope | Filtered export/audit event passes; >page API/redaction and browser acceptance remain |
+| In Progress | **061 Authenticated scoped CSV** | 020,044,057,060,085; H02/O08/O10/O13 | authorized server download, capped snapshot, safe filename/content-type/BOM/escaping/formula defense | Owned DB >100 rows/formula/audit/scope and helper tests pass; browser download remains |
 
 All target feature modules and models are **proposed** until created; use actual repository conventions and record paths in handoff. Existing verified reusable targets are shared contracts/client/UI, tenant transaction receipts/audit, auth/tenant gates, and chart frame.
 
@@ -72,9 +72,10 @@ Stop if DEC-06/08/09 is unapproved or an earning line cannot be tied to an immut
 
 ## 11. Progress and handoff
 
-- **Status:** NOT STARTED
-- **Completed:** none
-- **Remaining:** 049,053–061
-- **Next recommended task:** GYMOS-MIG-049.
-- **Files/tests/issues/blockers/decisions:** _fill during execution_
+- **Status:** IN PROGRESS (0/10 completed; all ten tasks have implementation, acceptance remains incomplete)
+- **Implemented in this run:** 049 and 053–061 have implementation; the existing member roster is preserved at `/owner/members`.
+- **Remaining:** browser-visible finance/dashboard/analytics/audit/CSV review; platform stale/partial/freshness and continuation fixtures; payroll/budget race and expense rollback-fault coverage; hosted checks and owner acceptance.
+- **Next recommended task:** resume Chrome review when the browser host is restored, then close the remaining acceptance cases and hosted checks.
+- **Evidence:** [execution checklist](08_EXECUTION_CHECKLIST.md), task evidence 049 and 053–061, [run evidence](../evidence/SEGMENT-08-EXECUTION-20261104.md).
+- **Blockers:** browser-access host unavailable on retry; hosted CI/PR has not been run. Remaining platform partial/stale fixtures and race/fault tests are listed in run evidence. Keep tasks In Progress; do not claim owner acceptance.
 

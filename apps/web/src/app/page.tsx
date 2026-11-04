@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { LoadingState } from '@/components/ui';
-import { gymRolePath, SESSION_COOKIE, type GymAccessSummary } from '@/lib/gymos';
+import { gymRoleLandingPath, SESSION_COOKIE, type GymAccessSummary } from '@/lib/gymos';
 import { resolveCurrentSession } from '@/lib/navigation';
 
 async function HomeContent() {
@@ -23,7 +23,7 @@ async function HomeContent() {
   if (session.globalRole === 'SUPER_ADMIN') redirect('/admin');
   if (session.gyms.length === 0) redirect('/no-access');
   const firstGym = session.gyms[0];
-  if (session.gyms.length === 1 && firstGym) redirect(`/gyms/${encodeURIComponent(firstGym.slug)}/${firstGym.role === 'OWNER' ? 'owner' : gymRolePath(firstGym.role)}`);
+  if (session.gyms.length === 1 && firstGym) redirect(`/gyms/${encodeURIComponent(firstGym.slug)}/${gymRoleLandingPath(firstGym.role)}`);
   redirect('/gyms/select');
 }
 

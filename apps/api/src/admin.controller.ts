@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Headers, HttpCode, Param, Post, Query, Req, Res, UseGuards, UnprocessableEntityException } from '@nestjs/common';
 import type { Response } from 'express';
-import { idempotencyKeySchema, operationRetrySchema, provisioningInputSchema, registryQuerySchema } from '@gymos/contracts/platform';
+import { idempotencyKeySchema, operationRetrySchema, platformAnalyticsRefreshInputSchema, provisioningInputSchema, registryQuerySchema } from '@gymos/contracts/platform';
 import { credentialIssueInputSchema, credentialReissueInputSchema, credentialAcknowledgementInputSchema } from '@gymos/contracts/credentials';
 import { CredentialService } from './identity/credential.service.js';
 import { SuperAdminGuard, type PlatformRequest } from './super-admin.guard.js';
@@ -16,6 +16,15 @@ export class AdminController {
     const input = registryQuerySchema.safeParse(query);
     if (!input.success) throw new UnprocessableEntityException('Invalid registry page');
     return this.registry.page(request.platformIdentity!.identityId, input.data.cursor);
+  }
+  @Get('analytics/summary')
+  analyticsSummary() { return this.registry.analyticsSummary(); }
+  @Post('analytics/refresh')
+  @HttpCode(200)
+  refreshAnalytics(@Req() request: PlatformRequest, @Body() body: unknown) {
+    const input = platformAnalyticsRefreshInputSchema.safeParse(body ?? {});
+    if (!input.success) throw new UnprocessableEntityException('Enter a valid bounded summary cursor');
+    return this.registry.refreshAnalyticsBatch(request.platformIdentity!.identityId, input.data.cursor);
   }
   @Post('gyms')
   @HttpCode(202)

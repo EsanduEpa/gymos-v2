@@ -12,6 +12,7 @@
     "typecheck:workspace": "pnpm --dir packages/contracts typecheck && pnpm --dir packages/api-client typecheck && pnpm --dir apps/api exec tsc --noEmit --incremental false --pretty false && pnpm --dir apps/web exec tsc --noEmit --incremental false --pretty false",
     "test:unit": "pnpm --dir packages/contracts test && pnpm --dir packages/api-client test && pnpm --dir packages/theme-tokens test && pnpm --dir apps/api exec vitest run src && pnpm --dir apps/api exec vitest run --config vitest.config.pools.ts",
     "test:database:owned": "pnpm --dir apps/api exec vitest run --config vitest.config.environment-integration.ts --disableConsoleIntercept",
+    "test:finance:owned": "pnpm --dir apps/api exec vitest run --config vitest.config.finance.ts --disableConsoleIntercept",
     "test:recovery:owned": "pnpm --dir apps/api exec vitest run --config vitest.config.recovery.ts --disableConsoleIntercept",
     "generate:clients": "prisma generate --schema packages/database-master/prisma/schema.prisma && prisma generate --schema packages/database-tenant/prisma/schema.prisma",
     "prepare:checks": "pnpm generate:clients && pnpm --filter \"./packages/**\" --recursive --if-present build"

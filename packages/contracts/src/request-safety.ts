@@ -1,0 +1,21 @@
+/** Tracks client reads so responses from older requests cannot replace newer data. */
+export class LatestRequestSequence {
+  private sequence = 0;
+
+  begin(): number {
+    return ++this.sequence;
+  }
+
+  isCurrent(requestId: number): boolean {
+    return requestId === this.sequence;
+  }
+
+  invalidate(): void {
+    this.sequence++;
+  }
+}
+
+/** Propagate a disconnected download request and bound time spent proxying exports. */
+export function exportRequestSignal(requestSignal: AbortSignal): AbortSignal {
+  return AbortSignal.any([requestSignal, AbortSignal.timeout(30_000)]);
+}

@@ -24,7 +24,8 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
   const [switching, setSwitching] = useState(false);
   const role = support ? 'READ-ONLY SUPPORT' : gym?.role ?? 'SUPER_ADMIN';
   const destination = gym ? gymRoleUrl(gym) : '/admin';
-  const label = support ? 'Owner summary' : gym ? role === 'OWNER' ? 'Members' : role === 'TRAINER' ? 'Trainer workspace' : 'Member workspace' : 'All Gyms';
+  const label = support ? 'Owner summary' : gym ? role === 'OWNER' ? 'Dashboard' : role === 'TRAINER' ? 'My earnings' : 'Member workspace' : 'All Gyms';
+  const home = gym?.role === 'TRAINER' ? `${destination}/earnings` : destination;
   function close() { drawer.current?.close(); setOpen(false); opener.current?.focus(); }
   function show() { drawer.current?.showModal(); setOpen(true); }
   useEffect(() => {
@@ -48,9 +49,13 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
       <div className="shell-brand"><span className="shell-mark" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 4 14 14M4 6l2-2m12 16 2-2M2 8l6-6m8 20 6-6M6 12l6-6m0 12 6-6" /></svg></span><div><strong>GymOS</strong><small>Management System</small></div>
         {mobile ? <button type="button" onClick={close} aria-label="Close navigation menu">×</button> : null}</div>
       <nav aria-label={mobile ? 'Mobile navigation' : 'Main navigation'}>
-        <a href={destination} aria-current={pathname === destination || pathname === `/gyms/${gym?.slug}` ? 'page' : undefined} onClick={close}><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>{label}</a>
+        <a href={home} aria-current={pathname === home || pathname === `/gyms/${gym?.slug}` ? 'page' : undefined} onClick={close}><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>{label}</a>
         {!support && gym?.role === 'OWNER' ? <>
+          <a href={`${destination}/members`} aria-current={pathname.startsWith(`${destination}/members`) ? 'page' : undefined} onClick={close}>Members</a>
           <a href={`${destination}/sessions`} aria-current={pathname.startsWith(`${destination}/sessions`) ? 'page' : undefined} onClick={close}>PT Sessions</a>
+          <a href={`${destination}/financials`} aria-current={pathname.startsWith(`${destination}/financials`) ? 'page' : undefined} onClick={close}>Financials</a>
+          <a href={`${destination}/audit`} aria-current={pathname.startsWith(`${destination}/audit`) ? 'page' : undefined} onClick={close}>Audit history</a>
+          <a href={`${destination}/analytics`} aria-current={pathname.startsWith(`${destination}/analytics`) ? 'page' : undefined} onClick={close}>Analytics</a>
           <a href={`${destination}/trainers`} aria-current={pathname.startsWith(`${destination}/trainers`) ? 'page' : undefined} onClick={close}>Trainers</a>
         </> : null}
         {!support && gym?.role === 'TRAINER' ? <>

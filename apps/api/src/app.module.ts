@@ -45,12 +45,19 @@ import { MemberLifecycleController } from './member-lifecycle.controller.js';
 import { MemberLifecycleService } from './member-lifecycle.service.js';
 import { SessionLifecycleController } from './sessions/session-lifecycle.controller.js';
 import { SessionLifecycleService } from './sessions/session-lifecycle.service.js';
+import { FinanceController } from './finance/finance.controller.js';
+import { FinanceService } from './finance/finance.service.js';
+import { PayrollService } from './finance/payroll.service.js';
+import { DashboardController } from './dashboard/dashboard.controller.js';
+import { DashboardService } from './dashboard/dashboard.service.js';
+import { AnalyticsController } from './analytics/analytics.controller.js';
+import { AnalyticsService } from './analytics/analytics.service.js';
 
 @Module({
   imports: [
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
   ],
-  controllers: [AppController, AdminController, AuthController, CredentialsController, CredentialReissueController, GymsController, TrainersController, PacksController, NotificationsController, ConfigurationController, ProvisioningOwnerController, SupportSessionController, GymLifecycleController, SessionBookingController, SessionReadsController, SessionRequestsController, MemberSessionOverviewController, CoachingController, MemberLifecycleController, SessionLifecycleController],
+  controllers: [AppController, AdminController, AuthController, CredentialsController, CredentialReissueController, GymsController, TrainersController, PacksController, NotificationsController, ConfigurationController, ProvisioningOwnerController, SupportSessionController, GymLifecycleController, SessionBookingController, SessionReadsController, SessionRequestsController, MemberSessionOverviewController, CoachingController, MemberLifecycleController, SessionLifecycleController, FinanceController, DashboardController, AnalyticsController],
   providers: [
     AppService,
     DatabaseService,
@@ -76,6 +83,10 @@ import { SessionLifecycleService } from './sessions/session-lifecycle.service.js
     CoachingService,
     MemberLifecycleService,
     SessionLifecycleService,
+    FinanceService,
+    PayrollService,
+    DashboardService,
+    AnalyticsService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: SupportScopeGuard },
   ],

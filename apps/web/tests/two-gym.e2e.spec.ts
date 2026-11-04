@@ -375,12 +375,13 @@ test('real browser and HTTP requests preserve two-gym isolation and pure reads',
   expect(publishedList.ok()).toBe(true);
   const publishedTotal = (await publishedList.json()).totalCount as number;
   expect(publishedTotal).toBeGreaterThan(100);
+  await page.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/owner/members`);
   await expect(page.locator('.count-badge')).toHaveText(String(publishedTotal));
   await expect(page.locator('.gym-dashboard')).toHaveCSS('--gym-color', '#0F766E');
   await page.getByLabel('Full name').fill('Browser Added Member');
   await page.getByRole('textbox', { name: 'Email address optional' }).fill(`browser-${environment.runId}@example.test`);
   await page.getByRole('button', { name: 'Add member' }).click();
-  await expect(page.getByRole('status')).toContainText('Member added');
+  await expect(page.locator('.ui-feedback-success')).toContainText('Member added');
   await expect(page.getByText('Browser Added Member')).toBeVisible();
 
   const ownerCookie = (await page.context().cookies()).find((cookie) => cookie.name === 'gymos_access_token');
@@ -660,7 +661,7 @@ test('trainer registration enforces owner and selected-gym access, then hands of
     await expect(trainerPage.locator('.ui-feedback-success')).toContainText('Password updated');
     await trainerPage.getByRole('button', { name: 'Continue to sign in' }).click();
     await loginWithPassword(trainerPage, email, replacement);
-    await expect(trainerPage).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/trainer$`));
+    await expect(trainerPage).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/trainer/earnings$`));
     expect((await fixture.master.user.findUniqueOrThrow({ where: { id: identity.id } })).mustChangePassword).toBe(false);
   } finally { await trainerContext.close(); }
 });
@@ -779,13 +780,13 @@ test('V1 Classic branding stays readable and keeps identical geometry at approve
 
   for (const viewport of viewports) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await openGymWithTestSession(page, fixture.users.ownerA.id, fixture.gyms[0].slug);
+    await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${fixture.gyms[0].slug}/owner/members`);
     await expect(page.locator('.gym-dashboard')).toHaveCSS('--gym-color', '#0F766E');
     await expectResponsivePage(page);
     const alphaGeometry = await renderedGeometry(page);
     await page.screenshot({ path: join(classicEvidenceDirectory, `${viewport.name}-alpha.png`), animations: 'disabled' });
 
-    await openGymWithTestSession(page, fixture.users.ownerB.id, fixture.gyms[1].slug);
+    await openWithTestSession(page, fixture.users.ownerB.id, `/gyms/${fixture.gyms[1].slug}/owner/members`);
     await expect(page.locator('.gym-dashboard')).toHaveCSS('--gym-color', '#7C3AED');
     await expectResponsivePage(page);
     const betaGeometry = await renderedGeometry(page);
@@ -798,7 +799,7 @@ test('V1 Classic branding stays readable and keeps identical geometry at approve
   try {
     await fixture.master.theme.delete({ where: { gymId: fixture.gyms[0].id } });
     await page.setViewportSize({ width: 390, height: 844 });
-    await openGymWithTestSession(page, fixture.users.ownerA.id, fixture.gyms[0].slug);
+    await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${fixture.gyms[0].slug}/owner/members`);
     await expect(page.locator('.gym-dashboard')).toHaveCSS('--gym-color', '#007A35');
     await expectResponsivePage(page);
 
@@ -821,18 +822,18 @@ test('role shell supports keyboard drawer, safe switching and current context', 
   await mkdir(evidence, { recursive: true });
   const before = await fixture.master.$transaction([fixture.master.user.count(), fixture.master.gymAccess.count(), fixture.master.operation.count()]);
   for (const [user, role, label] of [
-    [fixture.users.ownerA, 'owner', 'Members'],
-    [fixture.users.trainerUser, 'trainer', 'Trainer workspace'],
+    [fixture.users.ownerA, 'owner', 'Dashboard'],
+    [fixture.users.trainerUser, 'trainer', 'My earnings'],
     [fixture.users.memberUser, 'member', 'Member workspace'],
   ] as const) {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await openGymWithTestSession(page, user.id, fixture.gyms[0].slug);
-    await expect(page).toHaveURL(new RegExp(`/${role}$`));
+    await expect(page).toHaveURL(new RegExp(`/${role === 'trainer' ? 'trainer/earnings' : role}$`));
     await expect(page.locator('.shell-profile')).toContainText(user.displayName!);
     await expect(page.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link', { name: label, exact: true })).toHaveAttribute('aria-current', 'page');
     expect(await page.locator('.shell-sidebar').evaluate(el => el.getBoundingClientRect().width)).toBe(224);
     expect(await page.locator('.shell-header').evaluate(el => el.getBoundingClientRect().height)).toBe(52);
-    await expect(page.getByRole('link', { name: /Subscription|Financials|Notifications|Support/ })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: /Subscription|Support/ })).toHaveCount(0);
     if (role !== 'owner') await expect(page.getByRole('button', { name: 'Add member' })).toHaveCount(0);
     await page.screenshot({ path: join(evidence, `${role}-1440.png`), animations: 'disabled' });
     await page.setViewportSize({ width: 320, height: 700 });
@@ -1026,9 +1027,9 @@ test('platform registry supports audited read-only gym selection, switching, exi
   // rendered its selected gym. Read support context from a fresh document.
   await page.goto('about:blank');
   await page.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/owner`);
-  await expect(page.locator('.support-banner')).toContainText('Viewing Test Gym Alpha');
-  await expect(page.locator('.support-banner')).toBeVisible();
-  await expect(page.getByRole('heading',{name:'Test Gym Alpha',exact:true})).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/owner$`));
+  await expect(page.locator('[data-support-session] .support-banner')).toContainText('Viewing Test Gym Alpha');
+  await expect(page.getByRole('main').getByRole('heading',{name:'Test Gym Alpha',exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'Add member'})).toHaveCount(0);
   await expect(page.locator('main')).not.toContainText('Alpha Person');
   const supportCookie=(await page.context().cookies()).find(cookie=>cookie.name==='gymos_support_context')!;
@@ -1047,9 +1048,9 @@ test('platform registry supports audited read-only gym selection, switching, exi
   // document so no stale shell state can satisfy the Beta assertions.
   await page.goto('about:blank');
   await page.goto(`${webBase}/gyms/${fixture.gyms[1].slug}/owner`);
-  await expect(page.locator('.support-banner')).toContainText('Viewing Test Gym Beta');
-  await expect(page.locator('.support-banner')).toBeVisible();
-  await expect(page.getByRole('heading',{name:'Test Gym Beta',exact:true})).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[1].slug}/owner$`));
+  await expect(page.locator('[data-support-session] .support-banner')).toContainText('Viewing Test Gym Beta');
+  await expect(page.getByRole('main').getByRole('heading',{name:'Test Gym Beta',exact:true})).toBeVisible();
   await expect(page.locator('main')).not.toContainText('Test Gym Alpha');
   await expect(oldTab).toHaveURL(/\/admin$/);
   await page.setViewportSize({width:320,height:700});
@@ -1306,7 +1307,7 @@ test('member roster and profile keep role, tenant, privacy, empty, and dependenc
     fixture.master.operation.count(), fixture.master.platformAuditLog.count(), fixture.tenants[0].auditLog.count(),
     fixture.tenants[0].membershipTerm.count(), fixture.tenants[1].auditLog.count(),
   ]);
-  await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${alpha}/owner`);
+  await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${alpha}/owner/members`);
   await expect(page.getByText(/basic contacts/)).toBeVisible();
   await expect(page.getByText(/operational accounts/)).toBeVisible();
   await expect(page.getByText(/pending enrollments in this gym/)).toBeVisible();
@@ -1401,7 +1402,7 @@ test('member roster and profile expose accessible loading states while tenant re
   const slug = fixture.gyms[0].slug;
   const member = await fixture.tenants[0].member.findFirstOrThrow({ where: { identityId: fixture.users.memberUser.id } });
   await openWithTestSession(page, fixture.users.ownerA.id, '/test-ui');
-  for (const path of [`/gyms/${slug}/owner`, `/gyms/${slug}/owner/members/${member.id}`]) {
+  for (const path of [`/gyms/${slug}/owner/members`, `/gyms/${slug}/owner/members/${member.id}`]) {
     let release!: () => void;
     let acquired!: () => void;
     const held = new Promise<void>(resolve => { release = resolve; });
@@ -1419,6 +1420,6 @@ test('member roster and profile expose accessible loading states while tenant re
       release();
       await transaction;
     }
-    await expect(page.getByRole('heading', { name: path.endsWith('/owner') ? 'Test Gym Alpha' : member.fullName, level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: path.endsWith('/members') ? 'Test Gym Alpha' : member.fullName, level: 1 })).toBeVisible();
   }
 });

@@ -48,7 +48,7 @@ it('returns actual bounded read-model counts and pagination without opening tena
  const unavailable=vi.spyOn(tenants,'withAdministrativeRead').mockRejectedValueOnce(new Error('Synthetic dependency unavailable'));
  await registry.refreshOne(gymA.id,actor);unavailable.mockRestore();
  const stale=(await registry.page(actor)).items.find(item=>item.id===gymA.id)!;
- expect(stale.health).toBe('UNAVAILABLE');expect(stale.memberCount).toBe(2);expect(stale.observedAt).toBe(row.observedAt);
+ expect(stale.health).toBe('UNAVAILABLE');expect(stale.memberCount).toBeNull();expect(stale.trainerCount).toBeNull();expect(stale.observedAt).toBeNull();
  expect(page.items.find((item:{id:string})=>item.id===gymB.id).memberCount).toBeNull();
  const raw=JSON.stringify(page);expect(/databaseName|password|ownerEmail|explanation|tokenHash/.test(raw)).toBe(false);
  for(let index=0;index<26;index++)await master.gym.create({data:{slug:`page-${index}`,name:'Synthetic registry page',databaseName:`gymos_${randomUUID().replaceAll('-','')}`}});

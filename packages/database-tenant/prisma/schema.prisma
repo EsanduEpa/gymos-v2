@@ -578,6 +578,8 @@ model CommandReceipt {
   sessionEvents           SessionStateEvent[]
   settlements             SessionSettlement[]
   packCreditMovements     PackCreditMovement[]
+  expenses                ExpenseRecord[]
+  budgets                 CategoryBudget[]
 
   @@unique([actorIdentityId, commandKind, idempotencyKey])
   @@index([state, createdAt])
@@ -599,4 +601,48 @@ model AuditLog {
 
   @@index([createdAt, id])
   @@index([actorIdentityId, createdAt])
+}
+
+enum ExpenseCategory {
+  RENT
+  UTILITIES
+  EQUIPMENT
+  MARKETING
+  SALARIES
+  MAINTENANCE
+  OTHER
+}
+
+model ExpenseRecord {
+  id                String @id @default(cuid())
+  category          ExpenseCategory
+  amount            Decimal @db.Decimal(19, 4)
+  currency          String
+  accountingDate    DateTime @db.Date
+  description       String?
+  recurring         Boolean @default(false)
+  version           Int @default(0)
+  commandReceiptId  String @unique
+  commandReceipt    CommandReceipt @relation(fields: [commandReceiptId], references: [id], onDelete: Restrict)
+  createdByIdentityId String
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
+  @@index([accountingDate, category, id])
+  @@index([category, accountingDate, id])
+}
+
+model CategoryBudget {
+  id               String @id @default(cuid())
+  category         ExpenseCategory
+  month            DateTime @db.Date
+  amount           Decimal @db.Decimal(19, 4)
+  currency         String
+  version          Int @default(0)
+  commandReceiptId String @unique
+  commandReceipt   CommandReceipt @relation(fields: [commandReceiptId], references: [id], onDelete: Restrict)
+  actorIdentityId  String
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @db.Timestamptz(3)
+  @@unique([category, month])
+  @@index([month, category])
 }

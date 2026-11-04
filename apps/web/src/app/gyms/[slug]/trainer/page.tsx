@@ -1,5 +1,6 @@
-import { GymRolePage } from '../role-page';
+import { redirect } from 'next/navigation';
 
-export default function TrainerWorkspace({ params }: { params: Promise<{ slug: string }> }) {
-  return <GymRolePage params={params} expectedRole="TRAINER" />;
+export default async function TrainerWorkspace({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  redirect(`/gyms/${encodeURIComponent(slug)}/trainer/earnings`);
 }
