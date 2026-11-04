@@ -1,0 +1,51 @@
+# Segment 08 execution checklist
+
+This is the bounded work plan and acceptance checklist for GYMOS-MIG-049 and GYMOS-MIG-053–061. Segment 09 (GYMOS-MIG-062–066) is a boundary reference only.
+
+## Baseline and constraints
+
+- Revision at start: branch `codex/segment-06-management`; working tree clean.
+- Approved policy: DEC-06, DEC-07, DEC-08 and DEC-09.
+- Existing reusable facts: tenant PT session, settlement, credit movement, operational earning, trainer-pay period/correction, transaction receipt and audit infrastructure. Task evidence 046/047 shows these implementations, but their hosted and owner acceptance remain open.
+- Existing finance feature implementation: none found in API, contracts, client, database, or web routes/components. O01/O10/O11/O13/T06 screenshot baselines exist under task 014, not runtime acceptance.
+- Safety: use additive migrations only, exact decimal strings, existing tenant guards/operation receipts/audit, no demo database, no V1 writes, no payment/payout claims, and no Segment 09 implementation.
+- Stop condition: complete the ten task-owned criteria and required local checks; record unavailable hosted/browser-owner checks without representing them as passed. Do not close upstream 06/07 acceptance.
+
+## Dependency-aware execution and acceptance
+
+Each row records the starting state, missing behavior, implementation boundary, dependency, finite acceptance evidence, evidence location, and completion condition. Exact tests are added only where the existing suites do not cover a listed requirement.
+
+| Task | Starting state and exact gap | Actions and boundary | Dependencies | Acceptance tests/review steps | Evidence | Completion condition |
+|---|---|---|---|---|---|---|
+| 049 lifecycle earning baseline | Immutable session settlement/earning facts exist; no finance read DTO/API/client/T06 or owner finance adapter. | Add pure trainer-own earnings and owner revenue/deferred/current-pay reads; bind each line to unique source IDs; expose decimal strings, window/currency/asOf, null cash and no period creation on GET. | 032,043,046,047,082,084; DEC-06/08 approved. Consume existing facts; keep 046/047 acceptance open. | Exact known lifecycle projections; replay does not duplicate; empty read has no writes; trainer-own and owner-only/foreign-gym denials; no cash/paid field; leap/timezone window boundary. | `docs/migration/evidence/GYMOS-MIG-049.md`, API/contracts tests, guarded DB fixture. | Finance owned DB suite verifies read/replay/isolation basics; upstream 046/047 acceptance, remaining boundary cases and browser review still open. |
+| 053 membership/pack earning | Current session settlement is sourced; no membership/pack allocation projection. | Implement approved daily/session allocation, exact remainder conservation, unique origin, suspension/expiry disposition per DEC-06/07. | 030,034,046,047,049,082,083. | Full/partial/zero, repeating division, leap month, gym timezone, expiry and suspension; sums reconcile exactly without implying cash. | `docs/migration/evidence/GYMOS-MIG-053.md`, arithmetic and guarded persistence suites. | All allocation cases conserve source amount and use approved disposition. |
+| 054 expenses | No expense model, route, contract, client or UI. | Add owner-only exact validated create and bounded paged/filter reads; transaction receipt/audit; versioned mutation where supported; preserve form draft on failure. | 012,018,027,049. | Precision/date/category/amount negatives, rollback, replay, stale conflict, foreign gym and page stability. | `docs/migration/evidence/GYMOS-MIG-054.md`, API/DB/browser evidence. | Owned suite verifies invalid precision, idempotent create/audit and cross-gym denial; rollback fault and browser review remain. |
+| 055 budgets | No category/month budget or variance query. | Add unique category+month versioned budgets and full-window actual/variance calculations. | 012,027,054,082. | Concurrent create/update, duplicate conflict, month edges, seven category rows, zero budget, >one-page totals. | `docs/migration/evidence/GYMOS-MIG-055.md`. | Owned suite verifies replay, seven categories and actual/variance; concurrent edits/month-edge review remains. |
+| 056 payroll | Session pay and correction primitives exist; no period read/close/approve API or owner/trainer views. | Add approved local periods, immutable snapshot, distinct versioned close/approval, idempotent receipts, immutable reasoned correction; trainer own rows only. | 018,046,049,053,084; DEC-08 approved. | Period boundaries, late completion vs close, concurrent close/retry, config changes, correction provenance, owner/trainer projection, approval creates no payout. | `docs/migration/evidence/GYMOS-MIG-056.md`, guarded DB suite. | Owned suite verifies one close/approval, exact total and no payout; races, late completion and correction provenance remain. |
+| 057 finance panels/P&L/charts | No finance UI/query panels. | Implement six O10 tabs on authorized complete-window query DTOs; operational P&L definitions, loading/empty/error, charts, honest deferred/cash labels. | 012,053–056,082,084. | Known cross-month fixture and all panels; sums not current-page-derived; exact currency/window/asOf; responsive states. | `docs/migration/evidence/GYMOS-MIG-057.md`, UI and browser review. | Owned DB fixture reconciles cross-source P&L; visible chart/accessibility/empty/error review remains. |
+| 058 owner dashboard | No O01 live dashboard implementation. | Add bounded role-authorized query and dashboard with approved DEC-09 metrics; 30s/manual refresh and stale-response discard. | 013,032,037,043,044,049,053,083,085. | Local midnight/two-hour buckets, selected-gym switch, overlapping refresh, empty/error, labels never claim physical attendance. | `docs/migration/evidence/GYMOS-MIG-058.md`. | Owned fixture verifies owner denial and bounded projection; selected-gym/overlap/visual browser review remains. |
+| 059 analytics/platform summaries | No analytics query or platform summary. | Implement three O11 series and approved sanitized cross-gym summary with visible partial-failure status. | 024,037,044,053,058,083,085. | 30-day and six-month boundaries, zero denominator, tenant failure is partial/stale not zero, support scope and privacy denial. | `docs/migration/evidence/GYMOS-MIG-059.md`. | Gym series shape/role verified; platform partial/stale/zero-denominator fixtures and visible review remain. |
+| 060 audit | Append-only audit write exists; no stable filtered/paged read screen. | Add server-authorized taxonomy/filter/cursor and sanitized transition DTOs, stable ordering, support actor preserved. | 013,024,043,056,080,085. | >page stable order, filters, malformed cursor, duplicate key, redaction, two-gym denial. | `docs/migration/evidence/GYMOS-MIG-060.md`. | Existing paged/filter API plus audit page is implemented; >page ordering/redaction and browser review remain. |
+| 061 CSV | No authenticated export endpoint. | Add allowlisted bounded authorized snapshot export; safe encoding/filename, BOM, RFC quoting, formula defense and safe export audit event. | 020,044,057,060,085; DEC-09 approved. | Role/scope/date/cap, stable snapshot, formula-leading/quotes/newlines/Unicode, MIME/filename/BOM and audit; failure has no body. | `docs/migration/evidence/GYMOS-MIG-061.md`. | Owned DB and helper tests verify row cap, formula defense, BOM, audit and role/date denials; browser download review remains. |
+
+## Finite cross-cutting acceptance checklist
+
+1. **Origins and arithmetic:** unique origin constraints; exact replay; remainder conservation; zero/partial/full allocation; leap and gym-local boundaries; approved expiry/suspension disposition.
+2. **Expenses/budgets:** invalid precision/date/category rejected; failed transactions roll back; command retries/stale versions safe; month boundaries, concurrent budget edits, full-window totals.
+3. **Payroll:** boundaries, late completion, concurrent close, retry, configuration changes, immutable adjustment provenance, owner/trainer projection differences.
+4. **Authorization/isolation:** owner/trainer/member/support permissions, forged/foreign-gym IDs, current gym binding, sanitized DTOs, second gym unchanged.
+5. **Queries/dashboard:** totals beyond one page, zero denominators, stable order, selected-gym switch, overlapping refresh, failed platform tenant visible, GETs are pure.
+6. **CSV:** role/scope/date/caps/snapshot; formula-leading, quoted, newline and Unicode cells; filename/MIME/BOM; errors and audit.
+7. **Browser:** O01/O10/O11/O13/T06 workflows, dialogs, filters, paging, charts, refresh, CSV and loading/empty/error/responsive states. Manual Chrome review must be recorded as agent-performed visible review under owner delegation, not independent owner approval.
+8. **Final checks:** relevant contract/API/DB/browser suites; workspace lint/typecheck/build; hosted checks on the reviewable revision. Run targeted checks as each slice lands, then required integrated checks once. Repeat only after an affected change or concrete unresolved failure.
+
+## Initial blockers and interpretation
+
+- Tasks 046/047 remain In Progress with hosted/owner acceptance pending. This run may consume their existing immutable facts; it does not claim their tasks complete.
+- The Segment 06/07 owner-visible browser-control host was unavailable at the prior checkpoint. Retry once for this review; if unavailable, record the limitation and continue automated checks.
+- Hosted checks and PR preparation depend on authorized GitHub connectivity. Record exact limitation if the environment cannot perform them.
+- No task is marked complete by this plan. Acceptance state is recorded only after implementation and evidence.
+
+## Execution update — 4 November 2026
+
+Tasks 049 and 053–061 now have implementations with acceptance still incomplete. See task evidence and `../evidence/SEGMENT-08-EXECUTION-20261104.md`. Finance-specific owned Postgres tests 2/2, contracts 54/54, arithmetic/CSV 5/5, lint, typecheck, production build, Prisma validation and workspace graph passed. Browser review, platform stale/partial cases, selected-gym/overlap behavior, race/fault cases and hosted CI remain open. Segment 09 was not entered.

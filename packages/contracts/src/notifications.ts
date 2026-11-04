@@ -36,11 +36,11 @@ export const notificationReadAllSchema = z.strictObject({
   through: isoInstantSchema.nullable(),
 });
 
-const auditEventCodeSchema = z.enum([
+export const auditEventCodeSchema = z.enum([
   'TRAINER_SHIFT_APPROVED', 'TRAINER_DEACTIVATED', 'TRAINER_REACTIVATED', 'MEMBER_STATUS_CHANGED',
   'MEMBER_SESSION_PACK_ISSUED', 'PT_SESSION_BOOKED', 'PT_SESSION_REQUESTED', 'PT_SESSION_ACCEPTED',
   'PT_SESSION_DECLINED', 'PT_SESSION_STARTED', 'PT_SESSION_COMPLETED', 'PT_SESSION_MISSED', 'PT_SESSION_CANCELLED',
-  'PT_SESSION_NOTES_UPDATED',
+  'PT_SESSION_NOTES_UPDATED', 'EXPENSE_CREATED', 'BUDGET_SET', 'PAY_PERIOD_CLOSED', 'PAY_PERIOD_APPROVED', 'CSV_EXPORTED',
 ]);
 export const auditQuerySchema = z.strictObject({
   actionType: auditEventCodeSchema.optional(),

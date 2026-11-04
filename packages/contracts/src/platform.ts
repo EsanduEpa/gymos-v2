@@ -37,6 +37,12 @@ export const registryRowSchema = z.strictObject({
   lifecycleOperation: gymLifecycleStatusSchema.nullable().optional(),
 });
 export const registryPageSchema = z.strictObject({ items: z.array(registryRowSchema).max(25), total: z.number().int().nonnegative(), nextCursor: z.string().nullable() });
+export const platformAnalyticsSummarySchema = z.strictObject({ totalGyms: z.number().int().nonnegative(), activeGyms: z.number().int().nonnegative(),
+  verifiedGyms: z.number().int().nonnegative(), unavailableGyms: z.number().int().nonnegative(), staleGyms: z.number().int().nonnegative(),
+  memberCount: z.number().int().nonnegative().nullable(), trainerCount: z.number().int().nonnegative().nullable(), partial: z.boolean(), freshnessSeconds: z.number().int().positive(), asOf: z.iso.datetime() });
+export const platformAnalyticsRefreshInputSchema = z.strictObject({ cursor: z.string().min(1).max(128).optional() });
+export const platformAnalyticsRefreshResultSchema = z.strictObject({ processed: z.number().int().nonnegative().max(25), unavailable: z.number().int().nonnegative().max(25),
+  nextCursor: z.string().nullable(), asOf: z.iso.datetime() });
 export const supportEntrySchema = z.strictObject({ gymId: z.string().min(1).max(128), scope: z.literal('GYM_SUMMARY_READ'), reasonCode: z.string().regex(/^[A-Z][A-Z0-9_]{1,49}$/), explanation: z.string().trim().min(10).max(500) });
 export const supportEntryResultSchema = z.strictObject({ id: z.string(), context: z.string().regex(/^[A-Za-z0-9_-]{43}$/), slug: z.string(), expiresAt: z.iso.datetime() });
 export const supportSummarySchema = z.strictObject({

@@ -24,7 +24,7 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
   const [switching, setSwitching] = useState(false);
   const role = support ? 'READ-ONLY SUPPORT' : gym?.role ?? 'SUPER_ADMIN';
   const destination = gym ? gymRoleUrl(gym) : '/admin';
-  const label = support ? 'Owner summary' : gym ? role === 'OWNER' ? 'Members' : role === 'TRAINER' ? 'Trainer workspace' : 'Member workspace' : 'All Gyms';
+  const label = support ? 'Owner summary' : gym ? role === 'OWNER' ? 'Dashboard' : role === 'TRAINER' ? 'Trainer workspace' : 'Member workspace' : 'All Gyms';
   function close() { drawer.current?.close(); setOpen(false); opener.current?.focus(); }
   function show() { drawer.current?.showModal(); setOpen(true); }
   useEffect(() => {
@@ -50,7 +50,11 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
       <nav aria-label={mobile ? 'Mobile navigation' : 'Main navigation'}>
         <a href={destination} aria-current={pathname === destination || pathname === `/gyms/${gym?.slug}` ? 'page' : undefined} onClick={close}><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>{label}</a>
         {!support && gym?.role === 'OWNER' ? <>
+          <a href={`${destination}/members`} aria-current={pathname.startsWith(`${destination}/members`) ? 'page' : undefined} onClick={close}>Members</a>
           <a href={`${destination}/sessions`} aria-current={pathname.startsWith(`${destination}/sessions`) ? 'page' : undefined} onClick={close}>PT Sessions</a>
+          <a href={`${destination}/financials`} aria-current={pathname.startsWith(`${destination}/financials`) ? 'page' : undefined} onClick={close}>Financials</a>
+          <a href={`${destination}/audit`} aria-current={pathname.startsWith(`${destination}/audit`) ? 'page' : undefined} onClick={close}>Audit history</a>
+          <a href={`${destination}/analytics`} aria-current={pathname.startsWith(`${destination}/analytics`) ? 'page' : undefined} onClick={close}>Analytics</a>
           <a href={`${destination}/trainers`} aria-current={pathname.startsWith(`${destination}/trainers`) ? 'page' : undefined} onClick={close}>Trainers</a>
         </> : null}
         {!support && gym?.role === 'TRAINER' ? <>

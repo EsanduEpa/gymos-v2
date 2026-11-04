@@ -1,12 +1,32 @@
-import { Suspense } from 'react';
-import { OwnerGymPage } from '@/components/navigation/owner-gym-page';
-import { SupportOwnerPage } from '@/components/platform/support-owner-page';
+import { Suspense, type CSSProperties } from 'react';
+import { notFound, redirect } from 'next/navigation';
+import { resolveGymBrandColors } from '@gymos/theme-tokens';
+import { ownerDashboardSchema } from '@gymos/contracts';
+import { apiUrl } from '@/lib/gymos';
+import { requireGymContext } from '@/lib/gym-context';
 import { currentSupportCookie } from '@/lib/support-context';
+import { DashboardChrome } from '@/components/navigation/dashboard-chrome';
+import { OwnerDashboardLive } from '@/components/navigation/owner-dashboard-live';
+import { SupportOwnerPage } from '@/components/platform/support-owner-page';
 import { LoadingState } from '@/components/ui';
-type Props={params:Promise<{slug:string}>;searchParams:Promise<{error?:string;created?:string;q?:string;status?:string;page?:string}>};
-async function OwnerContent(props:Props){
- const context=await currentSupportCookie();
- if(context){const {slug}=await props.params;return <SupportOwnerPage slug={slug}/>;}
- return <OwnerGymPage {...props}/>;
+
+type Props = { params: Promise<{ slug: string }> };
+async function Content({ params }: Props) {
+  const { slug } = await params;
+  const support = await currentSupportCookie();
+  if (support) return <SupportOwnerPage slug={slug}/>;
+  const { token, session, gym, theme } = await requireGymContext(slug, 'OWNER');
+  let response: Response;
+  try { response = await fetch(apiUrl(`/gyms/${encodeURIComponent(slug)}/dashboard`), { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' }); }
+  catch { response = new Response(null, { status: 503 }); }
+  if (response.status === 401) redirect('/login');
+  if (response.status === 403 || response.status === 404) notFound();
+  const parsed = response.ok ? ownerDashboardSchema.safeParse(await response.json().catch(() => null)) : null;
+  const brand = resolveGymBrandColors(theme.primaryColor);
+  const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
+  return <DashboardChrome identityId={session.identityId} key={`${session.identityId}:${gym.id}:${gym.role}`} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'} style={style}>
+    <div className="gym-banner"><div><span className="eyebrow">OWNER DASHBOARD</span><h1>{gym.name}</h1><p>Today’s operations, local to {parsed?.success ? parsed.data.timeZone : 'your gym'}.</p></div><span className="role-pill">{gym.role}</span></div>
+    <OwnerDashboardLive slug={slug} initial={parsed?.success ? parsed.data : null}/>
+  </DashboardChrome>;
 }
-export default function OwnerWorkspace(props:Props){return <Suspense fallback={<LoadingState label="Loading workspace…" page/>}><OwnerContent {...props}/></Suspense>;}
+export default function OwnerWorkspace(props: Props) { return <Suspense fallback={<LoadingState label="Loading dashboard…" page/>}><Content {...props}/></Suspense>; }

@@ -11,6 +11,7 @@ export * from './session-requests.js';
 export * from './session-lifecycle.js';
 export * from './member-lifecycle.js';
 export * from './coaching.js';
+export * from './finance.js';
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 type Fetcher = (input: string, init: RequestInit) => Promise<Response>;

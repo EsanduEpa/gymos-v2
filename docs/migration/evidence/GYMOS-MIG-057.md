@@ -1,0 +1,5 @@
+# GYMOS-MIG-057 evidence — 4 November 2026
+
+**Status: In Progress.** Owner finance page has Revenue, Expenses, Deferred, Payroll, P&L and Export panels. P&L uses a bounded repeatable-read snapshot, full-window exact totals, source-date session earnings/payroll, local-day membership allocation and separates SALARIES-category expenses to prevent double counting. Finance export panel links to the authenticated CSV route. Revenue and P&L totals reconciled in the owned PostgreSQL fixture; the finance tab includes window, currency, basis and category totals.
+
+Owned finance PostgreSQL suite passed 2/2, including P&L reconciliation. Contracts 54/54, arithmetic/CSV helper tests 5/5, lint, typecheck, Prisma validate and production build passed. Chart parity and browser loading/empty/error/responsive review remain open; no task completion is claimed.

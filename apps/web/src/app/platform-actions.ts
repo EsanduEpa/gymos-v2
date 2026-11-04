@@ -7,6 +7,7 @@ import { credentialReissueResultSchema, credentialAcknowledgementResultSchema } 
 import { apiUrl, SESSION_COOKIE } from '@/lib/gymos';
 import { currentSupportCookie, SUPPORT_COOKIE } from '@/lib/support-context';
 import { sessionCookieOptions } from '@/lib/session-transport';
+import { platformAnalyticsRefreshResultSchema } from '@gymos/contracts/platform';
 async function bearer() { return (await cookies()).get(SESSION_COOKIE)?.value; }
 export async function enterSupport(data: FormData): Promise<{destination?:string;error?:string}> {
  const token=await bearer();if(!token)return {error:'Sign in again before entering support.'};
@@ -60,4 +61,14 @@ export async function changeGymLifecycle(gymId:string,key:string,input:unknown,r
   }
   const operation=gymLifecycleStatusSchema.parse(body);revalidatePath('/admin');return {operation};
  }catch{return {error:'Transition outcome is unknown. Refresh the registry and resume the original operation; do not start a different request.'};}
+}
+
+export type PlatformSummaryRefreshState={error?:string;success?:string;nextCursor?:string|null};
+export async function refreshPlatformSummaries(_previous:PlatformSummaryRefreshState,form:FormData):Promise<PlatformSummaryRefreshState>{
+ const token=await bearer();if(!token)redirect('/login');const cursor=String(form.get('cursor')??'');
+ try{const response=await fetch(apiUrl('/admin/analytics/refresh'),{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify(cursor?{cursor}:{}),cache:'no-store',signal:AbortSignal.timeout(90_000)});
+  if(response.status===401)redirect('/login');if(!response.ok)return {error:response.status===403?'Super Admin access is required.':'Summary refresh was incomplete; cached status remains visible.'};
+  const result=platformAnalyticsRefreshResultSchema.safeParse(await response.json().catch(()=>null));if(!result.success)return {error:'Summary refresh response could not be verified.'};
+  revalidatePath('/admin');return {success:`Refreshed ${result.data.processed} gyms; ${result.data.unavailable} remain unavailable.`,nextCursor:result.data.nextCursor};
+ }catch(error){if(error&&typeof error==='object'&&'digest'in error)throw error;return {error:'Summary refresh outcome is unknown. Reload the cached platform summary before retrying.'};}
 }

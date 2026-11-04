@@ -2,7 +2,7 @@
 
 > **Segment 04 automated completion — 31 October 2026 at `c9af453`:** Segments 01–04 completed (23/6/6/5 tasks); **40/88 completed, 48 remaining**. All 11 hosted checks passed in [run 41210839760](https://github.com/EsanduEpa/gymos-v2/actions/runs/41210839760). [Segment 04 handoff](../SEGMENT_04_HANDOFF.md). Owner manual acceptance for Segments 02–04 remains pending; PRs #1–4 remain draft/unmerged under the manual safeguard.
 
-This matrix assigns every authoritative task and every V1 route responsibility to one owning segment. A dependency may consume an outcome but must not duplicate ownership. Task statuses reflect the tracker synchronized 3 November 2026.
+This matrix assigns every authoritative task and every V1 route responsibility to one owning segment. A dependency may consume an outcome but must not duplicate ownership. Task statuses reflect the tracker synchronized 4 November 2026.
 
 ## 1. Authoritative task coverage (88/88 assigned)
 
@@ -56,19 +56,19 @@ This matrix assigns every authoritative task and every V1 route responsibility t
 | GYMOS-MIG-046 | Complete exactly once | `endSession` | settlement transaction/receipt | 07 | GYMOS-MIG-046 | NOT STARTED |
 | GYMOS-MIG-047 | No-show/cancellation | O08/M03 session actions | quoted terminal commands | 07 | GYMOS-MIG-047 | NOT STARTED |
 | GYMOS-MIG-048 | Session concurrency proof | known lifecycle defects | barrier integration/e2e tests | 07 | GYMOS-MIG-048 | NOT STARTED |
-| GYMOS-MIG-049 | Lifecycle earning baseline | V1 revenue/pay effects | operational value read model | 08 | GYMOS-MIG-049 | NOT STARTED |
+| GYMOS-MIG-049 | Lifecycle earning baseline | V1 revenue/pay effects | operational value read model | 08 | GYMOS-MIG-049 | IN PROGRESS |
 | GYMOS-MIG-050 | Confirmed clients/360 | T02/T03 | relationship query/profile | 06 | GYMOS-MIG-050 | NOT STARTED |
 | GYMOS-MIG-051 | Workout plans and assigned member view | T04; `saveWorkoutPlan` | trainer authoring/retrieval and authenticated member read-only own-assignment view | 06 | GYMOS-MIG-051 | NOT STARTED |
 | GYMOS-MIG-052 | Meal plans/macros and assigned member view | T05; `saveMealPlan` | trainer authoring/retrieval and authenticated member read-only own-assignment view | 06 | GYMOS-MIG-052 | NOT STARTED |
-| GYMOS-MIG-053 | Membership/pack earning | O10 Revenue/Deferred | finance earning reconciliation | 08 | GYMOS-MIG-053 | NOT STARTED |
-| GYMOS-MIG-054 | Expenses | O10; expense actions | expense module/dialog/list | 08 | GYMOS-MIG-054 | NOT STARTED |
-| GYMOS-MIG-055 | Budgets/variance | O10; budget actions | budget module/chart | 08 | GYMOS-MIG-055 | NOT STARTED |
-| GYMOS-MIG-056 | Payroll close/approval | O10/T06 | payroll module/read models | 08 | GYMOS-MIG-056 | NOT STARTED |
-| GYMOS-MIG-057 | Finance panels/P&L/charts | O10 | finance page/read APIs | 08 | GYMOS-MIG-057 | NOT STARTED |
-| GYMOS-MIG-058 | Owner dashboard | O01 | dashboard aggregate/UI | 08 | GYMOS-MIG-058 | NOT STARTED |
-| GYMOS-MIG-059 | Operational analytics | O11/S01 summary | analytics APIs/UI | 08 | GYMOS-MIG-059 | NOT STARTED |
-| GYMOS-MIG-060 | Audit screen/taxonomy | O13 | audit query/filter/UI | 08 | GYMOS-MIG-060 | NOT STARTED |
-| GYMOS-MIG-061 | Scoped CSV | H02/O08/O10/O13 | authenticated export API | 08 | GYMOS-MIG-061 | NOT STARTED |
+| GYMOS-MIG-053 | Membership/pack earning | O10 Revenue/Deferred | finance earning reconciliation | 08 | GYMOS-MIG-053 | IN PROGRESS |
+| GYMOS-MIG-054 | Expenses | O10; expense actions | expense module/dialog/list | 08 | GYMOS-MIG-054 | IN PROGRESS |
+| GYMOS-MIG-055 | Budgets/variance | O10; budget actions | budget module/chart | 08 | GYMOS-MIG-055 | IN PROGRESS |
+| GYMOS-MIG-056 | Payroll close/approval | O10/T06 | payroll module/read models | 08 | GYMOS-MIG-056 | IN PROGRESS |
+| GYMOS-MIG-057 | Finance panels/P&L/charts | O10 | finance page/read APIs | 08 | GYMOS-MIG-057 | IN PROGRESS |
+| GYMOS-MIG-058 | Owner dashboard | O01 | dashboard aggregate/UI | 08 | GYMOS-MIG-058 | IN PROGRESS |
+| GYMOS-MIG-059 | Operational analytics | O11/S01 summary | analytics APIs/UI | 08 | GYMOS-MIG-059 | IN PROGRESS |
+| GYMOS-MIG-060 | Audit screen/taxonomy | O13 | audit query/filter/UI | 08 | GYMOS-MIG-060 | IN PROGRESS |
+| GYMOS-MIG-061 | Scoped CSV | H02/O08/O10/O13 | authenticated export API | 08 | GYMOS-MIG-061 | IN PROGRESS |
 | GYMOS-MIG-062 | Deferred scope record | O14/progress/theme extras | scope guards/navigation | 09 | GYMOS-MIG-062 | NOT STARTED |
 | GYMOS-MIG-063 | Final source parity | all V1 inventory/maps | traceability/coverage reconciliation | 09 | GYMOS-MIG-063 | NOT STARTED |
 | GYMOS-MIG-064 | Two-gym cross-role journeys | all role journeys | Playwright/API integration | 09 | GYMOS-MIG-064 | NOT STARTED |
