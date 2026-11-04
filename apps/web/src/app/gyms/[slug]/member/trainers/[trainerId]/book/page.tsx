@@ -15,6 +15,10 @@ function dateInZone(instant: string, timeZone: string) {
   return `${p.year}-${p.month}-${p.day}`;
 }
 
+function trainerLevel(level: 'LEVEL_1' | 'LEVEL_2' | null) {
+  return level === 'LEVEL_2' ? 'Level 2 Senior Trainer' : level === 'LEVEL_1' ? 'Level 1 Trainer' : 'Trainer level not listed';
+}
+
 export default async function RequestTrainerSessionPage({ params }: { params: Promise<{ slug: string; trainerId: string }> }) {
   const { slug, trainerId } = await params;
   const { token, session, gym, theme } = await requireGymContext(slug, 'MEMBER');
@@ -30,8 +34,11 @@ export default async function RequestTrainerSessionPage({ params }: { params: Pr
     <div className="gym-banner"><div><span className="eyebrow">SESSION REQUEST</span><h1>Request a trainer</h1><p>Choose a time in this gym’s local time zone. Your credit stays available until the trainer accepts.</p></div></div>
     <Card><CardHeader eyebrow="MEMBER REQUEST" title={options?.success ? options.data.trainerName : 'Session request'}/>
       {!options?.success ? <Feedback tone="error">Session request options could not be loaded. No request was sent.</Feedback> : <>
-        <p>{options.data.level?.replace('_', ' ') ?? 'Trainer level not listed'} · {options.data.specialisations.join(' · ') || 'Specialisations not listed'}</p>
-        <SessionRequestForm slug={slug} trainerId={trainerId} trainerName={options.data.trainerName} timeZone={options.data.timeZone}
+        <p>{trainerLevel(options.data.level)} · {options.data.specialisations.join(' · ') || 'Specialisations not listed'}</p>
+        <p><strong>Trainer shift:</strong> {options.data.shiftStart && options.data.shiftEnd ? `${options.data.shiftStart}–${options.data.shiftEnd} gym local time` : 'Not listed'}</p>
+        <p><strong>Session credits available today:</strong> {options.data.availableCredits} · <strong>Held:</strong> {options.data.heldCredits} · <strong>Expired:</strong> {options.data.expiredCredits}</p>
+        {!options.data.activeMembershipToday ? <p role="status">There is no active membership today. A session request is eligible only when both your membership and a pack cover the selected gym-local date; the API will recheck this when you submit.</p> : options.data.availableCredits === 0 ? <p role="status">No unheld, unexpired session credits are available today{options.data.expiredCredits ? `; ${options.data.expiredCredits} credit${options.data.expiredCredits === 1 ? ' is' : 's are'} expired` : ''}. You may still choose a future date; membership and pack eligibility are checked for that date when submitted.</p> : <p>One credit is reserved only if the trainer accepts. Eligibility is checked again for your selected date.</p>}
+        <SessionRequestForm slug={slug} trainerId={trainerId} timeZone={options.data.timeZone}
           minimumDurationMinutes={options.data.minimumDurationMinutes} requestKey={randomUUID()} minDate={dateInZone(options.data.asOf, options.data.timeZone)}/>
       </>}
     </Card>

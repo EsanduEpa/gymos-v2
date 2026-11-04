@@ -29,8 +29,10 @@ const sessionSchema = z.strictObject({ id, memberId: id, trainerId: id, state: z
   durationMinutes: z.number().int().min(15).max(480), notes: z.string().max(4000).nullable(), version: z.number().int().nonnegative() });
 export const sessionRequestResultSchema = z.strictObject({ receiptId: id, replayed: z.boolean(), session: sessionSchema, notificationOutcome });
 export const sessionRequestOptionsSchema = z.strictObject({ trainerId: id, trainerName: z.string().min(2).max(120), level: level.nullable(),
-  specialisations: z.array(z.string().min(1).max(80)).max(30), timeZone: z.string().min(1).max(100), minimumDurationMinutes: z.number().int().min(15).max(480),
-  maximumDurationMinutes: z.literal(480), currency, asOf: z.iso.datetime({ offset: true }) });
+  specialisations: z.array(z.string().min(1).max(80)).max(30), shiftStart: time.nullable(), shiftEnd: time.nullable(),
+  timeZone: z.string().min(1).max(100), minimumDurationMinutes: z.number().int().min(15).max(480),
+  maximumDurationMinutes: z.literal(480), currency, availableCredits: z.number().int().nonnegative(), heldCredits: z.number().int().nonnegative(), expiredCredits: z.number().int().nonnegative(),
+  activeMembershipToday: z.boolean(), asOf: z.iso.datetime({ offset: true }) });
 export const trainerSessionRequestsSchema = z.strictObject({ items: z.array(z.strictObject({ id, memberId: id, memberName: z.string().min(2).max(120),
   state: z.literal('PENDING_CONFIRMATION'), type, scheduledStartAt: z.iso.datetime({ offset: true }), scheduledEndAt: z.iso.datetime({ offset: true }),
   timeZone: z.string().min(1).max(100), durationMinutes: z.number().int().min(15).max(480), notes: z.string().max(4000).nullable(), version: z.number().int().nonnegative() })).max(100),

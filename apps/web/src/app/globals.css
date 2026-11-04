@@ -377,9 +377,25 @@ a { color: inherit; text-decoration: none; }
 .trainer-directory-search { display:grid; grid-template-columns:minmax(180px,1fr) auto; gap:12px; align-items:end; margin:4px 0 20px; }
 .trainer-directory-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); gap:16px; }
 .trainer-directory-card { min-width:0; display:flex; flex-direction:column; gap:10px; padding:20px; border:1px solid var(--classic-border); border-radius:14px; background:var(--classic-surface); }
-.trainer-directory-card h2 { margin:0; font-size:18px; overflow-wrap:anywhere; }.trainer-directory-card p { margin:0; color:var(--classic-text-muted); overflow-wrap:anywhere; }.trainer-directory-card .trainer-rating { font-size:12px; }.trainer-directory-card .ui-button { margin-top:auto; align-self:flex-start; }
+.trainer-directory-heading { display:flex; align-items:center; gap:12px; min-width:0; }.trainer-avatar { display:grid; place-items:center; width:48px; height:48px; flex:none; border:1px solid color-mix(in srgb,var(--gym-color,#007a35) 25%,white); border-radius:50%; background:color-mix(in srgb,var(--gym-color,#007a35) 10%,white); color:var(--gym-color,#007a35); font-weight:800; }.trainer-directory-title { min-width:0; }.trainer-directory-card h2 { margin:0 0 5px; font-size:16px; overflow-wrap:anywhere; }.trainer-level { display:inline-block; padding:3px 7px; border-radius:5px; background:var(--classic-surface-muted); color:var(--classic-text-secondary); font-size:11px; font-weight:700; }.trainer-level.is-senior { background:#e8efff; color:#254c9b; }.trainer-directory-card p { margin:0; color:var(--classic-text-muted); overflow-wrap:anywhere; }.trainer-directory-card .trainer-rating { font-size:12px; }.trainer-directory-card .ui-button { margin-top:auto; }
+.trainer-specialisations { display:flex; flex-wrap:wrap; gap:6px; }.trainer-specialisations span { padding:4px 8px; border-radius:5px; background:var(--classic-surface-muted); color:var(--classic-text-secondary); font-size:11px; font-weight:600; }
 @media (max-width:767px) { .trainer-filter-form { grid-template-columns:1fr; }.trainer-filter-form .ui-button { width:100%; }.ui-table-shell td { min-width:120px; } }
 @media (max-width:767px) { .trainer-directory-search { grid-template-columns:1fr; }.trainer-directory-search .ui-button { width:100%; } }
+
+/* Member pages keep the directory-first V1 hierarchy inside GymOS V2 chrome. */
+.member-dashboard .gym-banner { align-items:center; min-height:0; margin:0 0 20px; padding:0; border-radius:0; background:var(--classic-page); color:var(--classic-text); }
+.member-dashboard .gym-banner h1 { margin:0 0 5px; color:var(--classic-text); font-size:27px; line-height:1.2; letter-spacing:-.04em; }
+.member-dashboard .gym-banner p { color:var(--classic-text-muted); font-size:13px; line-height:1.45; }
+.member-dashboard .gym-banner .eyebrow { color:var(--gym-color); opacity:1; }
+.member-dashboard .ui-card { padding:20px; border-radius:12px; box-shadow:0 1px 3px #171b2810; }
+.member-dashboard .ui-card-header h2 { margin-top:5px; font-size:18px; letter-spacing:-.025em; }
+.member-dashboard .ui-button { min-height:38px; border-radius:8px; font-size:12px; }
+.member-dashboard .trainer-directory-card { gap:9px; padding:17px; border-radius:12px; box-shadow:0 1px 3px #171b2810; }
+.member-dashboard .trainer-directory-card h2 { font-size:15px; }
+.member-dashboard .trainer-directory-card p { font-size:12px; line-height:1.45; }
+.member-dashboard .trainer-directory-card .ui-button { min-height:40px; font-size:12px; }
+.member-dashboard .shell-sidebar nav a[aria-current],.member-dashboard .shell-drawer nav a[aria-current] { background:var(--gym-color); color:var(--gym-on-color,#fff); }
+@media(max-width:560px) { .member-dashboard .gym-banner { align-items:flex-start; }.member-dashboard .gym-banner h1 { font-size:24px; }.member-dashboard .ui-card { padding:16px; }.member-dashboard .trainer-directory-grid { grid-template-columns:minmax(0,1fr); gap:12px; } }
 .operation-controls { display:flex; flex-direction:column; align-items:flex-start; gap:8px; max-width:280px; overflow-wrap:anywhere; }
 .operation-controls code { font-size:10px; }
 .operation-controls p { margin:0; }

@@ -1,5 +1,6 @@
-import { GymRolePage } from '../role-page';
+import { redirect } from 'next/navigation';
 
-export default function MemberWorkspace({ params }: { params: Promise<{ slug: string }> }) {
-  return <GymRolePage params={params} expectedRole="MEMBER" />;
+export default async function MemberWorkspace({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  redirect(`/gyms/${encodeURIComponent(slug)}/member/trainers`);
 }

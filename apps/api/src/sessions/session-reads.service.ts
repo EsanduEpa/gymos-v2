@@ -55,8 +55,8 @@ function item(row: SessionRow, role: string, now: Date) {
     scheduledStartAt: row.scheduledStartAt.toISOString(), scheduledEndAt: row.scheduledEndAt.toISOString(), gymTimeZone: row.gymTimezone,
     startedAt: row.startedAt?.toISOString() ?? null, endedAt: row.endedAt?.toISOString() ?? null, confirmedAt: row.confirmedAt?.toISOString() ?? null,
     declineReason: role === 'MEMBER' ? row.declineReason : null,
-    createdAt: row.createdAt.toISOString(), fee: row.fee?.toString() ?? null,
-    currency: row.currency ?? null, notes: row.notes,
+    createdAt: row.createdAt.toISOString(), fee: role === 'OWNER' ? row.fee?.toString() ?? null : null,
+    currency: role === 'OWNER' || role === 'TRAINER' && row.payRecord ? row.currency ?? null : null, notes: row.notes,
     trainerPay: role === 'TRAINER' ? row.payRecord?.amount?.toString() ?? null : null,
     commandAffordances: sessionCommandAffordances(row, role, now),
   };

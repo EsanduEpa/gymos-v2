@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import type { SessionReadPage } from '@gymos/contracts';
 import {
   cancelSessionWithQuote,
@@ -33,6 +33,8 @@ function quoteTime(value: string | null, timeZone: string) {
 
 export function SessionPolicyControls({ slug, session, role }: { slug: string; session: Session; role: Role }) {
   const router = useRouter();
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
   const [pending, startTransition] = useTransition();
   const [panelAction, setPanelAction] = useState<PolicyAction | null>(null);
   const [quote, setQuote] = useState<Awaited<ReturnType<typeof getSessionPolicyQuote>>['quote']>();
@@ -45,7 +47,23 @@ export function SessionPolicyControls({ slug, session, role }: { slug: string; s
   const canNoShow = session.commandAffordances.includes('NO_SHOW');
   const cancelLabel = role === 'MEMBER' && session.state === 'PENDING_CONFIRMATION' ? 'Withdraw request' : 'Cancel session';
 
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!panelAction || !dialog) return;
+    dialog.showModal();
+    dialog.querySelector<HTMLElement>('h3')?.focus();
+    return () => {
+      if (dialog.open) dialog.close();
+      if (openerRef.current?.isConnected) openerRef.current.focus();
+    };
+  }, [panelAction]);
+
+  useEffect(() => {
+    if (state.error) dialogRef.current?.querySelector<HTMLElement>('[role="alert"]')?.focus();
+  }, [state.error]);
+
   function loadQuote(action: PolicyAction) {
+    openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setPanelAction(action);
     setQuote(undefined);
     setAcknowledged(false);
@@ -87,8 +105,9 @@ export function SessionPolicyControls({ slug, session, role }: { slug: string; s
       onClick={() => loadQuote('CANCEL')}>{cancelLabel}</button> : null}
     {canNoShow ? <button className="ui-button ui-button-secondary" type="button" disabled={pending || quoteLoading}
       onClick={() => loadQuote('NO_SHOW')}>Mark no-show</button> : null}
-    {panelAction ? <section className={styles.panel} aria-label={panelAction === 'CANCEL' ? 'Cancellation quote' : 'No-show quote'}>
-      <h3>{panelAction === 'CANCEL' ? cancelLabel : 'Mark no-show'}</h3>
+    {panelAction ? <dialog ref={dialogRef} className={styles.panel} aria-labelledby={`session-policy-title-${session.id}`}
+      onCancel={event => { event.preventDefault(); setPanelAction(null); setQuote(undefined); setState(initialState); }}>
+      <h3 id={`session-policy-title-${session.id}`} tabIndex={-1}>{panelAction === 'CANCEL' ? cancelLabel : 'Mark no-show'}</h3>
       {quoteLoading ? <p role="status">Loading the current gym policy quote…</p> : quote ? <>
         <p>{consequenceLabel(quote.consequence)}</p>
         {quote.eligibleAt ? <p>Available at {quoteTime(quote.eligibleAt, session.gymTimeZone)}.</p> : null}
@@ -101,20 +120,20 @@ export function SessionPolicyControls({ slug, session, role }: { slug: string; s
             ? `I understand this no-show consumes the held credit${creditInfo ? ` valued at ${creditInfo}` : ''}.`
             : `I understand the late cancellation consequence${creditInfo ? ` and ${creditInfo} credit value` : ''}.`}</span>
         </label> : null}
-        {missingAcknowledgmentToken ? <p role="alert">The server did not provide a valid acknowledgment token. Request a fresh quote.</p> : null}
+        {missingAcknowledgmentToken ? <p role="alert" tabIndex={-1}>The server did not provide a valid acknowledgment token. Request a fresh quote.</p> : null}
         {quote.eligible ? <button className="ui-button ui-button-primary" type="button" disabled={pending || missingAcknowledgmentToken || (requiresAcknowledgment && !acknowledged)}
           onClick={() => submitPolicyAction(panelAction)}>
           {pending ? 'Saving…' : state.outcomeUnknown ? 'Retry with same key' : panelAction === 'CANCEL' ? cancelLabel : 'Confirm no-show'}
         </button> : null}
       </> : null}
-      {state.error ? <p role="alert">{state.error}</p> : null}
+      {state.error ? <p role="alert" tabIndex={-1}>{state.error}</p> : null}
       {state.success ? <p role="status">{state.success}</p> : null}
       {state.refreshQuote ? <button className="ui-button ui-button-secondary" type="button" disabled={pending || quoteLoading}
         onClick={() => loadQuote(panelAction)}>{quoteLoading ? 'Refreshing quote…' : 'Review updated quote'}</button> : null}
       <button className="ui-button ui-button-secondary" type="button" disabled={pending} onClick={() => { setPanelAction(null); setQuote(undefined); setState(initialState); }}>
         Close
       </button>
-    </section> : null}
+    </dialog> : null}
     {state.error && !panelAction ? <p role="alert">{state.error}</p> : null}
   </div>;
 }
