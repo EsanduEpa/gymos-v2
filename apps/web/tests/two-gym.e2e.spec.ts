@@ -1027,9 +1027,9 @@ test('platform registry supports audited read-only gym selection, switching, exi
   // rendered its selected gym. Read support context from a fresh document.
   await page.goto('about:blank');
   await page.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/owner`);
-  await expect(page.locator('.support-banner')).toContainText('Viewing Test Gym Alpha');
-  await expect(page.locator('.support-banner')).toBeVisible();
-  await expect(page.getByRole('heading',{name:'Test Gym Alpha',exact:true})).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/owner$`));
+  await expect(page.locator('[data-support-session] .support-banner')).toContainText('Viewing Test Gym Alpha');
+  await expect(page.getByRole('main').getByRole('heading',{name:'Test Gym Alpha',exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'Add member'})).toHaveCount(0);
   await expect(page.locator('main')).not.toContainText('Alpha Person');
   const supportCookie=(await page.context().cookies()).find(cookie=>cookie.name==='gymos_support_context')!;
@@ -1048,9 +1048,9 @@ test('platform registry supports audited read-only gym selection, switching, exi
   // document so no stale shell state can satisfy the Beta assertions.
   await page.goto('about:blank');
   await page.goto(`${webBase}/gyms/${fixture.gyms[1].slug}/owner`);
-  await expect(page.locator('.support-banner')).toContainText('Viewing Test Gym Beta');
-  await expect(page.locator('.support-banner')).toBeVisible();
-  await expect(page.getByRole('heading',{name:'Test Gym Beta',exact:true})).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[1].slug}/owner$`));
+  await expect(page.locator('[data-support-session] .support-banner')).toContainText('Viewing Test Gym Beta');
+  await expect(page.getByRole('main').getByRole('heading',{name:'Test Gym Beta',exact:true})).toBeVisible();
   await expect(page.locator('main')).not.toContainText('Test Gym Alpha');
   await expect(oldTab).toHaveURL(/\/admin$/);
   await page.setViewportSize({width:320,height:700});
