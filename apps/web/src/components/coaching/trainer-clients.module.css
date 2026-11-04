@@ -8,8 +8,9 @@
 .card p { margin:3px 0 0; color:var(--classic-text-muted); font-size:12px; }
 .card strong { font-size:20px; }
 .card span { color:var(--classic-text-secondary); font-size:12px; }
+.actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; }
 .pager { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin-top:14px; }
 .pager p { margin:0; color:var(--classic-text-muted); font-size:12px; }
 .pager nav { display:flex; gap:8px; }
-@media(max-width:850px) { .card { grid-template-columns:repeat(2,minmax(0,1fr)); }.card nav { grid-column:span 2; } }
-@media(max-width:520px) { .search { display:grid; }.search button { width:100%; }.card { grid-template-columns:minmax(0,1fr); }.card nav { grid-column:auto; }.card nav a { width:100%; } }
+@media(max-width:850px) { .card { grid-template-columns:repeat(2,minmax(0,1fr)); }.actions { grid-column:span 2; justify-content:flex-start; } }
+@media(max-width:520px) { .search { display:grid; }.search button { width:100%; }.card { grid-template-columns:minmax(0,1fr); }.actions { grid-column:auto; flex-direction:column; }.actions a { width:100%; } }

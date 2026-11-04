@@ -24,8 +24,8 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
   const [switching, setSwitching] = useState(false);
   const role = support ? 'READ-ONLY SUPPORT' : gym?.role ?? 'SUPER_ADMIN';
   const destination = gym ? gymRoleUrl(gym) : '/admin';
-  const label = support ? 'Owner summary' : gym ? role === 'OWNER' ? 'Dashboard' : role === 'TRAINER' ? 'My earnings' : 'Member workspace' : 'All Gyms';
-  const home = gym?.role === 'TRAINER' ? `${destination}/earnings` : destination;
+  const label = support ? 'Owner summary' : gym ? role === 'OWNER' ? 'Dashboard' : role === 'TRAINER' ? 'Trainer workspace' : 'Member workspace' : 'All Gyms';
+  const home = gym?.role === 'TRAINER' ? `${destination}/schedule` : destination;
   function close() { drawer.current?.close(); setOpen(false); opener.current?.focus(); }
   function show() { drawer.current?.showModal(); setOpen(true); }
   useEffect(() => {
@@ -64,6 +64,7 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
           <a href={`${destination}/schedule`} aria-current={pathname.startsWith(`${destination}/schedule`) ? 'page' : undefined} onClick={close}>PT Schedule</a>
           <a href={`${destination}/requests`} aria-current={pathname.startsWith(`${destination}/requests`) ? 'page' : undefined} onClick={close}>Session requests</a>
           <a href={`${destination}/clients`} aria-current={pathname.startsWith(`${destination}/clients`) ? 'page' : undefined} onClick={close}>Clients</a>
+          <a href={`${destination}/earnings`} aria-current={pathname.startsWith(`${destination}/earnings`) ? 'page' : undefined} onClick={close}>Earnings</a>
         </> : null}
         {!support && gym?.role === 'MEMBER' ? <>
           <a href={`${destination}/trainers`} aria-current={pathname.startsWith(`${destination}/trainers`) ? 'page' : undefined} onClick={close}>Trainers</a>

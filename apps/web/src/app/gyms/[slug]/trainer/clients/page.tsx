@@ -44,7 +44,11 @@ export default async function TrainerClientsPage({ params, searchParams }: {
             <p>{client.usablePackBalance?.held ?? 0} held</p></div>
           <div>{client.latestSession ? <><span>{client.latestSession.state.replaceAll('_', ' ').toLowerCase()}</span>
             <p>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: result.data.timeZone }).format(new Date(client.latestSession.scheduledStartAt))}</p></> : <span>No qualifying session</span>}</div>
-          <nav aria-label={`Plan actions for ${client.fullName}`}><a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/trainer/plans/workout/new?memberId=${encodeURIComponent(client.id)}`}>Create workout</a></nav>
+          <nav className={styles.actions} aria-label={`Plan actions for ${client.fullName}`}>
+            <a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/trainer/clients/${encodeURIComponent(client.id)}`}>View profile</a>
+            <a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/trainer/plans/workout/new?memberId=${encodeURIComponent(client.id)}`}>Create workout</a>
+            <a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/trainer/plans/meal/new?memberId=${encodeURIComponent(client.id)}`}>Create meal plan</a>
+          </nav>
         </article>)}</div>}
       {result?.success ? <div className={styles.pager}><p>Page {result.data.page} of {Math.max(1, result.data.totalPages)} · {result.data.totalCount} matching clients</p>
         <nav aria-label="Client pages">{result.data.page > 1 ? <a className="ui-button ui-button-secondary" href={`?q=${encodeURIComponent(query.data.q ?? '')}&page=${result.data.page - 1}`}>Previous</a> : null}

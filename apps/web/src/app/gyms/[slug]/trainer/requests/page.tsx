@@ -21,13 +21,17 @@ export default async function TrainerRequestsPage({ params }: { params: Promise<
   const brand = resolveGymBrandColors(theme.primaryColor);
   const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
   return <DashboardChrome identityId={session.identityId} key={`${session.identityId}:${gym.id}:${gym.role}`} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'} style={style}>
-    <div className="gym-banner"><div><span className="eyebrow">TRAINER SCHEDULE</span><h1>Session requests</h1><p>Accepting a request rechecks eligibility and reserves one session credit.</p></div></div>
-    <Card><CardHeader eyebrow="PENDING" title={result?.success ? `${result.data.items.length} requests` : 'Session requests'}/>
+    <div className="gym-banner"><div><span className="eyebrow">TRAINER SCHEDULE</span><h1>Client Hire Requests</h1><p>Review incoming personal training requests. Acceptance rechecks eligibility and reserves a session credit.</p></div></div>
+    <div className="trainer-request-summary" aria-label="Pending requests summary"><Card><CardHeader eyebrow="PENDING REQUESTS" title={result?.success ? String(result.data.items.length) : 'Unavailable'}/></Card></div>
+    <Card><CardHeader eyebrow="PENDING SESSION REQUESTS" title={result?.success ? `${result.data.items.length} requests` : 'Session requests'}/>
       {!result?.success ? <Feedback tone="error">Requests could not be loaded. Refresh to try again.</Feedback> : result.data.items.length === 0 ?
         <div className="ui-empty-state"><h2>No pending requests</h2><p>New member requests will appear here.</p></div> :
         <div className="session-request-list">{result.data.items.map(item => <article className="session-request-card" key={item.id}>
-          <h2>{item.memberName}</h2><p>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: item.timeZone }).format(new Date(item.scheduledStartAt))} · {item.durationMinutes} minutes · {item.type.replace('_', ' ').toLowerCase()}</p>
-          {item.notes ? <p><strong>Member note:</strong> {item.notes}</p> : null}
+          <div className="trainer-request-details"><div><h2>{item.memberName}</h2><span className="ui-badge ui-badge-info">Pending confirmation</span></div>
+            <p><strong>Requested time</strong><br/><time dateTime={item.scheduledStartAt}>{new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: item.timeZone, timeZoneName: 'short' }).format(new Date(item.scheduledStartAt))}</time></p>
+            <p><strong>Duration &amp; type</strong><br/>{item.durationMinutes} min · {item.type.replace('_', ' ').toLowerCase()}</p>
+            <p><strong>Member goal / note</strong><br/>{item.notes ? <em>“{item.notes}”</em> : <span>No note provided</span>}</p>
+          </div>
           <div className="session-request-actions">
             <SessionRequestDecisionForm slug={slug} sessionId={item.id} expectedVersion={item.version} action="ACCEPT" requestKey={randomUUID()}/>
             <SessionRequestDecisionForm slug={slug} sessionId={item.id} expectedVersion={item.version} action="DECLINE" requestKey={randomUUID()}/>
