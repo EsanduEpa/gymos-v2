@@ -22,3 +22,9 @@ Local verification, all exit 0:
 Visual inspection: [registry desktop](GYMOS-MIG-024/registry-desktop.png), [registry 320px](GYMOS-MIG-024/registry-320.png), [Alpha support](GYMOS-MIG-024/support-alpha-desktop.png), [Beta 320px](GYMOS-MIG-024/support-beta-320.png). An initial Alpha capture showed the loading fallback; visibility assertions were strengthened and the artifact recaptured. Legacy synthetic browser gyms intentionally have no operational currency/timezone and display “Not configured”; task 023's newly provisioned fixtures verify required values before activation. A stale compiled API-client test was rebuilt and rerun; assertions were preserved.
 
 No V1/provider resource was executed or modified. Task 025 lifecycle transitions and task 026 controlled rollout/repair are separate remaining integration gates. Segment 03 is not complete.
+
+## Support-navigation full-suite follow-up — 4 November 2026
+
+- PR #8 run `41780707752` on `d37fbd1` exposed a full-suite browser timing issue after entering Alpha support: the server action updated the URL before the streamed owner shell rendered the selected gym heading. The same flow already used a fresh document for the later Beta switch.
+- The browser test now reloads the owner route from a fresh document after asserting the support-entry URL; support context is read from the scoped cookie, and the gym heading/banner are then verified.
+- The focused support-registry browser case passed **1/1**, and the complete disposable browser suite passed **23/23**. All runs used synthetic Alpha/Beta actors and ownership-validated cleanup. This is test stabilization; no owner-observed acceptance is claimed.

@@ -1022,6 +1022,10 @@ test('platform registry supports audited read-only gym selection, switching, exi
   const reason=page.getByRole('textbox',{name:/^Support reason/});await reason.fill('Synthetic owner-summary diagnosis');
   await page.getByRole('button',{name:'Enter support',exact:true}).click();
   await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/owner$`));
+  // The server action can change the URL before the streamed owner shell has
+  // rendered its selected gym. Read support context from a fresh document.
+  await page.goto('about:blank');
+  await page.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/owner`);
   await expect(page.locator('.support-banner')).toContainText('Viewing Test Gym Alpha');
   await expect(page.locator('.support-banner')).toBeVisible();
   await expect(page.getByRole('heading',{name:'Test Gym Alpha',exact:true})).toBeVisible();
