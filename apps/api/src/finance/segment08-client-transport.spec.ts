@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LatestRequestSequence } from '../../../web/src/lib/latest-request-sequence';
-import { exportRequestSignal } from '../../../web/src/lib/export-request-signal';
+import { exportRequestSignal, LatestRequestSequence } from '@gymos/contracts';
 
 describe('Segment 08 client transport safeguards', () => {
   it('keeps newer dashboard data when the older refresh resolves last', async () => {

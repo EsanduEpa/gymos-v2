@@ -1,8 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse, type NextRequest } from 'next/server';
-import { financeExportInputSchema } from '@gymos/contracts';
+import { exportRequestSignal, financeExportInputSchema } from '@gymos/contracts';
 import { apiUrl, SESSION_COOKIE } from '@/lib/gymos';
-import { exportRequestSignal } from '@/lib/export-request-signal';
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

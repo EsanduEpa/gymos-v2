@@ -1,9 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { OwnerDashboard } from '@gymos/contracts';
+import { LatestRequestSequence, type OwnerDashboard } from '@gymos/contracts';
 import { loadOwnerDashboard } from '@/app/dashboard-actions';
-import { LatestRequestSequence } from '@/lib/latest-request-sequence';
 
 type Data = OwnerDashboard;
 export function OwnerDashboardLive({ slug, initial }: { slug: string; initial: Data | null }) {
