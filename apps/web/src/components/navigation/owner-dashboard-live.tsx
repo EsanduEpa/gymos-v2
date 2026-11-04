@@ -3,25 +3,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { OwnerDashboard } from '@gymos/contracts';
 import { loadOwnerDashboard } from '@/app/dashboard-actions';
+import { LatestRequestSequence } from '@/lib/latest-request-sequence';
 
 type Data = OwnerDashboard;
 export function OwnerDashboardLive({ slug, initial }: { slug: string; initial: Data | null }) {
   const [data, setData] = useState(initial);
   const [error, setError] = useState(false);
-  const sequence = useRef(0);
+  const sequence = useRef(new LatestRequestSequence());
   const refresh = useCallback(async () => {
-    const id = ++sequence.current;
+    const id = sequence.current.begin();
     const target = slug;
     const result = await loadOwnerDashboard(target);
-    if (id !== sequence.current) return;
+    if (!sequence.current.isCurrent(id)) return;
     if (!result.unavailable) setData(result.data as Data | null);
     setError(result.unavailable);
   }, [slug]);
   useEffect(() => {
     const requestSequence = sequence;
-    requestSequence.current++;
+    requestSequence.current.invalidate();
     const timer = window.setInterval(() => { void refresh(); }, 30_000);
-    return () => { window.clearInterval(timer); requestSequence.current++; };
+    return () => { window.clearInterval(timer); requestSequence.current.invalidate(); };
   }, [refresh]);
   return <section className="owner-dashboard-live" aria-label="Live gym dashboard">
     <div className="finance-toolbar"><span>{data ? `As of ${new Date(data.asOf).toLocaleTimeString([], { timeZone: data.timeZone })} · ${data.timeZone}` : 'Dashboard data unavailable'}</span><button type="button" className="ui-button ui-button-secondary" onClick={() => void refresh()}>Refresh now</button></div>
