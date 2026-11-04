@@ -1294,7 +1294,10 @@ test('member roster and profile keep role, tenant, privacy, empty, and dependenc
   const alpha = fixture.gyms[0].slug;
   const beta = fixture.gyms[1].slug;
   const betaMember = await fixture.tenants[1].member.findFirstOrThrow();
-  const enrolled = await fixture.tenants[0].member.findFirstOrThrow({ where: { identityId: fixture.users.memberUser.id } });
+  // Task 039 above intentionally adds a term, pack and sessions to the linked
+  // fixture member. Keep this empty-profile assertion independent from that
+  // journey by using a separate active, unlinked synthetic member.
+  const profileMember = await fixture.tenants[0].member.findFirstOrThrow({ where: { fullName: 'Alpha Person 002' } });
   const before = await Promise.all([
     fixture.master.operation.count(), fixture.master.platformAuditLog.count(), fixture.tenants[0].auditLog.count(),
     fixture.tenants[0].membershipTerm.count(), fixture.tenants[1].auditLog.count(),
@@ -1310,15 +1313,15 @@ test('member roster and profile keep role, tenant, privacy, empty, and dependenc
   await page.getByRole('button', { name: 'Apply filters' }).click();
   await expect(page.getByText('No matching members.')).toBeVisible();
   await expect(page.getByText('0 matching members')).toBeVisible();
-  await page.getByLabel('Search members').fill(enrolled.email!);
+  await page.getByLabel('Search members').fill(profileMember.email!);
   await page.getByRole('button', { name: 'Apply filters' }).click();
-  await expect(page.locator('.member-list')).toContainText(enrolled.fullName);
+  await expect(page.locator('.member-list')).toContainText(profileMember.fullName);
   const ownerCookie = (await page.context().cookies()).find(cookie => cookie.name === 'gymos_access_token')!.value;
   const ownerHeaders = { authorization: `Bearer ${ownerCookie}` };
-  const ownerProfile = await request.get(`${apiBase}/gyms/${alpha}/members/${enrolled.id}`, { headers: ownerHeaders });
+  const ownerProfile = await request.get(`${apiBase}/gyms/${alpha}/members/${profileMember.id}`, { headers: ownerHeaders });
   expect(ownerProfile.status()).toBe(200);
   const profile = await ownerProfile.json();
-  expect(profile.accountState).toBe('OPERATIONAL');
+  expect(profile.accountState).toBe('BASIC');
   expect(profile.memberships).toEqual([]);
   expect(profile.sessionPacks).toEqual([]);
   expect(profile.recentSessions).toEqual([]);
@@ -1334,7 +1337,7 @@ test('member roster and profile keep role, tenant, privacy, empty, and dependenc
     const token = (await page.context().cookies()).find(cookie => cookie.name === 'gymos_access_token')!.value;
     const headers = { authorization: `Bearer ${token}` };
     const list = await request.get(`${apiBase}/gyms/${alpha}/members`, { headers });
-    const detail = await request.get(`${apiBase}/gyms/${alpha}/members/${enrolled.id}`, { headers });
+    const detail = await request.get(`${apiBase}/gyms/${alpha}/members/${profileMember.id}`, { headers });
     expect(list.status()).toBe(403);
     expect(detail.status()).toBe(403);
     const session = await request.get(`${apiBase}/auth/session`, { headers });
@@ -1345,8 +1348,8 @@ test('member roster and profile keep role, tenant, privacy, empty, and dependenc
     }
   }
 
-  await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${alpha}/owner/members/${enrolled.id}`);
-  await expect(page.getByRole('heading', { name: enrolled.fullName, level: 1 })).toBeVisible();
+  await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${alpha}/owner/members/${profileMember.id}`);
+  await expect(page.getByRole('heading', { name: profileMember.fullName, level: 1 })).toBeVisible();
   const tabs = page.getByRole('tablist').first();
   const overview = tabs.getByRole('tab', { name: 'Overview' });
   await overview.focus();
@@ -1365,7 +1368,7 @@ test('member roster and profile keep role, tenant, privacy, empty, and dependenc
   await expect(page.getByText('Issued 3 session credits. No payment was recorded.')).toBeVisible();
   await expect(page.locator('.session-pack-panel')).toContainText('3 sessions issued');
   await expect(page.locator('.session-pack-panel')).toContainText('3 available');
-  expect(await fixture.tenants[0]!.sessionPack.count({ where: { memberId: enrolled.id } })).toBe(1);
+  expect(await fixture.tenants[0]!.sessionPack.count({ where: { memberId: profileMember.id } })).toBe(1);
   await page.setViewportSize({ width: 320, height: 700 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: join(memberEvidence, 'profile-320.png'), fullPage: true, animations: 'disabled' });
@@ -1378,7 +1381,7 @@ test('member roster and profile keep role, tenant, privacy, empty, and dependenc
     await fixture.tenants[0].gymConfiguration.update({ where: { id: 'current' }, data: { timezone: 'Asia/Colombo' } });
     await page.getByRole('link', { name: 'Retry' }).focus();
     await page.keyboard.press('Enter');
-    await expect(page.getByRole('heading', { name: enrolled.fullName, level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: profileMember.fullName, level: 1 })).toBeVisible();
   } finally {
     await fixture.tenants[0].gymConfiguration.update({ where: { id: 'current' }, data: { timezone: 'Asia/Colombo' } });
   }

@@ -36,3 +36,11 @@ Revision `bab9b9776ab5afa9dd4d192764b64a70636ba02c` on PR [#6](https://github.co
 - Agent visual review, on synthetic disposable data only: `apps/web/test-results/migration-evidence/GYMOS-MIG-032/{roster-desktop,profile-320,profile-error-320}.png`. These generated captures are intentionally Git-ignored and remain local. The review caught a clipped mobile tab; the final profile tabs wrap and all labels are visible. No real data or credential screenshot was retained.
 
 **Manual acceptance record:** owner-delegated agent visual review is recorded separately from automated assertions. The owner authorized Codex to run manual tests and merge after verification; this record does not claim an independent owner browser session. Hosted checks and final PR review are recorded in the Segment 05 handoff.
+
+## Cross-suite profile-fixture isolation follow-up — 4 November 2026
+
+- PR #8 browser isolation run `41778443779` exposed a shared-fixture assumption: the preceding Task 039 browser journey intentionally gave the linked member a membership term, pack and sessions, while this profile case expected that same member to have an empty history.
+- The profile case now targets the separate synthetic active BASIC member `Alpha Person 002`, preserving its intended empty memberships/packs/sessions checks without depending on another scenario's writes. Owner list/profile role denials, 320px layout and dependency-error retry remain covered.
+- Focused case: `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web exec playwright test --config playwright.config.ts tests/two-gym.e2e.spec.ts --grep='member roster and profile keep role, tenant, privacy, empty, and dependency-error boundaries' --workers=1` — **1/1 passed, exit 0**.
+- Full browser isolation: `GYMOS_TEST_ALLOW_DOCKER=1 pnpm test:isolated` — **23/23 passed, exit 0**. Cleanup reported six owned databases/container/manifest per isolated spec and seven owned databases/container/manifest for the two-gym suite. The unrelated pre-existing development database was not used.
+- This is automated agent verification. It does not add owner-observed acceptance or close Segment 06/07 gates.
