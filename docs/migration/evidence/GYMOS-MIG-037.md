@@ -55,3 +55,9 @@ Codex reviewed the captured 390px screenshots. They show the roster table in a c
 - Tasks 041 and 042 now provide the owner booking and member request/session consumers. The profile still reads only the bounded, sanitized session summary described above.
 - `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web test:e2e --grep 'trainer roster/profile and member directory'` — exit 0; 1/1 guarded two-gym browser test. At 390px it rechecked the owner profile session metrics and gym-local timestamp, member-safe directory projection, and followed the selected trainer request link to the M02 `Request a trainer` route. Cleanup dropped six disposable databases and removed the container and run manifest.
 - This run used headed Playwright automation and test fixtures; it was not owner-observed Chrome review. The CUA browser-control host remains unavailable. Task 037 remains In Progress pending owner-visible review and hosted checks.
+
+## Agent-performed native Chrome review — 4 November 2026
+
+- In the dedicated `GymOS V2` Chrome window, the owner roster/profile/shift and trainer status recovery flow from the preceding visible pass were reviewed. The owner approved a gym-local recurring shift, then deactivated and reactivated the synthetic trainer with reasons; visible success states and persisted profile/shift recovery were checked. This was agent-performed review, not owner-observed acceptance.
+- Fixed the roster title to render “1 registered trainer” for a singular count in `apps/web/src/app/gyms/[slug]/owner/trainers/page.tsx`; focused ESLint, workspace typecheck and web production build passed afterward.
+- Full paged-roster/pack walkthrough and hosted gates remain open. See the shared [Segments 06–07 acceptance ledger](SEGMENTS-06-07-ACCEPTANCE.md).

@@ -34,3 +34,7 @@ Notification table DDL is part of the additive tenant migration with checksum `7
 - The shared one-worker Playwright command recorded in [Task 041 evidence](GYMOS-MIG-041.md) ran this notification spec in isolated headless Chromium — exit 0; 1/1 test passed. It covered notification listing, links, explicit mark-read/all-read actions, unread state after API outage and recovery, and the 390px responsive layout.
 - The two-gym fixture runner reported six owned databases dropped, its PostgreSQL container removed and its run manifest removed. The refreshed [390px bell screenshot](GYMOS-MIG-043/notifications-bell-390.png) was inspected and stays within the viewport.
 - This automated rerun is not owner-observed Chrome acceptance. Task 043 remains In Progress pending hosted checks and the visible walkthrough.
+
+## Agent-performed native Chrome review — 4 November 2026
+
+- Member notification popover visibly contained request-declined and session-confirmed events. Mark-all-read returned the unread count to zero. Trainer notification events were visible, but trainer mark-all-read was not verified in this walkthrough. This was not owner-observed acceptance; see the [acceptance ledger](SEGMENTS-06-07-ACCEPTANCE.md).

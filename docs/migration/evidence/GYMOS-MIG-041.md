@@ -35,3 +35,8 @@ Status: **In Progress; API and owner form implemented, guarded API and headed br
 - C21 exposes authoritative fee/policy data and current eligible actors/credits; exact slot collision is authoritatively checked by C22 at submit time and is reported as a conflict.
 - The headed browser check was automated and agent-reviewed. Owner-observed visible review remains pending because the CUA browser host was unavailable.
 - Task remains In Progress until parent integration and remaining end-to-end/hosted acceptance are verified. No completion is claimed.
+
+## Agent-performed native Chrome review — 4 November 2026
+
+- The member directory → request → trainer accept/decline flow was visibly exercised in the dedicated Chrome window. Session request state did not reserve credit before acceptance; after accept/decline the member view showed one scheduled and one declined session and the stored decline reason. The visible owner pass showed pack balances; no new pack issuance was submitted.
+- A trainer schedule cancellation control opened a quote showing the cutoff and credit consequence, then was dismissed without committing a cancellation. Full task, hosted and owner-observed gates remain open; see the [acceptance ledger](SEGMENTS-06-07-ACCEPTANCE.md).

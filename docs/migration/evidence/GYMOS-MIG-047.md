@@ -27,3 +27,7 @@ Status: **In Progress.** Evidence is from the uncommitted working tree on 3 Nove
 
 - Task044's role controls and headed browser flow are integrated and tested; no owner-observed visual acceptance is claimed here because CUA cannot attach to the running Chrome window.
 - Dependency completion, hosted checks and final cross-task review remain pending. Task remains In Progress.
+
+## Agent-performed native Chrome review — 4 November 2026
+
+- A trainer’s scheduled-session cancellation control opened a quote showing that cancellation remained within the free window, the free-cancellation cutoff, and a quoted LKR 10.00 / one-credit consequence. The dialog was dismissed; no cancellation was committed. No-show quote and terminal settlement were not visibly exercised. This was not owner-observed acceptance; see the [acceptance ledger](SEGMENTS-06-07-ACCEPTANCE.md).

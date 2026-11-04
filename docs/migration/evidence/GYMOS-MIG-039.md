@@ -26,3 +26,8 @@ Codex reviewed the captured 390px member directory: [member directory screenshot
 
 - Task 042 now supplies the M02 request page/options and guarded API checks for eligibility. The directory browser test follows its selected-gym trainer link; missing/inactive trainer handling remains covered by Task 042's API boundary rather than the directory page journey.
 - Re-run on a committed revision, complete owner-visible Chrome review and hosted PR checks before moving to Verified/Completed.
+
+## Agent-performed native Chrome review — 4 November 2026
+
+- In the dedicated Chrome window, the member opened the active trainer directory and requested a session for Trainer Alpha. After trainer acceptance of that request, the member submitted a second request that the trainer declined with “Trainer unavailable at this time. Please choose another slot.” Member sessions then showed one scheduled and one declined session, with the decline reason visible to that member. The matching held-credit state was checked. This was not owner-observed acceptance.
+- See the shared [acceptance ledger](SEGMENTS-06-07-ACCEPTANCE.md) for visible scope, fixture identity and cleanup.

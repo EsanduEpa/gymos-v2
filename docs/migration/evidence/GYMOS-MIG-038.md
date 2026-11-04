@@ -20,3 +20,8 @@ Status: **In Progress.** Evidence captured 3 November 2026 from the uncommitted 
 - Task 048's complete barrier-synchronized cross-boundary race suite remains gated on Task 049, which the owner confirmed stays with the finance/operational value segment. The specific booking, request and cancel/no-show races have separate guarded evidence.
 - Demonstrate deactivation/reactivation in the correct owner-visible Chrome application when the browser-control host is available. Current CUA errors are `browser access host unavailable` and `cgWindowNotFound`; no owner-observed UI review is claimed.
 - No hosted checks or owner acceptance are claimed.
+
+## Agent-performed native Chrome review — 4 November 2026
+
+- The owner gym’s synthetic trainer was deactivated and reactivated in the dedicated Chrome window, with a reason supplied for each action; the successful recovery state was visible. No future held session was cancelled during that status review. Agent-performed review only; no owner-observed acceptance is claimed.
+- Task 048 remains gated on Task 049, which remains outside this run in Segment 08. No 049 implementation is included.

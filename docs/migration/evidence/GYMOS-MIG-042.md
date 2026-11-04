@@ -25,3 +25,7 @@ Status: **In Progress; API/UI slice, directory integration and guarded/browser v
 
 - Visible owner-observed Chrome review and hosted CI remain open. The CUA browser-control host is unavailable; no owner acceptance is claimed.
 - Task 042 remains In Progress pending committed-revision and hosted checks and the full Task048 race gate. No task completion is claimed here.
+
+## Agent-performed native Chrome review — 4 November 2026
+
+- Synthetic member requests were accepted and declined by the assigned trainer in the dedicated Chrome window. The requesting member subsequently saw the persisted decline reason, one scheduled and one declined session, and the expected available/held credit counts. Agent-performed review only; see the [acceptance ledger](SEGMENTS-06-07-ACCEPTANCE.md).

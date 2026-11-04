@@ -21,3 +21,7 @@
 | GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web exec playwright test --config playwright.config.ts tests/session-reads.e2e.spec.ts --headed | Passed 1/1 with Task044 and Task051 coverage included. Browser interaction tests add/edit two meal rows, check live totals (500 kcal, 37.50 g protein), save and assign, verify member view and persisted rows/receipt/audit counts. Cleanup explicitly reported 6 databases dropped, container removed and manifest removed. |
 
 The headed artifacts are tracked in GYMOS-MIG-044 evidence. They were inspected by the agent and are not owner-observed; visible CUA Chrome is unavailable.
+
+## Agent-performed native Chrome review — 4 November 2026
+
+- The trainer created and assigned a Monday breakfast meal plan for the confirmed synthetic client. Live totals showed 500 kcal, 25 g protein, 60 g carbs and 12 g fat. The member’s read-only Meal plans page showed the assigned food item and the same totals. This was reviewed in the controlled Chrome window with the disposable fixture alive; see the [acceptance ledger](SEGMENTS-06-07-ACCEPTANCE.md). No owner-observed acceptance is claimed.

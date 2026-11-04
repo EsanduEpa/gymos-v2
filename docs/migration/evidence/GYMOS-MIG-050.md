@@ -21,3 +21,7 @@
 | Focused web ESLint on coaching and session files | Passed before the final screenshot-only spec amendment. |
 
 The exact-total candidate scan remains linear in the filtered eligible tenant candidate set; each scan iteration is bounded to 200 candidates and master verification queries are chunked to those candidates.
+
+## Agent-performed native Chrome review — 4 November 2026
+
+- In a rebuilt API/web two-gym disposable fixture, the trainer client roster visibly returned the confirmed synthetic member. The profile showed status, credit totals, no health notes, one related scheduled session in history, and the empty workout/meal states. The earlier 500 was isolated to stale `apps/api/dist`; a fresh guarded route diagnostic returned 200 and the rebuilt route loaded in Chrome. See the [acceptance ledger](SEGMENTS-06-07-ACCEPTANCE.md) for run and cleanup. Cross-gym visible denial remains open; this is not owner-observed acceptance.

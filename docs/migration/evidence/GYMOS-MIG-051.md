@@ -20,3 +20,7 @@
 | Headed Chrome: GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web exec playwright test --config playwright.config.ts tests/session-reads.e2e.spec.ts --headed | Final run passed 1/1 with navigation integrated. It saves an edited seeded sample with 0 kg and verifies member sees 0 kg with no edit/save affordance; persisted plan/exercise/receipt/audit counts are asserted. Cleanup reported six database drops, container removal and manifest removal. |
 
 Member and trainer sidebar links are now integrated by the parent and are included in the final production build and headed browser run.
+
+## Agent-performed native Chrome review — 4 November 2026
+
+- The trainer created and assigned “Visible walkthrough strength plan” to the confirmed synthetic client. The trainer profile reloaded it with two persisted exercise rows; the member’s read-only Workout plans page displayed the same exercises and weights. The assignment was verified in the controlled Chrome window using a guarded disposable fixture; see the [acceptance ledger](SEGMENTS-06-07-ACCEPTANCE.md). No owner-observed acceptance is claimed.

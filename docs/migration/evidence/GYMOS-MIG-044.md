@@ -26,3 +26,7 @@
 ## Artifacts and remaining gates
 
 Tracked screenshots: owner-sessions-month.png, trainer-active-session.png, member-sessions-mobile.png, member-workout-plans.png, trainer-meal-plan-builder.png, and member-meal-plans.png. Remaining prerequisite review is needed before marking this task verified or complete. No hosted checks or owner-visible Chrome review are claimed.
+
+## Agent-performed native Chrome review — 4 November 2026
+
+- The member session page showed one scheduled and one declined session, month-state totals and the stored decline reason. The trainer schedule showed the accepted session on its gym-local day; its cancellation quote displayed the cutoff and credit consequence, then was dismissed without submission. This supplements, but does not replace, the automated role/filter/pagination evidence. No owner-observed acceptance is claimed; see the [acceptance ledger](SEGMENTS-06-07-ACCEPTANCE.md).
