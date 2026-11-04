@@ -40,3 +40,7 @@ Status: **In Progress; API and owner form implemented, guarded API and headed br
 
 - The member directory → request → trainer accept/decline flow was visibly exercised in the dedicated Chrome window. Session request state did not reserve credit before acceptance; after accept/decline the member view showed one scheduled and one declined session and the stored decline reason. The visible owner pass showed pack balances; no new pack issuance was submitted.
 - A trainer schedule cancellation control opened a quote showing the cutoff and credit consequence, then was dismissed without committing a cancellation. Full task, hosted and owner-observed gates remain open; see the [acceptance ledger](SEGMENTS-06-07-ACCEPTANCE.md).
+
+## Additional agent-performed native Chrome walkthrough — 4 November 2026
+
+- In the same controlled Chrome window, the owner issued a three-credit pack to the synthetic walkthrough member and reloaded the profile to confirm its available balance. The owner booking form then created a 60-minute in-person session for 5 November 2026 at 15:00 Asia/Colombo with a displayed LKR 50 fee. Success reported one held credit; the owner ledger showed the persisted scheduled session and session note after navigation. The member monthly session ledger also showed it, with totals updated from the ledger. This is agent-performed review, not owner-observed acceptance. See the shared [acceptance ledger](SEGMENTS-06-07-ACCEPTANCE.md) for fixture cleanup and the remaining owner booking/paging/policy gates.

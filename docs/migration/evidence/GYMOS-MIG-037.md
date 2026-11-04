@@ -67,3 +67,8 @@ Codex reviewed the captured 390px screenshots. They show the roster table in a c
 - Run `41776997248` found the mobile roster spec used an unscoped `View profile` locator even though the synthetic gym has two trainers. Scoped it to the `Trainer Alpha` row.
 - `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web exec playwright test --config playwright.config.ts tests/session-reads.e2e.spec.ts tests/two-gym.e2e.spec.ts --grep='owner, trainer and member see the same selected-gym session ledger read-only|trainer roster/profile and member directory are usable at mobile width without exposing contact fields' --workers=1` — exit 0; 2/2 passed. Both disposable fixtures reported six owned databases, container, and manifest cleaned up.
 - The focused roster/profile and directory browser case passed, but the full paged-roster/pack walkthrough and hosted gates remain open. This was agent-performed automated review, not owner-observed acceptance.
+
+## Agent-performed native Chrome walkthrough — 4 November 2026
+
+- In the dedicated native Chrome window, the owner trainer list showed one registered trainer. The owner opened Trainer Alpha's profile, approved a 09:00–17:00 Asia/Colombo recurring shift, and reloaded to verify persistence. Deactivation and reactivation required reasons; ACTIVE status and the same shift remained visible after recovery. This supplements the earlier profile/session-summary walkthrough but does not verify trainer-roster paging or owner-observed acceptance.
+- Details and disposable fixture cleanup are in the shared [Segments 06–07 acceptance ledger](SEGMENTS-06-07-ACCEPTANCE.md). Task 037 remains In Progress pending the remaining roster/privacy/role gates and owner-observed acceptance.

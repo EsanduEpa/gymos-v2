@@ -29,3 +29,7 @@ Status: **In Progress; API/UI slice, directory integration and guarded/browser v
 ## Agent-performed native Chrome review — 4 November 2026
 
 - Synthetic member requests were accepted and declined by the assigned trainer in the dedicated Chrome window. The requesting member subsequently saw the persisted decline reason, one scheduled and one declined session, and the expected available/held credit counts. Agent-performed review only; see the [acceptance ledger](SEGMENTS-06-07-ACCEPTANCE.md).
+
+## Additional agent-performed native Chrome walkthrough — 4 November 2026
+
+- A synthetic member opened the active Trainer Alpha card from the selected gym's directory and submitted a 50-minute request. The member ledger showed it as pending with no additional hold. The assigned Trainer Alpha accepted it; the trainer schedule then showed a scheduled session in Asia/Colombo time. A second request was declined with a stored reason, which the member later saw on the declined session. The ledger showed two scheduled and one declined session, 1 available credit, 2 held, and 0 consumed. This was visible agent review in the actual controlled Chrome window, not owner-observed acceptance. Hosted check run `41782976210` on `fcc852e` subsequently passed all 11 jobs; Task 048 remains gated on Task 049.

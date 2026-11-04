@@ -38,3 +38,7 @@ Notification table DDL is part of the additive tenant migration with checksum `7
 ## Agent-performed native Chrome review — 4 November 2026
 
 - Member notification popover visibly contained request-declined and session-confirmed events. Mark-all-read returned the unread count to zero. Trainer notification events were visible, but trainer mark-all-read was not verified in this walkthrough. This was not owner-observed acceptance; see the [acceptance ledger](SEGMENTS-06-07-ACCEPTANCE.md).
+
+## Additional agent-performed native Chrome walkthrough — 4 November 2026
+
+- Member notifications showed the session-confirmed event; Mark all read returned the unread count to zero. Trainer notifications showed both new session request events; trainer Mark all read also returned unread to zero. The visible review did not inspect notification audit details or foreign-gym notification denial screens. This is agent-performed review, not owner-observed acceptance; see the shared [acceptance ledger](SEGMENTS-06-07-ACCEPTANCE.md).

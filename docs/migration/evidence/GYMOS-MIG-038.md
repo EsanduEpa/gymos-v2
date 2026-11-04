@@ -30,3 +30,7 @@ Status: **In Progress.** Evidence captured 3 November 2026 from the uncommitted 
 
 - Run `41776997248` exposed the trainer lifecycle Master migration missing from the immutable Master manifest. Added `20261103020000_trainer_lifecycle_intent` with SHA-256 `7cd5f7986fca900cb132a1461b43626f3f8403d5716d9f929768061192b63939`, alongside the member lifecycle migration and postconditions. The Master template is now `master-2026-11-03.1`.
 - The focused owned-runner rollout test passed 1/1 after the manifest refresh; it is recorded in Task 033. Task 038 remains In Progress with full visible acceptance and hosted checks outstanding.
+
+## Agent-performed native Chrome walkthrough — 4 November 2026
+
+- The owner deactivated and reactivated the synthetic trainer with a reason for each operation. The recovered ACTIVE status and gym-local recurring shift persisted after reload. The walkthrough did not include a future held session during deactivation, so it does not provide visible confirmation of session cancellation/credit release. Task 048 remains gated on Task 049 in Segment 08; no Task 049 work was included.
