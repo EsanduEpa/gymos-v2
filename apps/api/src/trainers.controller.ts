@@ -120,7 +120,7 @@ export class TrainersController {
       const [totalCount, rows] = await Promise.all([
         tenant.trainer.count({ where }),
         tenant.trainer.findMany({ where, orderBy: [{ fullName: 'asc' }, { id: 'asc' }], skip: (page - 1) * pageSize, take: pageSize,
-          select: { id: true, fullName: true, level: true, specialisations: true, bio: true } }),
+          select: { id: true, fullName: true, level: true, specialisations: true, bio: true, shiftStart: true, shiftEnd: true } }),
       ]);
       return memberTrainerDirectorySchema.parse({ items: rows.map(row => ({ ...row, rating: null })), page, pageSize,
         totalCount, totalPages: Math.ceil(totalCount / pageSize), asOf: new Date().toISOString() });

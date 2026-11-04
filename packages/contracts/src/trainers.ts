@@ -24,7 +24,8 @@ const trainerSummarySchema = z.strictObject({
 });
 const trainerMemberSummarySchema = z.strictObject({
   id: idSchema, fullName: z.string().min(2).max(120), level: trainerLevelSchema.nullable(),
-  specialisations: z.array(z.string().max(60)).max(20), bio: z.string().max(2000).nullable(), rating: z.null(),
+  specialisations: z.array(z.string().max(60)).max(20), bio: z.string().max(2000).nullable(),
+  shiftStart: shiftTimeSchema.nullable(), shiftEnd: shiftTimeSchema.nullable(), rating: z.null(),
 });
 function trainerPageSchema<T extends z.ZodType>(item: T) {
   return z.strictObject({ items: z.array(item).max(100), page: z.number().int().min(1), pageSize: z.number().int().min(1).max(100),

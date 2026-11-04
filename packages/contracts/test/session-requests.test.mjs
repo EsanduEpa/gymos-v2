@@ -20,8 +20,8 @@ test('trainer decision normalizes an optional member-visible decline reason', ()
 });
 
 test('request options exclude private trainer fields', () => {
-  const safe = { trainerId: 'trainer', trainerName: 'Trainer Name', level: 'LEVEL_1', specialisations: ['Strength'], timeZone: 'Asia/Colombo',
-    minimumDurationMinutes: 30, maximumDurationMinutes: 480, currency: 'LKR', asOf: '2026-11-03T10:00:00Z' };
+  const safe = { trainerId: 'trainer', trainerName: 'Trainer Name', level: 'LEVEL_1', specialisations: ['Strength'], shiftStart: '08:00', shiftEnd: '17:00', timeZone: 'Asia/Colombo',
+    minimumDurationMinutes: 30, maximumDurationMinutes: 480, currency: 'LKR', availableCredits: 3, heldCredits: 1, expiredCredits: 2, activeMembershipToday: true, asOf: '2026-11-03T10:00:00Z' };
   assert.equal(sessionRequestOptionsSchema.parse(safe).trainerName, safe.trainerName);
   assert.equal(sessionRequestOptionsSchema.safeParse({ ...safe, phone: '+100000' }).success, false);
 });

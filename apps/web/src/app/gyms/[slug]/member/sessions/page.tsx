@@ -17,7 +17,7 @@ export default async function MemberSessionsPage({ params, searchParams }: {
   const brand = resolveGymBrandColors(theme.primaryColor);
   const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
   return <DashboardChrome identityId={session.identityId} key={`${session.identityId}:${gym.id}:${gym.role}`} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'} style={style}>
-    <div className="gym-banner"><div><span className="eyebrow">MY SESSIONS</span><h1>Session history</h1><p>Review session requests, upcoming appointments and completed sessions by gym-local month.</p></div>
+    <div className="gym-banner"><div><span className="eyebrow">MY TRAINING</span><h1>My PT Sessions</h1><p>Review your requests, upcoming appointments and past sessions in {gym.name} time.</p></div>
       <a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/member/trainers`}>Find a trainer</a></div>
     <Card><CardHeader eyebrow="MEMBER SESSION HISTORY" title={loaded.data ? `${loaded.data.filterTotal} matching sessions` : 'Session history'} />
       <SessionReadView slug={slug} role="MEMBER" filters={loaded.filters} data={loaded.data} stateCounts={loaded.stateCounts} countsFailed={loaded.countsFailed} loadError={loaded.failed} style={style}/>

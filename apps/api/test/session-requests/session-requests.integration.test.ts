@@ -164,3 +164,13 @@ it('rolls back the entire pending request when the required trainer notification
   expect(await tenant.notification.count({ where: { recipientIdentityId: fixture.users.trainerUser.id, eventCode: 'HIRE_REQUEST' } })).toBe(before.notifications);
   expect(await tenant.auditLog.count({ where: { eventCode: 'PT_SESSION_REQUESTED' } })).toBe(before.audits);
 });
+
+it('returns accurate selected-gym session credit eligibility and trainer shifts', async () => {
+  const { service, tenant, trainer, memberAccess } = await setup();
+  const before = await service.options(memberAccess, trainer.id);
+  await tenant.trainer.update({ where: { id: trainer.id }, data: { shiftStart: '08:00', shiftEnd: '17:00' } });
+  await entitlement(tenant, `${run.runId}-options`, 3);
+  const options = await service.options(memberAccess, trainer.id);
+  expect(options).toMatchObject({ trainerId: trainer.id, shiftStart: '08:00', shiftEnd: '17:00', timeZone: 'Asia/Colombo',
+    availableCredits: before.availableCredits + 3, heldCredits: before.heldCredits, expiredCredits: before.expiredCredits, activeMembershipToday: true });
+});

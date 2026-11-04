@@ -140,6 +140,8 @@ it('serves role-safe, Master-published trainer pages and versioned/audited shift
   const directory = await call(`/gyms/${gymA.slug}/me/trainer-directory?page=1&pageSize=100`, member);
   expect(directory.status).toBe(200); const directoryBody = await directory.json();
   expect(directoryBody.items).toHaveLength(100); expect(directoryBody.totalCount).toBe(105);
+  expect(directoryBody.items[0]).toHaveProperty('shiftStart', null);
+  expect(directoryBody.items[0]).toHaveProperty('shiftEnd', null);
   expect(directoryBody.items.every((item: Record<string, unknown>) => !('email' in item) && !('phone' in item) && !('identityId' in item))).toBe(true);
   expect(directoryBody.items.some((item: { id: string }) => item.id === trainers[0]!.id)).toBe(false);
   expect((await call(`/gyms/${gymA.slug}/me/trainer-directory`, trainerIdentity)).status).toBe(403);
