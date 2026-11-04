@@ -27,7 +27,7 @@ export default async function NewMemberPage({ params }: { params: Promise<{ slug
   const brand = resolveGymBrandColors(theme.primaryColor);
   const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
   return <DashboardChrome identityId={session.identityId} key={`${session.identityId}:${gym.id}:${gym.role}`} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'} style={style}>
-    <div className="gym-banner"><div><span className="eyebrow">OWNER WORKSPACE</span><h1>Register a member</h1><p>Create the member account, initial membership and one-time credential handoff.</p></div><a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/owner`}>Back to members</a></div>
+    <div className="gym-banner"><div><h1>Register New Member</h1><p>Create the member account, initial membership and one-time credential handoff.</p></div><a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/owner/members`}>← Back to Member List</a></div>
     <MemberRegistrationForm slug={slug} plans={configuration.data.plans.filter(plan => plan.status === 'ACTIVE')} initialRequestKey={randomUUID()} />
   </DashboardChrome>;
 }

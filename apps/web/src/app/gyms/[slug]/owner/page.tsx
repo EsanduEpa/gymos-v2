@@ -25,7 +25,7 @@ async function Content({ params }: Props) {
   const brand = resolveGymBrandColors(theme.primaryColor);
   const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
   return <DashboardChrome identityId={session.identityId} key={`${session.identityId}:${gym.id}:${gym.role}`} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'} style={style}>
-    <div className="gym-banner"><div><span className="eyebrow">OWNER DASHBOARD</span><h1>{gym.name}</h1><p>Today’s operations, local to {parsed?.success ? parsed.data.timeZone : 'your gym'}.</p></div><span className="role-pill">{gym.role}</span></div>
+    <div className="gym-banner"><div><h1>Live Gym Operations</h1><p>{gym.name} · today’s operations, local to {parsed?.success ? parsed.data.timeZone : 'your gym'}.</p></div></div>
     <OwnerDashboardLive key={slug} slug={slug} initial={parsed?.success ? parsed.data : null}/>
   </DashboardChrome>;
 }

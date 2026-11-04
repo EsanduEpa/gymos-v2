@@ -18,8 +18,8 @@ export default async function OwnerSessionsPage({ params, searchParams }: {
   const brand = resolveGymBrandColors(theme.primaryColor);
   const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
   return <DashboardChrome identityId={session.identityId} key={`${session.identityId}:${gym.id}:${gym.role}`} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'} style={style}>
-    <div className="gym-banner"><div><span className="eyebrow">SESSIONS</span><h1>Session management</h1><p>Review the gym session ledger by local date, month, state or member and trainer.</p></div>
-      <a className="ui-button" href={`/gyms/${encodeURIComponent(slug)}/owner/sessions/book`}>Book a session</a></div>
+    <div className="gym-banner"><div><h1>PT Session Oversight &amp; Analytics</h1><p>Monitor PT sessions across all personal trainers and track session outcomes.</p></div>
+      <a className="ui-button ui-button-primary" href={`/gyms/${encodeURIComponent(slug)}/owner/sessions/book`}>＋ Book PT Session</a></div>
     <Card><CardHeader eyebrow="GYM SESSION LEDGER" title={loaded.data ? `${loaded.data.filterTotal} matching sessions` : 'Session ledger'} />
       {loaded.filters.mode === 'month' ? <OwnerMonthOverview slug={slug} month={loaded.filters.month ?? ''} q={loaded.filters.q} data={loaded.memberOverview} failed={loaded.overviewFailed}/> : null}
       <SessionReadView slug={slug} role="OWNER" filters={loaded.filters} data={loaded.data} loadError={loaded.failed} style={style}/>

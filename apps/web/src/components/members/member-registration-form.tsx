@@ -10,7 +10,7 @@ import { Button, Card, CardHeader, Feedback } from '@/components/ui';
 export function MemberRegistrationForm({ slug, plans, initialRequestKey }: { slug: string; plans: MembershipPlan[]; initialRequestKey: string }) {
   const router = useRouter();
   const [state, action, pending] = useActionState(registerMemberAction.bind(null, slug), { idempotencyKey: initialRequestKey } satisfies MemberRegistrationActionState);
-  const [requestKey, setRequestKey] = useState(initialRequestKey);
+  const [requestKey] = useState(initialRequestKey);
   const [draft, setDraft] = useState({ fullName: '', email: '', phone: '', dateOfBirth: '', emergencyContact: '', healthNotes: '', membershipPlanId: '' });
   const [replacement, setReplacement] = useState<{ password?: string; version: number } | null>(null);
   const [handoffComplete, setHandoffComplete] = useState(false);
@@ -68,7 +68,7 @@ export function MemberRegistrationForm({ slug, plans, initialRequestKey }: { slu
     {result?.status === 'PENDING' ? <Feedback tone="warning">
       This email belongs to an existing GymOS identity. The person must sign in, review this gym enrollment, and explicitly accept it before registration can finish. Share this private sign-in path and request reference with them, then retry this unchanged form: <a href={`/gyms/${encodeURIComponent(slug)}/enrollment-consent/${encodeURIComponent(result.operationId)}`}>Review enrollment consent</a> · <code>{result.operationId}</code>
     </Feedback> : null}
-    {!completed ? <form action={action} className="stack-form" onSubmit={event => {
+    {!completed ? <form action={action} className="stack-form member-registration-fields" onSubmit={event => {
       // Server Actions reset their form controls after resolving. Capture the
       // submitted values into React state before that reset so a pending
       // consent response can be resumed without changing the enrollment.
@@ -83,19 +83,18 @@ export function MemberRegistrationForm({ slug, plans, initialRequestKey }: { slu
         membershipPlanId: String(submitted.get('membershipPlanId') ?? ''),
       });
     }}>
-      <label className="ui-field"><span className="ui-field-label">Enrollment reference</span><input name="idempotencyKey" value={requestKey} minLength={16} maxLength={128} required readOnly={pending || Boolean(state.error || state.result)} onChange={event => setRequestKey(event.currentTarget.value)} aria-describedby="enrollment-reference-hint"/></label>
-      <p id="enrollment-reference-hint" className="ui-field-hint">Keep this reference until enrollment is confirmed. After closing this page, use the same reference and member details to recover an uncertain result.</p>
-      <label className="ui-field"><span className="ui-field-label">Full name</span><input name="fullName" autoComplete="name" minLength={2} maxLength={120} required value={draft.fullName} onChange={event => updateDraft('fullName', event.currentTarget.value)} /></label>
-      <label className="ui-field"><span className="ui-field-label">Email address</span><input name="email" type="email" autoComplete="email" maxLength={254} required value={draft.email} onChange={event => updateDraft('email', event.currentTarget.value)} /></label>
-      <label className="ui-field"><span className="ui-field-label">Phone</span><input name="phone" type="tel" autoComplete="tel" maxLength={40} required value={draft.phone} onChange={event => updateDraft('phone', event.currentTarget.value)} /></label>
-      <label className="ui-field"><span className="ui-field-label">Date of birth</span><input name="dateOfBirth" type="date" required value={draft.dateOfBirth} onChange={event => updateDraft('dateOfBirth', event.currentTarget.value)} /></label>
-      <label className="ui-field"><span className="ui-field-label">Emergency contact <small>optional</small></span><input name="emergencyContact" maxLength={240} value={draft.emergencyContact} onChange={event => updateDraft('emergencyContact', event.currentTarget.value)} /></label>
-      <label className="ui-field"><span className="ui-field-label">Health notes <small>owner and confirmed trainer only</small></span><textarea name="healthNotes" maxLength={4000} rows={5} value={draft.healthNotes} onChange={event => updateDraft('healthNotes', event.currentTarget.value)} /></label>
-      <label className="ui-field"><span className="ui-field-label">Initial membership plan</span><select key={`${state.attempt ?? 0}:${state.result?.status ?? 'draft'}`} name="membershipPlanId" required value={draft.membershipPlanId} onChange={event => updateDraft('membershipPlanId', event.currentTarget.value)}>
+      <input type="hidden" name="idempotencyKey" value={requestKey} minLength={16} maxLength={128}/>
+      <label className="ui-field member-field-full"><span className="ui-field-label">Full name</span><input name="fullName" autoComplete="name" minLength={2} maxLength={120} required value={draft.fullName} onChange={event => updateDraft('fullName', event.currentTarget.value)} /></label>
+      <label className="ui-field member-field-half"><span className="ui-field-label">Email address</span><input name="email" type="email" autoComplete="email" maxLength={254} required value={draft.email} onChange={event => updateDraft('email', event.currentTarget.value)} /></label>
+      <label className="ui-field member-field-half"><span className="ui-field-label">Phone</span><input name="phone" type="tel" autoComplete="tel" maxLength={40} required value={draft.phone} onChange={event => updateDraft('phone', event.currentTarget.value)} /></label>
+      <label className="ui-field member-field-half"><span className="ui-field-label">Date of birth</span><input name="dateOfBirth" type="date" required value={draft.dateOfBirth} onChange={event => updateDraft('dateOfBirth', event.currentTarget.value)} /></label>
+      <label className="ui-field member-field-half"><span className="ui-field-label">Emergency contact <small>optional</small></span><input name="emergencyContact" maxLength={240} value={draft.emergencyContact} onChange={event => updateDraft('emergencyContact', event.currentTarget.value)} /></label>
+      <label className="ui-field member-field-full"><span className="ui-field-label">Health notes <small>owner and confirmed trainer only</small></span><textarea name="healthNotes" maxLength={4000} rows={5} value={draft.healthNotes} onChange={event => updateDraft('healthNotes', event.currentTarget.value)} /></label>
+      <label className="ui-field member-field-full"><span className="ui-field-label">Initial membership plan</span><select key={`${state.attempt ?? 0}:${state.result?.status ?? 'draft'}`} name="membershipPlanId" required value={draft.membershipPlanId} onChange={event => updateDraft('membershipPlanId', event.currentTarget.value)}>
         <option value="" disabled>Select a plan</option>{plans.map(plan => <option key={plan.id} value={plan.id}>{plan.name} · {plan.price} {plan.currency} · {plan.durationDays} days</option>)}
       </select></label>
       {plans.length === 0 ? <Feedback tone="error">Create an active membership plan before registering a member.</Feedback> : null}
-      <p className="ui-field-hint">Registration records the agreed membership value. It does not record a cash payment.</p>
+      <p className="ui-field-hint member-field-full">Registration records the agreed membership value. It does not record a cash payment.</p>
       <Button className="gym-button" type="submit" pending={pending} disabled={!plans.length}>{result?.status === 'PENDING' ? 'Check consent and finish enrollment' : 'Register member'}</Button>
     </form> : password ? <div className="stack-form" aria-live="polite">
       <p>Copy this temporary password and hand it to the member securely. It is shown once and expires in 24 hours. The member must change it when signing in.</p>

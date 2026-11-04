@@ -26,7 +26,7 @@ export default async function OwnerTrainersPage({ params, searchParams }: { para
   const brand = resolveGymBrandColors(theme.primaryColor);
   const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
   return <DashboardChrome identityId={session.identityId} key={`${session.identityId}:${gym.id}:${gym.role}`} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'} style={style}>
-    <div className="gym-banner"><div><span className="eyebrow">PEOPLE</span><h1>Trainers</h1><p>Search registered trainers and review their profile and approved shift.</p></div><a className="ui-button" href={`/gyms/${encodeURIComponent(slug)}/owner/trainers/new`}>Register trainer</a></div>
+    <div className="gym-banner"><div><h1>Trainer Roster Management</h1><p>Add trainer accounts, configure levels and shift hours, and monitor performance.</p></div><a className="ui-button ui-button-primary" href={`/gyms/${encodeURIComponent(slug)}/owner/trainers/new`}>Add New Trainer</a></div>
     <Card><CardHeader eyebrow="TRAINER ROSTER" title={result?.success ? `${result.data.totalCount} registered ${result.data.totalCount === 1 ? 'trainer' : 'trainers'}` : 'Trainer roster'} />
       <form method="get" role="search" className="trainer-filter-form">
         <label className="ui-field"><span className="ui-field-label">Search name or email</span><input name="q" defaultValue={filters.q ?? ''} maxLength={120}/></label>

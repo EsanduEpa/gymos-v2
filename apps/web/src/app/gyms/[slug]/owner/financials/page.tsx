@@ -65,7 +65,7 @@ export default async function OwnerFinancialsPage({ params, searchParams }: {
   const sharedParams = new URLSearchParams({ from, to, month, page: String(page) });
   return <DashboardChrome identityId={session.identityId} key={`${session.identityId}:${gym.id}:${gym.role}`} gym={gym} gyms={session.gyms}
     displayName={session.displayName ?? 'GymOS user'} style={style}>
-    <div className="gym-banner"><div><span className="eyebrow">OWNER FINANCE</span><h1>Financials</h1><p>Operational earning and expense reports · {settings.data.configuration.currency} · {settings.data.configuration.timezone}</p></div></div>
+    <div className="gym-banner"><div><h1>Financial Management</h1><p>Revenue, expense tracking, payroll close and P&amp;L statements · {settings.data.configuration.currency} · {settings.data.configuration.timezone}</p></div><div className="owner-header-actions"><a className="ui-button ui-button-primary" href={`${base}?${new URLSearchParams({ ...Object.fromEntries(sharedParams), tab: 'expenses' })}`}>＋ Log Expense</a><a className="ui-button ui-button-secondary" href={`${base}?${new URLSearchParams({ ...Object.fromEntries(sharedParams), tab: 'export' })}`}>Export Financials</a></div></div>
     <nav className="finance-tabs" aria-label="Finance sections">{tabs.map(([id, label]) => <a key={id} aria-current={tab === id ? 'page' : undefined}
       className={`finance-tab ${tab === id ? 'finance-tab-active' : ''}`} href={`${base}?${new URLSearchParams({ ...Object.fromEntries(sharedParams), tab: id })}`}>{label}</a>)}</nav>
     <section id={`panel-${tab}`} role="region" aria-label={tabs.find(([id]) => id === tab)?.[1]}>

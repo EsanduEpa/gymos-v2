@@ -29,7 +29,7 @@ export default async function MemberProfilePage({ params, searchParams }: { para
   const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
   return <DashboardChrome identityId={session.identityId} key={`${session.identityId}:${gym.id}:${gym.role}`} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'} style={style}>
     {!parsed?.success ? <Card><h1>Profile unavailable</h1><Feedback tone="error">The profile could not be loaded. No changes were made.</Feedback><a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/owner/members/${encodeURIComponent(memberId)}`}>Retry</a></Card> : <>
-      <div className="gym-banner"><div><span className="eyebrow">MEMBER PROFILE</span><h1>{parsed.data.fullName}</h1><p>{parsed.data.email ?? 'No email'} · {parsed.data.phone ?? 'No phone'}</p></div><a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/owner`}>Back to members</a></div>
+      <div className="gym-banner"><div><h1>{parsed.data.fullName}</h1><p>{parsed.data.email ?? 'No email'} · {parsed.data.phone ?? 'No phone'}</p></div><a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/owner/members`}>← Back to Member List</a></div>
       <MemberProfileTabs member={parsed.data} slug={slug} requestKey={randomUUID()}/>
     </>}
   </DashboardChrome>;

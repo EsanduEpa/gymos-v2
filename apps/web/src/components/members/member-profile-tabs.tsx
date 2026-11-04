@@ -6,7 +6,7 @@ import { Card, EmptyState, StatusBadge, Tabs } from '@/components/ui';
 import { SessionPackPanel } from '@/components/members/session-pack-panel';
 import { MemberLifecycleForm } from '@/components/members/member-lifecycle-form';
 
-const items = [{ id: 'overview', label: 'Overview' }, { id: 'sessions', label: 'Attendance' }, { id: 'history', label: 'Membership & Packs' }];
+const items = [{ id: 'overview', label: 'Overview' }, { id: 'sessions', label: 'Attendance History' }, { id: 'history', label: 'Membership & Packs' }];
 
 export function MemberProfileTabs({ member, slug, requestKey }: { member: MemberDetail; slug: string; requestKey: string }) {
   const [active, setActive] = useState(() => typeof window !== 'undefined' && window.location.hash === '#history' ? 'history' : 'overview');
@@ -27,7 +27,7 @@ export function MemberProfileTabs({ member, slug, requestKey }: { member: Member
       </div> : null}
       {active === 'sessions' ? <div id="panel-sessions" role="tabpanel" aria-labelledby="tab-sessions" tabIndex={0} className="member-profile-panel">
         {member.recentSessions.length ? <ol>{member.recentSessions.map(session => <li key={session.id}>{session.scheduledStart} · {session.state}</li>)}</ol>
-          : <EmptyState title="Session history is not available yet." hint="PT session history will appear after the session record feature is delivered."/>}
+          : <EmptyState title="No sessions recorded yet." hint="Completed and scheduled PT sessions will appear here."/>}
       </div> : null}
       {active === 'history' ? <div id="panel-history" role="tabpanel" aria-labelledby="tab-history" tabIndex={0} className="member-profile-panel">
         <h3>Membership history</h3>

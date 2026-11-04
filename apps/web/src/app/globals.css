@@ -395,3 +395,79 @@ a { color: inherit; text-decoration: none; }
 .finance-budget-row { grid-template-columns:minmax(110px,1fr) minmax(130px,1fr) auto; align-items:end; }
 .finance-payroll-row { grid-template-columns:1fr auto; align-items:center; margin:8px 0; }
 @media(max-width:600px) { .finance-budget-row,.finance-payroll-row { grid-template-columns:1fr; }.finance-budget-row>button,.finance-payroll-row>form>button { width:100%; } }
+
+/* Compact V1 owner workspace styling, layered over V2's shared components. */
+.owner-page-header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:0 0 24px; }
+.owner-page-header h1 { margin:0 0 5px; color:var(--classic-text); font-size:25px; line-height:1.2; letter-spacing:-.04em; }
+.owner-page-header p { margin:0; color:var(--classic-text-muted); font-size:13px; line-height:1.45; }
+.owner-dashboard .owner-page-header .ui-button { flex-shrink:0; }
+.owner-dashboard .gym-banner { align-items:center; min-height:0; margin:0 0 24px; padding:0; border-radius:0; background:transparent; color:var(--classic-text); }
+.owner-dashboard .gym-banner h1 { margin:0 0 5px; color:var(--classic-text); font-size:25px; line-height:1.2; letter-spacing:-.04em; }
+.owner-dashboard .gym-banner p { color:var(--classic-text-muted); font-size:13px; line-height:1.45; }
+.owner-dashboard .gym-banner .eyebrow { color:var(--classic-primary); opacity:1; }
+.owner-header-actions { display:flex; flex-wrap:wrap; gap:10px; }
+.owner-dashboard .gym-banner .role-pill,.owner-dashboard .gym-logo { display:none; }
+.owner-dashboard .ui-card { padding:20px; border-radius:12px; box-shadow:0 1px 3px #171b2810; }
+.owner-dashboard .ui-card-header h2 { margin-top:5px; font-size:18px; letter-spacing:-.025em; }
+.owner-dashboard .ui-button { min-height:36px; padding:8px 14px; border-radius:8px; font-size:12px; }
+.owner-dashboard .ui-field { gap:5px; color:var(--classic-text-secondary); font-size:11px; }
+.owner-dashboard .ui-field-label { color:var(--classic-text-secondary); font-size:11px; text-transform:uppercase; }
+.owner-dashboard .ui-field input,.owner-dashboard .ui-field select,.owner-dashboard .ui-field textarea,.owner-dashboard .stack-form input,.owner-dashboard .stack-form select,.owner-dashboard .stack-form textarea,.owner-dashboard .ui-form-stack input,.owner-dashboard .ui-form-stack select,.owner-dashboard .ui-form-stack textarea { min-width:0; min-height:36px; height:36px; padding:7px 12px; border:1px solid var(--classic-border); border-radius:8px; background:var(--classic-surface-muted); color:var(--classic-text); font-size:12px; }
+.owner-dashboard .ui-field textarea,.owner-dashboard .stack-form textarea,.owner-dashboard .ui-form-stack textarea { height:auto; min-height:80px; }
+.owner-dashboard .ui-table-shell { border-radius:10px; box-shadow:none; }
+.owner-dashboard .ui-table-shell table { font-size:12px; }
+.owner-dashboard .ui-table-shell th { font-size:9px; }
+.owner-dashboard .ui-table-shell th,.owner-dashboard .ui-table-shell td { padding:11px 14px; }
+.owner-dashboard .finance-tabs { gap:0; margin:10px 0 20px; padding:0; }
+.owner-dashboard .finance-tab { padding:12px 16px; border-radius:0; font-size:13px; }
+.owner-dashboard .finance-tab[aria-current="page"] { background:transparent; box-shadow:inset 0 -2px var(--gym-color); }
+.owner-dashboard .owner-form-card,.owner-dashboard .member-registration-card { width:min(672px,100%); }
+.owner-dashboard .member-registration-fields,.owner-dashboard .trainer-registration-fields,.owner-dashboard .owner-booking-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px 16px; margin-top:18px; }
+.owner-dashboard .member-registration-fields>.member-field-full,.owner-dashboard .trainer-registration-fields>.trainer-field-full,.owner-dashboard .owner-booking-form>.booking-field-full,.owner-dashboard .member-registration-fields>.ui-feedback,.owner-dashboard .trainer-registration-fields>.ui-feedback,.owner-dashboard .owner-booking-form>.ui-feedback,.owner-dashboard .owner-booking-form>[role="status"],.owner-dashboard .owner-booking-form>[role="alert"] { grid-column:1/-1; }
+.owner-dashboard .member-registration-fields>.member-field-half,.owner-dashboard .trainer-registration-fields>.trainer-field-half,.owner-dashboard .owner-booking-form>.booking-field-half { grid-column:span 1; }
+.owner-dashboard .member-registration-fields>.ui-button,.owner-dashboard .trainer-registration-fields>.ui-button,.owner-dashboard .owner-booking-form>button { grid-column:1/-1; justify-self:end; }
+.owner-dashboard .member-registration-fields,.owner-dashboard .trainer-registration-fields { margin-top:0; }
+.owner-live-toolbar { display:flex; align-items:center; justify-content:flex-end; gap:14px; margin:-55px 0 18px; color:var(--classic-text-muted); font-size:11px; }
+.dashboard-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; margin-bottom:20px; }
+.dashboard-metric { display:grid; align-items:center; gap:5px 12px; min-height:96px; padding:18px 20px; border:1px solid var(--classic-border); border-radius:12px; background:white; box-shadow:0 1px 3px #171b2810; }
+.dashboard-metric span { color:var(--classic-text-muted); font-size:10px; font-weight:750; letter-spacing:.08em; text-transform:uppercase; }
+.dashboard-metric strong { color:var(--classic-text); font-size:25px; line-height:1.1; overflow-wrap:anywhere; }
+.dashboard-chart-card,.dashboard-sessions-card { margin-bottom:20px; overflow:hidden; border:1px solid var(--classic-border); border-radius:12px; background:var(--classic-surface); box-shadow:0 1px 3px #171b2810; }
+.dashboard-chart-card>header,.dashboard-sessions-card>header { padding:18px 20px; }
+.dashboard-chart-card h2,.dashboard-sessions-card h2,.dashboard-trainer-roster>h2 { margin:0; font-size:15px; }
+.dashboard-chart-card header p,.dashboard-sessions-card header p { margin:4px 0 0; color:var(--classic-text-muted); font-size:11px; }
+.dashboard-bars { display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); align-items:end; gap:8px; height:230px; margin:0; padding:12px 22px 18px; list-style:none; }
+.dashboard-bars li { display:flex; min-width:0; height:100%; flex-direction:column; align-items:center; justify-content:flex-end; gap:7px; }
+.dashboard-bar-value,.dashboard-bar-label { color:var(--classic-text-muted); font-size:9px; }
+.dashboard-bar-track { display:flex; width:min(30px,75%); height:78%; align-items:flex-end; background:#f0f2f3; }
+.dashboard-bar { display:block; width:100%; min-height:3px; border-radius:4px 4px 0 0; background:var(--classic-primary); }
+.dashboard-sessions-card>header { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.dashboard-sessions-card>header>a { color:var(--classic-primary); font-size:12px; font-weight:700; }
+.dashboard-trainer-roster { margin:0 0 24px; }
+.dashboard-trainer-roster>h2 { margin-bottom:12px; }
+.dashboard-trainer-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+.dashboard-trainer-card { min-width:0; padding:16px; border:1px solid var(--classic-border); border-radius:12px; background:white; box-shadow:0 1px 3px #171b2810; }
+.dashboard-trainer-card>div { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; padding-bottom:12px; border-bottom:1px solid var(--classic-border); }
+.dashboard-trainer-card strong { font-size:12px; overflow-wrap:anywhere; }
+.dashboard-trainer-card>div>span { flex:0 0 auto; padding:4px 8px; border-radius:20px; background:var(--classic-surface-muted); color:var(--classic-text-muted); font-size:10px; }
+.dashboard-trainer-card>div>span.is-on-floor { background:var(--classic-success); color:white; }
+.dashboard-trainer-card dl { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:12px 0 0; text-align:center; }
+.dashboard-trainer-card dt { color:var(--classic-text-muted); font-size:10px; }.dashboard-trainer-card dd { margin:4px 0 0; font-size:13px; font-weight:700; }
+.owner-member-filters { grid-template-columns:minmax(200px,1fr) minmax(140px,220px) auto; align-items:end; margin:0 0 20px; }
+.shell-nav-icon { display:inline-grid; width:16px; flex:0 0 16px; place-items:center; font-size:15px; line-height:1; }
+.owner-dashboard .shell-sidebar nav a,.owner-dashboard .shell-drawer nav a { min-height:40px; }
+.owner-analytics-method { margin:0 0 16px; color:var(--classic-text-muted); font-size:11px; line-height:1.5; }
+.owner-utilization-chart { display:grid; gap:12px; }
+.owner-utilization-row { display:grid; grid-template-columns:minmax(100px,.8fr) minmax(100px,1.6fr) auto; align-items:center; gap:7px 12px; font-size:12px; }
+.owner-utilization-row>small { grid-column:2/4; color:var(--classic-text-muted); font-size:10px; }
+.owner-utilization-track { height:9px; overflow:hidden; border-radius:6px; background:#eef1f0; }
+.owner-utilization-track>i { display:block; height:100%; border-radius:6px; background:var(--classic-primary); }
+.owner-analytics-bars { display:grid; grid-template-columns:repeat(15,minmax(0,1fr)); align-items:end; gap:6px; height:170px; }
+.owner-analytics-bars>div { display:flex; height:100%; min-width:0; flex-direction:column; align-items:center; justify-content:flex-end; gap:5px; }
+.owner-analytics-bars b { color:var(--classic-text-muted); font-size:9px; }
+.owner-analytics-bars i { display:block; width:min(22px,75%); min-height:2px; border-radius:3px 3px 0 0; background:var(--classic-primary); }
+.owner-analytics-bars small { color:var(--classic-text-muted); font-size:8px; }
+.owner-growth-chart { grid-template-columns:repeat(6,minmax(0,1fr)); }
+.owner-analytics-sr-only { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+@media(max-width:900px) { .dashboard-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }.dashboard-trainer-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:560px) { .owner-dashboard .gym-banner { align-items:stretch; flex-direction:column; }.owner-dashboard .gym-banner h1,.owner-page-header h1 { font-size:24px; }.owner-page-header { align-items:stretch; flex-direction:column; margin-bottom:20px; }.owner-page-header>.ui-button,.owner-header-actions>.ui-button { width:100%; }.owner-header-actions { display:grid; grid-template-columns:1fr; }.dashboard-metrics,.dashboard-trainer-grid { grid-template-columns:1fr; }.dashboard-metric { min-height:76px; }.dashboard-bars { gap:4px; height:190px; padding:10px 8px 16px; }.owner-member-filters { grid-template-columns:1fr; }.owner-dashboard .member-registration-fields,.owner-dashboard .trainer-registration-fields,.owner-dashboard .owner-booking-form { grid-template-columns:1fr; }.owner-dashboard .member-registration-fields>*:not(.member-field-full),.owner-dashboard .trainer-registration-fields>*:not(.trainer-field-full),.owner-dashboard .owner-booking-form>*:not(.booking-field-full) { grid-column:1; }.owner-dashboard .member-registration-fields>.ui-button,.owner-dashboard .trainer-registration-fields>.ui-button,.owner-dashboard .owner-booking-form>button { justify-self:stretch; }.owner-utilization-row { grid-template-columns:minmax(0,1fr) auto; }.owner-utilization-track { grid-column:1/-1; grid-row:2; }.owner-utilization-row>small { grid-column:1/-1; }.owner-live-toolbar { justify-content:space-between; margin:0 0 14px; } }

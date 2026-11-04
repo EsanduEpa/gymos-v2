@@ -8,10 +8,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const form = await request.formData();
   const kind = String(form.get('kind') ?? '');
   const actionType = String(form.get('actionType') ?? '');
+  const returnToAudit = form.get('returnTo') === 'audit';
   const input = financeExportInputSchema.safeParse({ kind, ...(form.get('from') ? { from: String(form.get('from')) } : {}),
     ...(form.get('to') ? { to: String(form.get('to')) } : {}), page: Number(form.get('page') ?? 1), pageSize: Number(form.get('pageSize') ?? 20),
     ...(actionType ? { actionType } : {}) });
-  const destination = new URL(`/gyms/${encodeURIComponent(slug)}/owner/financials?tab=export&exportError=1`, request.url);
+  const destination = new URL(returnToAudit ? `/gyms/${encodeURIComponent(slug)}/owner/audit?exportError=1${actionType ? `&actionType=${encodeURIComponent(actionType)}` : ''}&page=${encodeURIComponent(String(form.get('page') ?? '1'))}` : `/gyms/${encodeURIComponent(slug)}/owner/financials?tab=export&exportError=1`, request.url);
   if (!input.success) return NextResponse.redirect(destination, 303);
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return NextResponse.redirect(new URL('/login', request.url), 303);

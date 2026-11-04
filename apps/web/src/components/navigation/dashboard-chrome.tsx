@@ -51,12 +51,14 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
       <nav aria-label={mobile ? 'Mobile navigation' : 'Main navigation'}>
         <a href={home} aria-current={pathname === home || pathname === `/gyms/${gym?.slug}` ? 'page' : undefined} onClick={close}><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>{label}</a>
         {!support && gym?.role === 'OWNER' ? <>
-          <a href={`${destination}/members`} aria-current={pathname.startsWith(`${destination}/members`) ? 'page' : undefined} onClick={close}>Members</a>
-          <a href={`${destination}/sessions`} aria-current={pathname.startsWith(`${destination}/sessions`) ? 'page' : undefined} onClick={close}>PT Sessions</a>
-          <a href={`${destination}/financials`} aria-current={pathname.startsWith(`${destination}/financials`) ? 'page' : undefined} onClick={close}>Financials</a>
-          <a href={`${destination}/audit`} aria-current={pathname.startsWith(`${destination}/audit`) ? 'page' : undefined} onClick={close}>Audit history</a>
-          <a href={`${destination}/analytics`} aria-current={pathname.startsWith(`${destination}/analytics`) ? 'page' : undefined} onClick={close}>Analytics</a>
-          <a href={`${destination}/trainers`} aria-current={pathname.startsWith(`${destination}/trainers`) ? 'page' : undefined} onClick={close}>Trainers</a>
+          <a href={`${destination}/members`} aria-current={pathname.startsWith(`${destination}/members`) ? 'page' : undefined} onClick={close}><span className="shell-nav-icon" aria-hidden="true">♙</span>Members</a>
+          <a href={`${destination}/trainers`} aria-current={pathname.startsWith(`${destination}/trainers`) ? 'page' : undefined} onClick={close}><span className="shell-nav-icon" aria-hidden="true">♧</span>Trainers</a>
+          <a href={`${destination}/sessions`} aria-current={pathname.startsWith(`${destination}/sessions`) ? 'page' : undefined} onClick={close}><span className="shell-nav-icon" aria-hidden="true">▦</span>Sessions</a>
+          <a href={`${destination}/financials`} aria-current={pathname.startsWith(`${destination}/financials`) ? 'page' : undefined} onClick={close}><span className="shell-nav-icon" aria-hidden="true">＄</span>Financials</a>
+          <a href={`${destination}/analytics`} aria-current={pathname.startsWith(`${destination}/analytics`) ? 'page' : undefined} onClick={close}><span className="shell-nav-icon" aria-hidden="true">▥</span>Analytics</a>
+          <a href={`${destination}/gym-config`} aria-current={pathname.endsWith('/gym-config') ? 'page' : undefined} onClick={close}><span className="shell-nav-icon" aria-hidden="true">⚙</span>Gym Configuration</a>
+          <a href={`${destination}/audit`} aria-current={pathname.startsWith(`${destination}/audit`) ? 'page' : undefined} onClick={close}><span className="shell-nav-icon" aria-hidden="true">⛨</span>Audit Log</a>
+          <a href={`${destination}/subscription`} aria-current={pathname.startsWith(`${destination}/subscription`) ? 'page' : undefined} onClick={close}><span className="shell-nav-icon" aria-hidden="true">▱</span>Subscription</a>
         </> : null}
         {!support && gym?.role === 'TRAINER' ? <>
           <a href={`${destination}/schedule`} aria-current={pathname.startsWith(`${destination}/schedule`) ? 'page' : undefined} onClick={close}>PT Schedule</a>
@@ -69,7 +71,6 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
           <a href={`${destination}/workout-plans`} aria-current={pathname.startsWith(`${destination}/workout-plans`) ? 'page' : undefined} onClick={close}>Workout plans</a>
           <a href={`${destination}/meal-plans`} aria-current={pathname.startsWith(`${destination}/meal-plans`) ? 'page' : undefined} onClick={close}>Meal plans</a>
         </> : null}
-        {!support && gym?.role === 'OWNER' ? <a href={`${destination}/gym-config`} aria-current={pathname.endsWith('/gym-config') ? 'page' : undefined} onClick={close}>Gym Configuration</a> : null}
         {gym && gyms.length > 1 ? <a href="/gyms/select" onClick={() => { close(); setSwitching(true); }}>Switch gym</a> : null}
         {support ? <a href="/admin" onClick={close}>All Gyms</a> : null}
       </nav>
@@ -77,7 +78,7 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
         <form action={signOut} data-session-exit><Button type="submit" variant="secondary">Sign out</Button></form></div>
     </>;
   }
-  return <div data-session-identity={identityId} data-support-session={support?.id} data-support-expiry={support?.expiresAt} className={`application-shell ${gym ? 'gym-dashboard' : ''}`} style={style}>
+  return <div data-session-identity={identityId} data-support-session={support?.id} data-support-expiry={support?.expiresAt} className={`application-shell ${gym ? 'gym-dashboard' : ''} ${gym?.role === 'OWNER' ? 'owner-dashboard' : ''}`} style={style}>
     <a className="skip-link" href="#workspace-content">Skip to content</a>
     <aside className="shell-sidebar">{navigation()}</aside>
     <dialog ref={drawer} id="primary-navigation" className="shell-drawer" aria-label="Navigation menu" onKeyDown={trap}

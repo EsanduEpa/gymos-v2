@@ -14,7 +14,7 @@ export default async function NewTrainerPage({ params }: { params: Promise<{ slu
   const brand = resolveGymBrandColors(theme.primaryColor);
   const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
   return <DashboardChrome identityId={session.identityId} key={`${session.identityId}:${gym.id}:${gym.role}`} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'} style={style}>
-    <div className="gym-banner"><div><span className="eyebrow">OWNER WORKSPACE</span><h1>Register a trainer</h1><p>Create a trainer profile and secure one-time credential handoff.</p></div><a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/owner`}>Back to workspace</a></div>
-    <Card><CardHeader eyebrow="TRAINER PROFILE" title="Trainer details"/><Feedback tone="info">Shift start and end must be provided together. Leave both blank if the trainer has no approved shift yet.</Feedback><TrainerRegistrationForm slug={slug} initialRequestKey={randomUUID()} /></Card>
+    <div className="gym-banner"><div><h1>Add New Personal Trainer</h1><p>Create a trainer profile and secure one-time credential handoff.</p></div><a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/owner/trainers`}>← Back to Trainer Roster</a></div>
+    <Card className="owner-form-card"><CardHeader eyebrow="TRAINER PROFILE" title="Trainer details"/><Feedback tone="info">Shift start and end must be provided together. Leave both blank if the trainer has no approved shift yet.</Feedback><TrainerRegistrationForm slug={slug} initialRequestKey={randomUUID()} /></Card>
   </DashboardChrome>;
 }
