@@ -36,9 +36,9 @@ Working checklist created 3 November 2026 from the segment plans and task specs.
 - [x] Workspace contracts/API/web typecheck, lint and production build pass on `abfab90`; `git diff --check` is clean.
 - [x] Focused guarded PostgreSQL suites cover rollback, retries, role/tenant/privacy, access-fence races and exact persisted effects. Disposable cleanup was reported; demo and V1 databases were not used.
 - [ ] Full visible Chrome acceptance remains open. The agent performed a partial review in the controlled `GymOS V2` Chrome window; this was not owner-observed acceptance.
-- [ ] Evidence names commands, exit codes, disposable environment/cleanup, screenshots actually reviewed, and whether review was agent-performed or owner-observed.
-- [x] Commit `abfab90` is pushed to `codex/segment-06-management`; no merge or deployment occurred.
-- [x] Draft PR #8 is open on `codex/segment-06-management`; [ ] its hosted checks must finish successfully before the hosted release gate is closed.
+- [x] Evidence names commands, exit codes, disposable environment/cleanup, screenshots actually reviewed, and whether review was agent-performed or owner-observed; coverage remains partial.
+- [x] Implementation `abfab90` and evidence commits through `6f8de6f` are pushed to `codex/segment-06-management`; no merge or deployment occurred.
+- [x] Draft PR #8 is open on `codex/segment-06-management`; hosted checks on `6f8de6f` were 9/11 successful, with browser isolation and owned disposable database jobs still in progress at the recorded check.
 
 ## Review checkpoint — 3 November 2026
 
@@ -46,7 +46,7 @@ Working checklist created 3 November 2026 from the segment plans and task specs.
 - **Final workspace checks on `abfab90`:** `pnpm lint:workspace`, `pnpm typecheck:workspace`, `pnpm build:workspace`, `git diff --check` — exit 0.
 - **Focused guarded suites:** contract tests 50/50; booking 3/3; request/accept/decline 4/4; member lifecycle 1/1 plus routed controller guard 1/1; pack issuance/balance 1/1; session lifecycle 3/3; cancellation/no-show 5/5 plus exact cutoff/grace 2/2; session reads 5/5; C63 2/2; coaching Tasks 050–052 4/4. The two-gym trainer/member directory-to-request Playwright journey passed 1/1. Individual commands and persisted-effect assertions are in task evidence.
 - **Additional headed review evidence:** the role session/read journey passed 1/1, and a second Chrome-channel run of the directory/request/accept/decline journey passed 1/1. The guarded harnesses reported cleanup of six disposable databases, the container and run manifest. These are agent-performed automated browser checks; no owner-observed review is claimed.
-- **Visible review and PR status:** CUA still lists no browser-control provider, so owner-visible review is paused pending Chrome/Codex restart. `gh` is unavailable, but the pushed branch is now tracked by draft [PR #8](https://github.com/EsanduEpa/gymos-v2/pull/8). GitHub reported 11 hosted check runs queued or in progress at creation; no hosted result is yet claimed.
+- **Visible review and PR status at this checkpoint:** native Chrome control was unavailable during the 3 November attempt. A partial agent-performed native Chrome review was completed on 4 November, documented below; this is not owner-observed acceptance. `gh` remains unavailable, and draft [PR #8](https://github.com/EsanduEpa/gymos-v2/pull/8) is the only PR. Its current 6f8de6f run has nine successful checks and two in progress.
 - **Scope boundary:** the owner approved storing trainer decline reasons with member-only visibility. The owner also chose to preserve Segment 08 ownership of Task 049. No Task 049 code was included; Task 048 remains gated on Task 049.
 
 ## Visible Chrome and coaching review — 4 November 2026
@@ -56,7 +56,13 @@ Working checklist created 3 November 2026 from the segment plans and task specs.
 - **Visible persisted plan effects:** trainer profile showed “Visible walkthrough strength plan” with Bench Press (4 × 10, 60 kg) and Incline DB Flyes (3 × 12, 16 kg); member read-only Workout plans showed the same published rows. The meal builder reported 500 kcal, 25 g protein, 60 g carbs, and 12 g fat; member read-only Meal plans showed the assigned Monday breakfast “Test oats and yogurt” and identical totals.
 - **Coaching route correction:** the earlier trainer-client 500 was isolated to the previously built `apps/api/dist`; rebuilding the API made the guarded route diagnostic return HTTP 200 and the rebuilt route loaded visibly in Chrome. `pnpm --dir apps/api build`, `pnpm --dir apps/web build`, focused ESLint for the trainer roster page, and `pnpm typecheck:workspace` exited 0. The coaching guarded suite passed 4/4. The roster page also received a singular “1 registered trainer” label fix.
 - **Visible review scope still open:** the partial walkthrough does not cover every owner roster/page/pack action, all session lifecycle transitions, trainer notification mark-all, visible foreign-gym denials, or a full end-to-end two-gym coaching denial check. Those automated guarded tests remain evidence, not visible review. No owner-observed review is claimed.
-- **Gates retained:** hosted checks must be checked against the latest PR #8 commit after the pending push. Task 048 remains gated on Task 049; Task 049 is Segment 08 and out of scope. Neither Segment 06 nor Segment 07 is claimed complete.
+- **Gates retained:** recheck hosted results after any later push. Task 048 remains gated on Task 049; Task 049 is Segment 08 and out of scope. Neither Segment 06 nor Segment 07 is claimed complete.
+
+## Post-push checkpoint — 4 November 2026
+
+- **Source revision:** `6f8de6f docs(migration): record segments 06-07 visible review`, pushed to `origin/codex/segment-06-management`; working tree clean at inspection.
+- **Hosted checks on PR #8:** run `41776997248`, tied to commit `6f8de6f`; 9/11 successful, with Browser isolation test and Owned disposable database tests still in progress at inspection. All hosted results must be refreshed against the eventual latest PR commit before closing that gate.
+- **PR handling:** existing draft PR #8 only; no additional PR, merge, or deployment.
 
 ## Isolated browser rerun — 3 November 2026
 
