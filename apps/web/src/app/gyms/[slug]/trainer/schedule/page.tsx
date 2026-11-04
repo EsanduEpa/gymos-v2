@@ -1,10 +1,12 @@
 import type { CSSProperties } from 'react';
+import { randomUUID } from 'node:crypto';
 import { notFound, redirect } from 'next/navigation';
 import { trainerSessionRequestsSchema } from '@gymos/contracts';
 import { resolveGymBrandColors } from '@gymos/theme-tokens';
 import { Card, CardHeader } from '@/components/ui';
 import { DashboardChrome } from '@/components/navigation/dashboard-chrome';
 import { SessionReadView } from '@/components/sessions/read-views/session-read-view';
+import { SessionRequestDecisionForm } from '@/components/sessions/session-request-forms';
 import { loadSessionReadPage } from '@/components/sessions/read-views/load-session-read-page';
 import { requireGymContext } from '@/lib/gym-context';
 import { apiUrl } from '@/lib/gymos';
@@ -26,14 +28,21 @@ export default async function TrainerSchedulePage({ params, searchParams }: {
   const brand = resolveGymBrandColors(theme.primaryColor);
   const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
   return <DashboardChrome identityId={session.identityId} key={`${session.identityId}:${gym.id}:${gym.role}`} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'} style={style}>
-    <div className="gym-banner"><div><span className="eyebrow">TRAINER SCHEDULE</span><h1>My sessions</h1><p>Review assigned requests and sessions. The elapsed timer is display-only; server time controls session commands.</p></div>
-      <a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/trainer/requests`}>Session requests{requests?.success && requests.data.items.length ? ` (${requests.data.items.length})` : ''}</a></div>
-    {requests?.success && requests.data.items.length > 0 ? <Card><CardHeader eyebrow="ACTION NEEDED" title={`${requests.data.items.length} pending session request${requests.data.items.length === 1 ? '' : 's'}`}/>
-      <p>Member requests are ready for your decision. Review the requested time and accept or decline each request.</p>
-      <a className="ui-button ui-button-primary" href={`/gyms/${encodeURIComponent(slug)}/trainer/requests`}>Review session requests</a>
-    </Card> : null}
-    <Card><CardHeader eyebrow="ASSIGNED SESSIONS" title={loaded.data ? `${loaded.data.filterTotal} matching sessions` : 'Schedule'} />
-      <SessionReadView slug={slug} role="TRAINER" filters={loaded.filters} data={loaded.data} loadError={loaded.failed} style={style}/>
-    </Card>
+    <div className="gym-banner"><div><span className="eyebrow">SCHEDULE</span><h1>Trainer Daily Schedule</h1><p>Manage incoming session requests, your confirmed schedule, and completion notes.</p></div>
+      <a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/trainer/requests`}>All hire requests{requests?.success && requests.data.items.length ? ` (${requests.data.items.length})` : ''}</a></div>
+    {requests?.success && requests.data.items.length > 0 ? <Card className="trainer-pending-card"><CardHeader eyebrow="PENDING SESSION REQUESTS" title={`Pending session requests (${requests.data.items.length})`}/>
+      <div className="trainer-schedule-requests">{requests.data.items.map(item => <article className="trainer-schedule-request" key={item.id}>
+        <div className="trainer-schedule-request-main"><div className="trainer-schedule-request-title"><h2>{item.memberName}</h2><span className="ui-badge ui-badge-info">Pending confirmation</span></div>
+          <p><time dateTime={item.scheduledStartAt}>{new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: item.timeZone, timeZoneName: 'short' }).format(new Date(item.scheduledStartAt))}</time>
+            {' · '}{item.type.replace('_', ' ')} · {item.durationMinutes} min</p>
+          {item.notes ? <p className="trainer-schedule-request-note">“{item.notes}”</p> : null}
+        </div>
+        <div className="trainer-schedule-request-actions">
+          <SessionRequestDecisionForm slug={slug} sessionId={item.id} expectedVersion={item.version} action="ACCEPT" requestKey={randomUUID()}/>
+          <SessionRequestDecisionForm slug={slug} sessionId={item.id} expectedVersion={item.version} action="DECLINE" requestKey={randomUUID()}/>
+        </div>
+      </article>)}</div>
+    </Card> : requests && !requests.success ? <Card><CardHeader eyebrow="PENDING REQUESTS" title="Requests unavailable"/><p role="alert">We couldn’t check for new requests. Open the request page to retry.</p><a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/trainer/requests`}>Open requests</a></Card> : null}
+    <SessionReadView slug={slug} role="TRAINER" filters={loaded.filters} data={loaded.data} loadError={loaded.failed} style={style}/>
   </DashboardChrome>;
 }

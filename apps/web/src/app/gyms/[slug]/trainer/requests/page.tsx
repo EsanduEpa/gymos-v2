@@ -21,7 +21,7 @@ export default async function TrainerRequestsPage({ params }: { params: Promise<
   const brand = resolveGymBrandColors(theme.primaryColor);
   const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
   return <DashboardChrome identityId={session.identityId} key={`${session.identityId}:${gym.id}:${gym.role}`} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'} style={style}>
-    <div className="gym-banner"><div><span className="eyebrow">TRAINER SCHEDULE</span><h1>Client Hire Requests</h1><p>Review incoming personal training requests. Acceptance rechecks eligibility and reserves a session credit.</p></div></div>
+    <div className="gym-banner"><div><span className="eyebrow">TRAINER HIRE REQUESTS</span><h1>Client Hire Requests</h1><p>Review incoming one-on-one personal training requests. Accepting reserves a pack credit and books the session.</p></div></div>
     <div className="trainer-request-summary" aria-label="Pending requests summary"><Card><CardHeader eyebrow="PENDING REQUESTS" title={result?.success ? String(result.data.items.length) : 'Unavailable'}/></Card></div>
     <Card><CardHeader eyebrow="PENDING SESSION REQUESTS" title={result?.success ? `${result.data.items.length} requests` : 'Session requests'}/>
       {!result?.success ? <Feedback tone="error">Requests could not be loaded. Refresh to try again.</Feedback> : result.data.items.length === 0 ?
