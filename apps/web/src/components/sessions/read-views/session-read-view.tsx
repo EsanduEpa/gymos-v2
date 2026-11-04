@@ -70,17 +70,22 @@ function Affordances({ session, role }: { session: Session; role: Role }) {
 function SessionCard({ session, role, slug }: { session: Session; role: Role; slug: string }) {
   const counterpart = role === 'MEMBER' ? `Trainer: ${session.trainerName}` : `Member: ${session.memberName}`;
   const duration = Math.max(0, Math.round((new Date(session.scheduledEndAt).getTime() - new Date(session.scheduledStartAt).getTime()) / 60_000));
-  return <article className={styles.sessionCard}>
+  const content = <>
     <div className={styles.sessionMeta}><StatusBadge status={session.state}/><span>{session.type.replaceAll('_', ' ').toLowerCase()}</span></div>
     <h2>{counterpart}</h2>
-    <p><time dateTime={session.scheduledStartAt}>{dateLabel(session.scheduledStartAt, session.gymTimeZone, true)}</time><br/>{duration} minutes</p>
+    {role === 'TRAINER' ? <p>{duration} minutes{session.trainerPay !== null ? ` · Trainer earning: ${session.currency ?? ''} ${session.trainerPay}` : ''}</p> : <p><time dateTime={session.scheduledStartAt}>{dateLabel(session.scheduledStartAt, session.gymTimeZone, true)}</time><br/>{duration} minutes</p>}
     {session.state === 'ACTIVE' && session.startedAt && role === 'TRAINER' ? <ElapsedSessionClock startedAt={session.startedAt}/> : null}
-    {session.trainerPay !== null && role === 'TRAINER' ? <p>Trainer earning: {session.currency ?? ''} {session.trainerPay}</p> : null}
+    {session.fee !== null && session.currency ? <p>Session fee: {session.currency} {session.fee}</p> : null}
+    {role !== 'TRAINER' && session.trainerPay !== null ? <p>Trainer earning: {session.currency ?? ''} {session.trainerPay}</p> : null}
     {session.notes ? <p className={styles.sessionNotes}><strong>Session notes</strong><br/>{session.notes}</p> : null}
     {role === 'MEMBER' && session.state === 'DECLINED' && session.declineReason ? <p className={styles.sessionNotes}><strong>Trainer’s reason</strong><br/>{session.declineReason}</p> : null}
     {role === 'TRAINER' ? <SessionLifecycleControls slug={slug} session={session}/> : null}
     <SessionPolicyControls slug={slug} session={session} role={role}/>
     <Affordances session={session} role={role}/>
+  </>;
+  return <article className={`${styles.sessionCard} ${role === 'TRAINER' ? 'trainer-session-card' : ''}`}>
+    {role === 'TRAINER' ? <div className="trainer-session-date"><strong><time dateTime={session.scheduledStartAt}>{new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', timeZone: session.gymTimeZone }).format(new Date(session.scheduledStartAt))}</time></strong><small>{new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', timeZone: session.gymTimeZone }).format(new Date(session.scheduledStartAt))}</small></div> : null}
+    <div className={role === 'TRAINER' ? 'trainer-session-content' : undefined}>{content}</div>
   </article>;
 }
 function OwnerTable({ items, slug }: { items: Session[]; slug: string }) {
@@ -104,9 +109,9 @@ export function SessionReadView({ slug, role, filters, data, stateCounts = [], c
   const mode = filters.mode;
   const retry = noQueryUrl(slug, role, filters);
   const states = sessionReadStateSchema.options;
-  return <section style={style} aria-label={`${role.toLowerCase()} session view`}>
-    <div className={styles.toolbar}><p>Refreshing this active view every 30 seconds and when you return to the tab. Session reads never change booking or credit records.</p><SessionReadRefresh href={retry}/></div>
-    <div className={styles.switcher} aria-label="Session date range">
+  return <section className={role === 'TRAINER' ? 'trainer-session-view' : undefined} style={style} aria-label={`${role.toLowerCase()} session view`}>
+    <div className={`${styles.toolbar} ${role === 'TRAINER' ? 'trainer-session-toolbar' : ''}`}><p>Refreshing this active view every 30 seconds and when you return to the tab. Session reads never change booking or credit records.</p><SessionReadRefresh href={retry}/></div>
+    <div className={`${styles.switcher} ${role === 'TRAINER' ? 'trainer-session-switcher' : ''}`} aria-label="Session date range">
       <a href={href(slug, role, filters, { mode: 'day', date: selectedDay, month: undefined, page: 1 })} aria-current={mode === 'day' ? 'page' : undefined}>Daily view</a>
       <a href={href(slug, role, filters, { mode: 'month', month: selectedMonth, date: undefined, page: 1 })} aria-current={mode === 'month' ? 'page' : undefined}>Monthly view</a>
     </div>
@@ -121,7 +126,7 @@ export function SessionReadView({ slug, role, filters, data, stateCounts = [], c
         <a className="ui-button ui-button-secondary" href={href(slug, role, filters, { month: moveMonth(selectedMonth, 1), date: undefined, page: 1 })} aria-label="Next month">Next month →</a></div>
       <p>{selectedMonth} · {data?.timeZone ?? 'Gym local time'}</p>
     </nav>}
-    <form method="get" className={styles.filters}>
+    <form method="get" className={`${styles.filters} ${role === 'TRAINER' ? 'trainer-session-filters' : ''}`}>
       <input type="hidden" name="mode" value={mode}/>
       {filters.memberId ? <input type="hidden" name="memberId" value={filters.memberId}/> : null}
       {mode === 'day' ? <label>Date<input type="date" name="date" defaultValue={selectedDay}/></label> : <label>Month<input type="month" name="month" defaultValue={selectedMonth}/></label>}
@@ -135,8 +140,8 @@ export function SessionReadView({ slug, role, filters, data, stateCounts = [], c
       </div> : null}
       {role === 'MEMBER' && data.summary.lifetimePackCredits ? <p aria-label="Lifetime pack credit totals">Lifetime pack credits · Available {data.summary.lifetimePackCredits.available} · Held {data.summary.lifetimePackCredits.held} · Consumed {data.summary.lifetimePackCredits.consumed} · Expired unused {data.summary.lifetimePackCredits.expired}</p> : null}
       {data.items.length === 0 ? <div className={styles.empty}><h2>No sessions found</h2><p>There are no sessions for this date and filter combination.</p></div> : role === 'OWNER' ? <OwnerTable items={data.items} slug={slug}/> :
-        <div className={styles.cards}>{data.items.map(session => <SessionCard key={session.id} slug={slug} session={session} role={role}/>)}</div>}
-      <div className={styles.pager}><p aria-live="polite">Page {data.page} of {Math.max(1, data.totalPages)} · {data.filterTotal} sessions match these filters · {data.asOf ? `Updated ${dateLabel(data.asOf, data.timeZone, true)}` : ''}</p>
+        <div className={`${styles.cards} ${role === 'TRAINER' ? 'trainer-session-cards' : ''}`}>{data.items.map(session => <SessionCard key={session.id} slug={slug} session={session} role={role}/>)}</div>}
+      <div className={`${styles.pager} ${role === 'TRAINER' ? 'trainer-session-pager' : ''}`}><p aria-live="polite">Page {data.page} of {Math.max(1, data.totalPages)} · {data.filterTotal} sessions match these filters · {data.asOf ? `Updated ${dateLabel(data.asOf, data.timeZone, true)}` : ''}</p>
         <div className={styles.pagerLinks}>{data.page > 1 ? <a className="ui-button ui-button-secondary" href={href(slug, role, filters, { page: data.page - 1 })}>Previous page</a> : null}
           {data.page < data.totalPages ? <a className="ui-button ui-button-secondary" href={href(slug, role, filters, { page: data.page + 1 })}>Next page</a> : null}</div>
       </div>

@@ -2,14 +2,15 @@
 .search label { display:grid; gap:5px; min-width:min(100%, 320px); color:var(--classic-text-secondary); font-size:12px; }
 .search input { min-height:40px; padding:8px 10px; border:1px solid var(--classic-border); border-radius:8px; background:var(--classic-surface); color:var(--classic-text); }
 .list { display:grid; gap:10px; }
-.card { display:grid; grid-template-columns:minmax(180px,1.2fr) minmax(120px,.6fr) minmax(180px,.8fr) auto; align-items:center; gap:16px; padding:14px; border:1px solid var(--classic-border); border-radius:10px; background:var(--classic-surface); }
+.card { display:grid; grid-template-columns:minmax(180px,1.2fr) minmax(110px,.55fr) minmax(130px,.65fr) minmax(180px,.9fr) auto; align-items:center; gap:14px; padding:14px; border:1px solid var(--classic-border); border-radius:10px; background:var(--classic-surface); }
 .card h2 { margin:0 0 4px; font-size:15px; }
 .card h2 a { color:var(--classic-text); text-decoration:underline; text-underline-offset:3px; }
 .card p { margin:3px 0 0; color:var(--classic-text-muted); font-size:12px; }
 .card strong { font-size:20px; }
 .card span { color:var(--classic-text-secondary); font-size:12px; }
+.actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; }
 .pager { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin-top:14px; }
 .pager p { margin:0; color:var(--classic-text-muted); font-size:12px; }
 .pager nav { display:flex; gap:8px; }
-@media(max-width:850px) { .card { grid-template-columns:repeat(2,minmax(0,1fr)); }.card nav { grid-column:span 2; } }
-@media(max-width:520px) { .search { display:grid; }.search button { width:100%; }.card { grid-template-columns:minmax(0,1fr); }.card nav { grid-column:auto; }.card nav a { width:100%; } }
+@media(max-width:850px) { .card { grid-template-columns:repeat(2,minmax(0,1fr)); }.actions { grid-column:span 2; justify-content:flex-start; } }
+@media(max-width:520px) { .search { display:grid; }.search button { width:100%; }.card { grid-template-columns:minmax(0,1fr); }.actions { grid-column:auto; flex-direction:column; }.actions a { width:100%; } }

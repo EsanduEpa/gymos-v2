@@ -49,6 +49,6 @@ export function SessionLifecycleControls({ slug, session }: { slug: string; sess
   return <div className="session-lifecycle-controls" data-session-lifecycle={session.id}>
     {session.commandAffordances.includes('START') ? <CommandForm key={`start-${session.id}-${session.version}`} slug={slug} session={session} kind="start"/> : null}
     {session.commandAffordances.includes('COMPLETE') ? <CommandForm key={`complete-${session.id}-${session.version}`} slug={slug} session={session} kind="complete"/> : null}
-    {session.commandAffordances.includes('UPDATE_NOTES') ? <NotesForm key={`notes-${session.id}-${session.version}`} slug={slug} session={session}/> : null}
+    {session.commandAffordances.includes('UPDATE_NOTES') ? <details className="trainer-notes-editor"><summary>Edit Notes</summary><NotesForm key={`notes-${session.id}-${session.version}`} slug={slug} session={session}/></details> : null}
   </div>;
 }
