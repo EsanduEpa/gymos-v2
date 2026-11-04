@@ -79,3 +79,9 @@ Checks after these observed defects: web lint, web typecheck, web production bui
 | 061 | In Progress | Attachment filename/type verified; browser download cancellation UI was unavailable after the 688-byte download completed. Automated proxy cancellation remains covered. |
 
 Review was performed by the agent under the user's explicit delegation. It is not recorded as independent owner approval. No merge, deployment, Segment 09 work or 046/047 task status change occurred.
+
+## Hosted check follow-up
+
+Revision `0cfaa82` triggered workflow `41817359026`. Ten of eleven required checks passed, including the owned disposable database suite; Browser isolation failed on exactly two stale assertions: password-reset trainer login expected the old `/trainer` root instead of `/trainer/earnings`, and role-shell accessibility expected a “Trainer workspace” primary link instead of “My earnings”. Updated those two browser expectations without changing production behavior and reran only those cases locally: **2/2 passed** on guarded disposable PostgreSQL, with cleanup reporting six databases dropped and container/manifest removed. A fresh full hosted run is required for the resulting test-only revision.
+
+Cleanup audit also found four abandoned containers bearing `gymos.test.run` labels. Each was a matching `gymos-mig-test-<runId>` PostgreSQL 17 container with tmpfs data, loopback-only random port, 41–59 minutes old and no established client connection; those four containers were removed. The active project Compose database was not touched. The earlier visible fixture run was stopped via its recorded stop-file and reported six databases/container/manifest cleaned. Subsequent fixture runs likewise reported cleanup.

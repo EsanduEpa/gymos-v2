@@ -661,7 +661,7 @@ test('trainer registration enforces owner and selected-gym access, then hands of
     await expect(trainerPage.locator('.ui-feedback-success')).toContainText('Password updated');
     await trainerPage.getByRole('button', { name: 'Continue to sign in' }).click();
     await loginWithPassword(trainerPage, email, replacement);
-    await expect(trainerPage).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/trainer$`));
+    await expect(trainerPage).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/trainer/earnings$`));
     expect((await fixture.master.user.findUniqueOrThrow({ where: { id: identity.id } })).mustChangePassword).toBe(false);
   } finally { await trainerContext.close(); }
 });
@@ -823,12 +823,12 @@ test('role shell supports keyboard drawer, safe switching and current context', 
   const before = await fixture.master.$transaction([fixture.master.user.count(), fixture.master.gymAccess.count(), fixture.master.operation.count()]);
   for (const [user, role, label] of [
     [fixture.users.ownerA, 'owner', 'Dashboard'],
-    [fixture.users.trainerUser, 'trainer', 'Trainer workspace'],
+    [fixture.users.trainerUser, 'trainer', 'My earnings'],
     [fixture.users.memberUser, 'member', 'Member workspace'],
   ] as const) {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await openGymWithTestSession(page, user.id, fixture.gyms[0].slug);
-    await expect(page).toHaveURL(new RegExp(`/${role}$`));
+    await expect(page).toHaveURL(new RegExp(`/${role === 'trainer' ? 'trainer/earnings' : role}$`));
     await expect(page.locator('.shell-profile')).toContainText(user.displayName!);
     await expect(page.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link', { name: label, exact: true })).toHaveAttribute('aria-current', 'page');
     expect(await page.locator('.shell-sidebar').evaluate(el => el.getBoundingClientRect().width)).toBe(224);
