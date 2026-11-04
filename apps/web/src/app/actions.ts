@@ -7,7 +7,7 @@ import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { sessionCookieOptions } from '@/lib/session-transport';
-import { apiUrl, gymRolePath, SESSION_COOKIE } from '@/lib/gymos';
+import { apiUrl, gymRoleLandingPath, SESSION_COOKIE } from '@/lib/gymos';
 import { SUPPORT_COOKIE } from '@/lib/support-context';
 
 function field(formData: FormData, key: string): string {
@@ -60,7 +60,7 @@ export async function login(formData: FormData) {
 
   const firstGym = result.gyms[0];
   redirect(result.globalRole === 'SUPER_ADMIN' ? '/admin' : firstGym === undefined ? '/no-access'
-    : result.gyms.length === 1 ? `/gyms/${encodeURIComponent(firstGym.slug)}/${firstGym.role === 'OWNER' ? 'owner' : gymRolePath(firstGym.role)}` : '/gyms/select');
+    : result.gyms.length === 1 ? `/gyms/${encodeURIComponent(firstGym.slug)}/${gymRoleLandingPath(firstGym.role)}` : '/gyms/select');
 }
 
 export async function signOut() {

@@ -7,3 +7,5 @@ Contract tests and schema validation pass. Owned finance PostgreSQL suite passed
 ## 4 November 2026 continuation from ef81213
 
 Added February 2026 accounting-date edge fixture: January 31 and March 1 are excluded, February 1 and 28 total 5.0000, and unbudgeted utilization stays null. Existing create/update race and stale conflict evidence remains passing. Visible UI review remains.
+
+In the delegated walkthrough, the owner changed RENT budget to LKR 500; the panel showed LKR 125 actual and LKR -375 variance. Visible month and budget review complete the gate; task status is Complete.

@@ -42,7 +42,8 @@ export class PayrollService {
           const total = period.records.reduce((sum, row) => sum + units(row.amount.toString()), 0n)
             + period.corrections.reduce((sum, row) => sum + units(row.amount.toString()), 0n);
           return { id: period.id, cadence: period.cadence, start: dateOnly(period.localStartDate), endExclusive: dateOnly(period.localEndDateExclusive),
-            timezone: period.timezone, state: period.state, version: period.version, total: decimal(total), recordCount: period.records.length + period.corrections.length };
+            timezone: period.timezone, state: period.state, version: period.version, total: decimal(total), currency,
+            recordCount: period.records.length + period.corrections.length };
         }) });
       });
     });

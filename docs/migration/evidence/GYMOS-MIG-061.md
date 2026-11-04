@@ -7,3 +7,5 @@ Owned finance PostgreSQL suite passed 2/2, including 106 expense rows, UTF-8 BOM
 ## 4 November 2026 continuation from ef81213
 
 Added automated API content-disposition safe filename, text/csv MIME, no-store, BOM and invalid-export no-attachment checks. The web proxy now passes request cancellation to the API fetch using AbortSignal.any; browser download/cancellation review remains.
+
+Delegated Chrome review downloaded the synthetic revenue CSV; filename was `gymos-test-gym-alpha-ebab226f610f16d4-revenue-2026-11-01-2026-11-04.csv`, 688 bytes, and `file` identified CSV text. Chrome had no active cancellation control once the small download completed, so visible cancellation was not demonstrated. Automated content-disposition/MIME/cache/BOM/error assertions and proxy abort propagation pass; task stays In Progress pending visible cancellation evidence if supported by a slower in-progress download.

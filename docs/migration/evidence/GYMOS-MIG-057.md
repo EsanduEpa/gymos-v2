@@ -7,3 +7,5 @@ Owned finance PostgreSQL suite passed 2/2, including P&L reconciliation. Contrac
 ## 4 November 2026 continuation from ef81213
 
 The existing owned fixture spans prior and current month and reconciles P&L against membership, session earnings, expense and payroll; exact currency, window and asOf are schema-bound. Visual chart/panel/loading/error/responsive review remains.
+
+Delegated visible review inspected all six panels, cross-month P&L (LKR 281.02 operational - 125 expenses - 50 payroll = LKR 106.02 surplus), LKR/window/asOf labels, empty Beta revenue, route loading and a 393×852 single-column finance layout. Membership rows previously displayed Oct 31 due UTC formatting of gym-local midnight; the table now formats with the gym timezone and rebuilt Chrome shows Nov 1, 2 and 3. The chart-specific narrow layout and finance error state were not visibly exercised, so this task remains In Progress.

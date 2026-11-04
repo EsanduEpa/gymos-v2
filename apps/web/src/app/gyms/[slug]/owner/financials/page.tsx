@@ -18,6 +18,11 @@ function localToday(zone: string) {
 }
 function firstDay(month: string) { return `${month}-01`; }
 function validDate(value?: string) { return !!value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)); }
+function localDate(value: string, timezone: string) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' })
+    .formatToParts(new Date(value)).map(part => [part.type, part.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
 async function read<T>(slug: string, path: string, token: string, schema: { safeParse(value: unknown): { success: boolean; data?: T } }): Promise<{ data: T | null; unavailable: boolean }> {
   try {
     const response = await fetch(apiUrl(`/gyms/${encodeURIComponent(slug)}/${path}`), { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' });
@@ -75,7 +80,7 @@ export default async function OwnerFinancialsPage({ params, searchParams }: {
             ['Membership not yet recognized', revenue.data.deferred.membershipUnrecognized], ['Available pack value', revenue.data.deferred.packAvailable],
             ['Held pack value', revenue.data.deferred.packHeld], ['Expired unused pack value · separate', revenue.data.deferred.expiredPackUnused],
           ].map(([label, value]) => <div className="finance-metric" key={label}><small>{label}</small><strong>{value} {revenue.data!.currency}</strong></div>)}</div> : null}
-          {tab === 'revenue' ? <div className="ui-table-shell"><div className="ui-table-scroll"><table aria-label="Operational earning lines"><thead><tr><th>Date</th><th>Category</th><th>Source</th><th>Value</th></tr></thead><tbody>{revenue.data.lines.map(line => <tr key={line.id}><td>{line.occurredAt.slice(0, 10)}</td><td>{line.category.replaceAll('_', ' ')}</td><td>{line.sourceType} · {line.sourceId}</td><td>{line.amount} {line.currency}</td></tr>)}</tbody></table></div>{revenue.data.totalCount === 0 ? <EmptyState title="No operational earning in this window." hint="Completed and charged lifecycle facts appear here when they occur."/> : <p>Page {revenue.data.page} · {revenue.data.totalCount} earning lines in the full window.</p>}</div> : null}
+          {tab === 'revenue' ? <div className="ui-table-shell"><div className="ui-table-scroll"><table aria-label="Operational earning lines"><thead><tr><th>Date</th><th>Category</th><th>Source</th><th>Value</th></tr></thead><tbody>{revenue.data.lines.map(line => <tr key={line.id}><td>{localDate(line.occurredAt, settings.data!.configuration.timezone)}</td><td>{line.category.replaceAll('_', ' ')}</td><td>{line.sourceType} · {line.sourceId}</td><td>{line.amount} {line.currency}</td></tr>)}</tbody></table></div>{revenue.data.totalCount === 0 ? <EmptyState title="No operational earning in this window." hint="Completed and charged lifecycle facts appear here when they occur."/> : <p>Page {revenue.data.page} · {revenue.data.totalCount} earning lines in the full window.</p>}</div> : null}
           {tab === 'pnl' ? pnl.data ? <><p>{pnl.data.method}</p><div className="finance-metrics">{[
             ['Operational earning', pnl.data.operationalEarning], ['Expenses excluding SALARIES category', pnl.data.expenses], ['Trainer payroll cost', pnl.data.payrollCost],
             ['SALARIES expense shown separately', pnl.data.salaryExpenseExcluded], ['Operating surplus', pnl.data.operatingSurplus],

@@ -7,3 +7,5 @@ Contract tests passed 54/54; owned finance PostgreSQL suite passed 2/2, verifyin
 ## 4 November 2026 continuation from ef81213
 
 Owned DB now asserts an explicit stale budget/expense-adjacent version conflict in addition to existing replay and rollback. Expense creation itself has no mutable version field, so stale-version semantics apply to versioned budget and payroll commands. Visible form review remains.
+
+The delegated owner walkthrough created a synthetic Nov 4 RENT expense (LKR 125) and showed the save confirmation and descriptive-only recurring flag. The visible form review and stale expected-version conflict complete the task-owned gate; task status is Complete.

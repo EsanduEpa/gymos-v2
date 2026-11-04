@@ -58,6 +58,9 @@ it('isolates and replays expense/budget commands, reconciles P&L, and closes pay
     timezone: 'Asia/Colombo', utcStartAt: new Date('2026-09-30T18:30:00Z'), utcEndAt: new Date('2026-10-31T18:30:00Z'), calculatedTotal: '50.0000' } });
   await tenant.payRecord.create({ data: { sessionId, periodId, amount: '50.0000', currency: 'LKR', sourceKey: `pay:${sessionId}`,
     confirmationRate: '0.200000', confirmationLevel: 'LEVEL_1' } });
+  const payrollList = await call(`/gyms/${slug}/payroll/periods`, owner);
+  expect(payrollList.status).toBe(200);
+  expect(await payrollList.json()).toMatchObject({ items: [expect.objectContaining({ id: periodId, total: '50.0000', currency: 'LKR', recordCount: 1 })] });
   const plan = await tenant.membershipPlan.create({ data: { name: 'Completed full term', price: '310.0000', currency: 'LKR', durationDays: monthDays } });
   await tenant.membershipTerm.create({ data: { memberId: memberRow.id, planId: plan.id, startDate: date(monthStart), endDateExclusive: date(nextMonth),
     agreedPrice: '310.0000', currency: 'LKR', planNameSnapshot: plan.name, configurationVersion: config.version, actorIdentityId: fixture.users.ownerA.id,
@@ -263,7 +266,8 @@ it('withholds platform totals for missing, stale and failed tenant summaries and
   for (const row of initial) await makeCurrentCache(row.id, now);
   const complete = await service.analyticsSummary(); expect(complete.partial).toBe(false);
   expect(complete.memberCount).toBe(initial.length * 4); expect(complete.trainerCount).toBe(initial.length * 2);
-  await master.gymRegistrySummary.update({ where: { gymId: initial[1]!.id }, data: { observedAt: new Date(now.getTime() - 3_600_001) } });
+  const [databaseClock] = await master.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
+  await master.gymRegistrySummary.update({ where: { gymId: initial[1]!.id }, data: { observedAt: new Date(databaseClock!.now.getTime() - 7_200_000) } });
   await master.gymRegistrySummary.delete({ where: { gymId: initial[2]!.id } });
   const partial = await service.analyticsSummary();
   expect(partial.partial).toBe(true); expect(partial.memberCount).toBeNull(); expect(partial.trainerCount).toBeNull();

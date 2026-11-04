@@ -31,6 +31,10 @@ export function gymRolePath(role: GymRole): string {
   return role === 'OWNER' ? 'owner' : role === 'TRAINER' ? 'trainer' : 'member';
 }
 
+export function gymRoleLandingPath(role: GymRole): string {
+  return role === 'TRAINER' ? 'trainer/earnings' : gymRolePath(role);
+}
+
 export function gymRoleUrl(gym: Pick<GymAccessSummary, 'slug' | 'role'>): string {
   return `/gyms/${encodeURIComponent(gym.slug)}/${gym.role === 'OWNER' ? 'owner' : gymRolePath(gym.role)}`;
 }

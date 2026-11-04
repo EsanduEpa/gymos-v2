@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { resolveCurrentSession } from '@/lib/navigation';
-import { gymRolePath, SESSION_COOKIE } from '@/lib/gymos';
+import { gymRoleLandingPath, SESSION_COOKIE } from '@/lib/gymos';
 import { signOut } from '../../actions';
 import { Button, LoadingState } from '@/components/ui';
 
@@ -23,7 +23,7 @@ async function GymSelectionContent() {
   if (session.gyms.length === 0) redirect('/no-access');
   if (session.gyms.length === 1) {
     const gym = session.gyms[0];
-    if (gym) redirect(`/gyms/${encodeURIComponent(gym.slug)}/${gymRolePath(gym.role)}`);
+    if (gym) redirect(`/gyms/${encodeURIComponent(gym.slug)}/${gymRoleLandingPath(gym.role)}`);
   }
 
   return <main className="auth-shell"><section className="form-card auth-card" aria-labelledby="gym-selection-heading">
@@ -32,7 +32,7 @@ async function GymSelectionContent() {
     <p className="muted">Select the gym workspace you want to open.</p>
     <div className="stack-form">
       {session.gyms.map((gym) => <a className="primary-button" key={gym.id}
-        href={`/gyms/${encodeURIComponent(gym.slug)}/${gym.role === 'OWNER' ? 'owner' : gymRolePath(gym.role)}`}>
+        href={`/gyms/${encodeURIComponent(gym.slug)}/${gymRoleLandingPath(gym.role)}`}>
         {gym.name} <span>{gym.role.toLowerCase()} →</span>
       </a>)}
     </div>

@@ -7,3 +7,5 @@ Workspace typecheck passes. Owned finance PostgreSQL suite passed 2/2 and verifi
 ## 4 November 2026 continuation from ef81213
 
 Reused the passing session-lifecycle test that mutates configuration and trainer level after booking yet settles pay at stored 0.400000/LEVEL_1, plus existing late-close correction provenance. No new payroll configuration case was needed. Visible owner/trainer payroll review remains.
+
+Delegated visible review showed the owner’s open Nov period at LKR 50 for one earning and the trainer’s own earnings/current period at LKR 50. No close, approval or payout was performed. Payroll period API regression: the service omitted `currency`, causing output schema validation at `items[0].currency`; it now maps the configured currency, and the focused integration assertion passed. Configuration snapshot and visible payroll criteria complete; task status is Complete.
