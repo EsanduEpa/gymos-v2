@@ -14,16 +14,10 @@ function monthBounds(month: string) {
 }
 function averagePerSession(total: string, count: number) {
   if (!count) return '0.0000';
-  const [whole = '0', fraction = ''] = total.split('.');
-  const micros = BigInt(whole) * 10_000n + BigInt(fraction.padEnd(4, '0').slice(0, 4));
-  const average = micros / BigInt(count);
-  return `${average / 10_000n}.${String(average % 10_000n).padStart(4, '0')}`;
+  return (Number(total) / count).toFixed(4);
 }
 function formatMoney(amount: string, currency: string) {
-  const [whole = '0', fraction = ''] = amount.split('.');
-  const micros = BigInt(whole) * 10_000n + BigInt(fraction.padEnd(4, '0').slice(0, 4));
-  const cents = (micros + 50n) / 100n;
-  return `${currency} ${cents / 100n}.${String(cents % 100n).padStart(2, '0')}`;
+  return `${currency} ${Number(amount).toFixed(2)}`;
 }
 
 export default async function TrainerEarningsPage({ params, searchParams }: {
