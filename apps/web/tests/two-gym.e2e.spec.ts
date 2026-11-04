@@ -1081,10 +1081,12 @@ test('platform registry supports audited read-only gym selection, switching, exi
   await expect.poll(()=>alpha.getByRole('cell').nth(2).evaluate(element=>element.firstChild?.textContent?.trim())).toBe(String(expectedAlphaMembers));
   await expect(table).toBeVisible();
   const evidence=join(webDirectory,'test-results/migration-evidence/GYMOS-MIG-024');await mkdir(evidence,{recursive:true});
-  await page.screenshot({path:join(evidence,'registry-desktop.png'),fullPage:true,animations:'disabled'});
-  await page.setViewportSize({width:320,height:700});
-  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-  await page.screenshot({path:join(evidence,'registry-320.png'),fullPage:true,animations:'disabled'});
+  for(const width of [1440,768,390,320]){
+    await page.setViewportSize({width,height:width<400?844:900});
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    if(width===768) await expect(alpha.getByRole('button',{name:'View dashboard'})).toBeVisible();
+    await page.screenshot({path:join(evidence,`registry-${width}.png`),fullPage:true,animations:'disabled'});
+  }
   await page.setViewportSize({width:1280,height:720});
   await alpha.getByRole('button',{name:'View dashboard'}).focus();
   await page.keyboard.press('Enter');
@@ -1102,7 +1104,12 @@ test('platform registry supports audited read-only gym selection, switching, exi
   await expect(page.locator('main')).not.toContainText('Alpha Person');
   const supportCookie=(await page.context().cookies()).find(cookie=>cookie.name==='gymos_support_context')!;
   expect(supportCookie.httpOnly&&supportCookie.secure&&supportCookie.sameSite==='Lax').toBe(true);
-  await page.screenshot({path:join(evidence,'support-alpha-desktop.png'),fullPage:true,animations:'disabled'});
+  for(const width of [1440,768,390,320]){
+    await page.setViewportSize({width,height:width<400?844:900});
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await page.screenshot({path:join(evidence,`support-alpha-${width}.png`),fullPage:true,animations:'disabled'});
+  }
+  await page.setViewportSize({width:1280,height:720});
   const oldTab=await page.context().newPage();await oldTab.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/owner`);
   await expect(oldTab.locator('.support-banner')).toContainText('Viewing Test Gym Alpha');
   await page.getByRole('navigation',{name:'Main navigation'}).getByRole('link',{name:'All Gyms'}).click();
@@ -1144,7 +1151,8 @@ test('platform lifecycle confirms suspension and verified reactivation while old
  const ownerContext=await browser.newContext();const ownerPage=await ownerContext.newPage();
  try{
   await openGymWithTestSession(ownerPage,fixture.users.ownerA.id,fixture.gyms[0].slug);
-  await expect(ownerPage.getByRole('heading',{name:'Test Gym Alpha',exact:true})).toBeVisible();
+  await expect(ownerPage.locator('.shell-header')).toContainText('Test Gym Alpha');
+  await expect(ownerPage.getByRole('main').getByRole('heading',{name:'Live Gym Operations',exact:true})).toBeVisible();
   await waitForSessionLifecycle(ownerPage);
   await openWithTestSession(page,fixture.users.admin.id,'/admin');
   const row=()=>page.getByRole('table',{name:'Registered gym tenants'}).getByRole('row').filter({has:page.getByText('Test Gym Alpha',{exact:true})});
@@ -1177,7 +1185,8 @@ test('platform lifecycle confirms suspension and verified reactivation while old
   await reactivate.getByRole('button',{name:'Confirm',exact:true}).click();
   await expect(row().getByRole('button',{name:'Suspend gym',exact:true})).toBeVisible();
   await ownerPage.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/owner`);
-  await expect(ownerPage.getByRole('heading',{name:'Test Gym Alpha',exact:true})).toBeVisible();
+  await expect(ownerPage.locator('.shell-header')).toContainText('Test Gym Alpha');
+  await expect(ownerPage.getByRole('main').getByRole('heading',{name:'Live Gym Operations',exact:true})).toBeVisible();
   await page.setViewportSize({width:1280,height:720});await expect(row()).toBeVisible();
   await page.screenshot({path:join(evidence,'reactivated-registry.png'),fullPage:true,animations:'disabled'});
  }finally{await ownerContext.close();}
