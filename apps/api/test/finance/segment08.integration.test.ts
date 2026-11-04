@@ -62,6 +62,17 @@ it('isolates and replays expense/budget commands, reconciles P&L, and closes pay
   await tenant.membershipTerm.create({ data: { memberId: memberRow.id, planId: plan.id, startDate: date(monthStart), endDateExclusive: date(nextMonth),
     agreedPrice: '310.0000', currency: 'LKR', planNameSnapshot: plan.name, configurationVersion: config.version, actorIdentityId: fixture.users.ownerA.id,
     idempotencyKey: randomUUID(), requestDigest: 'd1:' + 'a'.repeat(64) } });
+  const shortPlan = await tenant.membershipPlan.create({ data: { name: 'Three local days', price: '0.1000', currency: 'LKR', durationDays: 3 } });
+  await tenant.membershipTerm.create({ data: { memberId: memberRow.id, planId: shortPlan.id, startDate: date('2026-09-01'), endDateExclusive: date('2026-09-04'),
+    agreedPrice: '0.1000', currency: 'LKR', planNameSnapshot: shortPlan.name, configurationVersion: config.version, actorIdentityId: fixture.users.ownerA.id,
+    idempotencyKey: randomUUID(), requestDigest: 'd1:' + '9'.repeat(64) } });
+  await tenant.member.update({ where: { id: memberRow.id }, data: { status: 'SUSPENDED' } });
+  const suspended = await (await call(`/gyms/${slug}/financials/revenue?from=2026-09-01&to=2026-09-03&page=1&pageSize=25`, owner)).json();
+  expect(suspended.rangeStart).toBe('2026-08-31T18:30:00.000Z');
+  expect(suspended.totals.membership).toBe('0.1000');
+  expect(suspended.lines.filter((item: { sourceType: string }) => item.sourceType === 'MEMBERSHIP_TERM').map((item: { amount: string }) => item.amount)).toEqual(['0.04', '0.03', '0.03']);
+  const expired = await (await call(`/gyms/${slug}/financials/revenue?from=2026-09-04&to=2026-09-04&page=1&pageSize=25`, owner)).json();
+  expect(expired.totals.membership).toBe('0.0000');
 
   const expensesBefore = await tenant.expenseRecord.count(); const auditsBefore = await tenant.auditLog.count(); const receiptsBefore = await tenant.commandReceipt.count();
   await tenant.$executeRawUnsafe(`CREATE FUNCTION reject_expense_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW."eventCode" = 'EXPENSE_CREATED' THEN RAISE EXCEPTION 'injected expense audit failure'; END IF; RETURN NEW; END $$`);
@@ -95,6 +106,17 @@ it('isolates and replays expense/budget commands, reconciles P&L, and closes pay
     { category: 'UTILITIES', month: expenseBody.accountingDate.slice(0, 7), amount, currency: 'LKR', expectedVersion: 0, idempotencyKey: randomUUID() })));
   expect(racingBudgetUpdates.map(response => response.status).sort((a, b) => a - b)).toEqual([201, 409]);
   expect(await tenant.categoryBudget.findUniqueOrThrow({ where: { category_month: { category: 'UTILITIES', month: date(`${expenseBody.accountingDate.slice(0, 7)}-01`) } } })).toMatchObject({ version: 1 });
+  expect((await call(`/gyms/${slug}/financials/budgets`, owner,
+    { category: 'UTILITIES', month: expenseBody.accountingDate.slice(0, 7), amount: '230.00', currency: 'LKR', expectedVersion: 0, idempotencyKey: randomUUID() })).status).toBe(409);
+  const monthEdge = '2026-02';
+  const edgeReceipts = await Promise.all(Array.from({ length: 4 }, () => tenant.commandReceipt.create({ data: { actorIdentityId: fixture.users.ownerA.id, commandKind: 'FIXTURE_EXPENSE',
+    idempotencyKey: randomUUID(), requestDigest: `d1:${'e'.repeat(64)}`, state: 'COMMITTED', safeResult: {}, committedAt: today } })));
+  await tenant.expenseRecord.createMany({ data: ['2026-01-31', '2026-02-01', '2026-02-28', '2026-03-01'].map((day, index) => ({
+    category: 'OTHER' as const, amount: `${index + 1}.00`, currency: 'LKR', accountingDate: date(day), description: `edge-${day}`,
+    recurring: false, commandReceiptId: edgeReceipts[index]!.id, createdByIdentityId: fixture.users.ownerA.id })) });
+  const edgeBudget = await (await call(`/gyms/${slug}/financials/budgets?month=${monthEdge}`, owner)).json();
+  expect(edgeBudget.totalActual).toBe('5.0000');
+  expect(edgeBudget.items.find((item: { category: string }) => item.category === 'OTHER')).toMatchObject({ actual: '5', utilizationPercent: null });
 
   const range = `from=${monthStart}&to=${localToday}`;
   const pnlResponse = await call(`/gyms/${slug}/financials/pnl?${range}`, owner); expect(pnlResponse.status).toBe(200);
@@ -115,6 +137,8 @@ it('isolates and replays expense/budget commands, reconciles P&L, and closes pay
   expect((await call(`/gyms/${slug}/payroll/periods/${periodId}/close`, owner, { expectedVersion: 0, idempotencyKey: winningCloseKey })).status).toBe(201);
   const approved = await call(`/gyms/${slug}/payroll/periods/${periodId}/approve`, owner, { expectedVersion: 1, expectedTotal: '50.0000', idempotencyKey: randomUUID() }); expect(approved.status).toBe(201);
   expect((await approved.json()).state).toBe('APPROVED');
+  expect((await call(`/gyms/${slug}/payroll/periods/${periodId}/approve`, owner,
+    { expectedVersion: 1, expectedTotal: '50.0000', idempotencyKey: randomUUID() })).status).toBe(409);
   expect(await tenant.payRecord.count({ where: { sessionId } })).toBe(1);
 });
 
@@ -130,6 +154,8 @@ it('exports complete bounded row sets over 100, protects formulas, exports only 
     createdByIdentityId: fixture.users.ownerA.id, createdAt: new Date('2026-10-16T10:00:00Z'), updatedAt: new Date('2026-10-16T10:00:00Z') })) });
   const exportResponse = await call(`/gyms/${slug}/financials/export`, owner, { kind: 'expenses', from: '2026-10-01', to: '2026-10-31' });
   expect(exportResponse.status).toBe(200); expect(exportResponse.headers.get('content-type')).toContain('text/csv');
+  expect(exportResponse.headers.get('content-disposition')).toMatch(/^attachment; filename="[a-zA-Z0-9._-]+\.csv"$/);
+  expect(exportResponse.headers.get('cache-control')).toContain('no-store');
   const csvBytes = new Uint8Array(await exportResponse.arrayBuffer()); const csv = new TextDecoder().decode(csvBytes); expect(Array.from(csvBytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]); expect(csv.match(/\r\n/g)?.length).toBe(count + 1);
   expect(csv).toContain("'=1+1"); expect(csv).toContain('"row-104"');
   const auditExport = await call(`/gyms/${slug}/financials/export`, owner, { kind: 'audit', page: 1, pageSize: 20, actionType: 'EXPENSE_CREATED' });
@@ -137,12 +163,33 @@ it('exports complete bounded row sets over 100, protects formulas, exports only 
   expect(await tenant.auditLog.count({ where: { eventCode: 'CSV_EXPORTED' } })).toBeGreaterThanOrEqual(2);
   expect((await call(`/gyms/${slug}/financials/export`, await bearer(fixture.users.trainerUser.id), { kind: 'expenses', from: '2026-10-01', to: '2026-10-31' })).status).toBe(403);
   expect((await call(`/gyms/${slug}/financials/export`, owner, { kind: 'expenses', from: '2025-01-01', to: '2026-11-01' })).status).toBe(422);
+  const invalidExport = await call(`/gyms/${slug}/financials/export`, owner, { kind: 'expenses', from: '2025-01-01', to: '2026-11-01' });
+  expect(invalidExport.headers.get('content-disposition')).toBeNull();
 
+  const trainerRow = await tenant.trainer.findFirstOrThrow(); const memberRow = await tenant.member.findFirstOrThrow();
+  const localToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Colombo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const midnightUtc = new Date(Date.parse(`${localToday}T00:00:00Z`) - 330 * 60_000);
+  for (const [minutes, amount] of [[-1, '1.0000'], [0, '2.0000'], [479, '3.0000'], [480, '4.0000']] as const) {
+    const sessionId = randomUUID(); const scheduledStartAt = new Date(midnightUtc.getTime() + minutes * 60_000);
+    await tenant.pTSession.create({ data: { id: sessionId, memberId: memberRow.id, trainerId: trainerRow.id, state: 'COMPLETED', type: 'IN_PERSON',
+      scheduledStartAt, scheduledEndAt: new Date(scheduledStartAt.getTime() + 60_000), gymTimezone: 'Asia/Colombo', fee: amount, currency: 'LKR',
+      confirmedAt: scheduledStartAt, confirmationRate: '0.200000', confirmationLevel: 'LEVEL_1', startedAt: scheduledStartAt,
+      endedAt: new Date(scheduledStartAt.getTime() + 60_000), configurationVersion: 0, createdByIdentityId: fixture.users.ownerA.id } });
+    await tenant.revenueRecord.create({ data: { sessionId, category: 'COMPLETED_SESSION', amount, currency: 'LKR', sourceKey: `session:${sessionId}:completed` } });
+  }
   const dashboard = await call(`/gyms/${slug}/dashboard`, owner); expect(dashboard.status).toBe(200); const data = await dashboard.json();
   expect(data.timeZone).toBe('Asia/Colombo'); expect(data.earningChart).toHaveLength(8); expect(data.metrics.membersInGym.definition).toContain('not a people count');
+  expect(data.rangeStart).toBe(midnightUtc.toISOString()); expect(data.metrics.todayOperationalEarning.value).toBe('9.0000');
+  expect(data.earningChart[0]).toMatchObject({ startHour: 6, endHour: 8, amount: '3.0000' });
+  expect(data.earningChart[1]).toMatchObject({ startHour: 8, endHour: 10, amount: '4.0000' });
   expect((await call(`/gyms/${slug}/dashboard`, await bearer(fixture.users.memberUser.id))).status).toBe(403);
   const analytics = await call(`/gyms/${slug}/analytics?window=6m`, owner); expect(analytics.status).toBe(200); const insights = await analytics.json();
   expect(insights.memberGrowth.points).toHaveLength(6); expect(insights.peakHours.points).toHaveLength(15); expect(insights.utilization.formula).toContain('overnight shifts wrap midnight');
+  const emptyGymAnalytics = await (await call(`/gyms/${fixture.gyms[1]!.slug}/analytics?window=30d`, await bearer(fixture.users.ownerB.id))).json();
+  expect(emptyGymAnalytics.utilization.points).toEqual([]);
+  expect(emptyGymAnalytics.peakHours.points.every((point: { sessionCount: number; averagePerDay: number }) => point.sessionCount === 0 && point.averagePerDay === 0)).toBe(true);
+  expect(emptyGymAnalytics.memberGrowth.points).toHaveLength(6);
+  expect(Number.isFinite(Date.parse(emptyGymAnalytics.rangeStart))).toBe(true);
   expect((await call(`/gyms/${slug}/analytics?window=invalid`, owner)).status).toBe(404);
   const audit = await call(`/gyms/${slug}/audit?page=1&pageSize=20&actionType=EXPENSE_CREATED`, owner); expect(audit.status).toBe(200);
   expect((await audit.json()).availableActionTypes).toContain('CSV_EXPORTED');
@@ -162,6 +209,19 @@ it('exports complete bounded row sets over 100, protects formulas, exports only 
   expect(page1.items.map((row: { id: string }) => row.id)).toEqual(sortedAuditRows.slice(0, 20).map(row => row.id));
   expect(page2.items.map((row: { id: string }) => row.id)).toEqual(sortedAuditRows.slice(20).map(row => row.id));
   expect(new Set([...page1.items, ...page2.items].map((row: { id: string }) => row.id)).size).toBe(27);
+  const supportRowId = randomUUID(); const supportReceipt = await tenant.commandReceipt.create({ data: { actorIdentityId: fixture.users.admin.id,
+    commandKind: 'FIXTURE_AUDIT', idempotencyKey: randomUUID(), requestDigest: `d1:${'f'.repeat(64)}`, state: 'COMMITTED', safeResult: {}, committedAt: new Date() } });
+  await tenant.auditLog.create({ data: { id: supportRowId, eventKey: `ta1:${createHash('sha256').update(supportRowId).digest('hex')}`,
+    contentDigest: createHash('sha256').update(`fixture-content:${supportRowId}`).digest('hex'), receiptId: supportReceipt.id,
+    actorIdentityId: fixture.users.admin.id, originalActorIdentityId: fixture.users.ownerA.id, eventCode: 'PT_SESSION_STARTED',
+    resourceType: 'PT_SESSION', resourceId: supportRowId, transition: { from: 'SCHEDULED', to: 'ACTIVE', version: 1, secret: 'must be redacted' } } });
+  const supportAudit = await (await call(`/gyms/${slug}/audit?page=1&pageSize=20&actionType=PT_SESSION_STARTED`, owner)).json();
+  expect(supportAudit.items.find((row: { id: string }) => row.id === supportRowId)).toMatchObject({ actorIdentityId: fixture.users.admin.id,
+    originalActorIdentityId: fixture.users.ownerA.id, transition: { from: 'SCHEDULED', to: 'ACTIVE', version: 1 } });
+  expect(JSON.stringify(supportAudit)).not.toContain('must be redacted');
+  expect((await call(`/gyms/${slug}/audit?page=1&pageSize=20&actionType=PT_SESSION_STARTED`, await bearer(fixture.users.ownerB.id))).status).toBe(403);
+  const otherGymAudit = await (await call(`/gyms/${fixture.gyms[1]!.slug}/audit?page=1&pageSize=20&actionType=PT_SESSION_STARTED`, await bearer(fixture.users.ownerB.id))).json();
+  expect(otherGymAudit.items).toEqual([]);
 });
 
 it('withholds platform totals for missing, stale and failed tenant summaries and refreshes only 25 gyms per cursor batch', async () => {

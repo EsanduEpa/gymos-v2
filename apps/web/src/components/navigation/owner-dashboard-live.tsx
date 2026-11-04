@@ -14,11 +14,12 @@ export function OwnerDashboardLive({ slug, initial }: { slug: string; initial: D
     const target = slug;
     const result = await loadOwnerDashboard(target);
     if (id !== sequence.current) return;
-    setData(result.data as Data | null);
+    if (!result.unavailable) setData(result.data as Data | null);
     setError(result.unavailable);
   }, [slug]);
   useEffect(() => {
     const requestSequence = sequence;
+    requestSequence.current++;
     const timer = window.setInterval(() => { void refresh(); }, 30_000);
     return () => { window.clearInterval(timer); requestSequence.current++; };
   }, [refresh]);

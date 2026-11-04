@@ -17,7 +17,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!token) return NextResponse.redirect(new URL('/login', request.url), 303);
   try {
     const response = await fetch(apiUrl(`/gyms/${encodeURIComponent(slug)}/financials/export`), { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-      body: JSON.stringify(input.data), cache: 'no-store', signal: AbortSignal.timeout(30_000) });
+      body: JSON.stringify(input.data), cache: 'no-store', signal: AbortSignal.any([request.signal, AbortSignal.timeout(30_000)]) });
     if (response.status === 401) return NextResponse.redirect(new URL('/login?error=expired', request.url), 303);
     if (response.status === 403 || response.status === 404) return new NextResponse('Export is not available for this account.', { status: response.status });
     if (!response.ok) return NextResponse.redirect(destination, 303);
