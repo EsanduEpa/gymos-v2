@@ -53,6 +53,7 @@ export const memberListSchema = pageSchema(memberListItemSchema);
 
 export const memberDetailSchema = z.strictObject({
   id: idSchema, fullName: z.string().min(2).max(120), email: z.email().max(254).nullable(),
+  gymCurrency: z.enum(['LKR', 'USD']).nullable(),
   accountState: memberAccountStateSchema, joinedAt: isoInstantSchema,
   phone: z.string().max(40).nullable(), dateOfBirth: localDateSchema.nullable(),
   emergencyContact: z.string().max(240).nullable(), healthNotes: z.string().max(4000).nullable(),
@@ -62,6 +63,8 @@ export const memberDetailSchema = z.strictObject({
   membershipPage: z.number().int().min(1), membershipPageSize: z.number().int().min(1).max(100),
   membershipTotalCount: z.number().int().nonnegative(), membershipTotalPages: z.number().int().nonnegative(),
   sessionPacks: z.array(z.strictObject({ id: idSchema, issuedCredits: z.number().int().min(1).max(1000), availableCredits: z.number().int().min(0).max(1000),
+    heldCredits: z.number().int().min(0).max(1000), consumedCredits: z.number().int().min(0).max(1000), expiredCredits: z.number().int().min(0).max(1000),
+    validityDays: z.number().int().min(1).max(3650),
     price: nonnegativeDecimalStringSchema, currency: z.enum(['LKR', 'USD']), startDate: localDateSchema, endDateExclusive: localDateSchema,
     status: z.enum(['ACTIVE', 'EXPIRED', 'DEPLETED']) })).max(100),
   recentSessions: z.array(z.strictObject({ id: idSchema, scheduledStart: isoInstantSchema, state: z.string().min(1).max(40) })).max(5),

@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 import { seedTwoGymFixture } from '../../api/test/fixtures/two-gym-fixture.js';
 import { createDisposableEnvironment } from '../../api/test/support/disposable-environment.js';
+import { requestDigest } from '../../api/src/operations/primitives.js';
 
 // Authentication scenarios must never persist bearer/password traffic in traces.
 test.use({ trace: 'off', screenshot: 'off' });
@@ -109,6 +110,12 @@ async function openWithTestSession(page: Page, userId: string, path: string, exp
     sameSite: 'Lax',
   }]);
   await page.goto(`${webBase}${path}`);
+}
+
+function localDate(instant: Date, timeZone: string) {
+  const values = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(instant);
+  const parts = Object.fromEntries(values.map(value => [value.type, value.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
 async function openGymWithTestSession(page: Page, userId: string, slug: string, expiresIn = 900): Promise<void> {
@@ -658,6 +665,108 @@ test('trainer registration enforces owner and selected-gym access, then hands of
   } finally { await trainerContext.close(); }
 });
 
+test('trainer roster/profile and member directory are usable at mobile width without exposing contact fields', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const gym = fixture.gyms[0]!;
+  const tenant = fixture.tenants[0]!;
+  const memberId = (await tenant.member.findUniqueOrThrow({ where: { identityId: fixture.users.memberUser.id } })).id;
+  const trainerId = (await tenant.trainer.findUniqueOrThrow({ where: { identityId: fixture.users.trainerUser.id } })).id;
+  await tenant.trainer.update({ where: { id: trainerId }, data: { shiftStart: '09:00', shiftEnd: '18:00' } });
+  const gymToday = localDate(new Date(), 'Asia/Colombo');
+  const packStart = new Date(`${gymToday}T00:00:00.000Z`);
+  const packEnd = new Date(packStart); packEnd.setUTCDate(packEnd.getUTCDate() + 90);
+  const plan = await tenant.membershipPlan.create({ data: { name: `Task039 request term ${environment.runId}`, price: '0.00', currency: 'LKR', durationDays: 90 } });
+  await tenant.membershipTerm.create({ data: { memberId, planId: plan.id, startDate: packStart, endDateExclusive: packEnd, agreedPrice: '0.00', currency: 'LKR',
+    planNameSnapshot: plan.name, configurationVersion: 0, actorIdentityId: fixture.users.ownerA.id, idempotencyKey: `task039-request-term-${environment.runId}`,
+    requestDigest: requestDigest({ runId: environment.runId, task: '039-request-term' }) } });
+  const packReceipt = await tenant.commandReceipt.create({ data: { actorIdentityId: fixture.users.ownerA.id,
+    commandKind: 'TEST_DIRECTORY_REQUEST_PACK', idempotencyKey: `task039-request-pack-${environment.runId}`,
+    requestDigest: requestDigest({ runId: environment.runId, task: '039-request-pack' }), state: 'COMMITTED', committedAt: new Date(), safeResult: { state: 'COMPLETE' } } });
+  const pack = await tenant.sessionPack.create({ data: { memberId, issuedCredits: 2, price: '100.00', currency: 'LKR', totalMinorUnits: BigInt(10_000),
+    creditBaseMinorUnits: BigInt(5_000), creditRemainder: 0, creditAllocationPolicyVersion: 'DEC-06-v1', validityDays: 90,
+    startDate: packStart, endDateExclusive: packEnd, commandReceiptId: packReceipt.id, actorIdentityId: fixture.users.ownerA.id,
+    idempotencyKey: `task039-request-pack-${environment.runId}`, requestDigest: requestDigest({ runId: environment.runId, task: '039-request-pack' }) } });
+  await tenant.packCreditMovement.create({ data: { packId: pack.id, kind: 'ISSUE', availableDelta: 2, heldDelta: 0, consumedDelta: 0, expiredDelta: 0,
+    sourceKey: `task039-request-pack-issue-${environment.runId}`, receiptId: packReceipt.id, actorIdentityId: fixture.users.ownerA.id } });
+  const sessionStart = new Date('2026-11-01T04:00:00.000Z');
+  await tenant.pTSession.create({ data: { id: `task037-profile-${environment.runId}`, memberId, trainerId, state: 'COMPLETED', type: 'IN_PERSON',
+    scheduledStartAt: sessionStart, scheduledEndAt: new Date(sessionStart.getTime() + 60 * 60_000), gymTimezone: 'Asia/Colombo', fee: '100.0000', currency: 'LKR',
+    confirmationRate: '0.400000', confirmationLevel: 'LEVEL_1', configurationVersion: 0, confirmedAt: sessionStart,
+    startedAt: sessionStart, endedAt: new Date(sessionStart.getTime() + 60 * 60_000), createdByIdentityId: fixture.users.ownerA.id,
+    createdAt: sessionStart, updatedAt: sessionStart } });
+  await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${gym.slug}/owner/trainers`);
+  await expect(page.getByRole('heading', { name: 'Trainers', level: 1 })).toBeVisible();
+  const trainerRow = page.getByRole('row').filter({ hasText: 'Trainer Alpha' });
+  const trainerProfileLink = trainerRow.getByRole('link', { name: 'View profile' });
+  await expect(trainerProfileLink).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: '/tmp/gymos-task037-owner-roster-390.png', fullPage: true });
+
+  await trainerProfileLink.click();
+  await expect(page.getByRole('heading', { name: 'Trainer Alpha', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Approve recurring shift' })).toBeVisible();
+  await expect(page.locator('.trainer-profile-session-metrics')).toContainText(/Related clients\s*1/);
+  await expect(page.locator('.trainer-profile-session-metrics')).toContainText(/Completed sessions\s*1/);
+  await expect(page.locator('.trainer-profile-session-metrics')).toContainText(/Completed in latest ten\s*1/);
+  await expect(page.locator('.trainer-profile-sessions')).toContainText('COMPLETED');
+  await expect(page.locator('.trainer-profile-sessions')).toContainText('Nov 1, 2026, 9:30 AM');
+  await expect(page.getByText('Ratings are unavailable until members submit ratings.')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: '/tmp/gymos-task037-owner-profile-390.png', fullPage: true });
+
+  await openWithTestSession(page, fixture.users.memberUser.id, `/gyms/${gym.slug}/member/trainers`);
+  await expect(page.getByRole('heading', { name: 'Find a trainer', level: 1 })).toBeVisible();
+  const card = page.locator('.trainer-directory-card').filter({ hasText: 'Trainer Alpha' });
+  await expect(card).toBeVisible();
+  await expect(card).not.toContainText(fixture.users.trainerUser.email);
+  await expect(card).toContainText('Rating unavailable');
+  const requestLink = card.getByRole('link', { name: 'Request this trainer' });
+  await expect(requestLink).toHaveAttribute('href', new RegExp(`/gyms/${gym.slug}/member/trainers/${trainerId}/book`));
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: '/tmp/gymos-task039-member-directory-390.png', fullPage: true });
+  await requestLink.click();
+  await expect(page).toHaveURL(new RegExp(`/gyms/${gym.slug}/member/trainers/${trainerId}/book`));
+  await expect(page.getByRole('heading', { name: 'Request a trainer', level: 1 })).toBeVisible();
+  const requestDate = localDate(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), 'Asia/Colombo');
+  const startingEffects = { sessions: await tenant.pTSession.count(), holds: await tenant.sessionCreditHold.count(), movements: await tenant.packCreditMovement.count() };
+  await page.getByLabel('Session date').fill(requestDate);
+  await page.getByLabel(/Start time/).fill('10:00');
+  await page.getByLabel('Note for the trainer (optional)').fill('Please focus on beginner strength training.');
+  await page.getByRole('button', { name: 'Request session' }).click();
+  await expect(page.getByRole('status')).toContainText('The trainer must accept before credit is reserved.');
+  const requested = await tenant.pTSession.findFirstOrThrow({ where: { memberId, trainerId, state: 'PENDING_CONFIRMATION' }, orderBy: { createdAt: 'desc' } });
+  expect({ sessions: await tenant.pTSession.count(), holds: await tenant.sessionCreditHold.count(), movements: await tenant.packCreditMovement.count() })
+    .toEqual({ sessions: startingEffects.sessions + 1, holds: startingEffects.holds, movements: startingEffects.movements });
+
+  await openWithTestSession(page, fixture.users.trainerUser.id, `/gyms/${gym.slug}/trainer/requests`);
+  const acceptCard = page.locator('.session-request-card').filter({ hasText: 'Please focus on beginner strength training.' });
+  await expect(acceptCard).toBeVisible();
+  await acceptCard.getByRole('button', { name: 'Accept and reserve one credit' }).click();
+  await expect.poll(async () => (await tenant.pTSession.findUniqueOrThrow({ where: { id: requested.id } })).state).toBe('SCHEDULED');
+  await expect(page.getByRole('heading', { name: 'No pending requests' })).toBeVisible();
+  expect((await tenant.pTSession.findUniqueOrThrow({ where: { id: requested.id } })).state).toBe('SCHEDULED');
+  expect((await tenant.sessionCreditHold.findUniqueOrThrow({ where: { sessionId: requested.id } })).state).toBe('HELD');
+  expect(await tenant.packCreditMovement.count()).toBe(startingEffects.movements + 1);
+
+  await openWithTestSession(page, fixture.users.memberUser.id, `/gyms/${gym.slug}/member/trainers/${trainerId}/book`);
+  await page.getByLabel('Session date').fill(requestDate);
+  await page.getByLabel(/Start time/).fill('11:00');
+  await page.getByLabel('Note for the trainer (optional)').fill('Please review my shoulder warmup.');
+  await page.getByRole('button', { name: 'Request session' }).click();
+  await expect(page.getByRole('status')).toContainText('The trainer must accept before credit is reserved.');
+  const declinedRequest = await tenant.pTSession.findFirstOrThrow({ where: { memberId, trainerId, state: 'PENDING_CONFIRMATION' }, orderBy: { createdAt: 'desc' } });
+  await openWithTestSession(page, fixture.users.trainerUser.id, `/gyms/${gym.slug}/trainer/requests`);
+  const declineCard = page.locator('.session-request-card').filter({ hasText: 'Please review my shoulder warmup.' });
+  await expect(declineCard).toBeVisible();
+  await declineCard.getByLabel('Optional message for the member').fill('I am unavailable at that time. Please choose another slot.');
+  await declineCard.getByRole('button', { name: 'Decline request' }).click();
+  await expect.poll(async () => (await tenant.pTSession.findUniqueOrThrow({ where: { id: declinedRequest.id } })).state).toBe('DECLINED');
+  expect(await tenant.sessionCreditHold.count()).toBe(startingEffects.holds + 1);
+  expect(await tenant.packCreditMovement.count()).toBe(startingEffects.movements + 1);
+  await openWithTestSession(page, fixture.users.memberUser.id, `/gyms/${gym.slug}/member/sessions?mode=month&month=${requestDate.slice(0, 7)}`);
+  await expect(page.getByText('I am unavailable at that time. Please choose another slot.')).toBeVisible();
+});
+
 test('V1 Classic branding stays readable and keeps identical geometry at approved widths', async ({ page }) => {
   test.setTimeout(120_000);
   await mkdir(classicEvidenceDirectory, { recursive: true });
@@ -913,6 +1022,10 @@ test('platform registry supports audited read-only gym selection, switching, exi
   const reason=page.getByRole('textbox',{name:/^Support reason/});await reason.fill('Synthetic owner-summary diagnosis');
   await page.getByRole('button',{name:'Enter support',exact:true}).click();
   await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/owner$`));
+  // The server action can change the URL before the streamed owner shell has
+  // rendered its selected gym. Read support context from a fresh document.
+  await page.goto('about:blank');
+  await page.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/owner`);
   await expect(page.locator('.support-banner')).toContainText('Viewing Test Gym Alpha');
   await expect(page.locator('.support-banner')).toBeVisible();
   await expect(page.getByRole('heading',{name:'Test Gym Alpha',exact:true})).toBeVisible();
@@ -1185,7 +1298,10 @@ test('member roster and profile keep role, tenant, privacy, empty, and dependenc
   const alpha = fixture.gyms[0].slug;
   const beta = fixture.gyms[1].slug;
   const betaMember = await fixture.tenants[1].member.findFirstOrThrow();
-  const enrolled = await fixture.tenants[0].member.findFirstOrThrow({ where: { identityId: fixture.users.memberUser.id } });
+  // Task 039 above intentionally adds a term, pack and sessions to the linked
+  // fixture member. Keep this empty-profile assertion independent from that
+  // journey by using a separate active, unlinked synthetic member.
+  const profileMember = await fixture.tenants[0].member.findFirstOrThrow({ where: { fullName: 'Alpha Person 002' } });
   const before = await Promise.all([
     fixture.master.operation.count(), fixture.master.platformAuditLog.count(), fixture.tenants[0].auditLog.count(),
     fixture.tenants[0].membershipTerm.count(), fixture.tenants[1].auditLog.count(),
@@ -1201,15 +1317,15 @@ test('member roster and profile keep role, tenant, privacy, empty, and dependenc
   await page.getByRole('button', { name: 'Apply filters' }).click();
   await expect(page.getByText('No matching members.')).toBeVisible();
   await expect(page.getByText('0 matching members')).toBeVisible();
-  await page.getByLabel('Search members').fill(enrolled.email!);
+  await page.getByLabel('Search members').fill(profileMember.email!);
   await page.getByRole('button', { name: 'Apply filters' }).click();
-  await expect(page.locator('.member-list')).toContainText(enrolled.fullName);
+  await expect(page.locator('.member-list')).toContainText(profileMember.fullName);
   const ownerCookie = (await page.context().cookies()).find(cookie => cookie.name === 'gymos_access_token')!.value;
   const ownerHeaders = { authorization: `Bearer ${ownerCookie}` };
-  const ownerProfile = await request.get(`${apiBase}/gyms/${alpha}/members/${enrolled.id}`, { headers: ownerHeaders });
+  const ownerProfile = await request.get(`${apiBase}/gyms/${alpha}/members/${profileMember.id}`, { headers: ownerHeaders });
   expect(ownerProfile.status()).toBe(200);
   const profile = await ownerProfile.json();
-  expect(profile.accountState).toBe('OPERATIONAL');
+  expect(profile.accountState).toBe('BASIC');
   expect(profile.memberships).toEqual([]);
   expect(profile.sessionPacks).toEqual([]);
   expect(profile.recentSessions).toEqual([]);
@@ -1225,7 +1341,7 @@ test('member roster and profile keep role, tenant, privacy, empty, and dependenc
     const token = (await page.context().cookies()).find(cookie => cookie.name === 'gymos_access_token')!.value;
     const headers = { authorization: `Bearer ${token}` };
     const list = await request.get(`${apiBase}/gyms/${alpha}/members`, { headers });
-    const detail = await request.get(`${apiBase}/gyms/${alpha}/members/${enrolled.id}`, { headers });
+    const detail = await request.get(`${apiBase}/gyms/${alpha}/members/${profileMember.id}`, { headers });
     expect(list.status()).toBe(403);
     expect(detail.status()).toBe(403);
     const session = await request.get(`${apiBase}/auth/session`, { headers });
@@ -1236,8 +1352,8 @@ test('member roster and profile keep role, tenant, privacy, empty, and dependenc
     }
   }
 
-  await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${alpha}/owner/members/${enrolled.id}`);
-  await expect(page.getByRole('heading', { name: enrolled.fullName, level: 1 })).toBeVisible();
+  await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${alpha}/owner/members/${profileMember.id}`);
+  await expect(page.getByRole('heading', { name: profileMember.fullName, level: 1 })).toBeVisible();
   const tabs = page.getByRole('tablist').first();
   const overview = tabs.getByRole('tab', { name: 'Overview' });
   await overview.focus();
@@ -1248,6 +1364,15 @@ test('member roster and profile keep role, tenant, privacy, empty, and dependenc
   await page.keyboard.press('Home');
   await expect(overview).toBeFocused();
   await expect(page.getByRole('tabpanel')).toHaveAttribute('tabindex', '0');
+  await tabs.getByRole('tab', { name: 'Membership & Packs' }).click();
+  await page.getByLabel('Session credits').fill('3');
+  await page.getByLabel('Validity in days').fill('90');
+  await page.getByLabel('Agreed pack price').fill('0');
+  await page.getByRole('button', { name: 'Issue pack' }).click();
+  await expect(page.getByText('Issued 3 session credits. No payment was recorded.')).toBeVisible();
+  await expect(page.locator('.session-pack-panel')).toContainText('3 sessions issued');
+  await expect(page.locator('.session-pack-panel')).toContainText('3 available');
+  expect(await fixture.tenants[0]!.sessionPack.count({ where: { memberId: profileMember.id } })).toBe(1);
   await page.setViewportSize({ width: 320, height: 700 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: join(memberEvidence, 'profile-320.png'), fullPage: true, animations: 'disabled' });
@@ -1260,7 +1385,7 @@ test('member roster and profile keep role, tenant, privacy, empty, and dependenc
     await fixture.tenants[0].gymConfiguration.update({ where: { id: 'current' }, data: { timezone: 'Asia/Colombo' } });
     await page.getByRole('link', { name: 'Retry' }).focus();
     await page.keyboard.press('Enter');
-    await expect(page.getByRole('heading', { name: enrolled.fullName, level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: profileMember.fullName, level: 1 })).toBeVisible();
   } finally {
     await fixture.tenants[0].gymConfiguration.update({ where: { id: 'current' }, data: { timezone: 'Asia/Colombo' } });
   }
@@ -1268,7 +1393,7 @@ test('member roster and profile keep role, tenant, privacy, empty, and dependenc
     fixture.master.operation.count(), fixture.master.platformAuditLog.count(), fixture.tenants[0].auditLog.count(),
     fixture.tenants[0].membershipTerm.count(), fixture.tenants[1].auditLog.count(),
   ]);
-  expect(after).toEqual(before);
+  expect(after).toEqual([before[0], before[1], before[2] + 1, before[3], before[4]]);
 });
 
 test('member roster and profile expose accessible loading states while tenant reads wait', async ({ page }) => {

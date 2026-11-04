@@ -1,0 +1,16 @@
+.form { display: grid; gap: 1.25rem; }
+.fields, .rowFields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.fields label, .rowFields label { display: grid; gap: .4rem; font-weight: 600; }
+.fields input, .fields textarea, .rowFields input, .rowFields textarea { width: 100%; min-width: 0; padding: .65rem .75rem; border: 1px solid var(--ui-border, #cbd5e1); border-radius: .5rem; color: inherit; background: var(--ui-surface, white); }
+.assigned, .rowHeader p { color: var(--ui-muted, #64748b); margin: 0; }
+.rowHeader { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.rowHeader h2 { margin: 0 0 .25rem; }
+.rows { display: grid; gap: 1rem; }
+.row { min-width: 0; padding: 1rem; border: 1px solid var(--ui-border, #cbd5e1); border-radius: .75rem; }
+.row legend { padding-inline: .4rem; font-weight: 700; }
+.rowFields { margin-bottom: 1rem; }
+.notes { grid-column: 1 / -1; }
+.error, .success { padding: .75rem; border-radius: .5rem; }
+.error { color: #991b1b; background: #fef2f2; }
+.success { color: #166534; background: #f0fdf4; }
+@media (max-width: 640px) { .fields, .rowFields { grid-template-columns: 1fr; } .rowHeader { align-items: flex-start; flex-direction: column; } }

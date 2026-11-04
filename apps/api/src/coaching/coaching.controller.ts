@@ -1,0 +1,64 @@
+import { Body, Controller, ForbiddenException, Get, Headers, Param, Post, Query, Req, UnprocessableEntityException, UseGuards } from '@nestjs/common';
+import { idempotencyKeySchema, mealPlanCreateSchema, memberWorkoutPlansQuerySchema, trainerClientQuerySchema, workoutPlanCreateSchema } from '@gymos/contracts';
+import { GymAccessGuard, type GymRequest } from '../gym-access.guard.js';
+import { CoachingService } from './coaching.service.js';
+
+@Controller('gyms/:slug/me')
+@UseGuards(GymAccessGuard)
+export class CoachingController {
+  constructor(private readonly coaching: CoachingService) {}
+
+  @Get('clients')
+  listClients(@Req() request: GymRequest, @Query() query: unknown) {
+    const access = request.gymAccess;
+    if (!access || access.role !== 'TRAINER' || access.actor?.kind !== 'TRAINER') throw new ForbiddenException('Trainer access is required');
+    const parsed = trainerClientQuerySchema.safeParse(query ?? {});
+    if (!parsed.success) throw new UnprocessableEntityException('Enter valid client filters and page details');
+    return this.coaching.listClients(access, parsed.data);
+  }
+
+  @Get('clients/:memberId')
+  clientProfile(@Req() request: GymRequest, @Param('memberId') memberId: string) {
+    const access = request.gymAccess;
+    if (!access || access.role !== 'TRAINER' || access.actor?.kind !== 'TRAINER') throw new ForbiddenException('Trainer access is required');
+    return this.coaching.clientProfile(access, memberId);
+  }
+
+  @Post('clients/:memberId/workout-plans')
+  createWorkoutPlan(@Req() request: GymRequest, @Param('memberId') memberId: string, @Headers('idempotency-key') key: unknown, @Body() body: unknown) {
+    const access = request.gymAccess;
+    if (!access || access.role !== 'TRAINER' || access.actor?.kind !== 'TRAINER') throw new ForbiddenException('Trainer access is required');
+    const parsed = workoutPlanCreateSchema.safeParse(body);
+    const idempotencyKey = idempotencyKeySchema.safeParse(key);
+    if (!parsed.success || !idempotencyKey.success) throw new UnprocessableEntityException('Provide a valid workout plan and idempotency key');
+    return this.coaching.createWorkoutPlan(access, memberId, idempotencyKey.data, parsed.data);
+  }
+
+  @Post('clients/:memberId/meal-plans')
+  createMealPlan(@Req() request: GymRequest, @Param('memberId') memberId: string, @Headers('idempotency-key') key: unknown, @Body() body: unknown) {
+    const access = request.gymAccess;
+    if (!access || access.role !== 'TRAINER' || access.actor?.kind !== 'TRAINER') throw new ForbiddenException('Trainer access is required');
+    const parsed = mealPlanCreateSchema.safeParse(body);
+    const idempotencyKey = idempotencyKeySchema.safeParse(key);
+    if (!parsed.success || !idempotencyKey.success) throw new UnprocessableEntityException('Provide a valid meal plan and idempotency key');
+    return this.coaching.createMealPlan(access, memberId, idempotencyKey.data, parsed.data);
+  }
+
+  @Get('workout-plans')
+  memberWorkoutPlans(@Req() request: GymRequest, @Query() query: unknown) {
+    const access = request.gymAccess;
+    if (!access || access.role !== 'MEMBER' || access.actor?.kind !== 'MEMBER') throw new ForbiddenException('Member access is required');
+    const parsed = memberWorkoutPlansQuerySchema.safeParse(query ?? {});
+    if (!parsed.success) throw new UnprocessableEntityException('Enter valid workout plan page details');
+    return this.coaching.memberWorkoutPlans(access, parsed.data);
+  }
+
+  @Get('meal-plans')
+  memberMealPlans(@Req() request: GymRequest, @Query() query: unknown) {
+    const access = request.gymAccess;
+    if (!access || access.role !== 'MEMBER' || access.actor?.kind !== 'MEMBER') throw new ForbiddenException('Member access is required');
+    const parsed = memberWorkoutPlansQuerySchema.safeParse(query ?? {});
+    if (!parsed.success) throw new UnprocessableEntityException('Enter valid meal plan page details');
+    return this.coaching.memberMealPlans(access, parsed.data);
+  }
+}

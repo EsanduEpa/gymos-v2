@@ -1,0 +1,20 @@
+.tabs { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 14px; }
+.tabs a { padding:8px 12px; border:1px solid var(--classic-border); border-radius:8px; color:var(--classic-text); background:var(--classic-surface); text-decoration:none; }
+.details { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr)); gap:10px; margin:0; }
+.details div { padding:10px; border:1px solid var(--classic-border); border-radius:8px; }
+.details dt { color:var(--classic-text-muted); font-size:11px; }
+.details dd { margin:4px 0 0; overflow-wrap:anywhere; }
+.health { margin-top:16px; padding:12px; border-radius:9px; background:var(--classic-surface-muted); }
+.health h2 { margin:0 0 6px; font-size:14px; }
+.health p,.hint { color:var(--classic-text-secondary); font-size:12px; line-height:1.5; white-space:pre-wrap; }
+.planList { display:grid; gap:10px; margin-bottom:14px; }
+.plan { padding:13px; border:1px solid var(--classic-border); border-radius:9px; }
+.plan h3 { margin:0 0 6px; font-size:14px; }
+.plan p { margin:0 0 6px; white-space:pre-wrap; }
+.plan small { color:var(--classic-text-muted); }
+.plan ol,.plan ul { margin:8px 0 0; padding-left:22px; }
+.plan li { padding:2px 0; overflow-wrap:anywhere; font-size:12px; }
+.history { display:grid; gap:8px; padding-left:22px; }
+.history li { padding:5px 0; }
+.history time { margin-left:8px; color:var(--classic-text-muted); font-size:12px; }
+.history p { margin:5px 0 0; white-space:pre-wrap; }

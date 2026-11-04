@@ -2,7 +2,7 @@
 
 > **Segment 04 automated completion — 31 October 2026 at `c9af453`:** Segments 01–04 completed (23/6/6/5 tasks); **40/88 completed, 48 remaining**. All 11 hosted checks passed in [run 41210839760](https://github.com/EsanduEpa/gymos-v2/actions/runs/41210839760). [Segment 04 handoff](../SEGMENT_04_HANDOFF.md). Owner manual acceptance for Segments 02–04 remains pending; PRs #1–4 remain draft/unmerged under the manual safeguard.
 
-This matrix assigns every authoritative task and every V1 route responsibility to one owning segment. A dependency may consume an outcome but must not duplicate ownership. Task statuses reflect the tracker synchronized 31 October 2026.
+This matrix assigns every authoritative task and every V1 route responsibility to one owning segment. A dependency may consume an outcome but must not duplicate ownership. Task statuses reflect the tracker synchronized 3 November 2026.
 
 ## 1. Authoritative task coverage (88/88 assigned)
 
@@ -41,16 +41,16 @@ This matrix assigns every authoritative task and every V1 route responsibility t
 | GYMOS-MIG-031 | Member registration | O03; `actions/members.ts` | member enrollment saga/API/UI | 05 | GYMOS-MIG-031 | COMPLETED |
 | GYMOS-MIG-032 | Member list/profile | O02/O04 | member query/detail/UI | 05 | GYMOS-MIG-032 | COMPLETED |
 | GYMOS-MIG-033 | Member status/hold release | O04 status action | recoverable member status command | 07 | GYMOS-MIG-033 | NOT STARTED |
-| GYMOS-MIG-034 | Session packs/balance | O04; `actions/packs.ts` | pack/hold ledger projection | 07 | GYMOS-MIG-034 | NOT STARTED |
+| GYMOS-MIG-034 | Session packs/balance | O04; `actions/packs.ts` | pack issuance API, ledger projection and owner form | 07 | GYMOS-MIG-034 | IN PROGRESS |
 | GYMOS-MIG-035 | Enrollment recovery journey | O03→O04 | two-gym browser/integration evidence | 05 | GYMOS-MIG-035 | COMPLETED |
-| GYMOS-MIG-036 | Trainer registration | O06; `actions/trainers.ts` | trainer enrollment saga/API/UI | 06 | GYMOS-MIG-036 | IN PROGRESS |
-| GYMOS-MIG-037 | Trainer roster/profile/shifts | O05/O07 | trainer queries/status/shift UI | 06 | GYMOS-MIG-037 | NOT STARTED |
+| GYMOS-MIG-036 | Trainer registration | O06; `actions/trainers.ts` | trainer enrollment saga/API/UI | 06 | GYMOS-MIG-036 | COMPLETED |
+| GYMOS-MIG-037 | Trainer roster/profile/shifts | O05/O07 | trainer queries/status/shift UI | 06 | GYMOS-MIG-037 | IN PROGRESS |
 | GYMOS-MIG-038 | Trainer deactivate/reactivate | O07 | recoverable trainer status command | 06 | GYMOS-MIG-038 | NOT STARTED |
-| GYMOS-MIG-039 | Member trainer directory | M01 | member-safe trainer query/UI | 06 | GYMOS-MIG-039 | NOT STARTED |
-| GYMOS-MIG-040 | Session aggregate/holds/transitions | `PTSession`, pricing/session actions | tenant session module/schema | 07 | GYMOS-MIG-040 | NOT STARTED |
+| GYMOS-MIG-039 | Member trainer directory | M01 | member-safe trainer query/UI | 06 | GYMOS-MIG-039 | IN PROGRESS |
+| GYMOS-MIG-040 | Session aggregate/holds/transitions | `PTSession`, pricing/session actions | tenant session module/schema | 07 | GYMOS-MIG-040 | IN PROGRESS |
 | GYMOS-MIG-041 | Owner booking | O09; `bookSession` | atomic booking API/UI | 07 | GYMOS-MIG-041 | NOT STARTED |
 | GYMOS-MIG-042 | Request + accept/decline | M02/T01 | request/response commands/UI | 07 | GYMOS-MIG-042 | NOT STARTED |
-| GYMOS-MIG-043 | Notifications/audit reads | bell; notification/audit actions | selected-gym notification/audit module | 07 | GYMOS-MIG-043 | NOT STARTED |
+| GYMOS-MIG-043 | Notifications/audit reads | bell; notification/audit actions | selected-gym notification/audit module | 07 | GYMOS-MIG-043 | IN PROGRESS |
 | GYMOS-MIG-044 | Session read views | O08/T01/M03 and member profile | role projections/pages and recent-session panel | 07 | GYMOS-MIG-044 | NOT STARTED |
 | GYMOS-MIG-045 | Start/shared notes | T01; session actions | guarded lifecycle commands | 07 | GYMOS-MIG-045 | NOT STARTED |
 | GYMOS-MIG-046 | Complete exactly once | `endSession` | settlement transaction/receipt | 07 | GYMOS-MIG-046 | NOT STARTED |
@@ -142,4 +142,6 @@ Additional interfaces: L01/L02/X01–X03 belong to segments 01/02/09; H01 belong
 - **Conflicts:** approved addenda override stale pre-start completion, fake DeskPayment/receipt/subscription billing, expanded theme, and meal-day assumptions. See `../MIGRATION_DECISIONS.md`.
 - **Coverage conclusion:** all 88 original task IDs have one unique segment assignment; all 29/29 route responsibilities have a static owner. Runtime/visual/functional parity is not yet proven and must not be described as 100% migrated.
 
-Segment 06 continuation — 3 November 2026: Task 036 remains IN PROGRESS. Publication policy is tested inside 036; positive directory consumer verification is owned by 039 and booking eligibility by 041. Tasks 040/043 are later session/lifecycle prerequisites for 038/booking behavior, not prerequisites for 036. Current continuation checks and Docker socket limitation are recorded in [036 evidence](../evidence/GYMOS-MIG-036.md).
+Segment 06 update — 3 November 2026: Task 036 completed in PR #7 (`8c01842`); all 11 hosted checks passed. Tasks 037 and 039 are In Progress with guarded two-gym API and 390px browser evidence. Task 037 session summaries await Segment 07 session records; Task 039's request destination awaits Task 042. Task 038 needs 040/043; Tasks 050–052 need 041/042/044, with 051/052 also depending on 050. See [036](../evidence/GYMOS-MIG-036.md), [037](../evidence/GYMOS-MIG-037.md), and [039](../evidence/GYMOS-MIG-039.md) evidence.
+
+Segment 07 update — 3 November 2026: Tasks 040 and 043 are In Progress with verified foundations, not complete tasks. 034 now has an owner issuance API/form and a ledger-derived balance projection, but its 040 dependency and remaining failure acceptance are open. Task 033 and downstream booking/session workflows remain unstarted. See [034](../evidence/GYMOS-MIG-034.md), [040](../evidence/GYMOS-MIG-040.md) and [043](../evidence/GYMOS-MIG-043.md).

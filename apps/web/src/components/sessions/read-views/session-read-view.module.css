@@ -1,0 +1,39 @@
+.filters { display:grid; grid-template-columns:repeat(4,minmax(130px,1fr)) auto; align-items:end; gap:12px; margin:4px 0 18px; }
+.filters label { display:grid; gap:6px; min-width:0; color:var(--classic-text-secondary); font-size:12px; font-weight:650; }
+.filters input,.filters select { min-width:0; width:100%; min-height:40px; padding:8px 10px; border:1px solid var(--classic-border); border-radius:8px; background:var(--classic-surface); color:var(--classic-text); }
+.switcher { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 14px; }
+.switcher a { display:inline-flex; align-items:center; min-height:36px; padding:6px 12px; border:1px solid var(--classic-border); border-radius:8px; color:var(--classic-text); font-size:12px; text-decoration:none; }
+.switcher a[aria-current="page"] { border-color:var(--gym-color); background:var(--gym-color); color:var(--gym-on-color,#fff); }
+.toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin:0 0 14px; }
+.toolbar p { margin:0; color:var(--classic-text-muted); font-size:12px; }
+.toolbar a { text-decoration:none; }
+.refresh { white-space:nowrap; }
+.stateCounts { display:grid; grid-template-columns:repeat(auto-fit,minmax(115px,1fr)); gap:8px; margin:0 0 16px; }
+.stateCount { display:grid; gap:3px; padding:10px 12px; border:1px solid var(--classic-border); border-radius:10px; background:var(--classic-surface); }
+.stateCount span { color:var(--classic-text-muted); font-size:11px; }
+.stateCount strong { font-size:18px; }
+.tableWrap { width:100%; overflow:auto; border:1px solid var(--classic-border); border-radius:10px; }
+.table { width:100%; min-width:780px; border-collapse:collapse; font-size:13px; }
+.table th,.table td { padding:12px; border-bottom:1px solid var(--classic-border); text-align:left; vertical-align:top; }
+.table th { background:var(--classic-surface-muted); color:var(--classic-text-secondary); font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
+.table tr:last-child td { border-bottom:0; }
+.table td small { display:block; margin-top:4px; color:var(--classic-text-muted); }
+.cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr)); gap:12px; }
+.sessionCard { display:grid; gap:10px; min-width:0; padding:16px; border:1px solid var(--classic-border); border-radius:12px; background:var(--classic-surface); }
+.sessionCard h2 { margin:0; font-size:16px; overflow-wrap:anywhere; }
+.sessionCard p { margin:0; color:var(--classic-text-secondary); font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
+.sessionCard time { font-weight:650; }
+.sessionMeta { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.sessionNotes { padding:10px; border-radius:8px; background:var(--classic-surface-muted); white-space:pre-wrap; }
+.affordance { padding-top:9px; border-top:1px solid var(--classic-border); color:var(--classic-text-muted)!important; font-size:11px!important; }
+.timer { display:inline-block; padding:5px 8px; border-radius:7px; background:var(--classic-primary-soft); color:var(--classic-primary); font-variant-numeric:tabular-nums; font-weight:700; }
+.empty { padding:30px 18px; border:1px dashed var(--classic-border); border-radius:12px; text-align:center; }
+.empty h2 { margin:0 0 6px; font-size:16px; }
+.empty p { margin:0; color:var(--classic-text-muted); font-size:13px; }
+.pager { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding-top:16px; }
+.pager p { margin:0; color:var(--classic-text-muted); font-size:12px; }
+.pagerLinks { display:flex; gap:8px; }
+.failure { display:grid; justify-items:start; gap:10px; padding:20px; border:1px solid #f0c2c2; border-radius:12px; background:#fffafa; }
+.failure p { margin:0; color:#8d2727; }
+@media(max-width:900px) { .filters { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:560px) { .filters { grid-template-columns:minmax(0,1fr); }.filters button { width:100%; }.pager { align-items:stretch; flex-direction:column; }.pagerLinks .ui-button { flex:1; justify-content:center; } }

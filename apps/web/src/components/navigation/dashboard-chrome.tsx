@@ -8,6 +8,7 @@ import { signOut } from '@/app/actions';
 import { exitSupport } from '@/app/platform-actions';
 import { gymRoleUrl, type GymAccessSummary } from '@/lib/gymos';
 import { Button, LoadingState } from '@/components/ui';
+import { NotificationsBell } from './notifications-bell';
 
 // Only implemented destinations belong here. Support uses its explicit read-only
 // context; notification/subscription navigation waits for its owning slices.
@@ -48,6 +49,21 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
         {mobile ? <button type="button" onClick={close} aria-label="Close navigation menu">×</button> : null}</div>
       <nav aria-label={mobile ? 'Mobile navigation' : 'Main navigation'}>
         <a href={destination} aria-current={pathname === destination || pathname === `/gyms/${gym?.slug}` ? 'page' : undefined} onClick={close}><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>{label}</a>
+        {!support && gym?.role === 'OWNER' ? <>
+          <a href={`${destination}/sessions`} aria-current={pathname.startsWith(`${destination}/sessions`) ? 'page' : undefined} onClick={close}>PT Sessions</a>
+          <a href={`${destination}/trainers`} aria-current={pathname.startsWith(`${destination}/trainers`) ? 'page' : undefined} onClick={close}>Trainers</a>
+        </> : null}
+        {!support && gym?.role === 'TRAINER' ? <>
+          <a href={`${destination}/schedule`} aria-current={pathname.startsWith(`${destination}/schedule`) ? 'page' : undefined} onClick={close}>PT Schedule</a>
+          <a href={`${destination}/requests`} aria-current={pathname.startsWith(`${destination}/requests`) ? 'page' : undefined} onClick={close}>Session requests</a>
+          <a href={`${destination}/clients`} aria-current={pathname.startsWith(`${destination}/clients`) ? 'page' : undefined} onClick={close}>Clients</a>
+        </> : null}
+        {!support && gym?.role === 'MEMBER' ? <>
+          <a href={`${destination}/trainers`} aria-current={pathname.startsWith(`${destination}/trainers`) ? 'page' : undefined} onClick={close}>Trainers</a>
+          <a href={`${destination}/sessions`} aria-current={pathname.startsWith(`${destination}/sessions`) ? 'page' : undefined} onClick={close}>PT Sessions</a>
+          <a href={`${destination}/workout-plans`} aria-current={pathname.startsWith(`${destination}/workout-plans`) ? 'page' : undefined} onClick={close}>Workout plans</a>
+          <a href={`${destination}/meal-plans`} aria-current={pathname.startsWith(`${destination}/meal-plans`) ? 'page' : undefined} onClick={close}>Meal plans</a>
+        </> : null}
         {!support && gym?.role === 'OWNER' ? <a href={`${destination}/gym-config`} aria-current={pathname.endsWith('/gym-config') ? 'page' : undefined} onClick={close}>Gym Configuration</a> : null}
         {gym && gyms.length > 1 ? <a href="/gyms/select" onClick={() => { close(); setSwitching(true); }}>Switch gym</a> : null}
         {support ? <a href="/admin" onClick={close}>All Gyms</a> : null}
@@ -70,7 +86,7 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
       <header className="shell-header">
         <button ref={opener} className="shell-menu" type="button" aria-label="Open navigation menu" aria-controls="primary-navigation" aria-expanded={open} onClick={show}>☰</button>
         <span className="shell-gym-name">{gym?.name ?? 'Platform administration'}</span>
-        {/* Notification bell integration waits for scoped read/read-status APIs. */}
+        {gym && !support ? <NotificationsBell key={`${identityId}:${gym.slug}:${gym.role}`} slug={gym.slug} identityId={identityId} role={gym.role} /> : null}
         <div className="shell-profile"><span className="shell-avatar" aria-hidden="true">{displayName.slice(0, 1).toUpperCase()}</span><div><strong>{displayName}</strong><small>{role.replaceAll('_', ' ')}</small></div></div>
       </header>
       <main id="workspace-content" className="shell-content" tabIndex={-1}>{switching ? <LoadingState label="Loading your gyms…" /> : children}</main>

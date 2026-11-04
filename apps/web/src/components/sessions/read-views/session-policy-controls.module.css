@@ -1,0 +1,8 @@
+.controls { display:flex; flex-wrap:wrap; align-items:start; gap:8px; }
+.panel { display:grid; gap:9px; width:100%; padding:12px; border:1px solid var(--classic-border); border-radius:9px; background:var(--classic-surface-muted); }
+.panel h3,.panel p { margin:0; }
+.panel h3 { font-size:14px; }
+.panel p { color:var(--classic-text-secondary); font-size:12px; line-height:1.5; }
+.panel [role="alert"] { color:#8d2727; }
+.acknowledgment { display:flex; align-items:flex-start; gap:8px; font-size:12px; line-height:1.5; }
+.acknowledgment input { margin-top:3px; accent-color:var(--classic-primary); }

@@ -39,6 +39,8 @@ it('validates printable16–128 idempotency keys and safe allowlisted replay res
   expect(idempotencyKey('repeatable/intent~001')).toBe('repeatable/intent~001');
   for (const key of ['short', 'contains whitespace1', 'a'.repeat(129)]) expect(() => idempotencyKey(key)).toThrow();
   expect(safeResult({ operationId: 'op', resourceIds: ['member-1'], refreshScopes: ['people/member-1'], retryable: false })).toEqual({ operationId: 'op', resourceIds: ['member-1'], refreshScopes: ['people/member-1'], retryable: false });
+  expect(safeResult({ notesSnapshot: 'shared note', version: 2 })).toEqual({ notesSnapshot: 'shared note', version: 2 });
+  for (const notesSnapshot of [42, 'n'.repeat(4001)]) expect(() => safeResult({ notesSnapshot })).toThrow();
   for (const value of [{ password: 'private' }, { databaseName: 'private' }, { unexpected: {} }, { version: -1 }, { state: 'RUNNING' }]) expect(() => safeResult(value)).toThrow();
 });
 it('enforces typed ordered monotonic checkpoints and required member receipt/term evidence', () => {
@@ -50,6 +52,33 @@ it('enforces typed ordered monotonic checkpoints and required member receipt/ter
   expect(() => appendStep('PROVISION_GYM', first, 'GYM_RESERVED', { ...reserved, gymId: 'other' }, now)).toThrow(OperationIntegrityError);
   expect(() => appendStep('PROVISION_GYM', {}, 'DATABASE_CREATED', { databaseName: reserved.databaseName }, now)).toThrow('prerequisite');
   expect(() => appendStep('REGISTER_MEMBER', {}, 'TENANT_REGISTRATION_COMMITTED', { tenantActorId: 'a', tenantCommandReceiptId: 'r' }, now)).toThrow();
+});
+it('keeps trainer lifecycle checkpoints ordered and only marks the operation complete after access finalization', () => {
+  const now = new Date('2026-11-03T00:00:00Z');
+  const base = { gymId: 'gym', subjectIdentityId: 'owner', tenantActorId: 'trainer', trainerId: 'trainer',
+    targetStatus: 'DEACTIVATED', expectedTrainerVersion: 4, expectedAccessVersion: 2 };
+  expect(() => appendStep('CHANGE_TRAINER_ACCESS', {}, 'TRAINER_STATUS_APPLIED', base, now)).toThrow('prerequisite');
+  const prepared = appendStep('CHANGE_TRAINER_ACCESS', {}, 'TRAINER_ACCESS_PREPARED', base, now);
+  const status = appendStep('CHANGE_TRAINER_ACCESS', prepared, 'TRAINER_STATUS_APPLIED', base, now);
+  expect(stateForSteps('CHANGE_TRAINER_ACCESS', status)).toBe('TENANT_COMMITTED');
+  const reconciled = appendStep('CHANGE_TRAINER_ACCESS', status, 'TRAINER_SESSIONS_RECONCILED', base, now);
+  expect(stateForSteps('CHANGE_TRAINER_ACCESS', reconciled)).toBe('TENANT_COMMITTED');
+  const complete = appendStep('CHANGE_TRAINER_ACCESS', reconciled, 'TRAINER_ACCESS_FINALIZED', base, now);
+  expect(stateForSteps('CHANGE_TRAINER_ACCESS', complete)).toBe('COMPLETE');
+  expect(() => appendStep('CHANGE_TRAINER_ACCESS', {}, 'TRAINER_ACCESS_PREPARED', { ...base, expectedAccessVersion: -1 }, now)).toThrow();
+});
+it('keeps member lifecycle checkpoints ordered and only completes after access finalization', () => {
+  const now = new Date('2026-11-03T00:00:00Z');
+  const base = { gymId: 'gym', subjectIdentityId: 'owner', tenantActorId: 'member', memberId: 'member',
+    targetStatus: 'SUSPENDED', expectedMemberVersion: 4, expectedAccessVersion: 2 };
+  expect(() => appendStep('CHANGE_MEMBER_STATUS', {}, 'MEMBER_STATUS_APPLIED', base, now)).toThrow('prerequisite');
+  const prepared = appendStep('CHANGE_MEMBER_STATUS', {}, 'MEMBER_ACCESS_PREPARED', base, now);
+  const status = appendStep('CHANGE_MEMBER_STATUS', prepared, 'MEMBER_STATUS_APPLIED', base, now);
+  expect(stateForSteps('CHANGE_MEMBER_STATUS', status)).toBe('TENANT_COMMITTED');
+  const reconciled = appendStep('CHANGE_MEMBER_STATUS', status, 'MEMBER_SESSIONS_RECONCILED', base, now);
+  const complete = appendStep('CHANGE_MEMBER_STATUS', reconciled, 'MEMBER_ACCESS_FINALIZED', base, now);
+  expect(stateForSteps('CHANGE_MEMBER_STATUS', complete)).toBe('COMPLETE');
+  expect(() => appendStep('CHANGE_MEMBER_STATUS', {}, 'MEMBER_ACCESS_PREPARED', { ...base, expectedMemberVersion: -1 }, now)).toThrow();
 });
 it('heartbeats every10seconds with serialized lease versions and stops on failure', async () => {
   vi.useFakeTimers();

@@ -32,6 +32,7 @@ import { MemberEnrollmentService } from './member-enrollment.service.js';
 import { TrainerEnrollmentService } from './trainer-enrollment.service.js';
 import { identityFromAuthorization } from './auth-token.js';
 import { trainerRegistrationInputSchema } from '@gymos/contracts';
+import { derivePackCreditBalance } from './sessions/session-state.js';
 
 const createMemberInput = z.strictObject({
   fullName: z.string().trim().min(2).max(120),
@@ -277,8 +278,8 @@ export class GymsController {
       const member = await tenant.member.findFirst({ where: { id: memberId, registrationState: { in: ['BASIC', 'COMPLETE'] } },
         select: { id: true, identityId: true, createdAt: true, enrollmentOperationId: true, fullName: true, email: true, phone: true, dateOfBirth: true, emergencyContact: true,
           healthNotes: true, status: true, registrationState: true, version: true,
-          sessionPacks: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 0,
-            select: { id: true } } },
+          sessionPacks: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 100,
+            include: { creditMovements: { select: { availableDelta: true, heldDelta: true, consumedDelta: true, expiredDelta: true } } } } },
       });
       if (!member) throw new NotFoundException('Member not found');
       if (member.registrationState === 'COMPLETE') {
@@ -287,7 +288,7 @@ export class GymsController {
         if (!published) throw new NotFoundException('Member not found');
       }
       const activeLink = member.identityId ? await this.database.master.gymAccess.findFirst({ where: { gymId: access.gymId, userId: member.identityId, role: 'MEMBER', actorKind: 'MEMBER', linkStatus: 'ACTIVE', tenantActorId: member.id, enrollmentOperationId: member.enrollmentOperationId }, select: { userId: true } }) : null;
-      const config = await tenant.gymConfiguration.findUnique({ where: { id: 'current' }, select: { timezone: true } });
+      const config = await tenant.gymConfiguration.findUnique({ where: { id: 'current' }, select: { timezone: true, currency: true } });
       if (!config?.timezone) throw new ServiceUnavailableException('Gym timezone is unavailable');
       const asOf = new Date();
       const membershipTotalCount = await tenant.membershipTerm.count({ where: { memberId } });
@@ -299,6 +300,7 @@ export class GymsController {
         select: { id: true, planNameSnapshot: true, startDate: true, endDateExclusive: true, agreedPrice: true, currency: true } });
       return memberDetailSchema.parse({
         accountState: member.registrationState === 'BASIC' ? 'BASIC' : activeLink && member.status === 'ACTIVE' ? 'OPERATIONAL' : 'HISTORICAL',
+        gymCurrency: config.currency,
         joinedAt: member.createdAt.toISOString(),
         id: member.id, fullName: member.fullName, email: member.email, phone: member.phone,
         dateOfBirth: member.dateOfBirth?.toISOString().slice(0, 10) ?? null,
@@ -308,7 +310,19 @@ export class GymsController {
           startDate: term.startDate.toISOString().slice(0, 10), endDateExclusive: term.endDateExclusive.toISOString().slice(0, 10),
           agreedPrice: term.agreedPrice.toString(), currency: term.currency })),
         membershipPage, membershipPageSize: parsedPage.data.pageSize, membershipTotalCount, membershipTotalPages,
-        sessionPacks: [], recentSessions: [], asOf: asOf.toISOString(),
+        sessionPacks: member.sessionPacks.map(pack => {
+          const ledgerBalance = derivePackCreditBalance(pack.issuedCredits, pack.creditMovements.map(movement => ({
+            available: movement.availableDelta, held: movement.heldDelta,
+            consumed: movement.consumedDelta, expired: movement.expiredDelta,
+          })));
+          const expired = gymLocalDate(config.timezone!, asOf) >= pack.endDateExclusive.toISOString().slice(0, 10);
+          const balance = expired ? { ...ledgerBalance, available: 0, expired: ledgerBalance.expired + ledgerBalance.available } : ledgerBalance;
+          const status = balance.available + balance.held === 0 ? 'DEPLETED' : expired ? 'EXPIRED' : 'ACTIVE';
+          return { id: pack.id, issuedCredits: pack.issuedCredits, availableCredits: balance.available,
+            heldCredits: balance.held, consumedCredits: balance.consumed, expiredCredits: balance.expired,
+            validityDays: pack.validityDays, price: pack.price.toString(), currency: pack.currency,
+            startDate: pack.startDate.toISOString().slice(0, 10), endDateExclusive: pack.endDateExclusive.toISOString().slice(0, 10), status };
+        }), recentSessions: [], asOf: asOf.toISOString(),
       });
     });
   }
