@@ -91,6 +91,10 @@ it('isolates and replays expense/budget commands, reconciles P&L, and closes pay
     { category: 'UTILITIES', month: expenseBody.accountingDate.slice(0, 7), amount, currency: 'LKR', expectedVersion: null, idempotencyKey: randomUUID() })));
   expect(racingBudgets.map(response => response.status).sort((a, b) => a - b)).toEqual([201, 409]);
   expect(await tenant.categoryBudget.count({ where: { category: 'UTILITIES', month: date(`${expenseBody.accountingDate.slice(0, 7)}-01`) } })).toBe(1);
+  const racingBudgetUpdates = await Promise.all(['210.00', '220.00'].map(amount => call(`/gyms/${slug}/financials/budgets`, owner,
+    { category: 'UTILITIES', month: expenseBody.accountingDate.slice(0, 7), amount, currency: 'LKR', expectedVersion: 0, idempotencyKey: randomUUID() })));
+  expect(racingBudgetUpdates.map(response => response.status).sort((a, b) => a - b)).toEqual([201, 409]);
+  expect(await tenant.categoryBudget.findUniqueOrThrow({ where: { category_month: { category: 'UTILITIES', month: date(`${expenseBody.accountingDate.slice(0, 7)}-01`) } } })).toMatchObject({ version: 1 });
 
   const range = `from=${monthStart}&to=${localToday}`;
   const pnlResponse = await call(`/gyms/${slug}/financials/pnl?${range}`, owner); expect(pnlResponse.status).toBe(200);
@@ -104,8 +108,11 @@ it('isolates and replays expense/budget commands, reconciles P&L, and closes pay
 
   const earnings = await call(`/gyms/${slug}/me/earnings?${range}`, trainer); expect(earnings.status).toBe(200); expect(Number((await earnings.json()).total)).toBe(50);
   expect((await call(`/gyms/${slug}/me/earnings?${range}`, owner)).status).toBe(403);
-  const competingCloses = await Promise.all([randomUUID(), randomUUID()].map(idempotencyKey => call(`/gyms/${slug}/payroll/periods/${periodId}/close`, owner, { expectedVersion: 0, idempotencyKey })));
+  const closeKeys = [randomUUID(), randomUUID()];
+  const competingCloses = await Promise.all(closeKeys.map(idempotencyKey => call(`/gyms/${slug}/payroll/periods/${periodId}/close`, owner, { expectedVersion: 0, idempotencyKey })));
   expect(competingCloses.map(response => response.status).sort((a, b) => a - b)).toEqual([201, 409]);
+  const winningCloseKey = closeKeys[competingCloses.findIndex(response => response.status === 201)]!;
+  expect((await call(`/gyms/${slug}/payroll/periods/${periodId}/close`, owner, { expectedVersion: 0, idempotencyKey: winningCloseKey })).status).toBe(201);
   const approved = await call(`/gyms/${slug}/payroll/periods/${periodId}/approve`, owner, { expectedVersion: 1, expectedTotal: '50.0000', idempotencyKey: randomUUID() }); expect(approved.status).toBe(201);
   expect((await approved.json()).state).toBe('APPROVED');
   expect(await tenant.payRecord.count({ where: { sessionId } })).toBe(1);
