@@ -1,7 +1,7 @@
 import { contentDigest } from '../operations/primitives.js';
 // Immutable reviewed chain; schema deployment is an explicit owned runner command.
 export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
-  version: 'master-2026-10-31.2',
+  version: 'master-2026-11-03.1',
   migrations: [
     {
       name: '20261021100256_init_master',
@@ -52,6 +52,14 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       name: '20261031030000_theme_version',
       checksum: 'be233f1bf8d30b7d691074a4abe54648220cc773df109e8717b8019c7a04a265',
     },
+    {
+      name: '20261103020000_trainer_lifecycle_intent',
+      checksum: '7cd5f7986fca900cb132a1461b43626f3f8403d5716d9f929768061192b63939',
+    },
+    {
+      name: '20261103040000_member_lifecycle_intent',
+      checksum: '304c97681a03e5bff34226bafeda0d0385aed6d22e40ed412cc64437f1a7eebc',
+    },
   ],
   postconditions: {
     tables: [
@@ -63,6 +71,7 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       'GymRegistrySummary',
       'MasterSchemaDeployment',
       'MasterSchemaState',
+      'MemberLifecycleIntent',
       'Operation',
       'PlatformAuditLog',
       'ProvisioningIntent',
@@ -73,6 +82,7 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       'SupportEvent',
       'SupportSession',
       'Theme',
+      'TrainerLifecycleIntent',
       'User',
     ],
     triggers: [
@@ -128,6 +138,22 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
         'schemaEvidenceDigest',
         'verifiedAt',
         'version',
+      ],
+      TrainerLifecycleIntent: [
+        'operationId',
+        'trainerId',
+        'expectedAccessVersion',
+        'expectedTrainerVersion',
+        'targetStatus',
+        'reason',
+      ],
+      MemberLifecycleIntent: [
+        'operationId',
+        'memberId',
+        'expectedAccessVersion',
+        'expectedMemberVersion',
+        'targetStatus',
+        'reason',
       ],
     },
   },

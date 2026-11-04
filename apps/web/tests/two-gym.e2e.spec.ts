@@ -696,11 +696,13 @@ test('trainer roster/profile and member directory are usable at mobile width wit
     createdAt: sessionStart, updatedAt: sessionStart } });
   await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${gym.slug}/owner/trainers`);
   await expect(page.getByRole('heading', { name: 'Trainers', level: 1 })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'View profile' })).toBeVisible();
+  const trainerRow = page.getByRole('row').filter({ hasText: 'Trainer Alpha' });
+  const trainerProfileLink = trainerRow.getByRole('link', { name: 'View profile' });
+  await expect(trainerProfileLink).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: '/tmp/gymos-task037-owner-roster-390.png', fullPage: true });
 
-  await page.getByRole('link', { name: 'View profile' }).click();
+  await trainerProfileLink.click();
   await expect(page.getByRole('heading', { name: 'Trainer Alpha', level: 1 })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Approve recurring shift' })).toBeVisible();
   await expect(page.locator('.trainer-profile-session-metrics')).toContainText(/Related clients\s*1/);

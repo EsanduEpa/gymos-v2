@@ -64,6 +64,13 @@ Working checklist created 3 November 2026 from the segment plans and task specs.
 - **Hosted checks on PR #8:** run `41776997248`, tied to commit `6f8de6f`; 9/11 successful, with Browser isolation test and Owned disposable database tests still in progress at inspection. All hosted results must be refreshed against the eventual latest PR commit before closing that gate.
 - **PR handling:** existing draft PR #8 only; no additional PR, merge, or deployment.
 
+## Hosted failure diagnosis and focused repairs — 4 November 2026
+
+- **Run `41776997248` on `6f8de6f`:** final status was Failure, 9/11 checks successful. Owned disposable database tests failed because the two Master lifecycle intent migrations on disk were absent from the immutable Master manifest. Browser isolation failed two cases: the session-read spec forced headed Chrome in a runner without X (`Missing X server or $DISPLAY`), and the mobile roster test used an ambiguous `View profile` locator with two seeded trainers.
+- **Repairs:** added both checksummed lifecycle migrations and schema postconditions to the Master manifest; set its version to `master-2026-11-03.1`; removed the forced headed browser override; scoped the roster link assertion/click to the `Trainer Alpha` row.
+- **Focused verification:** the rollout test passed 1/1 (8 other tests skipped) with cleanup of five owned databases and its container. The session-read and mobile roster browser cases passed 2/2; each fixture reported six owned databases, its container, and manifest removed. API typecheck, API lint, focused web ESLint and `git diff --check` passed against these repairs.
+- **Latest PR head at this check:** `bed480b` showed “There are no checks for this commit” on the PR Checks tab; it is the ledger-only push. The repairs above are not yet pushed at this checkpoint, so hosted results for them are pending a new commit/run.
+
 ## Isolated browser rerun — 3 November 2026
 
 - `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web exec playwright test --config playwright.config.ts tests/owner-session-booking.e2e.spec.ts tests/notifications-bell.e2e.spec.ts --workers=1` — exit 0; 2/2 passed in headless Chromium with one worker. The suite ran the documented disposable PostgreSQL harness, synthetic two-gym fixtures, and isolated loopback API/web servers; no repository `.env` was loaded.

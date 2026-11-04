@@ -23,3 +23,9 @@ Status: **In Progress.** Working-tree evidence on `codex/segment-06-management`,
 
 - Run the member status headed UI flow and visible Chrome review when the browser-control host is available.
 - Complete shared Task 048 booking/status race verification and hosted checks.
+
+## Hosted rollout follow-up — 4 November 2026
+
+- PR #8 hosted run `41776997248` exposed that the two lifecycle intent migrations already present in `packages/database-master/prisma/migrations` were missing from `MASTER_TEMPLATE_MANIFEST`. Added both checksummed migrations, their table/column postconditions, and advanced the Master template version to `master-2026-11-03.1`; no migration was removed or rewritten.
+- Focused reproduction and verification: `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/api exec vitest run --config vitest.config.platform.ts test/platform/rollout.integration.test.ts --testNamePattern='deploys/verifies the immutable Master chain only through the owned runner and refuses missing ownership' --disableConsoleIntercept` — exit 0; 1 passed, 8 skipped. Cleanup reported five owned databases dropped and the disposable container removed.
+- Task 033 remains In Progress. Task 048 is still gated on Task 049, which remains in Segment 08.

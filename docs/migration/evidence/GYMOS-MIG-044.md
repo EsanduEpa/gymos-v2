@@ -30,3 +30,8 @@ Tracked screenshots: owner-sessions-month.png, trainer-active-session.png, membe
 ## Agent-performed native Chrome review — 4 November 2026
 
 - The member session page showed one scheduled and one declined session, month-state totals and the stored decline reason. The trainer schedule showed the accepted session on its gym-local day; its cancellation quote displayed the cutoff and credit consequence, then was dismissed without submission. This supplements, but does not replace, the automated role/filter/pagination evidence. No owner-observed acceptance is claimed; see the [acceptance ledger](SEGMENTS-06-07-ACCEPTANCE.md).
+
+## Hosted browser follow-up — 4 November 2026
+
+- The session-read spec forced headed Chrome with `headless: false` and `channel: 'chrome'`, which failed in the hosted headless runner (`Missing X server or $DISPLAY`). It now uses the shared Playwright config's installed headless Chromium.
+- The focused role/session-ledger browser journey passed as part of the 2/2 Playwright rerun recorded in Task 037. It exercised owner, trainer, and member session reads, pagination, filters, quote panels, and the member mobile view. Fixture cleanup reported six owned databases, container, and manifest removed. This is automated agent evidence, not owner-observed acceptance.

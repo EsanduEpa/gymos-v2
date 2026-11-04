@@ -8,7 +8,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { createDisposableEnvironment } from '../../api/test/support/disposable-environment.js';
 import { seedTwoGymFixture } from '../../api/test/fixtures/two-gym-fixture.js';
 
-test.use({ trace: 'off', screenshot: 'off', video: 'off', channel: 'chrome', headless: false });
+test.use({ trace: 'off', screenshot: 'off', video: 'off' });
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const apiDirectory = join(root, 'apps/api');
 const webDirectory = join(root, 'apps/web');
