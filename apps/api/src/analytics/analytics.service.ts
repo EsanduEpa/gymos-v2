@@ -44,6 +44,7 @@ export class AnalyticsService {
         const today = localDay(asOf, zone);
         const monthStart = `${today.slice(0, 7)}-01`;
         const sixMonthStart = `${monthAdd(today.slice(0, 7), -5)}-01`;
+        const nextMonthStart = `${monthAdd(today.slice(0, 7), 1)}-01`;
         const start30 = new Date(asOf.getTime() - 30 * 86_400_000);
         const utilizationEnd = midnight(dateAdd(today, 366), zone); // today plus the full 365-day booking horizon
         const [trainers, trainerHours, peak, growth] = await Promise.all([
@@ -59,8 +60,8 @@ export class AnalyticsService {
               AND "state" IN ('SCHEDULED','ACTIVE','COMPLETED') AND EXTRACT(HOUR FROM ("scheduledStartAt" AT TIME ZONE ${zone})) BETWEEN 6 AND 20
             GROUP BY 1 ORDER BY 1`,
           tx.$queryRaw<{ month: string; count: bigint }[]>`
-            SELECT to_char(date_trunc('month', ("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${zone}), 'YYYY-MM') AS month, COUNT(*)::bigint AS count
-            FROM "Member" WHERE ("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${zone} >= ${midnight(sixMonthStart, zone)} AND ("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${zone} < ${midnight(dateAdd(monthStart, 32), zone)}
+            SELECT to_char(("createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${zone}, 'YYYY-MM') AS month, COUNT(*)::bigint AS count
+            FROM "Member" WHERE ("createdAt" AT TIME ZONE 'UTC') >= ${midnight(sixMonthStart, zone)} AND ("createdAt" AT TIME ZONE 'UTC') < ${midnight(nextMonthStart, zone)}
             GROUP BY 1 ORDER BY 1`,
         ]);
         if (trainers.length > 100) throw new NotFoundException('Analytics source exceeds its configured bound');
@@ -78,7 +79,7 @@ export class AnalyticsService {
         const points = Array.from({ length: 6 }, (_, index) => monthAdd(today.slice(0, 7), index - 5));
         const rangeStart = parsed.data.window === '30d' ? start30 : midnight(sixMonthStart, zone);
         return gymAnalyticsSchema.parse({ gymSlug: access.slug, window: parsed.data.window, timeZone: zone,
-          rangeStart: rangeStart.toISOString(), rangeEndExclusive: (parsed.data.window === '30d' ? asOf : midnight(dateAdd(monthStart, 32), zone)).toISOString(), asOf: asOf.toISOString(),
+          rangeStart: rangeStart.toISOString(), rangeEndExclusive: (parsed.data.window === '30d' ? asOf : midnight(nextMonthStart, zone)).toISOString(), asOf: asOf.toISOString(),
           utilization: { label: 'Estimated trainer utilization', formula: 'scheduled PT-session duration in trailing 30×24 hours plus future sessions within the 365-day booking horizon divided by current trainer shift hours × 22 working days; default shift is 8 hours and overnight shifts wrap midnight', points: utilization },
           peakHours: { label: 'Average scheduled sessions per trailing 30 days', formula: 'scheduled, active and completed PT-session records by gym-local scheduled start hour from 06:00 through 20:59, divided by 30', points: Array.from({ length: 15 }, (_, index) => { const hour = index + 6; const sessionCount = peakMap.get(hour) ?? 0; return { hour, sessionCount, averagePerDay: Math.round(sessionCount / 30 * 10) / 10 }; }) },
           memberGrowth: { label: 'Member profiles created', formula: 'member records grouped by gym-local creation month across six calendar months including the current month', points: points.map(month => ({ month, count: growthMap.get(month) ?? 0 })) },

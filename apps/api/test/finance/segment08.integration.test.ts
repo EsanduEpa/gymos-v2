@@ -185,6 +185,16 @@ it('exports complete bounded row sets over 100, protects formulas, exports only 
   expect((await call(`/gyms/${slug}/dashboard`, await bearer(fixture.users.memberUser.id))).status).toBe(403);
   const analytics = await call(`/gyms/${slug}/analytics?window=6m`, owner); expect(analytics.status).toBe(200); const insights = await analytics.json();
   expect(insights.memberGrowth.points).toHaveLength(6); expect(insights.peakHours.points).toHaveLength(15); expect(insights.utilization.formula).toContain('overnight shifts wrap midnight');
+  const oldestMonth = insights.memberGrowth.points[0].month as string;
+  const oldestBoundary = new Date(Date.parse(`${oldestMonth}-01T00:00:00Z`) - 330 * 60_000);
+  const currentMonth = insights.memberGrowth.points[5].month as string;
+  const nextMonthBoundary = new Date(Date.UTC(Number(currentMonth.slice(0, 4)), Number(currentMonth.slice(5, 7)), 1) - 330 * 60_000);
+  await tenant.member.createMany({ data: [new Date(oldestBoundary.getTime() - 1), oldestBoundary,
+    new Date(nextMonthBoundary.getTime() - 1), nextMonthBoundary].map((createdAt, index) => ({ fullName: `Growth edge ${index}`, createdAt })) });
+  const edgedGrowth = (await (await call(`/gyms/${slug}/analytics?window=6m`, owner)).json()).memberGrowth.points;
+  expect(edgedGrowth[0].count - insights.memberGrowth.points[0].count).toBe(1);
+  expect(edgedGrowth[5].count - insights.memberGrowth.points[5].count).toBe(1);
+  expect(edgedGrowth.slice(1, 5).map((point: { count: number }, index: number) => point.count - insights.memberGrowth.points[index + 1].count)).toEqual([0, 0, 0, 0]);
   const emptyGymAnalytics = await (await call(`/gyms/${fixture.gyms[1]!.slug}/analytics?window=30d`, await bearer(fixture.users.ownerB.id))).json();
   expect(emptyGymAnalytics.utilization.points).toEqual([]);
   expect(emptyGymAnalytics.peakHours.points.every((point: { sessionCount: number; averagePerDay: number }) => point.sessionCount === 0 && point.averagePerDay === 0)).toBe(true);

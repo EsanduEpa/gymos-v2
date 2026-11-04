@@ -7,3 +7,5 @@ Dashboard contract test passes within the 54-test contracts suite; owned finance
 ## 4 November 2026 continuation from ef81213
 
 Added owned DB gym-local midnight and 07:59/08:00 bucket fixture; pre-midnight earning is excluded, current-day operational total is 9.0000, and two-hour buckets split 3.0000/4.0000. The dashboard now remounts on gym slug change and preserves last data on refresh error. Visible gym-switch/overlap review remains.
+
+The inherited browser isolation suite also revealed an obsolete add-member redirect to the former owner root. The redirect now returns to `/owner/members?created=1`, preserving the roster success state after Segment 08 moved the owner root to the live dashboard. The five affected browser checks passed across the route-sensitive rerun and the rebuilt add-member rerun. This is automated browser evidence, not the visible owner walkthrough.

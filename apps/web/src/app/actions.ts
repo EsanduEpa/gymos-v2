@@ -158,7 +158,7 @@ export async function createMember(slug: string, formData: FormData) {
   if (!response.ok) redirect(`/gyms/${slug}?error=member-input`);
 
   revalidatePath(`/gyms/${slug}`);
-  redirect(`/gyms/${slug}?created=1`);
+  redirect(`/gyms/${slug}/owner/members?created=1`);
 }
 
 export async function createGym(formData: FormData) {

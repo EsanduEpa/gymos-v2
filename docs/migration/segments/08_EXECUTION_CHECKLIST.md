@@ -49,3 +49,17 @@ Each row records the starting state, missing behavior, implementation boundary, 
 ## Execution update — 4 November 2026 continuation
 
 Tasks 049 and 053–061 are implemented; acceptance remains In Progress by task. Finance-owned Postgres tests pass 3/3, including stale/missing/failed platform cache states, cursor batches, expense audit rollback, budget create conflict, payroll close conflict and >page stable audit order. A targeted lifecycle close/correction test passed 1/1. Exact remaining task gates and prior passing checks are recorded in `../evidence/SEGMENT-08-EXECUTION-20261104.md`. Draft review PR #9 is open from pushed head `91ee6ab`; all 11 hosted checks were in progress at inspection. Chrome control is currently unavailable, so visible O01/O10/O11/O13/T06 walkthrough remains open. Segment 09 was not entered.
+
+## 4 November 2026 acceptance continuation from `ef81213`
+
+- **053 Complete:** zero/partial/full and leap/remainder arithmetic plus the owned Asia/Colombo suspension/expiry source-data fixture reconcile exactly. Its task-owned completion condition is met.
+- **054 In Progress:** expense replay, precision/rollback/isolation and immutable-create semantics pass. The related versioned budget stale conflict passes; visible form review remains.
+- **055 In Progress:** concurrent create/update, stale conflict, zero budget and February month-edge/full-window totals pass; visible budget review remains.
+- **056 In Progress:** existing lifecycle configuration-change snapshot test directly proves stored trainer rate/level despite later configuration and level edits. Close/retry/late-correction checks pass; visible payroll review remains.
+- **057 In Progress:** cross-month operational P&L and metadata are covered by owned fixture/schema; chart, panels and responsive/empty/error browser review remains.
+- **058 In Progress:** local midnight/two-hour bucket fixture passes; selected-gym remount and stale-response sequencing are implemented. Visible switching/overlap/empty/error review remains.
+- **059 In Progress:** six-month gym-local member-growth edge bug fixed and tested; empty 30-day gym returns finite zero peak averages and no fabricated trainer utilization. Visible analytics review remains.
+- **060 In Progress:** support/original actor, redaction, stable page order and second-gym isolation pass; visible audit review remains.
+- **061 In Progress:** API filename/MIME/BOM/no-store/error-header checks pass; cancellation propagates through the web proxy. Visible download/cancellation review remains.
+
+The upstream 046/047 tasks retain their independent open acceptance. The visible walkthrough was unavailable because Chrome browser access reported an unavailable host, followed by `noWindowsAvailable` from the native application handle. No owner approval is inferred.

@@ -7,3 +7,5 @@ Owned finance PostgreSQL suite passed 2/2, including owner denial, bounded time-
 ## 4 November 2026 continuation from ef81213
 
 Added owned DB empty second-gym analytics fixture: 30-day peak averages are finite zero, trainer utilization has no invented denominator row, and six month points remain bounded. Existing stale/partial platform-cache and cursor fixtures remain passing. Visible chart review remains.
+
+The six-month edge fixture exposed a UTC-naive Member.createdAt comparison bug. The query now converts that column to a UTC instant before comparing gym-local boundary instants, and groups using the gym-local month. The fixture inserts records one millisecond before and at the first/last window boundaries and checks only the in-window rows contribute.
