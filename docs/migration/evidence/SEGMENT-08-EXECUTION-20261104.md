@@ -1,6 +1,6 @@
 # Segment 08 execution evidence — 4 November 2026
 
-Continuation from pushed commit `c1c7067` on `codex/segment-08-finance`. This continuation adds a platform cache correctness fix and acceptance fixtures; commit/PR and hosted checks remain pending. Segment 09 work was not started.
+Continuation from pushed commit `c1c7067` on `codex/segment-08-finance`; continuation commit `91ee6ab` is pushed. Draft review PR [#9](https://github.com/EsanduEpa/gymos-v2/pull/9) is open against `main`. Hosted checks were queried at `91ee6ab`; all 11 were still `in_progress` at inspection. Segment 09 work was not started.
 
 ## Implemented task scope
 
@@ -41,6 +41,6 @@ The finance DB suite verifies expense role denials, precision rejection, replay/
 - **059:** implementation and fresh/stale/missing/failed platform summary, null-suppression, 25-item cursor continuation, and gym analytics DB shapes are complete. Pending explicit analytics 30-day/six-month edge and zero-denominator fixture, and visible chart/refresh review.
 - **060:** implementation and 27-row stable same-time page ordering/filter fixture are complete. Pending redaction/support-original-actor/second-gym specific assertions and visible audit UI review.
 - **061:** implementation and owned DB row-cap/formula/BOM/audit/auth cases plus helper CSV quoting tests are complete. Pending visible attachment download verification for MIME/filename/cancellation and browser review.
-- **Cross-cutting:** visible Chrome O01/O10/O11/O13/T06 walkthrough, hosted check inspection, and review PR creation remain. No independent owner approval is claimed. No merge or deploy was attempted.
+- **Cross-cutting:** Chrome control became unavailable (`noWindowsAvailable`, followed by `timeoutReached`; state inventory reports “The browser access host is unavailable”), so the visible O01/O10/O11/O13/T06 walkthrough could not be performed. The correct signed-in Chrome window had been confirmed and a GitHub compare/creation form for `main` ← `codex/segment-08-finance` was visible, but that is not an application walkthrough. Hosted check inspection is complete for the moment: all 11 PR #9 checks were `in_progress`, with no conclusions yet. Draft PR creation is complete. No independent owner approval is claimed. No merge or deploy was attempted.
 
 All ten tasks have implementation complete, but remain **In Progress** because their listed acceptance gates are not all satisfied. Segment 09 remains untouched.
