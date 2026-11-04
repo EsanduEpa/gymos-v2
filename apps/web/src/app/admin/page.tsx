@@ -28,7 +28,7 @@ async function AdminContent({searchParams}:{searchParams:Search}) {
  let summaryResponse:Response;try{summaryResponse=await fetch(apiUrl('/admin/analytics/summary'),{headers:{authorization:`Bearer ${token}`},cache:'no-store'});}catch{summaryResponse=new Response(null,{status:503});}
  if(summaryResponse.status===401)redirect('/login');const summaryParsed=summaryResponse.ok?platformAnalyticsSummarySchema.safeParse(await summaryResponse.json().catch(()=>null)):null;const summary=summaryParsed?.success?summaryParsed.data:null;
  return <DashboardChrome identityId={session.identityId} gyms={[]} displayName={session.displayName??'Platform administrator'}>
-  <PageHeader eyebrow="PLATFORM CONTROL" title="Gym workspaces" description="Manage tenant gyms and enter scoped read-only support." action={<StatCard label="Total gyms" value={page.total}/>}/>
+  <PageHeader eyebrow="PLATFORM CONTROL" title="SuperAdmin Control Panel" description="Manage gym workspaces, follow provisioning, and enter scoped read-only support." action={<StatCard label="Total gyms" value={page.total}/>}/>
   <Card><CardHeader eyebrow="SANITIZED PLATFORM SUMMARY" title="Tenant overview" action={<StatCard label="Active gyms" value={summary?.activeGyms??'—'}/>}/>
    {summary?<><p>{summary.partial?'Partial or stale summary · unavailable gyms are excluded and totals are withheld.':`Counts are current within ${summary.freshnessSeconds/60} minutes.`} · {summary.verifiedGyms} verified · {summary.staleGyms} stale · {summary.unavailableGyms} unavailable · as of {summary.asOf}</p>
     <div className="finance-metrics"><div className="finance-metric"><small>Member profiles</small><strong>{summary.memberCount??'Partial'}</strong></div><div className="finance-metric"><small>Trainer profiles</small><strong>{summary.trainerCount??'Partial'}</strong></div></div>
@@ -36,7 +36,7 @@ async function AdminContent({searchParams}:{searchParams:Search}) {
    <RefreshSummaries cursor={cursor}/>
   </Card>
   {error==='support-exit-uncertain'?<Feedback tone="error">Browser support state was cleared. The API could not confirm revocation; the context still expires at its original time.</Feedback>:null}
-  <Registry page={page} selectedSlug={selected?.slug}/>
+  <Registry page={page} selectedSlug={selected?.slug} supportExpiresAt={selected?.expiresAt} hasCursor={Boolean(cursor)}/>
   {cursor?<p><Link href="/admin">← First page</Link></p>:null}
   <Card><CardHeader eyebrow="NEW WORKSPACE" title="Create a gym"/><ProvisioningForm requestKey={randomUUID()}/></Card>
  </DashboardChrome>;
