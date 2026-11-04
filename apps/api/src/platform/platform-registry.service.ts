@@ -75,10 +75,10 @@ export class PlatformRegistryService {
  // Explicit bounded worker job. The registry HTTP read never fans out to tenants.
  async refreshOne(gymId:string,actorIdentityId:string){
   const gym=await this.database.master.gym.findUniqueOrThrow({where:{id:gymId},include:{expectedTenantOperation:true}});
-  let values: {memberCount?:number;trainerCount?:number;observedAt?:Date;schemaVersion?:string;health:string}={health:'UNAVAILABLE'};
+  let values: {memberCount:number|null;trainerCount:number|null;observedAt:Date|null;schemaVersion:string|null;health:string}={memberCount:null,trainerCount:null,observedAt:null,schemaVersion:null,health:'UNAVAILABLE'};
   if(['ACTIVE','SUSPENDED'].includes(gym.status)){
    try{const summary=await readApprovedTenantSummary(this.tenants,gym);values={memberCount:summary.memberCount,trainerCount:summary.trainerCount,observedAt:new Date(),schemaVersion:gym.expectedTenantSchemaVersion!,health:'VERIFIED'};}
-   catch(error){values={health:error instanceof OperationIntegrityError?'REPAIR_REQUIRED':'UNAVAILABLE'};}
+   catch(error){values={memberCount:null,trainerCount:null,observedAt:null,schemaVersion:null,health:error instanceof OperationIntegrityError?'REPAIR_REQUIRED':'UNAVAILABLE'};}
   }
   await this.database.master.$transaction(async tx=>{
    const actor=await tx.user.findUnique({where:{id:actorIdentityId},select:{globalRole:true,mustChangePassword:true}});

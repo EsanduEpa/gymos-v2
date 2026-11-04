@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import { SignJWT } from 'jose';
@@ -7,6 +7,8 @@ import { DatabaseService } from '../../src/database.service.js';
 import type { DatabaseService as DatabaseServiceType } from '../../src/database.service.js';
 import { createDisposableEnvironment } from '../support/disposable-environment.js';
 import { seedTwoGymFixture } from '../fixtures/two-gym-fixture.js';
+import { PlatformRegistryService } from '../../src/platform/platform-registry.service.js';
+import { TenantDatabaseService } from '../../src/tenant-database.service.js';
 
 let run: Awaited<ReturnType<typeof createDisposableEnvironment>>;
 let fixture: Awaited<ReturnType<typeof seedTwoGymFixture>>;
@@ -62,6 +64,14 @@ it('isolates and replays expense/budget commands, reconciles P&L, and closes pay
     idempotencyKey: randomUUID(), requestDigest: 'd1:' + 'a'.repeat(64) } });
 
   const expensesBefore = await tenant.expenseRecord.count(); const auditsBefore = await tenant.auditLog.count(); const receiptsBefore = await tenant.commandReceipt.count();
+  await tenant.$executeRawUnsafe(`CREATE FUNCTION reject_expense_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW."eventCode" = 'EXPENSE_CREATED' THEN RAISE EXCEPTION 'injected expense audit failure'; END IF; RETURN NEW; END $$`);
+  await tenant.$executeRawUnsafe(`CREATE TRIGGER reject_expense_audit BEFORE INSERT ON "AuditLog" FOR EACH ROW EXECUTE FUNCTION reject_expense_audit()`);
+  const failedDraft = { category: 'OTHER', amount: '12.00', currency: 'LKR', accountingDate: localToday, description: 'rollback fault injection', recurring: false, idempotencyKey: randomUUID() };
+  const failedWrite = await call(`/gyms/${slug}/financials/expenses`, owner, failedDraft);
+  await tenant.$executeRawUnsafe('DROP TRIGGER reject_expense_audit ON "AuditLog"'); await tenant.$executeRawUnsafe('DROP FUNCTION reject_expense_audit()');
+  expect(failedWrite.status).toBeGreaterThanOrEqual(500);
+  expect(await tenant.expenseRecord.count()).toBe(expensesBefore); expect(await tenant.auditLog.count()).toBe(auditsBefore);
+  expect(await tenant.commandReceipt.count()).toBe(receiptsBefore);
   const expenseBody = { category: 'RENT', amount: '100.00', currency: 'LKR', accountingDate: localToday, description: '=1+1', recurring: false, idempotencyKey: randomUUID() };
   expect((await call(`/gyms/${slug}/financials/expenses`, trainer, expenseBody)).status).toBe(403);
   expect((await call(`/gyms/${slug}/financials/expenses`, member)).status).toBe(403);
@@ -77,6 +87,10 @@ it('isolates and replays expense/budget commands, reconciles P&L, and closes pay
   expect((await call(`/gyms/${slug}/financials/budgets`, owner, budgetBody)).status).toBe(201);
   const budgetList = await (await call(`/gyms/${slug}/financials/budgets?month=${expenseBody.accountingDate.slice(0, 7)}`, owner)).json();
   expect(budgetList).toMatchObject({ totalActual: '100.0000', items: expect.arrayContaining([expect.objectContaining({ category: 'RENT', variance: '-50.0000' })]) });
+  const racingBudgets = await Promise.all(['120.00', '180.00'].map(amount => call(`/gyms/${slug}/financials/budgets`, owner,
+    { category: 'UTILITIES', month: expenseBody.accountingDate.slice(0, 7), amount, currency: 'LKR', expectedVersion: null, idempotencyKey: randomUUID() })));
+  expect(racingBudgets.map(response => response.status).sort((a, b) => a - b)).toEqual([201, 409]);
+  expect(await tenant.categoryBudget.count({ where: { category: 'UTILITIES', month: date(`${expenseBody.accountingDate.slice(0, 7)}-01`) } })).toBe(1);
 
   const range = `from=${monthStart}&to=${localToday}`;
   const pnlResponse = await call(`/gyms/${slug}/financials/pnl?${range}`, owner); expect(pnlResponse.status).toBe(200);
@@ -90,7 +104,8 @@ it('isolates and replays expense/budget commands, reconciles P&L, and closes pay
 
   const earnings = await call(`/gyms/${slug}/me/earnings?${range}`, trainer); expect(earnings.status).toBe(200); expect(Number((await earnings.json()).total)).toBe(50);
   expect((await call(`/gyms/${slug}/me/earnings?${range}`, owner)).status).toBe(403);
-  const closed = await call(`/gyms/${slug}/payroll/periods/${periodId}/close`, owner, { expectedVersion: 0, idempotencyKey: randomUUID() }); expect(closed.status).toBe(201);
+  const competingCloses = await Promise.all([randomUUID(), randomUUID()].map(idempotencyKey => call(`/gyms/${slug}/payroll/periods/${periodId}/close`, owner, { expectedVersion: 0, idempotencyKey })));
+  expect(competingCloses.map(response => response.status).sort((a, b) => a - b)).toEqual([201, 409]);
   const approved = await call(`/gyms/${slug}/payroll/periods/${periodId}/approve`, owner, { expectedVersion: 1, expectedTotal: '50.0000', idempotencyKey: randomUUID() }); expect(approved.status).toBe(201);
   expect((await approved.json()).state).toBe('APPROVED');
   expect(await tenant.payRecord.count({ where: { sessionId } })).toBe(1);
@@ -124,4 +139,79 @@ it('exports complete bounded row sets over 100, protects formulas, exports only 
   expect((await call(`/gyms/${slug}/analytics?window=invalid`, owner)).status).toBe(404);
   const audit = await call(`/gyms/${slug}/audit?page=1&pageSize=20&actionType=EXPENSE_CREATED`, owner); expect(audit.status).toBe(200);
   expect((await audit.json()).availableActionTypes).toContain('CSV_EXPORTED');
+
+  const auditRows = Array.from({ length: 27 }, () => ({ id: randomUUID(), at: new Date('2026-10-20T10:00:00.000Z') }));
+  const auditReceipts = auditRows.map(() => ({ id: randomUUID(), actorIdentityId: fixture.users.ownerA.id, commandKind: 'FIXTURE_AUDIT',
+    idempotencyKey: randomUUID(), requestDigest: `d1:${'c'.repeat(64)}`, state: 'COMMITTED' as const, safeResult: {},
+    committedAt: new Date('2026-10-20T10:00:00.000Z'), updatedAt: new Date('2026-10-20T10:00:00.000Z') }));
+  await tenant.commandReceipt.createMany({ data: auditReceipts });
+  const sortedAuditRows = [...auditRows].sort((a, b) => b.at.getTime() - a.at.getTime() || b.id.localeCompare(a.id));
+  await tenant.auditLog.createMany({ data: sortedAuditRows.map((row, index) => ({ id: row.id, eventKey: `ta1:${createHash('sha256').update(row.id).digest('hex')}`, contentDigest: createHash('sha256').update(`fixture-content:${row.id}`).digest('hex'),
+    receiptId: auditReceipts[index]!.id, actorIdentityId: fixture.users.ownerA.id, eventCode: 'PT_SESSION_STARTED', resourceType: 'PT_SESSION', resourceId: row.id,
+    transition: { to: 'audit', version: 0 }, createdAt: row.at })) });
+  const page1 = await (await call(`/gyms/${slug}/audit?page=1&pageSize=20&actionType=PT_SESSION_STARTED`, owner)).json();
+  const page2 = await (await call(`/gyms/${slug}/audit?page=2&pageSize=20&actionType=PT_SESSION_STARTED`, owner)).json();
+  expect(page1.totalCount).toBe(27); expect(page1.items).toHaveLength(20); expect(page2.items).toHaveLength(7);
+  expect(page1.items.map((row: { id: string }) => row.id)).toEqual(sortedAuditRows.slice(0, 20).map(row => row.id));
+  expect(page2.items.map((row: { id: string }) => row.id)).toEqual(sortedAuditRows.slice(20).map(row => row.id));
+  expect(new Set([...page1.items, ...page2.items].map((row: { id: string }) => row.id)).size).toBe(27);
+});
+
+it('withholds platform totals for missing, stale and failed tenant summaries and refreshes only 25 gyms per cursor batch', async () => {
+  const master = fixture.master;
+  const rows = await master.gym.findMany({ orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], select: { id: true } });
+  const seedGym = await master.gym.findUniqueOrThrow({ where: { id: fixture.gyms[0]!.id }, include: { expectedTenantOperation: true } });
+  const count = 27;
+  for (let i = 0; i < count; i++) {
+    const slug = `summary-${i}-${run.runId.slice(0, 8)}`;
+    const operationId = `summary_op_${i}_${run.runId.slice(0, 8)}`;
+    const databaseName = `gymos_${randomUUID().replaceAll('-', '')}`;
+    const gym = await master.gym.create({ data: { name: `Summary Gym ${i}`, slug, databaseName, status: 'ACTIVE' } });
+    await master.operation.create({ data: { id: operationId, kind: 'PROVISION_GYM', actorIdentityId: fixture.users.admin.id,
+      scopeKey: `provision-gym:${slug}`, idempotencyKey: `summary-key-${i}-${run.runId}`, requestDigest: `d1:${'a'.repeat(64)}`,
+      requestedSlug: slug, databaseName, intendedTenantTemplateVersion: seedGym.expectedTenantSchemaVersion,
+      intendedTenantManifestDigest: seedGym.expectedTenantManifestDigest, appliedTenantTemplateVersion: seedGym.expectedTenantSchemaVersion,
+      appliedTenantManifestDigest: seedGym.expectedTenantManifestDigest, gymId: gym.id, state: 'COMPLETE', step: 'MASTER_ACTIVATED', safeResult: {},
+      provisioningIntent: { create: { name: `Summary Gym ${i}`, ownerEmail: `summary${i}@example.test`, plannedOwnerIdentityId: fixture.users.admin.id,
+        reuseIdentity: true, actorAuthVersion: 0, currency: 'LKR', timezone: 'Asia/Colombo' } } } });
+    await master.gym.update({ where: { id: gym.id }, data: { expectedTenantSchemaVersion: seedGym.expectedTenantSchemaVersion,
+      expectedTenantManifestDigest: seedGym.expectedTenantManifestDigest, expectedTenantOperationId: operationId } });
+  }
+  const initial = await master.gym.findMany({ orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], select: { id: true } });
+  const service = new PlatformRegistryService({ master } as DatabaseServiceType, {} as TenantDatabaseService);
+  const makeCurrentCache = (gymId: string, observedAt: Date, memberCount = 4, trainerCount = 2) => master.gymRegistrySummary.upsert({ where: { gymId },
+    create: { gymId, health: 'VERIFIED', observedAt, memberCount, trainerCount, schemaVersion: seedGym.expectedTenantSchemaVersion },
+    update: { health: 'VERIFIED', observedAt, memberCount, trainerCount, schemaVersion: seedGym.expectedTenantSchemaVersion } });
+  const now = new Date();
+  for (const row of initial) await makeCurrentCache(row.id, now);
+  const complete = await service.analyticsSummary(); expect(complete.partial).toBe(false);
+  expect(complete.memberCount).toBe(initial.length * 4); expect(complete.trainerCount).toBe(initial.length * 2);
+  await master.gymRegistrySummary.update({ where: { gymId: initial[1]!.id }, data: { observedAt: new Date(now.getTime() - 3_600_001) } });
+  await master.gymRegistrySummary.delete({ where: { gymId: initial[2]!.id } });
+  const partial = await service.analyticsSummary();
+  expect(partial.partial).toBe(true); expect(partial.memberCount).toBeNull(); expect(partial.trainerCount).toBeNull();
+  expect(partial.staleGyms).toBe(1); expect(partial.unavailableGyms).toBe(2); expect(partial.verifiedGyms).toBe(initial.length - 2);
+
+  // A controlled refresh with one inaccessible tenant must write UNAVAILABLE instead of zero counts.
+  const unavailableGym = initial[0]!;
+  const failingTenants = { withAdministrativeRead: vi.fn().mockRejectedValue(new Error('tenant unavailable')) } as unknown as TenantDatabaseService;
+  const failedRefreshService = new PlatformRegistryService({ master } as DatabaseServiceType, failingTenants);
+  await failedRefreshService.refreshOne(unavailableGym.id, fixture.users.admin.id);
+  expect(await master.gymRegistrySummary.findUniqueOrThrow({ where: { gymId: unavailableGym.id } })).toMatchObject({ health: 'UNAVAILABLE', memberCount: null, trainerCount: null });
+  const stillPartial = await service.analyticsSummary(); expect(stillPartial.partial).toBe(true); expect(stillPartial.memberCount).toBeNull();
+
+  const first = await master.gym.findMany({ take: 26, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], select: { id: true } });
+  const expectedFirst = first.slice(0, 25);
+  const refreshSpy = vi.spyOn(service, 'refreshOne').mockImplementation(async () => undefined);
+  const batch1 = await service.refreshAnalyticsBatch(fixture.users.admin.id);
+  expect(batch1.processed).toBe(25); expect(batch1.nextCursor).toBe(expectedFirst.at(-1)!.id);
+  expect(refreshSpy).toHaveBeenCalledTimes(25);
+  refreshSpy.mockClear();
+  const nextRows = await master.gym.findMany({ take: 26, cursor: { id: batch1.nextCursor! }, skip: 1, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], select: { id: true } });
+  const batch2 = await service.refreshAnalyticsBatch(fixture.users.admin.id, batch1.nextCursor!);
+  expect(batch2.processed).toBe(nextRows.length); expect(batch2.nextCursor).toBeNull();
+  expect(refreshSpy).toHaveBeenCalledTimes(nextRows.length);
+  await expect(service.refreshAnalyticsBatch(fixture.users.admin.id, 'missing-cursor')).rejects.toThrow();
+  expect(await master.gym.count()).toBe(initial.length);
+  expect(rows.length).toBe(2);
 });

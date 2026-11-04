@@ -1,6 +1,6 @@
 # Segment 08 execution evidence — 4 November 2026
 
-Branch at start: `codex/segment-06-management`; changes remain uncommitted pending Git metadata approval. Segment 09 work was not started.
+Continuation from pushed commit `c1c7067` on `codex/segment-08-finance`. This continuation adds a platform cache correctness fix and acceptance fixtures; commit/PR and hosted checks remain pending. Segment 09 work was not started.
 
 ## Implemented task scope
 
@@ -16,7 +16,8 @@ Branch at start: `codex/segment-06-management`; changes remain uncommitted pendi
 
 ## Verified checks
 
-- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm test:finance:owned`: **2/2 passed** on owned disposable PostgreSQL; cleanup reported six databases dropped, temporary container removed and manifest removed.
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm test:finance:owned`: **3/3 passed** on owned disposable PostgreSQL; cleanup reported six databases dropped, temporary container removed and manifest removed. Added stale/missing/failed platform-cache coverage and 25-row cursor batches; audit stable ordering over 27 same-time rows; expense audit-fault rollback; competing budget creation and payroll close races. The injected audit failure is expected and all expense/audit/receipt counts remain unchanged.
+- `pnpm --dir apps/api exec vitest run --config vitest.config.session-lifecycle.ts test/session-lifecycle/session-lifecycle.integration.test.ts -t "writes a signed correction after a close wins"`: **1/1 passed**; late completion after close yields signed correction provenance.
 - `pnpm --dir packages/contracts build && pnpm --dir packages/contracts test`: **54/54 passed**.
 - `pnpm --dir apps/api exec vitest run src/finance/finance-arithmetic.spec.ts`: **5/5 passed** (membership/pack arithmetic, CSV bytes/formula safety, trainer shift defaults/overnight).
 - `pnpm lint:workspace`: passed, no warnings after cleanup.
@@ -28,13 +29,18 @@ Branch at start: `codex/segment-06-management`; changes remain uncommitted pendi
 
 The finance DB suite verifies expense role denials, precision rejection, replay/audit with one effect, budget replay and variance, full-window P&L reconciliation, membership/session recognition without a cash claim, payroll by source-session date and no payout/duplicate record, trainer privacy, two-gym isolation, >100 expense CSV rows, formula defense, filtered audit CSV and export audit, owner dashboard shape/access, analytics windows/shape/access, and bounded export date rejection.
 
-## Explicitly incomplete acceptance
+## Exact remaining acceptance by task
 
-- **Visible browser walkthrough:** blocked because the CUA browser-access host is unavailable. No owner-visible Chrome review or independent owner approval is claimed. Resume when Chrome/browser access is restored while the owner watches.
-- **Platform analytics:** no dedicated tenant-missing/stale/partial summary or multi-batch cursor fixture yet; API behavior is implemented but that finite acceptance remains open.
-- **Concurrency/fault cases:** budget concurrent update/create race, payroll competing close race, late completion/correction provenance, and expense transaction rollback fault injection remain unverified.
-- **UI interactions:** selected-gym switch/overlapping refresh, finance/chart visual parity, audit paging/filter, CSV download behavior, responsive/loading/empty/error states remain for visible review.
-- **Hosted checks and reviewable PR:** pending Git branch/commit/PR preparation and GitHub connectivity; `gh` is not installed in the environment. No merge or deploy was attempted.
-- **Upstream lifecycle tasks 046/047 and task 048 remain open;** Segment 08 consumes their existing tenant facts but does not claim their acceptance.
+- **049:** implementation and finance DB owner/trainer/foreign-gym/read-purity evidence are complete. Pending visible owner/trainer finance review and independent upstream 046/047 acceptance; task 048 remains outside this scope.
+- **053:** implementation and arithmetic/DB reconciliation are complete. Pending explicit source-data matrix for timezone, suspension, expiry, partial and zero allocation dispositions.
+- **054:** implementation, invalid precision, replay, foreign-gym denial, rollback fault injection, and stable >page audit fixture are complete. Pending stale-version case review and visible form/access/browser review.
+- **055:** implementation, seven categories/full-window variance, duplicate-create race conflict, and zero budget semantics are complete. Pending update-race and month-edge fixture/review plus visible UI.
+- **056:** implementation, owner/trainer scope, exact approval reconciliation/no payout, competing close race, and signed late-completion correction provenance are complete. Pending explicit configuration-change and retry fixture/review plus visible payroll review.
+- **057:** implementation and DB P&L reconciliation are complete. Pending all-six-panel visible review, cross-month visual/chart parity, responsive/loading/empty/error states, and exact currency/window/asOf inspection.
+- **058:** implementation and bounded owner DB shape are complete. Pending local-midnight/two-hour boundary fixture, selected-gym switch, overlapping refresh, empty/error labels, and visible review.
+- **059:** implementation and fresh/stale/missing/failed platform summary, null-suppression, 25-item cursor continuation, and gym analytics DB shapes are complete. Pending explicit analytics 30-day/six-month edge and zero-denominator fixture, and visible chart/refresh review.
+- **060:** implementation and 27-row stable same-time page ordering/filter fixture are complete. Pending redaction/support-original-actor/second-gym specific assertions and visible audit UI review.
+- **061:** implementation and owned DB row-cap/formula/BOM/audit/auth cases plus helper CSV quoting tests are complete. Pending visible attachment download verification for MIME/filename/cancellation and browser review.
+- **Cross-cutting:** visible Chrome O01/O10/O11/O13/T06 walkthrough, hosted check inspection, and review PR creation remain. No independent owner approval is claimed. No merge or deploy was attempted.
 
-All ten Segment 08 tasks remain **In Progress** (0/10 completed). Segment 09 remains untouched.
+All ten tasks have implementation complete, but remain **In Progress** because their listed acceptance gates are not all satisfied. Segment 09 remains untouched.
