@@ -67,6 +67,10 @@ it('holds synthetic owned data for a visible review until its stop file appears'
     scheduledStartAt, scheduledEndAt: new Date(scheduledStartAt.getTime() + 3_600_000), gymTimezone: 'Asia/Colombo', fee: '250.0000', currency: 'LKR',
     confirmedAt: scheduledStartAt, confirmationRate: '0.200000', confirmationLevel: 'LEVEL_1', startedAt: scheduledStartAt,
     endedAt: new Date(scheduledStartAt.getTime() + 3_600_000), configurationVersion: config.version, createdByIdentityId: fixture.users.ownerA.id } });
+  await tenant.mealPlan.create({ data: { memberId: member.id, trainerId: trainer.id, name: 'Weekly meal plan', entries: { create: [
+    { sortOrder: 0, dayOfWeek: 1, mealType: 'Breakfast', foodItem: 'Oatmeal with berries', calories: 350 },
+    { sortOrder: 1, dayOfWeek: 3, mealType: 'Lunch', foodItem: 'Chicken and rice bowl', calories: 520 },
+  ] } } });
   await tenant.revenueRecord.create({ data: { sessionId, category: 'COMPLETED_SESSION', amount: '250.0000', currency: 'LKR', sourceKey: `session:${sessionId}:completed` } });
   const period = await tenant.trainerPayPeriod.create({ data: { cadence: 'MONTHLY', localStartDate: new Date(`${month}-01T00:00:00.000Z`),
     localEndDateExclusive: new Date(`${nextMonth}T00:00:00.000Z`), timezone: 'Asia/Colombo',
@@ -99,7 +103,7 @@ it('holds synthetic owned data for a visible review until its stop file appears'
     return contentType.includes('text/html') && body.includes('GymOS') && body.includes('Sign in');
   }); } catch (error) { throw new Error(`${String(error)}\n${webLog()}`); }
   const stopFile = `/tmp/gymos-visible-stop-${environment.runId}`;
-  console.info('[visible-fixture-ready]', JSON.stringify({ url: webUrl, apiUrl, owner: fixture.users.ownerA.email, trainer: fixture.users.trainerUser.email,
+  console.info('[visible-fixture-ready]', JSON.stringify({ url: webUrl, apiUrl, owner: fixture.users.ownerA.email, trainer: fixture.users.trainerUser.email, member: fixture.users.memberUser.email,
     multiOwner: fixture.users.multiOwner.email, password: fixture.password, gymA: fixture.gyms[0]!.slug, gymB: fixture.gyms[1]!.slug,
     readiness: 'API root returned HTTP 200; web /login returned GymOS HTML', stopFile }));
   while (!existsSync(stopFile) && api.exitCode === null && web.exitCode === null) await new Promise(resolve => setTimeout(resolve, 1000));

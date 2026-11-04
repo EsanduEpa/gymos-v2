@@ -99,7 +99,7 @@ export class SessionRequestsService {
         { identityId: trainerBinding.identityId, gymId: access.gymId, role: 'TRAINER', tenantActorId: trainerId },
       ], async () => {
         const [trainer, config, clockRows, memberRow] = await Promise.all([
-          tenant.trainer.findUnique({ where: { id: trainerId }, select: { fullName: true, level: true, specialisations: true, status: true } }),
+          tenant.trainer.findUnique({ where: { id: trainerId }, select: { fullName: true, level: true, specialisations: true, shiftStart: true, shiftEnd: true, status: true } }),
           tenant.gymConfiguration.findUnique({ where: { id: 'current' }, select: { timezone: true, currency: true, minimumSessionDurationMinutes: true, masterGymId: true } }),
           tenant.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`,
           tenant.member.findUnique({ where: { id: member.actorId }, select: { identityId: true, registrationState: true, status: true } }),
@@ -107,9 +107,24 @@ export class SessionRequestsService {
         if (!memberRow || memberRow.identityId !== member.identityId || memberRow.registrationState !== 'COMPLETE' || memberRow.status !== 'ACTIVE') throw new ForbiddenException('Member access is inactive');
         if (!trainer || trainer.status !== 'ACTIVE') throw new NotFoundException('Trainer not found');
         if (!config?.timezone || !config.currency || config.masterGymId !== access.gymId) throw new UnprocessableEntityException('Gym session policy is unavailable');
+        const asOf = clockRows[0]!.now;
+        const localToday = localDateAt(asOf, config.timezone);
+        const [membership, packs] = await Promise.all([
+          tenant.membershipTerm.findFirst({ where: { memberId: member.actorId, startDate: { lte: new Date(`${localToday}T00:00:00.000Z`) }, endDateExclusive: { gt: new Date(`${localToday}T00:00:00.000Z`) } }, select: { id: true } }),
+          tenant.sessionPack.findMany({ where: { memberId: member.actorId }, include: { creditMovements: { select: { availableDelta: true, heldDelta: true, consumedDelta: true, expiredDelta: true } } } }),
+        ]);
+        const balances = packs.map(pack => ({ pack, balance: derivePackCreditBalance(pack.issuedCredits, pack.creditMovements.map(row => ({
+          available: row.availableDelta, held: row.heldDelta, consumed: row.consumedDelta, expired: row.expiredDelta,
+        }))) }));
+        const currentlyEligible = balances.filter(({ pack }) => pack.startDate.toISOString().slice(0, 10) <= localToday && pack.endDateExclusive.toISOString().slice(0, 10) > localToday);
+        const expiredCredits = balances.reduce((total, { pack, balance }) => total + balance.expired +
+          (pack.endDateExclusive.toISOString().slice(0, 10) <= localToday ? balance.available : 0), 0);
         return sessionRequestOptionsSchema.parse({ trainerId, trainerName: trainer.fullName, level: trainer.level, specialisations: trainer.specialisations,
+          shiftStart: trainer.shiftStart, shiftEnd: trainer.shiftEnd,
           timeZone: config.timezone, minimumDurationMinutes: config.minimumSessionDurationMinutes, maximumDurationMinutes: 480,
-          currency: config.currency, asOf: clockRows[0]!.now.toISOString() });
+          currency: config.currency, availableCredits: currentlyEligible.reduce((total, row) => total + row.balance.available, 0),
+          heldCredits: balances.reduce((total, row) => total + row.balance.held, 0), expiredCredits,
+          activeMembershipToday: Boolean(membership), asOf: asOf.toISOString() });
       });
     });
   }

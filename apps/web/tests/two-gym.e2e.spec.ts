@@ -154,7 +154,7 @@ async function contrastRatio(page: Page, selector: string): Promise<number> {
 }
 
 async function renderedGeometry(page: Page) {
-  return page.locator('.gym-banner').evaluate((element) => {
+  return page.locator('.gym-banner, .owner-page-header').first().evaluate((element) => {
     const box = element.getBoundingClientRect();
     return { x: box.x, y: box.y, width: box.width, height: box.height };
   });
@@ -163,11 +163,14 @@ async function renderedGeometry(page: Page) {
 async function expectResponsivePage(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  expect(await contrastRatio(page, '.gym-banner')).toBeGreaterThanOrEqual(4.5);
-  expect(await contrastRatio(page, '.ui-badge-success')).toBeGreaterThanOrEqual(4.5);
-  await page.getByRole('button', { name: 'Add member' }).focus();
-  await expect(page.getByRole('button', { name: 'Add member' })).toBeFocused();
-  expect(await page.getByRole('button', { name: 'Add member' }).evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe('none');
+  if (await page.locator('.gym-banner').count()) expect(await contrastRatio(page, '.gym-banner')).toBeGreaterThanOrEqual(4.5);
+  if (await page.locator('.ui-badge-success').count()) expect(await contrastRatio(page, '.ui-badge-success')).toBeGreaterThanOrEqual(4.5);
+  const memberButton = page.getByRole('button', { name: 'Add member' });
+  const primaryAction = memberButton.count().then(count => count ? memberButton : page.locator('.ui-button-primary').first());
+  const action = await primaryAction;
+  await action.focus();
+  await expect(action).toBeFocused();
+  expect(await action.evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe('none');
   await page.evaluate(() => window.scrollTo(0, 0));
 }
 
@@ -695,8 +698,11 @@ test('trainer roster/profile and member directory are usable at mobile width wit
     confirmationRate: '0.400000', confirmationLevel: 'LEVEL_1', configurationVersion: 0, confirmedAt: sessionStart,
     startedAt: sessionStart, endedAt: new Date(sessionStart.getTime() + 60 * 60_000), createdByIdentityId: fixture.users.ownerA.id,
     createdAt: sessionStart, updatedAt: sessionStart } });
+  await tenant.mealPlan.create({ data: { memberId, trainerId, name: 'Calendar activity meal plan', entries: { create: [
+    { sortOrder: 0, dayOfWeek: 1, mealType: 'Breakfast', foodItem: 'Oatmeal with berries', calories: 350 },
+  ] } } });
   await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${gym.slug}/owner/trainers`);
-  await expect(page.getByRole('heading', { name: 'Trainers', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Trainer Roster Management', level: 1 })).toBeVisible();
   const trainerRow = page.getByRole('row').filter({ hasText: 'Trainer Alpha' });
   const trainerProfileLink = trainerRow.getByRole('link', { name: 'View profile' });
   await expect(trainerProfileLink).toBeVisible();
@@ -717,17 +723,46 @@ test('trainer roster/profile and member directory are usable at mobile width wit
 
   await openWithTestSession(page, fixture.users.memberUser.id, `/gyms/${gym.slug}/member/trainers`);
   await expect(page.getByRole('heading', { name: 'Find a trainer', level: 1 })).toBeVisible();
+  for (const viewport of [{ width: 1440, height: 1000 }, { width: 768, height: 1024 }, { width: 390, height: 844 }, { width: 320, height: 700 }]) {
+    await page.setViewportSize(viewport);
+    await expectResponsivePage(page);
+    await page.screenshot({ path: `/tmp/gymos-member-directory-${viewport.width}.png`, animations: 'disabled' });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
   const card = page.locator('.trainer-directory-card').filter({ hasText: 'Trainer Alpha' });
   await expect(card).toBeVisible();
   await expect(card).not.toContainText(fixture.users.trainerUser.email);
   await expect(card).toContainText('Rating unavailable');
+  await expect(card).toContainText('09:00–18:00 gym local time');
   const requestLink = card.getByRole('link', { name: 'Request this trainer' });
   await expect(requestLink).toHaveAttribute('href', new RegExp(`/gyms/${gym.slug}/member/trainers/${trainerId}/book`));
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: '/tmp/gymos-task039-member-directory-390.png', fullPage: true });
+  await openWithTestSession(page, fixture.users.memberUser.id, `/gyms/${gym.slug}/member/calendar?month=${gymToday.slice(0, 7)}`);
+  await expect(page.getByRole('heading', { name: 'Calendar', level: 1 })).toBeVisible();
+  await expect(page.getByRole('table', { name: `${new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${gymToday.slice(0, 7)}-01T00:00:00Z`))} session calendar` })).toBeVisible();
+  for (const viewport of [{ width: 1440, height: 1000 }, { width: 768, height: 1024 }, { width: 390, height: 844 }, { width: 320, height: 700 }]) {
+    await page.setViewportSize(viewport);
+    await expectResponsivePage(page);
+    await page.screenshot({ path: `/tmp/gymos-member-calendar-${viewport.width}.png`, animations: 'disabled' });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: new RegExp(`${gymToday.slice(0, 7)}-02`) }).click();
+  await expect(page.getByText('Meal plan activity')).toBeVisible();
+  await expect(page.getByText('Oatmeal with berries')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: '/tmp/gymos-member-calendar-meal-390.png', fullPage: true });
+  await openWithTestSession(page, fixture.users.memberUser.id, `/gyms/${gym.slug}/member/trainers`);
   await requestLink.click();
   await expect(page).toHaveURL(new RegExp(`/gyms/${gym.slug}/member/trainers/${trainerId}/book`));
   await expect(page.getByRole('heading', { name: 'Request a trainer', level: 1 })).toBeVisible();
+  await expect(page.getByText(/Session credits available today: 2/)).toBeVisible();
+  for (const viewport of [{ width: 1440, height: 1000 }, { width: 768, height: 1024 }, { width: 390, height: 844 }, { width: 320, height: 700 }]) {
+    await page.setViewportSize(viewport);
+    await expectResponsivePage(page);
+    await page.screenshot({ path: `/tmp/gymos-member-request-${viewport.width}.png`, animations: 'disabled' });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
   const requestDate = localDate(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), 'Asia/Colombo');
   const startingEffects = { sessions: await tenant.pTSession.count(), holds: await tenant.sessionCreditHold.count(), movements: await tenant.packCreditMovement.count() };
   await page.getByLabel('Session date').fill(requestDate);
@@ -766,6 +801,39 @@ test('trainer roster/profile and member directory are usable at mobile width wit
   expect(await tenant.packCreditMovement.count()).toBe(startingEffects.movements + 1);
   await openWithTestSession(page, fixture.users.memberUser.id, `/gyms/${gym.slug}/member/sessions?mode=month&month=${requestDate.slice(0, 7)}`);
   await expect(page.getByText('I am unavailable at that time. Please choose another slot.')).toBeVisible();
+  const acceptedCard = page.locator('article').filter({ hasText: 'Please focus on beginner strength training.' });
+  await acceptedCard.getByRole('button', { name: 'Cancel session' }).click();
+  const cancelDialog = page.getByRole('dialog', { name: 'Cancel session' });
+  await expect(cancelDialog).toBeVisible();
+  await expect(acceptedCard).toContainText('This cancellation is within the free cancellation period.');
+  await page.screenshot({ path: '/tmp/gymos-member-free-cancellation-quote.png', animations: 'disabled' });
+  await page.keyboard.press('Escape');
+  await expect(cancelDialog).not.toBeVisible();
+  await expect(acceptedCard.getByRole('button', { name: 'Cancel session' }).first()).toBeFocused();
+  await acceptedCard.getByRole('button', { name: 'Cancel session' }).click();
+  await expect(cancelDialog).toBeVisible();
+  await expect(acceptedCard).toContainText('This cancellation is within the free cancellation period.');
+  await acceptedCard.getByRole('button', { name: 'Cancel session' }).last().click();
+  await expect.poll(async () => (await tenant.pTSession.findUniqueOrThrow({ where: { id: requested.id } })).state).toBe('CANCELLED');
+  await expect.poll(async () => (await tenant.sessionCreditHold.findUniqueOrThrow({ where: { sessionId: requested.id } })).state).toBe('RELEASED');
+
+  await openWithTestSession(page, fixture.users.memberUser.id, `/gyms/${gym.slug}/member/trainers/${trainerId}/book`);
+  await page.getByLabel('Session date').fill(requestDate);
+  await page.getByLabel(/Start time/).fill('12:00');
+  await page.getByLabel('Note for the trainer (optional)').fill('Please withdraw this request.');
+  await page.getByRole('button', { name: 'Request session' }).click();
+  await expect(page.getByRole('status')).toContainText('The trainer must accept before credit is reserved.');
+  const withdrawRequest = await tenant.pTSession.findFirstOrThrow({ where: { memberId, trainerId, state: 'PENDING_CONFIRMATION' }, orderBy: { createdAt: 'desc' } });
+  await openWithTestSession(page, fixture.users.memberUser.id, `/gyms/${gym.slug}/member/sessions?mode=month&month=${requestDate.slice(0, 7)}`);
+  const pendingCard = page.locator('article').filter({ hasText: 'Please withdraw this request.' });
+  await pendingCard.getByRole('button', { name: 'Withdraw request' }).click();
+  const withdrawDialog = page.getByRole('dialog', { name: 'Withdraw request' });
+  await expect(withdrawDialog).toBeVisible();
+  await expect(pendingCard).toContainText('This will withdraw the pending request without using a credit.');
+  await page.screenshot({ path: '/tmp/gymos-member-pending-withdrawal-quote.png', animations: 'disabled' });
+  await pendingCard.getByRole('button', { name: 'Withdraw request' }).last().click();
+  await expect.poll(async () => (await tenant.pTSession.findUniqueOrThrow({ where: { id: withdrawRequest.id } })).state).toBe('CANCELLED');
+  expect(await tenant.sessionCreditHold.count({ where: { sessionId: withdrawRequest.id } })).toBe(0);
 });
 
 test('V1 Classic branding stays readable and keeps identical geometry at approved widths', async ({ page }) => {

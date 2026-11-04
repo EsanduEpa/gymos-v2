@@ -85,11 +85,11 @@ it('limits personal reads to the authenticated actor, includes all-session month
   const memberCtx = await contextFor(0, 'MEMBER');
   const memberPage = await memberCtx.service.list(memberCtx.access, { month: '2026-11', page: 1, pageSize: 10 });
   expect(memberPage.items).toHaveLength(2);
-  expect(memberPage.items.find(item => item.id === id)).toMatchObject({ notes: 'approved session notes', fee: '250', currency: 'LKR', trainerPay: null, declineReason: null });
+  expect(memberPage.items.find(item => item.id === id)).toMatchObject({ notes: 'approved session notes', fee: null, currency: null, trainerPay: null, declineReason: null });
   expect(memberPage.items.find(item => item.id === declinedId)).toMatchObject({ state: 'DECLINED', declineReason: 'Please choose another time.' });
   const trainerCtx = await contextFor(0, 'TRAINER');
   const trainerPage = await trainerCtx.service.list(trainerCtx.access, { month: '2026-11', page: 1, pageSize: 10 });
-  expect(trainerPage.items[0]).toMatchObject({ id, fee: '250', trainerPay: '112.5' });
+  expect(trainerPage.items[0]).toMatchObject({ id, fee: null, currency: 'LKR', trainerPay: '112.5' });
   expect(trainerPage.items.find(item => item.id === declinedId)).toMatchObject({ state: 'DECLINED', declineReason: null });
   const ownerRecent = await owner.service.recentMember(owner.access, member.id);
   expect(ownerRecent.items.find(item => item.id === declinedId)).toMatchObject({ declineReason: null });

@@ -75,7 +75,6 @@ function SessionCard({ session, role, slug }: { session: Session; role: Role; sl
     <h2>{counterpart}</h2>
     <p><time dateTime={session.scheduledStartAt}>{dateLabel(session.scheduledStartAt, session.gymTimeZone, true)}</time><br/>{duration} minutes</p>
     {session.state === 'ACTIVE' && session.startedAt && role === 'TRAINER' ? <ElapsedSessionClock startedAt={session.startedAt}/> : null}
-    {session.fee !== null && session.currency ? <p>Session fee: {session.currency} {session.fee}</p> : null}
     {session.trainerPay !== null && role === 'TRAINER' ? <p>Trainer earning: {session.currency ?? ''} {session.trainerPay}</p> : null}
     {session.notes ? <p className={styles.sessionNotes}><strong>Session notes</strong><br/>{session.notes}</p> : null}
     {role === 'MEMBER' && session.state === 'DECLINED' && session.declineReason ? <p className={styles.sessionNotes}><strong>Trainer’s reason</strong><br/>{session.declineReason}</p> : null}
