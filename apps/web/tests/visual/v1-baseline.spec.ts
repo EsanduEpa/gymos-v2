@@ -15,7 +15,7 @@ import { clock, gymA, gymB, memberId, trainerId, roles, seedV1 } from './v1-fixt
 const execute = promisify(execFile);
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
 const original = resolve(root, '../gymos');
-const evidence = join(root, 'docs/migration/evidence/GYMOS-MIG-014');
+const evidence = join(root, 'apps/web/tests/visual/fixtures/v1-baseline');
 const viewports = [{ width: 1440, height: 1000 }, { width: 768, height: 1024 }, { width: 390, height: 844 }, { width: 320, height: 700 }];
 const sha = (bytes: Buffer | string) => createHash('sha256').update(bytes).digest('hex');
 

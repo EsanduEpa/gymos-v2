@@ -4,7 +4,7 @@ import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
-const directory = fileURLToPath(new URL('../../../../docs/migration/evidence/GYMOS-MIG-014/', import.meta.url));
+const directory = fileURLToPath(new URL('./fixtures/v1-baseline/', import.meta.url));
 const manifest = JSON.parse(await readFile(join(directory, 'manifest.json'), 'utf8'));
 const preservation = JSON.parse(await readFile(join(directory, 'preservation.json'), 'utf8'));
 const fixture = JSON.parse(await readFile(join(directory, 'fixture.json'), 'utf8'));

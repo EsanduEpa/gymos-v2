@@ -1,8 +1,0 @@
-$ pnpm --dir apps/api build
-
-> api@0.0.1 build /Users/esanduepa/Desktop/Projects/gymos-v2/apps/api
-> nest build
-
-
-
-Exit code: 0

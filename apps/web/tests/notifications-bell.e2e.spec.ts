@@ -12,7 +12,7 @@ test.use({ trace: 'off', screenshot: 'off' });
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const apiDirectory = join(root, 'apps/api');
 const webDirectory = join(root, 'apps/web');
-const evidenceDirectory = join(root, 'docs/migration/evidence/GYMOS-MIG-043');
+const evidenceDirectory = join(root, 'apps/web/test-results/notifications-bell');
 type RunningProcess = { child: ChildProcess; errorText: () => string };
 let environment: Awaited<ReturnType<typeof createDisposableEnvironment>>;
 let fixture: Awaited<ReturnType<typeof seedTwoGymFixture>>;

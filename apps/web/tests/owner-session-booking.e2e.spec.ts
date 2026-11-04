@@ -12,7 +12,7 @@ import { requestDigest } from '../../api/src/operations/primitives.js';
 test.use({ trace: 'off', screenshot: 'off' });
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const apiDirectory = join(root, 'apps/api'); const webDirectory = join(root, 'apps/web');
-const evidenceDirectory = join(root, 'docs/migration/evidence/GYMOS-MIG-041');
+const evidenceDirectory = join(root, 'apps/web/test-results/owner-session-booking');
 type ProcessState = { child: ChildProcess; errors: () => string };
 let environment: Awaited<ReturnType<typeof createDisposableEnvironment>>;
 let fixture: Awaited<ReturnType<typeof seedTwoGymFixture>>;

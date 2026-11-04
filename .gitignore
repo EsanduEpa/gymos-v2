@@ -8,5 +8,6 @@ dist/
 apps/api/src/generated/
 apps/web/playwright-report/
 apps/web/test-results/
+apps/web/tests/visual/fixtures/v1-baseline/images/
 
 *.tsbuildinfo

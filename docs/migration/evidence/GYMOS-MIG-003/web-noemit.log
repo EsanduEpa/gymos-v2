@@ -1,4 +1,0 @@
-$ pnpm --dir apps/web exec tsc --noEmit --incremental false --pretty false
-
-
-Exit code: 0

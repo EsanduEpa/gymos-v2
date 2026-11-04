@@ -1,9 +1,0 @@
-
- RUN  v4.1.12 /Users/esanduepa/Desktop/Projects/gymos-v2/apps/api
-
-
- Test Files  1 passed (1)
-      Tests  7 passed (7)
-   Start at  01:42:06
-   Duration  7.60s (transform 116ms, setup 0ms, import 595ms, tests 6.86s, environment 0ms)
-

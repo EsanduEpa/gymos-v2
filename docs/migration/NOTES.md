@@ -1,0 +1,38 @@
+# GymOS V1 → V2 migration: special notes
+
+This is the only retained migration document. The previous plans, task statuses, decisions, handoffs, and evidence records were removed on 4 November 2026 so the migration can be reassessed from current source and actual user journeys. Their history remains in Git. A merged pull request or an existing V2 route does not establish V1 parity.
+
+## Goal and source of truth
+
+- Preserve the approved V1 web screens, navigation, roles, controls, workflows, and business outcomes in V2. V2 may change the architecture and correct known defects, but changes visible to users need explicit review.
+- Compare the current V1 checkout at `/Users/esanduepa/Desktop/Projects/gymos` with the current V2 checkout. Treat V1 code and safe synthetic screenshots as evidence of existing behavior, not as a reason to copy security, concurrency, or accounting defects.
+- Check each journey in the running V2 application with owner, trainer, member, and platform admin accounts. Static route or API inventories alone do not prove the migration works.
+- Start with login, gym selection, owner configuration, member and trainer registration, credential handoff, membership and pack issuance, PT request or booking, acceptance, start, completion, cancellation and no-show. Continue through coaching, notifications, dashboards, finance, audit, and exports. Compare loading, empty, error, validation, success, mobile, keyboard, and focus states too.
+- The original V1 visual references are test assets at `apps/web/tests/visual/fixtures/v1-baseline/`. They use synthetic data. Their presence is not proof that current V2 screens match them.
+- To verify those preserved reference assets without starting a database, run `node apps/web/tests/visual/verify-v1-evidence.mjs` from the V2 root. Regenerating them is a separate controlled browser run that requires the clean pinned V1 checkout, local Docker, and `GYMOS_TEST_ALLOW_DOCKER=1`; it must never use a shared database.
+
+## Architecture and data boundaries
+
+- V1 is a Next.js app with Server Actions and direct Prisma access. V2 uses a Next.js web app, a NestJS API, a Master identity and gym registry database, and a separate PostgreSQL database for each gym. UI authorization must also be enforced by the API.
+- Master owns identity, gym access, routing, lifecycle, public name and branding. The tenant owns operational profile, currency, timezone, rates, memberships, packs, sessions, coaching, and finance. Cross-database work uses durable operations and reconciliation; it is never described as one atomic transaction.
+- V1 and V2 must have separate databases and secrets. Do not write to V1, import customer data or password hashes, reuse V1 IDs, or point test tools at the demo, shared, or production database. Use owned disposable databases and synthetic accounts for verification.
+- Every gym request must verify the current identity, role, gym access, selected physical database, reciprocal gym binding, and compatible installed schema. Wrong-gym IDs and stale access must fail closed. Migrations are additive and versioned; an unknown existing database is never adopted or dropped automatically.
+- Commands use scoped idempotency keys, durable receipts, transactionally coupled local audit and required notification effects, and explicit pending or unknown outcomes. A retry reconciles the original effect rather than blindly repeating it.
+
+## Product rules to preserve
+
+- One Master identity may access multiple gyms but has one role per gym. Reusing an existing identity requires that person's private password confirmation and consent; an owner cannot assert consent. New member or trainer credentials are handed over once, expire after 24 hours, and require a first-login password change. Access tokens last 15 minutes; there is no automatic refresh. Password change and logout revoke existing sessions.
+- Public gym styling is limited to a primary color and HTTPS logo for this release. Keep V1 Classic hierarchy, spacing, system-font typography, and control behavior as the visual baseline. Semantic error, success, text, and focus colors remain readable. Expanded themes are deferred.
+- Membership and pack validity use half-open gym-local dates: the start is included and `endDateExclusive` is not. Session instants are stored in UTC with the gym timezone and policy snapshots. Reject nonexistent local times; require an explicit offset for ambiguous times. Session and shift overlaps are enforced by database constraints or a serializing lock.
+- A session confirmation holds one eligible pack credit. Its pack is selected by earliest expiry, then creation time, then stable ID unless a valid explicit selection is made. Start, completion, cancellation, no-show, hold release, and trainer/member deactivation must conserve credits and avoid duplicate earnings under retries and races.
+- Money is stored and returned as exact decimal strings. Pack and membership allocations conserve the original minor-unit total. Suspension stops eligibility but does not extend terms or pause scheduled membership earning. Expired unused pack value is separately classified. Operational earning is not a cash receipt or payment.
+- Payroll close and approval record immutable operational pay facts and reasoned later corrections. Approval does not make a payout or a paid claim. Billing, payment, receipts, member progress, ratings/community, and broad theme customization are deferred unless separately approved and implemented; UI must not imply they work.
+- Owner and confirmed related trainer access to private health fields is limited; trainer access expires 90 days after the last qualifying completion if no current qualifying session remains. Never expose health notes, credentials, database details, or raw operation data in directories, support views, audit, notifications, exports, or logs. Platform support is read-only, scoped, time-limited, and audited.
+- Notification reads are scoped to the selected gym. The bell retains a 20-second poll; cross-role screens should refresh after a successful command and when focus returns. Discard stale responses after identity or gym switches. CSV exports need authorized filters, bounds, safe quoting and formula defense, and no partial file on failure.
+
+## Current caution and release boundary
+
+- As of 4 November 2026, `main` contains the Segment 1–8 pull-request merges, including PR #9. That merge history is not a declaration that every V1 UI or workflow is present and usable. PT-session and cross-role acceptance, full V1-to-V2 journey comparison, visual/accessibility parity, and security/isolation/capacity review still need a fresh audit.
+- The existing regular local Gym A database was found behind the current tenant schema during QA account setup. Do not treat its failed trainer/member creation as a product acceptance result. A separate owned two-gym fixture can demonstrate current code, but its accounts and data are temporary and do not appear in the regular local app.
+- Web deployment, provider capacity and secret configuration, recovery rehearsal, controlled release, and mobile apps are separate decisions. No completed migration or production readiness claim follows from these notes.
+- The repository's private-branch rules were not mechanically enforced on the previous hosting plan. The owner accepted manual PR, latest-revision passing-check, review, and explicit merge safeguards. Prior V1 credential remediation was owner-attested; provider logs were not independently inspected. Reassess these conditions before release.
