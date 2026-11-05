@@ -48,7 +48,7 @@ export type TenantTemplateManifest = {
   readonly apiCompatibility: { readonly min: number; readonly max: number };
   readonly migrations: readonly { readonly name: string; readonly checksum: string }[];
   readonly postconditions: {
-    readonly tables: readonly string[]; readonly types: readonly string[];
+    readonly views?: readonly string[]; readonly tables: readonly string[]; readonly types: readonly string[];
     readonly indexes: readonly string[]; readonly constraints: readonly string[];
     readonly triggers: readonly string[]; readonly columns: Readonly<Record<string, readonly string[]>>;
   };
@@ -215,7 +215,7 @@ export const TENANT_TEMPLATE_V5: TenantTemplateManifest = Object.freeze({
       PTAvailabilityRule: ['commandReceiptId', 'createdAt', 'createdByIdentityId', 'effectiveFrom', 'effectiveToExclusive', 'endMinute', 'id', 'kind', 'localDate', 'reason', 'startMinute', 'trainerId', 'updatedAt', 'version', 'weekday'] },
   },
 });
-export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
+export const TENANT_TEMPLATE_V6: TenantTemplateManifest = Object.freeze({
   ...TENANT_TEMPLATE_V5,
   version: 'tenant-2026-11-06.2',
   migrations: [...TENANT_TEMPLATE_V5.migrations, { name: '20261106020000_pt_request_expiry', checksum: 'a1ae2e3a23f0e189e479a48ce037102ff9c1d697f0bbc9a2490776af08caa688' }],
@@ -227,7 +227,34 @@ export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
       PTSession: [...TENANT_TEMPLATE_V5.postconditions.columns.PTSession, 'requestExpiresAt', 'availabilityVersion'] },
   },
 });
-export const TENANT_MANIFESTS: readonly TenantTemplateManifest[] = [TENANT_TEMPLATE_V1, TENANT_TEMPLATE_V2, TENANT_TEMPLATE_V3, TENANT_TEMPLATE_V4, TENANT_TEMPLATE_V5, TENANT_TEMPLATE_MANIFEST];
+export const TENANT_TEMPLATE_V7: TenantTemplateManifest = Object.freeze({
+  ...TENANT_TEMPLATE_V6,
+  version: 'tenant-2026-11-06.3',
+  migrations: [...TENANT_TEMPLATE_V6.migrations, { name: '20261106030000_pt_expired_state_shape', checksum: '9fa2b90879b8115ed45c47dc303bc99c6ea97fd6c50c217878907a16d9dad691' }],
+  postconditions: {
+    ...TENANT_TEMPLATE_V6.postconditions,
+    constraints: [...TENANT_TEMPLATE_V6.postconditions.constraints.filter(name => name !== 'PTSession_state_shape_check'), 'PTSession_state_shape_v2_check'],
+  },
+});
+export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
+  ...TENANT_TEMPLATE_V7,
+  version: 'tenant-2026-11-06.4',
+  migrations: [...TENANT_TEMPLATE_V7.migrations, { name: '20261106040000_pt_owner_exceptions', checksum: 'd23789d50058968bca527e95ca21563e81f2eb4f177cd4aba219410f0c34ed0d' }],
+  postconditions: {
+    ...TENANT_TEMPLATE_V7.postconditions,
+    views: ['PTCreditUnitBalance'],
+    tables: [...TENANT_TEMPLATE_V7.postconditions.tables, 'PTSessionAdjustment', 'PTCreditRemedy'],
+    indexes: [...TENANT_TEMPLATE_V7.postconditions.indexes.filter(name => !['TrainerPayCorrection_sessionId_key', 'PackCreditMovement_terminal_ordinal_key'].includes(name)), "PackCreditMovement_terminal_history_idx", "PackCreditMovement_packId_creditOrdinal_idx", "TrainerPayCorrection_sessionId_idx", "RevenueRecord_reversesId_key", "PTSessionAdjustment_pkey", "PTSessionAdjustment_receiptId_key", "PTSessionAdjustment_replacementSessionId_key", "PTSessionAdjustment_sessionId_committedVersion_key", "PTSessionAdjustment_sessionId_createdAt_id_idx", "PTCreditRemedy_pkey", "PTCreditRemedy_adjustmentId_key", "PTCreditRemedy_sourceHoldId_key", "PTCreditRemedy_packId_creditOrdinal_newEndDateExclusive_idx"],
+    constraints: [...TENANT_TEMPLATE_V7.postconditions.constraints.filter(name => !["RevenueRecord_amount_check", "TrainerPayPeriod_version_check", "TrainerPayCorrection_provenance_check", "PackCreditMovement_shape_check"].includes(name)), "RevenueRecord_reversesId_fkey", "RevenueRecord_signed_amount_check", "TrainerPayPeriod_signed_total_check", "TrainerPayCorrection_provenance_v2_check", "PackCreditMovement_unit_conservation", "PackCreditMovement_conserved_shape_check", "PackCreditMovement_adjustmentId_fkey", "PTSessionAdjustment_pkey", "PTSessionAdjustment_sessionId_fkey", "PTSessionAdjustment_replacementSessionId_fkey", "PTSessionAdjustment_receiptId_fkey", "PTSessionAdjustment_sourceEventId_fkey", "PTSessionAdjustment_shape_check", "PTCreditRemedy_pkey", "PTCreditRemedy_adjustmentId_fkey", "PTCreditRemedy_sourceHoldId_fkey", "PTCreditRemedy_packId_fkey", "PTCreditRemedy_shape_check"],
+    triggers: [...TENANT_TEMPLATE_V7.postconditions.triggers, 'RevenueRecord_reversal_source_check', 'PTSessionAdjustment_append_only', 'PTCreditRemedy_append_only', 'PTCreditRemedy_source_check', 'PackCreditMovement_correction_source_check', 'PackCreditMovement_pack_serialization', 'PackCreditMovement_unit_conservation'],
+    columns: { ...TENANT_TEMPLATE_V7.postconditions.columns,
+      RevenueRecord: [...TENANT_TEMPLATE_V7.postconditions.columns.RevenueRecord, 'reversesId'],
+      PackCreditMovement: [...TENANT_TEMPLATE_V7.postconditions.columns.PackCreditMovement, 'adjustmentId'],
+      PTSessionAdjustment: ["id", "sessionId", "replacementSessionId", "receiptId", "sourceEventId", "kind", "initiatedBy", "reason", "actorIdentityId", "committedVersion", "fromState", "toState", "effectiveSettlementKind", "creditConsumed", "previousStartedAt", "previousEndedAt", "actualStartedAt", "actualEndedAt", "createdAt"],PTCreditRemedy: ["id", "adjustmentId", "sourceHoldId", "packId", "creditOrdinal", "originalEndDateExclusive", "newEndDateExclusive", "valueMinorUnits", "createdAt"],PTCreditUnitBalance: ["packId", "memberId", "currency", "creditOrdinal", "startDate", "endDateExclusive", "packCreatedAt", "valueMinorUnits", "effectiveEndDateExclusive", "available", "held", "consumed", "expired", "consistent"],
+    },
+  },
+});
+export const TENANT_MANIFESTS: readonly TenantTemplateManifest[] = [TENANT_TEMPLATE_V1, TENANT_TEMPLATE_V2, TENANT_TEMPLATE_V3, TENANT_TEMPLATE_V4, TENANT_TEMPLATE_V5, TENANT_TEMPLATE_V6, TENANT_TEMPLATE_V7, TENANT_TEMPLATE_MANIFEST];
 export function reviewedTenantManifest(version: string | null, digest: string | null) {
   return TENANT_MANIFESTS.find(manifest => manifest.version === version && tenantManifestDigest(manifest) === digest);
 }

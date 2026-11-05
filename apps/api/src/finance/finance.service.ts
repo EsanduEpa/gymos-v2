@@ -11,16 +11,17 @@ import { allocateMembershipMinorUnits } from './finance-arithmetic.js';
 import { csvDocument } from './finance-csv.js';
 
 type Access = TenantGateContext & { identityId: string; role: string; slug: string; actor?: { kind: string; id: string } | null };
-function localParts(date: Date, zone: string) {
-  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(date);
+function localParts(date: Date, zone: string, formatter?: Intl.DateTimeFormat) {
+  const parts = (formatter ?? new Intl.DateTimeFormat('en-GB', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })).formatToParts(date);
   return Object.fromEntries(parts.map(part => [part.type, part.value]));
 }
 function localMidnight(value: string, zone: string): Date {
   const [year, month, day] = value.split('-').map(Number);
   const naive = Date.UTC(year!, month! - 1, day!);
+  const formatter = new Intl.DateTimeFormat('en-GB', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
   for (let offset = -14 * 60; offset <= 14 * 60; offset++) {
     const candidate = new Date(naive - offset * 60_000);
-    const parts = localParts(candidate, zone);
+    const parts = localParts(candidate, zone, formatter);
     if (Number(parts.year) === year && Number(parts.month) === month && Number(parts.day) === day
       && Number(parts.hour) === 0 && Number(parts.minute) === 0) return candidate;
   }
@@ -278,29 +279,16 @@ export class FinanceService {
             membershipTotal += amount * 100n;
           }
         }
-        const [packDeferred] = await tx.$queryRaw<{ available: string; held: string; expired: string; inconsistent: bigint }[]>`
-          SELECT
-            COALESCE(SUM(CASE WHEN "expiredNow" THEN 0 ELSE GREATEST("availableCount",0) * "creditBaseMinorUnits" + GREATEST("availableExtra",0) END),0)::text AS available,
-            COALESCE(SUM("heldCount" * "creditBaseMinorUnits" + "heldExtra"),0)::text AS held,
-            COALESCE(SUM(CASE WHEN "expiredNow" THEN GREATEST("availableCount",0) * "creditBaseMinorUnits" + GREATEST("availableExtra",0) ELSE 0 END),0)::text AS expired,
-            COUNT(*) FILTER (WHERE "availableCount" < 0 OR "availableExtra" < 0)::bigint AS inconsistent
-          FROM (
-            SELECT p."creditBaseMinorUnits", p."issuedCredits" - terminal."terminalCount" - held."heldCount" AS "availableCount",
-              p."creditRemainder" - terminal."terminalExtra" - held."heldExtra" AS "availableExtra",
-              held."heldCount", held."heldExtra", p."endDateExclusive" <= ${today}::date AS "expiredNow"
-            FROM "SessionPack" p
-            CROSS JOIN LATERAL (
-              SELECT COUNT(DISTINCT m."creditOrdinal") FILTER (WHERE m."kind" IN ('CONSUME','EXPIRE'))::bigint AS "terminalCount",
-                COUNT(DISTINCT m."creditOrdinal") FILTER (WHERE m."kind" IN ('CONSUME','EXPIRE') AND m."creditOrdinal" <= p."creditRemainder")::bigint AS "terminalExtra"
-              FROM "PackCreditMovement" m WHERE m."packId"=p."id" AND m."creditOrdinal" IS NOT NULL
-            ) terminal
-            CROSS JOIN LATERAL (
-              SELECT COUNT(DISTINCT h."creditOrdinal") FILTER (WHERE h."state"='HELD')::bigint AS "heldCount",
-                COUNT(DISTINCT h."creditOrdinal") FILTER (WHERE h."state"='HELD' AND h."creditOrdinal" <= p."creditRemainder")::bigint AS "heldExtra"
-              FROM "SessionCreditHold" h WHERE h."packId"=p."id"
-            ) held
-            WHERE p."currency"=${currency}
-          ) allocation`;
+        const [packDeferred] = await tx.$queryRaw<{ available: string; held: string; expired: string; recordedExpired: string; inconsistent: bigint }[]>`
+          SELECT COALESCE(SUM(CASE WHEN "effectiveEndDateExclusive">${today}::date THEN available*"valueMinorUnits" ELSE 0 END),0)::text AS available,
+            COALESCE(SUM(held*"valueMinorUnits"),0)::text AS held,
+            COALESCE(SUM((expired+CASE WHEN "effectiveEndDateExclusive"<=${today}::date THEN available ELSE 0 END)*"valueMinorUnits"),0)::text AS expired,
+            COALESCE(SUM(CASE WHEN (expired=1 OR (available=1 AND "effectiveEndDateExclusive"<=${today}::date)) AND EXISTS (
+              SELECT 1 FROM "RevenueRecord" r JOIN "SessionCreditHold" h ON h."sessionId"=r."sessionId"
+              WHERE h."packId"=u."packId" AND h."creditOrdinal"=u."creditOrdinal" AND r.category='EXPIRED_UNUSED' GROUP BY h."packId",h."creditOrdinal" HAVING SUM(r.amount)>0
+            ) THEN "valueMinorUnits" ELSE 0 END),0)::text AS "recordedExpired",
+            COUNT(*) FILTER (WHERE NOT consistent)::bigint AS inconsistent
+          FROM "PTCreditUnitBalance" u WHERE currency=${currency}`;
         if (!packDeferred || BigInt(packDeferred.inconsistent) > 0n) throw new ConflictException('Pack value allocation is inconsistent; finance read is unavailable');
         const packAvailable = BigInt(packDeferred.available);
         const packHeld = BigInt(packDeferred.held);
@@ -317,7 +305,7 @@ export class FinanceService {
           recognitionBasis: 'operational earning; not money received', cashReceived: null,
           lines: pageLines, page: query.data.page, pageSize: query.data.pageSize, totalCount: allLines.length,
           totals: { completedSession: money(totals.completedSession), missedLate: money(totals.missedLate), lateCancel: money(totals.lateCancel),
-            membership: money(totalsMembership), expiredUnusedSeparate: money(totals.expiredUnusedSeparate + packExpired * 100n),
+            membership: money(totalsMembership), expiredUnusedSeparate: money(totals.expiredUnusedSeparate + (packExpired - BigInt(packDeferred.recordedExpired)) * 100n),
             totalOperational: money(totals.completedSession + totals.missedLate + totals.lateCancel + totalsMembership) },
           deferred: { membershipUnrecognized: minorUnits2(membershipUnrecognized), packAvailable: minorUnits2(packAvailable),
             packHeld: minorUnits2(packHeld), expiredPackUnused: minorUnits2(packExpired) } });
@@ -462,14 +450,16 @@ export class FinanceService {
       const endExclusive = localMidnight(nextDate(query.data.to), config.timezone);
       return tenant.$transaction(async tx => {
         await tx.$executeRaw`SET TRANSACTION READ ONLY`;
-        const [clock, totalCount, aggregate, rows] = await Promise.all([
+        const [clock, baseRows, correctionRows] = await Promise.all([
           tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`,
-          tx.payRecord.count({ where: { currency, session: { trainerId: trainer.id, scheduledStartAt: { gte: start, lt: endExclusive } } } }),
-          tx.payRecord.aggregate({ where: { currency, session: { trainerId: trainer.id, scheduledStartAt: { gte: start, lt: endExclusive } } }, _sum: { amount: true } }),
-          tx.payRecord.findMany({ where: { currency, session: { trainerId: trainer.id, scheduledStartAt: { gte: start, lt: endExclusive } } },
-            orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], skip: (query.data.page - 1) * query.data.pageSize, take: query.data.pageSize,
-            include: { period: { select: { id: true, state: true } }, session: { select: { scheduledStartAt: true } } } }),
+          tx.payRecord.findMany({ where: { currency, session: { trainerId: trainer.id, scheduledStartAt: { gte: start, lt: endExclusive } } }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], take: 5001, include: { period: { select: { id: true, state: true } }, session: { select: { scheduledStartAt: true } } } }),
+          tx.trainerPayCorrection.findMany({ where: { currency, session: { trainerId: trainer.id, scheduledStartAt: { gte: start, lt: endExclusive } } }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], take: 5001, include: { correctionPeriod: { select: { id: true, state: true } }, session: { select: { scheduledStartAt: true } } } }),
         ]);
+        if (baseRows.length + correctionRows.length > 5000) throw new UnprocessableEntityException('Narrow the earnings date range');
+        const allRows = [...baseRows, ...correctionRows.map(row => ({ ...row, periodId: row.correctionPeriodId, period: row.correctionPeriod }))].sort((a,b) => a.createdAt.getTime()-b.createdAt.getTime() || a.id.localeCompare(b.id));
+        const totalCount = allRows.length;
+        const totalAmount = money(allRows.reduce((sum,row) => sum + micros(row.amount.toString()),0n));
+        const rows = allRows.slice((query.data.page-1)*query.data.pageSize,query.data.page*query.data.pageSize);
         const currentPeriod = await tx.trainerPayPeriod.findFirst({ where: { utcStartAt: { lte: clock[0]!.now }, utcEndAt: { gt: clock[0]!.now }, OR: [
           { records: { some: { session: { trainerId: trainer.id } } } },
           { corrections: { some: { session: { trainerId: trainer.id } } } },
@@ -483,7 +473,7 @@ export class FinanceService {
           rangeStart: start.toISOString(), rangeEndExclusive: endExclusive.toISOString(), currency, asOf: clock[0]!.now.toISOString(),
           lines: rows.map(row => ({ id: row.id, sessionId: row.sessionId, periodId: row.periodId, scheduledStartAt: row.session.scheduledStartAt.toISOString(),
             amount: row.amount.toString(), currency: row.currency, periodState: row.period.state })), page: query.data.page, pageSize: query.data.pageSize,
-          totalCount, total: aggregate._sum?.amount?.toString() ?? '0.0000', currentPeriod: currentPeriod ? {
+          totalCount, total: totalAmount, currentPeriod: currentPeriod ? {
             id: currentPeriod.id, state: currentPeriod.state, start: currentPeriod.localStartDate.toISOString().slice(0, 10),
             endExclusive: currentPeriod.localEndDateExclusive.toISOString().slice(0, 10), total: currentTotal!,
           } : null });

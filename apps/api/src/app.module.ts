@@ -1,3 +1,5 @@
+import { SessionExceptionsController } from './sessions/session-exceptions.controller.js';
+import { SessionExceptionsService } from './sessions/session-exceptions.service.js';
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -60,8 +62,8 @@ import { SessionExpiryRunner } from './sessions/session-expiry-runner.js';
   imports: [
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
   ],
-  controllers: [AppController, AdminController, AuthController, CredentialsController, CredentialReissueController, GymsController, TrainersController, PacksController, NotificationsController, ConfigurationController, ProvisioningOwnerController, SupportSessionController, GymLifecycleController, SessionBookingController, SessionReadsController, SessionRequestsController, MemberSessionOverviewController, CoachingController, MemberLifecycleController, SessionLifecycleController, FinanceController, DashboardController, AnalyticsController, SessionAvailabilityController],
-  providers: [
+  controllers: [SessionExceptionsController, AppController, AdminController, AuthController, CredentialsController, CredentialReissueController, GymsController, TrainersController, PacksController, NotificationsController, ConfigurationController, ProvisioningOwnerController, SupportSessionController, GymLifecycleController, SessionBookingController, SessionReadsController, SessionRequestsController, MemberSessionOverviewController, CoachingController, MemberLifecycleController, SessionLifecycleController, FinanceController, DashboardController, AnalyticsController, SessionAvailabilityController],
+  providers: [SessionExceptionsService,
     AppService,
     DatabaseService,
     MemberEnrollmentService,

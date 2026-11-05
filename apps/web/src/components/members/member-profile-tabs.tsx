@@ -26,7 +26,7 @@ export function MemberProfileTabs({ member, slug, requestKey }: { member: Member
         {member.registrationState === 'COMPLETE' ? <MemberLifecycleForm slug={slug} memberId={member.id} status={member.status} version={member.version} initialRequestKey={requestKey}/> : null}
       </div> : null}
       {active === 'sessions' ? <div id="panel-sessions" role="tabpanel" aria-labelledby="tab-sessions" tabIndex={0} className="member-profile-panel">
-        {member.recentSessions.length ? <ol>{member.recentSessions.map(session => <li key={session.id}>{session.scheduledStart} · {session.state}</li>)}</ol>
+        {member.recentSessions.length ? <ol>{member.recentSessions.map(session => <li key={session.id}><a className="platform-text-link" href={`/gyms/${encodeURIComponent(slug)}/sessions/${encodeURIComponent(session.id)}`}>{session.scheduledStart} · {session.state}</a></li>)}</ol>
           : <EmptyState title="No sessions recorded yet." hint="Completed and scheduled PT sessions will appear here."/>}
       </div> : null}
       {active === 'history' ? <div id="panel-history" role="tabpanel" aria-labelledby="tab-history" tabIndex={0} className="member-profile-panel">

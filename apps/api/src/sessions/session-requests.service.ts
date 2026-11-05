@@ -1,3 +1,4 @@
+import { creditTotals, creditUnits, eligibleUnits } from './credit-unit-projection.js';
 import { randomUUID } from 'node:crypto';
 import { ConflictException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { Prisma as TP, PrismaClient } from '../generated/tenant/client.js';
@@ -8,7 +9,6 @@ import { CommandReceiptFoundationService } from '../operations/receipt.service.j
 import { tenantAuditKey, OperationConflictError } from '../operations/primitives.js';
 import { TenantSchemaGateService, type TenantGateContext } from '../tenancy/tenant-schema-gate.service.js';
 import { reserveSessionCredit } from './credit-holds.js';
-import { derivePackCreditBalance, selectEligibleSessionPack } from './session-state.js';
 import { retrySessionTransaction } from './session-transactions.js';
 import { allowedStartMinutes, type AvailabilityRule } from './availability-policy.js';
 import { requestCanBeAccepted, requestExpiryInstant } from './session-state.js';
@@ -111,21 +111,13 @@ export class SessionRequestsService {
         if (!config?.timezone || !config.currency || config.masterGymId !== access.gymId) throw new UnprocessableEntityException('Gym session policy is unavailable');
         const asOf = clockRows[0]!.now;
         const localToday = localDateAt(asOf, config.timezone);
-        const [membership, packs] = await Promise.all([
-          tenant.membershipTerm.findFirst({ where: { memberId: member.actorId, startDate: { lte: new Date(`${localToday}T00:00:00.000Z`) }, endDateExclusive: { gt: new Date(`${localToday}T00:00:00.000Z`) } }, select: { id: true } }),
-          tenant.sessionPack.findMany({ where: { memberId: member.actorId }, include: { creditMovements: { select: { availableDelta: true, heldDelta: true, consumedDelta: true, expiredDelta: true } } } }),
-        ]);
-        const balances = packs.map(pack => ({ pack, balance: derivePackCreditBalance(pack.issuedCredits, pack.creditMovements.map(row => ({
-          available: row.availableDelta, held: row.heldDelta, consumed: row.consumedDelta, expired: row.expiredDelta,
-        }))) }));
-        const currentlyEligible = balances.filter(({ pack }) => pack.startDate.toISOString().slice(0, 10) <= localToday && pack.endDateExclusive.toISOString().slice(0, 10) > localToday);
-        const expiredCredits = balances.reduce((total, { pack, balance }) => total + balance.expired +
-          (pack.endDateExclusive.toISOString().slice(0, 10) <= localToday ? balance.available : 0), 0);
+        const membership = await tenant.membershipTerm.findFirst({ where: { memberId: member.actorId, startDate: { lte: new Date(`${localToday}T00:00:00.000Z`) }, endDateExclusive: { gt: new Date(`${localToday}T00:00:00.000Z`) } }, select: { id: true } });
+        const totals = (await creditTotals(tenant, [member.actorId], localToday, true)).get(member.actorId);
         return sessionRequestOptionsSchema.parse({ trainerId, trainerName: trainer.fullName, level: trainer.level, specialisations: trainer.specialisations,
           shiftStart: trainer.shiftStart, shiftEnd: trainer.shiftEnd,
           timeZone: config.timezone, minimumDurationMinutes: 60, maximumDurationMinutes: 60,
-          currency: config.currency, availableCredits: currentlyEligible.reduce((total, row) => total + row.balance.available, 0),
-          heldCredits: balances.reduce((total, row) => total + row.balance.held, 0), expiredCredits,
+          currency: config.currency, availableCredits: totals?.available ?? 0,
+          heldCredits: totals?.held ?? 0, expiredCredits: totals?.expired ?? 0,
           activeMembershipToday: Boolean(membership), asOf: asOf.toISOString() });
       });
     });
@@ -191,15 +183,7 @@ export class SessionRequestsService {
             const day = new Date(`${input.data.localDate}T00:00:00.000Z`);
             const term = await tx.membershipTerm.findFirst({ where: { memberId: member.actorId, startDate: { lte: day }, endDateExclusive: { gt: day } }, select: { id: true } });
             if (!term) throw new UnprocessableEntityException('Member has no active membership for the session date');
-            const packs = await tx.sessionPack.findMany({ where: { memberId: member.actorId, startDate: { lte: day }, endDateExclusive: { gt: day } },
-              orderBy: [{ endDateExclusive: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }], select: { id: true, startDate: true, endDateExclusive: true, createdAt: true, issuedCredits: true } });
-            const eligibles = [];
-            for (const pack of packs) {
-              const movements = await tx.packCreditMovement.findMany({ where: { packId: pack.id }, select: { availableDelta: true, heldDelta: true, consumedDelta: true, expiredDelta: true } });
-              const balance = derivePackCreditBalance(pack.issuedCredits, movements.map(m => ({ available: m.availableDelta, held: m.heldDelta, consumed: m.consumedDelta, expired: m.expiredDelta })));
-              eligibles.push({ id: pack.id, startDate: pack.startDate.toISOString().slice(0, 10), endDateExclusive: pack.endDateExclusive.toISOString().slice(0, 10), createdAt: pack.createdAt, availableCredits: balance.available });
-            }
-            if (!selectEligibleSessionPack(eligibles, input.data.localDate)) throw new UnprocessableEntityException('No available unexpired session credit');
+            if (!eligibleUnits(await creditUnits(tx, member.actorId), input.data.localDate).length) throw new UnprocessableEntityException('No available unexpired session credit');
             const overlap = await tx.pTSession.findFirst({ where: { state: { in: ['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE'] },
               AND: [{ OR: [{ state: { not: 'PENDING_CONFIRMATION' } }, { requestExpiresAt: { gt: now } }] }],
               OR: [{ memberId: member.actorId }, { trainerId: trainer.actorId }], scheduledStartAt: { lt: end }, scheduledEndAt: { gt: start } }, select: { id: true } });

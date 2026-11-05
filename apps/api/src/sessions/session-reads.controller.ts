@@ -1,5 +1,5 @@
 import { Controller, ForbiddenException, Get, Param, Query, Req, UnprocessableEntityException, UseGuards } from '@nestjs/common';
-import { sessionReadQuerySchema } from '@gymos/contracts';
+import { sessionDetailQuerySchema, sessionAttentionQuerySchema, sessionReadQuerySchema } from '@gymos/contracts';
 import { GymAccessGuard, type GymRequest } from '../gym-access.guard.js';
 import { SessionReadsService } from './session-reads.service.js';
 
@@ -24,6 +24,22 @@ export class SessionReadsController {
     const parsed = sessionReadQuerySchema.safeParse(query ?? {});
     if (!parsed.success) throw new UnprocessableEntityException('Enter valid session date, filters and page details');
     return this.reads.list(access, parsed.data);
+  }
+
+  @Get('sessions/attention')
+  attention(@Req() request: GymRequest, @Query() query: unknown) {
+    if (!request.gymAccess || request.gymAccess.role !== 'OWNER') throw new ForbiddenException('Owner access is required');
+    const parsed = sessionAttentionQuerySchema.safeParse(query ?? {});
+    if (!parsed.success) throw new UnprocessableEntityException('Enter valid attention queue paging');
+    return this.reads.attention(request.gymAccess, parsed.data);
+  }
+
+  @Get('sessions/:sessionId')
+  detail(@Req() request: GymRequest, @Param('sessionId') sessionId: string, @Query() query: unknown) {
+    if (!request.gymAccess) throw new ForbiddenException('Gym access is required');
+    const parsed = sessionDetailQuerySchema.safeParse(query ?? {});
+    if (!parsed.success) throw new UnprocessableEntityException('Enter a valid timeline page');
+    return this.reads.detail(request.gymAccess, sessionId, parsed.data.timelinePage);
   }
 
   @Get('members/:memberId/recent-sessions')

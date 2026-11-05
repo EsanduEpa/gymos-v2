@@ -1,6 +1,7 @@
 import { ForbiddenException } from '@nestjs/common';
 import { PrismaClient as TenantClient } from '../../src/generated/tenant/client.js';
 import { DatabaseService } from '../../src/database.service.js';
+import { expirePendingSession } from '../../src/sessions/expire-pending-session.js';
 import { SessionReadsService } from '../../src/sessions/session-reads.service.js';
 import { TenantSchemaGateService } from '../../src/tenancy/tenant-schema-gate.service.js';
 import { createDisposableEnvironment } from '../support/disposable-environment.js';
@@ -111,4 +112,61 @@ it('keeps two gym databases isolated and owner-only member recent reads hide for
   expect((await a.service.recentMember(a.access, memberA.id)).items[0]?.id).toBe(id);
   await expect(a.service.recentMember({ ...a.access, role: 'MEMBER' }, memberA.id)).rejects.toBeInstanceOf(ForbiddenException);
   await expect(b.service.recentMember(b.access, memberA.id)).rejects.toThrow();
+});
+
+
+it('shares one authorized detail across roles and bounds the owner attention queue', async () => {
+  const owner = await contextFor(0, 'OWNER');
+  const memberCtx = await contextFor(0, 'MEMBER');
+  const trainerCtx = await contextFor(0, 'TRAINER');
+  const foreign = await contextFor(1, 'OWNER');
+  const member = await owner.tenant.member.findUniqueOrThrow({ where: { identityId: fixture.users.memberUser.id } });
+  const trainer = await owner.tenant.trainer.findUniqueOrThrow({ where: { identityId: fixture.users.trainerUser.id } });
+  const id = `detail-${run.runId}`;
+  await owner.tenant.pTSession.create({ data: { id, memberId: member.id, trainerId: trainer.id, state: 'COMPLETED', type: 'IN_PERSON',
+    scheduledStartAt: new Date('2026-10-01T03:00:00Z'), scheduledEndAt: new Date('2026-10-01T04:00:00Z'), gymTimezone: 'Asia/Colombo',
+    fee: '100', currency: 'LKR', configurationVersion: 0, confirmationRate: '0.4', confirmationLevel: 'LEVEL_1', confirmedAt: new Date('2026-09-30T00:00:00Z'), startedAt: new Date('2026-10-01T03:00:00Z'), endedAt: new Date('2026-10-01T04:00:00Z'), notes: 'Synthetic shared notes', createdByIdentityId: fixture.users.ownerA.id } });
+  const before = { sessions: await owner.tenant.pTSession.count(), events: await owner.tenant.sessionStateEvent.count(), movements: await owner.tenant.packCreditMovement.count() };
+  for (const ctx of [owner, memberCtx, trainerCtx]) {
+    const detail = await ctx.service.detail(ctx.access, id);
+    expect(detail.session).toMatchObject({ id, memberName: member.fullName, trainerName: trainer.fullName, notes: 'Synthetic shared notes', state: 'COMPLETED' });
+    expect(JSON.stringify(detail)).not.toMatch(/receiptId|actorIdentityId|confirmationRate|databaseName|creditOrdinal/);
+  }
+  expect((await memberCtx.service.detail(memberCtx.access, id)).session).toMatchObject({ fee: null, trainerPay: null, currency: null });
+  await expect(foreign.service.detail(foreign.access, id)).rejects.toThrow('Session not found');
+  await expect(owner.service.detail(owner.access, 'unknown-session')).rejects.toThrow('Session not found');
+  await expect(memberCtx.service.detail({ ...memberCtx.access, actor: { kind: 'MEMBER', id: 'unrelated-member' } }, id)).rejects.toThrow('Session not found');
+  await expect(trainerCtx.service.detail({ ...trainerCtx.access, actor: { kind: 'TRAINER', id: 'unrelated-trainer' } }, id)).rejects.toThrow('Session not found');
+  await expect(memberCtx.service.attention(memberCtx.access, { page: 1, pageSize: 10 })).rejects.toBeInstanceOf(ForbiddenException);
+  const attention = await owner.service.attention(owner.access, { page: 1, pageSize: 10 });
+  expect(attention.items.length).toBeLessThanOrEqual(10);
+  expect(attention.totalCount).toBeGreaterThan(10);
+  expect(attention.items.every(item => item.reason === 'SCHEDULED_PAST_END')).toBe(true);
+  expect(await owner.tenant.pTSession.count()).toBe(before.sessions);
+  expect(await owner.tenant.sessionStateEvent.count()).toBe(before.events);
+  expect(await owner.tenant.packCreditMovement.count()).toBe(before.movements);
+});
+
+
+it('renders overdue expiry safely and permits a real idempotent expiry under the forward state constraint', async () => {
+  const owner = await contextFor(0, 'OWNER');
+  const memberCtx = await contextFor(0, 'MEMBER');
+  const member = await owner.tenant.member.findUniqueOrThrow({ where: { identityId: fixture.users.memberUser.id } });
+  const trainer = await owner.tenant.trainer.findUniqueOrThrow({ where: { identityId: fixture.users.trainerUser.id } });
+  const id = `expiry-detail-${run.runId}`;
+  await owner.tenant.pTSession.create({ data: { id, memberId: member.id, trainerId: trainer.id, state: 'PENDING_CONFIRMATION', type: 'IN_PERSON',
+    scheduledStartAt: new Date('2026-10-02T03:00:00Z'), scheduledEndAt: new Date('2026-10-02T04:00:00Z'), requestExpiresAt: new Date('2026-10-02T02:00:00Z'), gymTimezone: 'Asia/Colombo',
+    fee: '100', currency: 'LKR', configurationVersion: 0, createdByIdentityId: fixture.users.memberUser.id } });
+  const before = await memberCtx.service.detail(memberCtx.access, id);
+  expect(before).toMatchObject({ expiryAwaitingSweep: true, reservation: 'NONE', session: { state: 'EXPIRED', commandAffordances: [] } });
+  expect((await owner.service.attention(owner.access, { page: 1, pageSize: 100 })).totalCount).toBeGreaterThan(0);
+  const first = await expirePendingSession(owner.tenant, owner.gym.id, id);
+  expect(first.result.requestOutcome).toBe('EXPIRED');
+  expect((await expirePendingSession(owner.tenant, owner.gym.id, id)).replayed).toBe(true);
+  const after = await memberCtx.service.detail(memberCtx.access, id);
+  expect(after).toMatchObject({ expiryAwaitingSweep: false, reservation: 'NONE', session: { state: 'EXPIRED', version: 1 } });
+  expect(after.timeline).toHaveLength(1);
+  expect(after.timeline[0]).toMatchObject({ from: 'PENDING_CONFIRMATION', to: 'EXPIRED', notesUpdated: false });
+  expect(await owner.tenant.sessionCreditHold.count({ where: { sessionId: id } })).toBe(0);
+  expect(await owner.tenant.notification.count({ where: { resourceId: id, eventCode: 'SESSION_EXPIRED' } })).toBe(2);
 });

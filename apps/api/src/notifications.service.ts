@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 import type { Prisma as TenantPrisma } from './generated/tenant/client.js';
 import { canonicalJson, OperationIntegrityError, reference } from './operations/primitives.js';
 
-type NotificationEvent = 'HIRE_REQUEST' | 'SESSION_BOOKED' | 'SESSION_DECLINED' | 'SESSION_CANCELLED' | 'SESSION_MISSED' | 'SESSION_STARTED' | 'SESSION_COMPLETED' | 'SESSION_EXPIRED';
-type NotificationLink = 'TRAINER_REQUESTS' | 'MEMBER_SESSIONS' | 'TRAINER_SCHEDULE';
+type NotificationEvent = 'HIRE_REQUEST' | 'SESSION_BOOKED' | 'SESSION_DECLINED' | 'SESSION_CANCELLED' | 'SESSION_MISSED' | 'SESSION_STARTED' | 'SESSION_COMPLETED' | 'SESSION_EXPIRED' | 'SESSION_RESCHEDULED' | 'SESSION_CORRECTED' | 'CREDIT_REMEDY_APPROVED' | 'CREDIT_REMEDY_REQUIRED';
+type NotificationLink = 'OWNER_SESSIONS' | 'TRAINER_REQUESTS' | 'MEMBER_SESSIONS' | 'TRAINER_SCHEDULE';
 const CONTENT: Readonly<Record<NotificationEvent, { title: string; message: string; linkKind: NotificationLink }>> = {
   HIRE_REQUEST: { title: 'New session request', message: 'A member requested a personal training session.', linkKind: 'TRAINER_REQUESTS' },
   SESSION_BOOKED: { title: 'Session confirmed', message: 'Your personal training session was confirmed.', linkKind: 'MEMBER_SESSIONS' },
@@ -12,6 +12,10 @@ const CONTENT: Readonly<Record<NotificationEvent, { title: string; message: stri
   SESSION_MISSED: { title: 'Session marked missed', message: 'Your personal training session was marked as missed.', linkKind: 'MEMBER_SESSIONS' },
   SESSION_STARTED: { title: 'Session started', message: 'Your personal training session has started.', linkKind: 'MEMBER_SESSIONS' },
   SESSION_COMPLETED: { title: 'Session completed', message: 'Your personal training session is complete.', linkKind: 'MEMBER_SESSIONS' },
+  SESSION_RESCHEDULED: { title: 'PT session rescheduled', message: 'The personal training appointment has changed. Open its details for the replacement time.', linkKind: 'MEMBER_SESSIONS' },
+  SESSION_CORRECTED: { title: 'PT outcome corrected', message: 'An owner corrected the training outcome. Open the booking for its current credit outcome.', linkKind: 'MEMBER_SESSIONS' },
+  CREDIT_REMEDY_APPROVED: { title: 'PT credit restored', message: 'The owner approved a new expiry for the affected PT credit. Membership is still required when booking.', linkKind: 'MEMBER_SESSIONS' },
+  CREDIT_REMEDY_REQUIRED: { title: 'PT credit needs owner review', message: 'The released credit has expired. Owner approval is needed before it can be used again.', linkKind: 'OWNER_SESSIONS' },
   SESSION_EXPIRED: { title: 'Session request expired', message: 'A personal training session request expired before confirmation.', linkKind: 'MEMBER_SESSIONS' },
 };
 

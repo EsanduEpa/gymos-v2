@@ -15,6 +15,7 @@ async function tokenOrRedirect() {
   return token;
 }
 function refresh(slug: string) {
+  revalidatePath(`/gyms/${encodeURIComponent(slug)}`, 'layout');
   revalidatePath(`/gyms/${encodeURIComponent(slug)}/trainer/schedule`);
   revalidatePath(`/gyms/${encodeURIComponent(slug)}/owner/sessions`);
   revalidatePath(`/gyms/${encodeURIComponent(slug)}/member/sessions`);

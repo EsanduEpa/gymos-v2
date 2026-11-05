@@ -52,7 +52,7 @@ export default async function OwnerTrainerProfilePage({ params }: { params: Prom
           {result.data.recentSessions.items.length === 0
             ? <Feedback tone="info">No sessions recorded yet.</Feedback>
             : <ul className="trainer-profile-sessions">{result.data.recentSessions.items.map(item => <li key={item.id}>
-              <div><strong>{item.state.replaceAll('_', ' ')}</strong><span>{item.type.replaceAll('_', ' ').toLowerCase()}</span></div>
+              <div><a className="platform-text-link" href={`/gyms/${encodeURIComponent(slug)}/sessions/${encodeURIComponent(item.id)}`}>{item.state.replaceAll('_', ' ')}</a><span>{item.type.replaceAll('_', ' ').toLowerCase()}</span></div>
               <time dateTime={item.scheduledStartAt}>{formatSessionStart(item.scheduledStartAt, result.data.gymTimeZone)}</time>
             </li>)}</ul>}
           {result.data.recentSessions.totalCount > 0 && <p className="trainer-profile-session-total">Showing {result.data.recentSessions.items.length} of {result.data.recentSessions.totalCount} sessions{result.data.recentSessions.hasMore ? ' · latest ten shown' : ''}.</p>}

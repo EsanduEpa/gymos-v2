@@ -58,7 +58,7 @@ export default async function TrainerClientProfilePage({ params }: { params: Pro
       <section id="history" aria-labelledby="history-tab"><Card><CardHeader eyebrow="LATEST TEN" title="Session history"/>
         <p className={styles.hint}>Showing {profile.data.recentSessions.items.length} of {profile.data.recentSessions.totalCount} related sessions{profile.data.recentSessions.hasMore ? '; older sessions are available.' : '.'}</p>
         {profile.data.recentSessions.items.length === 0 ? <div className="ui-empty-state"><h2>No sessions yet</h2><p>Related session history will appear here.</p></div> :
-          <ol className={styles.history}>{profile.data.recentSessions.items.map(item => <li key={item.id}><strong>{item.state.replaceAll('_', ' ').toLowerCase()}</strong>
+          <ol className={styles.history}>{profile.data.recentSessions.items.map(item => <li key={item.id}><a className="platform-text-link" href={`/gyms/${encodeURIComponent(slug)}/sessions/${encodeURIComponent(item.id)}`}>{item.state.replaceAll('_', ' ').toLowerCase()}</a>
             <time dateTime={item.scheduledStartAt}>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: profile.data.timeZone }).format(new Date(item.scheduledStartAt))}</time>
             {item.notes ? <p>{item.notes}</p> : null}</li>)}</ol>}
       </Card></section>

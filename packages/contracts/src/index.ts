@@ -137,3 +137,4 @@ export function commandSchema<T extends z.ZodType>(data: T) {
   });
 }
 export type ReadMeta = z.infer<typeof readMetaSchema>;
+export * from './session-exceptions.js';

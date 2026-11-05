@@ -28,7 +28,7 @@ export function SessionRequestForm({ slug, trainerId, timeZone, requestKey, minD
     <input type="hidden" name="type" value="IN_PERSON"/><input type="hidden" name="durationMinutes" value="60"/><div className="ui-feedback">In-person PT · 60 minutes · 1 credit. Requests made within 24 hours of the start are already in the late-cancellation window if accepted.</div>
     <label className="ui-field"><span className="ui-field-label">Note for the trainer (optional)</span><textarea disabled={!ready} name="notes" value={draft.notes} onChange={event => update('notes', event.currentTarget.value)} maxLength={4000} rows={4}/></label>
     {state.error ? <p role="alert" className="ui-feedback ui-feedback-error">{state.error}</p> : null}
-    {state.success ? <p role="status" className="ui-feedback ui-feedback-success">{state.success} {state.sessionId ? <a href={`/gyms/${encodeURIComponent(slug)}/member/sessions`}>View your sessions</a> : null}</p> : null}
+    {state.success ? <p role="status" className="ui-feedback ui-feedback-success">{state.success} {state.sessionId ? <a href={`/gyms/${encodeURIComponent(slug)}/sessions/${encodeURIComponent(state.sessionId)}`}>View booking</a> : null}</p> : null}
     <button className="ui-button ui-button-primary" type="submit" disabled={!ready || pending}>{pending ? 'Sending request…' : 'Request session'}</button>
   </form>;
 }

@@ -19,8 +19,8 @@ const initialState: SessionPolicyActionState = {};
 function consequenceLabel(consequence: string | null) {
   switch (consequence) {
     case 'PENDING_WITHDRAWAL': return 'This will withdraw the pending request without using a credit.';
-    case 'FREE_CANCELLATION': return 'This cancellation is within the free cancellation period.';
-    case 'LATE_CANCELLATION': return 'This cancellation is late under the gym policy.';
+    case 'FREE_CANCELLATION': return 'No PT credit is used. The reservation is released.';
+    case 'LATE_CANCELLATION': return 'This late cancellation consumes one PT credit.';
     case 'NO_SHOW': return 'This will mark the booking as a no-show under the gym policy.';
     default: return 'The gym policy quote did not return a consequence.';
   }
@@ -38,12 +38,13 @@ export function SessionPolicyControls({ slug, session, role }: { slug: string; s
   const [pending, startTransition] = useTransition();
   const [panelAction, setPanelAction] = useState<PolicyAction | null>(null);
   const [quote, setQuote] = useState<Awaited<ReturnType<typeof getSessionPolicyQuote>>['quote']>();
+  const [reason, setReason] = useState('');
   const [acknowledged, setAcknowledged] = useState(false);
   const [state, setState] = useState(initialState);
   const [initialKey, setInitialKey] = useState(() => globalThis.crypto.randomUUID());
   const [quoteLoading, setQuoteLoading] = useState(false);
 
-  const canCancel = session.commandAffordances.includes('CANCEL') || session.commandAffordances.includes('WITHDRAW');
+  const canCancel = role !== 'OWNER' && (session.commandAffordances.includes('CANCEL') || session.commandAffordances.includes('WITHDRAW'));
   const canNoShow = session.commandAffordances.includes('NO_SHOW');
   const cancelLabel = role === 'MEMBER' && session.state === 'PENDING_CONFIRMATION' ? 'Withdraw request' : 'Cancel session';
 
@@ -82,7 +83,7 @@ export function SessionPolicyControls({ slug, session, role }: { slug: string; s
     const key = state.currentKey ?? state.nextKey ?? initialKey;
     startTransition(async () => {
       const result = action === 'CANCEL'
-        ? await cancelSessionWithQuote(slug, session.id, quote.sessionVersion, quote.policyVersion, quote.acknowledgmentToken, key)
+        ? await cancelSessionWithQuote(slug, session.id, quote.sessionVersion, quote.policyVersion, quote.acknowledgmentToken, key, reason || undefined)
         : await markSessionNoShowWithQuote(slug, session.id, quote.sessionVersion, quote.policyVersion, quote.acknowledgmentToken, key);
       setState(result);
       if (result.nextKey) setInitialKey(result.nextKey);
@@ -106,10 +107,10 @@ export function SessionPolicyControls({ slug, session, role }: { slug: string; s
     {canNoShow ? <button className="ui-button ui-button-secondary" type="button" disabled={pending || quoteLoading}
       onClick={() => loadQuote('NO_SHOW')}>Mark no-show</button> : null}
     {panelAction ? <dialog ref={dialogRef} className={styles.panel} aria-labelledby={`session-policy-title-${session.id}`}
-      onCancel={event => { event.preventDefault(); setPanelAction(null); setQuote(undefined); setState(initialState); }}>
+      onCancel={event => { event.preventDefault(); if (pending || state.outcomeUnknown) return; setPanelAction(null); setQuote(undefined); setState(initialState); }}>
       <h3 id={`session-policy-title-${session.id}`} tabIndex={-1}>{panelAction === 'CANCEL' ? cancelLabel : 'Mark no-show'}</h3>
       {quoteLoading ? <p role="status">Loading the current gym policy quote…</p> : quote ? <>
-        <p>{consequenceLabel(quote.consequence)}</p>
+        <p>{consequenceLabel(quote.consequence)}</p><p>Quote valid until {quoteTime(quote.expiresAt, session.gymTimeZone)}.</p>
         {quote.eligibleAt ? <p>Available at {quoteTime(quote.eligibleAt, session.gymTimeZone)}.</p> : null}
         {quote.cancellationCutoff ? <p>Free cancellation cutoff: {quoteTime(quote.cancellationCutoff, session.gymTimeZone)}.</p> : null}
         {creditInfo ? <p>Quoted credit value: {creditInfo}{quote.creditOrdinal ? ` · credit ${quote.creditOrdinal}` : ''}</p> : null}
@@ -121,16 +122,18 @@ export function SessionPolicyControls({ slug, session, role }: { slug: string; s
             : `I understand the late cancellation consequence${creditInfo ? ` and ${creditInfo} credit value` : ''}.`}</span>
         </label> : null}
         {missingAcknowledgmentToken ? <p role="alert" tabIndex={-1}>The server did not provide a valid acknowledgment token. Request a fresh quote.</p> : null}
-        {quote.eligible ? <button className="ui-button ui-button-primary" type="button" disabled={pending || missingAcknowledgmentToken || (requiresAcknowledgment && !acknowledged)}
+        {panelAction === 'CANCEL' && role === 'TRAINER' ? <label>Reason for trainer cancellation<textarea disabled={pending || state.outcomeUnknown} value={reason} onChange={event => setReason(event.target.value)} maxLength={500} required/></label> : null}
+        {quote.eligible ? <button className="ui-button ui-button-primary" type="button" disabled={pending || (panelAction === 'CANCEL' && role === 'TRAINER' && !reason.trim()) || missingAcknowledgmentToken || (requiresAcknowledgment && !acknowledged)}
           onClick={() => submitPolicyAction(panelAction)}>
-          {pending ? 'Saving…' : state.outcomeUnknown ? 'Retry with same key' : panelAction === 'CANCEL' ? cancelLabel : 'Confirm no-show'}
+          {pending ? 'Saving…' : state.outcomeUnknown ? 'Retry same change' : panelAction === 'CANCEL' ? cancelLabel : 'Confirm no-show'}
         </button> : null}
       </> : null}
       {state.error ? <p role="alert" tabIndex={-1}>{state.error}</p> : null}
       {state.success ? <p role="status">{state.success}</p> : null}
       {state.refreshQuote ? <button className="ui-button ui-button-secondary" type="button" disabled={pending || quoteLoading}
         onClick={() => loadQuote(panelAction)}>{quoteLoading ? 'Refreshing quote…' : 'Review updated quote'}</button> : null}
-      <button className="ui-button ui-button-secondary" type="button" disabled={pending} onClick={() => { setPanelAction(null); setQuote(undefined); setState(initialState); }}>
+      {state.reauthenticate ? <a href="/login" target="_blank" rel="noreferrer">Sign in in a new tab, then return</a> : null}
+      <button className="ui-button ui-button-secondary" type="button" disabled={pending || state.outcomeUnknown} onClick={() => { setPanelAction(null); setQuote(undefined); setState(initialState); }}>
         Close
       </button>
     </dialog> : null}

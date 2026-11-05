@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sessionReadQuerySchema, sessionReadPageSchema } from '../dist/session-reads.js';
+import { sessionReadQuerySchema, sessionReadPageSchema, sessionDetailSchema, sessionDetailQuerySchema, sessionAttentionQuerySchema } from '../dist/session-reads.js';
 
 test('session read filters accept only one local date range and bounded paging', () => {
   assert.deepEqual(sessionReadQuerySchema.parse({ month: '2026-09', page: '2', pageSize: '50' }), {
@@ -25,4 +25,15 @@ test('session page schema validates the role-safe projection shape and summary t
   assert.equal(sessionReadPageSchema.safeParse({ ...page, items: [{ ...item, trainerPay: '2' }] }).success, true);
   assert.equal(sessionReadPageSchema.safeParse({ ...page, pageSize: 0 }).success, false);
   assert.equal(sessionReadPageSchema.safeParse({ ...page, summary: { ...page.summary, lifetimePackCredits: { available: -1, held: 0, consumed: 0, expired: 0 } } }).success, false);
+});
+
+
+test('detail and attention paging reject actor injection and timeline internals', () => {
+  assert.deepEqual(sessionDetailQuerySchema.parse({ timelinePage: '2' }), { timelinePage: 2 });
+  assert.equal(sessionDetailQuerySchema.safeParse({ memberId: 'another-member' }).success, false);
+  assert.equal(sessionAttentionQuerySchema.safeParse({ pageSize: 101 }).success, false);
+  assert.equal(sessionAttentionQuerySchema.safeParse({ page: 0 }).success, false);
+  assert.equal(sessionDetailSchema.shape.timeline.safeParse([{ from: null, to: 'SCHEDULED', at: '2026-11-06T00:00:00Z', notesUpdated: false, adjustmentKind: null }]).success, true);
+  assert.equal(sessionDetailSchema.shape.timeline.safeParse([{ from: null, to: 'SCHEDULED', at: '2026-11-06T00:00:00Z', notesUpdated: false, adjustmentKind: null, actorIdentityId: 'private' }]).success, false);
+  assert.equal(sessionDetailSchema.shape.timeline.safeParse(Array.from({ length: 51 }, () => ({ from: null, to: 'SCHEDULED', at: '2026-11-06T00:00:00Z', notesUpdated: false, adjustmentKind: null }))).success, false);
 });

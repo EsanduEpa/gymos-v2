@@ -21,6 +21,9 @@ type PeriodInfo = { cadence: 'WEEKLY' | 'MONTHLY'; start: string; end: string; t
 const QUOTE_TTL_MS = 2 * 60_000;
 type QuoteAction = 'CANCEL' | 'NO_SHOW';
 type QuoteConsequence = 'PENDING_WITHDRAWAL' | 'FREE_CANCELLATION' | 'LATE_CANCELLATION' | 'NO_SHOW';
+export function confirmedCancellationPolicy<T extends { cancellationWindowMinutes: number; lateCancelDeduction: boolean }>(session: { availabilityVersion?: number | null }, policy: T): T {
+  return session.availabilityVersion != null ? { ...policy, cancellationWindowMinutes: 1440, lateCancelDeduction: true } : policy;
+}
 export function cancellationConsequence(now: number, scheduledStart: number, cancellationWindowMinutes: number, deductionEnabled: boolean) {
   return now > scheduledStart - cancellationWindowMinutes * 60_000 && deductionEnabled ? 'LATE_CANCELLATION' as const : 'FREE_CANCELLATION' as const;
 }
@@ -59,12 +62,12 @@ function parseAccessRole(role: string): 'OWNER' | 'TRAINER' | 'MEMBER' {
   throw new ForbiddenException('This role cannot change a session');
 }
 
-function localParts(instant: Date, timeZone: string) {
-  const values = new Intl.DateTimeFormat('en-GB', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(instant);
+function localParts(instant: Date, timeZone: string, formatter?: Intl.DateTimeFormat) {
+  const values = (formatter ?? new Intl.DateTimeFormat('en-GB', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })).formatToParts(instant);
   const p = Object.fromEntries(values.map(v => [v.type, v.value]));
   return { year: Number(p.year), month: Number(p.month), day: Number(p.day), hour: Number(p.hour), minute: Number(p.minute), second: Number(p.second) };
 }
-function localDateAt(instant: Date, zone: string) {
+export function localDateAt(instant: Date, zone: string) {
   const p = localParts(instant, zone);
   return `${String(p.year).padStart(4, '0')}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
 }
@@ -75,11 +78,12 @@ function localMidnight(date: string, zone: string): Date {
   const [year, month, day] = date.split('-').map(Number);
   const target = { year: year!, month: month!, day: day!, hour: 0, minute: 0, second: 0 };
   const naive = Date.UTC(target.year, target.month - 1, target.day);
+  const formatter = new Intl.DateTimeFormat('en-GB', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
   const exact: Date[] = [];
   const sameDay: Date[] = [];
   for (let offset = -14 * 60; offset <= 14 * 60; offset += 1) {
     const candidate = new Date(naive - offset * 60_000);
-    const p = localParts(candidate, zone);
+    const p = localParts(candidate, zone, formatter);
     if (p.year === target.year && p.month === target.month && p.day === target.day) {
       sameDay.push(candidate);
       if (p.hour === 0 && p.minute === 0 && p.second === 0) exact.push(candidate);
@@ -89,7 +93,7 @@ function localMidnight(date: string, zone: string): Date {
   if (!selected) throw new UnprocessableEntityException('The pay-period local boundary cannot be resolved');
   return selected;
 }
-function periodFor(startAt: Date, cadence: 'WEEKLY' | 'MONTHLY', zone: string): PeriodInfo {
+export function periodFor(startAt: Date, cadence: 'WEEKLY' | 'MONTHLY', zone: string): PeriodInfo {
   const local = localDateAt(startAt, zone);
   const [year, month, day] = local.split('-').map(Number);
   let start: string; let end: string;
@@ -104,7 +108,7 @@ function periodFor(startAt: Date, cadence: 'WEEKLY' | 'MONTHLY', zone: string): 
   }
   return { cadence, start, end, timezone: zone, utcStart: localMidnight(start, zone), utcEnd: localMidnight(end, zone) };
 }
-function nextPeriod(info: PeriodInfo): PeriodInfo {
+export function nextPeriod(info: PeriodInfo): PeriodInfo {
   const start = info.end;
   const end = info.cadence === 'WEEKLY' ? addLocalDays(start, 7)
     : (() => { const [y, m] = start.split('-').map(Number); return m === 12 ? `${y! + 1}-01-01` : `${y}-${String(m! + 1).padStart(2, '0')}-01`; })();
@@ -116,7 +120,7 @@ function rateMicro(value: string): bigint {
   const [whole = '0', fraction = ''] = value.split('.');
   return BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, '0') || '0');
 }
-function payAmountMinor(creditMinor: bigint, rate: string) {
+export function payAmountMinor(creditMinor: bigint, rate: string) {
   const product = creditMinor * rateMicro(rate);
   return (product + 500_000n) / 1_000_000n;
 }
@@ -177,12 +181,12 @@ export class SessionLifecycleService {
     return { session, targets };
   }
 
-  private async currentPolicy(tenant: PrismaClient, session: { configurationVersion: number }) {
+  private async currentPolicy(tenant: PrismaClient, session: { configurationVersion: number; availabilityVersion?: number | null }) {
     const policy = await tenant.gymConfigurationVersion.findUnique({ where: { gymConfigurationId_configurationVersion: {
       gymConfigurationId: 'current', configurationVersion: session.configurationVersion,
     } } });
     if (!policy || policy.configurationVersion !== session.configurationVersion) throw new ConflictException('Booked session policy snapshot is unavailable');
-    return { policy, policyVersion: session.configurationVersion };
+    return { policy: confirmedCancellationPolicy(session, policy), policyVersion: session.configurationVersion };
   }
 
   private buildQuote(access: Access, session: any, policy: any, hold: any, now: Date, action: QuoteAction) {
@@ -197,7 +201,7 @@ export class SessionLifecycleService {
       if (session.state === 'PENDING_CONFIRMATION' && actorRole === 'MEMBER') {
         consequence = 'PENDING_WITHDRAWAL'; eligible = Boolean(session.requestExpiresAt && session.requestExpiresAt > now);
       } else if (session.state === 'SCHEDULED') {
-        consequence = cancellationConsequence(now.getTime(), session.scheduledStartAt.getTime(), policy.cancellationWindowMinutes, policy.lateCancelDeduction);
+        consequence = actorRole === 'MEMBER' ? cancellationConsequence(now.getTime(), session.scheduledStartAt.getTime(), policy.cancellationWindowMinutes, policy.lateCancelDeduction) : 'FREE_CANCELLATION';
         eligible = hold?.state === 'HELD'; requiresAcknowledgment = consequence === 'LATE_CANCELLATION';
       }
     } else if (session.state === 'SCHEDULED' && session.startedAt === null) {
@@ -237,6 +241,8 @@ export class SessionLifecycleService {
     const parsed = sessionCancelInputSchema.safeParse(raw);
     if (!parsed.success) throw new UnprocessableEntityException('Enter valid session cancellation details');
     const role = parseAccessRole(access.role);
+    if (role !== 'MEMBER' && !parsed.data.reason) throw new UnprocessableEntityException('Record the reason for a trainer/gym cancellation');
+    if (role === 'OWNER' && parsed.data.initiatedBy === 'MEMBER') throw new UnprocessableEntityException('Use the owner exception quote for a member-requested cancellation');
     return this.tenantGate.withVerifiedTenant(access, async tenant => {
       const { targets } = await this.context(access, sessionId, tenant, true);
       return withGymAccessFence(this.database.master, targets, async locked => {
@@ -245,8 +251,9 @@ export class SessionLifecycleService {
           const command = await retrySessionTransaction(() => new CommandReceiptFoundationService(tenant).execute({
             masterGymId: access.gymId, actorIdentityId: access.identityId, commandKind: 'CANCEL_PT_SESSION',
             idempotencyKey: parsed.data.idempotencyKey, normalizedIntent: { sessionId, expectedVersion: parsed.data.expectedVersion,
-              policyVersion: parsed.data.policyVersion, ackDigest: quoteTokenDigest(parsed.data.acknowledgmentToken) },
+              policyVersion: parsed.data.policyVersion, reason: parsed.data.reason ?? null, initiatedBy: role === 'MEMBER' ? 'MEMBER' : role === 'TRAINER' ? 'TRAINER' : parsed.data.initiatedBy ?? 'GYM', ackDigest: quoteTokenDigest(parsed.data.acknowledgmentToken) },
           }, async (tx, receipt) => {
+            await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${`pt-settlement:${access.gymId}`}, 0))`;
             await tx.$queryRaw`SELECT "id" FROM "PTSession" WHERE "id" = ${sessionId} FOR UPDATE`;
             const session = await tx.pTSession.findUnique({ where: { id: sessionId }, include: { member: true, trainer: true, creditHold: true } });
             if (!session) throw new NotFoundException('Session not found');
@@ -305,6 +312,8 @@ export class SessionLifecycleService {
               creditConsumed: charged, creditValue: amount, currency: session.currency, sourceReceiptId: receipt.id } });
             if (charged) await tx.revenueRecord.create({ data: { sessionId, category: 'LATE_CANCEL', amount, currency: session.currency,
               sourceKey: `pt-session:${access.gymId}:${sessionId}:late-cancel` } });
+            if (role !== 'MEMBER') await tx.pTSessionAdjustment.create({ data: { sessionId, receiptId: receipt.id, kind: 'CANCELLATION', initiatedBy: role === 'TRAINER' ? 'TRAINER' : parsed.data.initiatedBy ?? 'GYM',
+              reason: parsed.data.reason!, actorIdentityId: access.identityId, committedVersion: ended.version, fromState: session.state, toState: 'CANCELLED', effectiveSettlementKind: 'FREE_CANCELLED', creditConsumed: false } });
             const memberCancels = role === 'MEMBER';
             const recipientIdentityId = memberCancels ? session.trainer.identityId : session.member.identityId;
             if (!recipientIdentityId) throw new ConflictException('Session notification recipient is unavailable');
@@ -337,6 +346,7 @@ export class SessionLifecycleService {
             idempotencyKey: parsed.data.idempotencyKey, normalizedIntent: { sessionId, expectedVersion: parsed.data.expectedVersion,
               policyVersion: parsed.data.policyVersion, ackDigest: quoteTokenDigest(parsed.data.acknowledgmentToken) },
           }, async (tx, receipt) => {
+            await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${`pt-settlement:${access.gymId}`}, 0))`;
             await tx.$queryRaw`SELECT "id" FROM "PTSession" WHERE "id" = ${sessionId} FOR UPDATE`;
             const session = await tx.pTSession.findUnique({ where: { id: sessionId }, include: { member: true, trainer: true, creditHold: true } });
             if (!session) throw new NotFoundException('Session not found');
@@ -393,12 +403,13 @@ export class SessionLifecycleService {
       tenant.sessionSettlement.findUnique({ where: { id: settlementId } }), tenant.notification.findUnique({ where: { id: notificationId } }),
       tenant.sessionCreditHold.findUnique({ where: { sessionId } }),
     ]);
-    const revenue = await tenant.revenueRecord.findFirst({ where: { sessionId, category: 'LATE_CANCEL' } });
+    const revenue = await tenant.revenueRecord.findUnique({ where: { sourceKey: `pt-session:${access.gymId}:${sessionId}:late-cancel` } });
     if (!session || !event || event.committedVersion !== version || !settlement || settlement.sourceReceiptId !== receiptId || !notification
-      || notification.eventCode !== 'SESSION_CANCELLED' || !['CANCELLED'].includes(session.state) || (hold && settlement.creditConsumed !== (hold.state === 'CONSUMED'))
+      || notification.eventCode !== 'SESSION_CANCELLED'
       || (!hold && settlement.kind !== 'WITHDRAWN')) throw new ConflictException('Cancellation receipt references incomplete persisted effects');
+    if (hold && !await tenant.packCreditMovement.findFirst({ where: { holdId: hold.id, receiptId, kind: settlement.creditConsumed ? 'CONSUME' : { in: ['RELEASE','EXPIRE'] } } })) throw new ConflictException('Cancellation receipt has no original credit effect');
     const policy = await tenant.gymConfigurationVersion.findUnique({ where: { gymConfigurationId_configurationVersion: { gymConfigurationId: 'current', configurationVersion: session.configurationVersion } } });
-    const cutoff = policy && event?.fromState === 'SCHEDULED' ? new Date(session.scheduledStartAt.getTime() - policy.cancellationWindowMinutes * 60_000) : null;
+    const cutoff = policy && event?.fromState === 'SCHEDULED' ? new Date(session.scheduledStartAt.getTime() - confirmedCancellationPolicy(session, policy).cancellationWindowMinutes * 60_000) : null;
     const charged = settlement.kind === 'LATE_CANCELLED';
     if (charged !== Boolean(revenue) || (revenue && revenue.amount.toString() !== settlement.creditValue.toString())) throw new ConflictException('Cancellation earning does not match settlement');
     let balance: number | null = null;
@@ -413,10 +424,10 @@ export class SessionLifecycleService {
     const memberCancelled = event.actorIdentityId === member?.identityId;
     const expectedRecipient = memberCancelled ? trainer?.identityId : member?.identityId;
     if (!expectedRecipient || notification.recipientIdentityId !== expectedRecipient) throw new ConflictException('Cancellation notification recipient does not match the session action');
-    const isLateCancel = cutoff !== null && event?.fromState === 'SCHEDULED' && event.createdAt.getTime() > cutoff.getTime();
+    const isLateCancel = charged;
     return sessionCancelResultSchema.parse({ receiptId, replayed, session: { id: session.id, memberId: session.memberId, trainerId: session.trainerId, state: 'CANCELLED',
       scheduledStartAt: session.scheduledStartAt.toISOString(), scheduledEndAt: session.scheduledEndAt.toISOString(), startedAt: null,
-      endedAt: session.endedAt?.toISOString() ?? event.createdAt.toISOString(), version },
+      endedAt: event.createdAt.toISOString(), version },
       consequence: settlement.kind === 'WITHDRAWN' ? 'PENDING_WITHDRAWAL' : charged ? 'LATE_CANCELLATION' : 'FREE_CANCELLATION', isLateCancel,
       deductedCredits: charged ? 1 : 0, creditEffect: { holdId: hold?.id ?? null, packId: hold?.packId ?? null,
         creditOrdinal: hold?.creditOrdinal ?? null, resolution: !hold ? 'NONE' : charged ? 'CONSUMED' : 'RELEASED',
@@ -438,16 +449,17 @@ export class SessionLifecycleService {
     ]);
     const member = session ? await tenant.member.findUnique({ where: { id: session.memberId }, select: { identityId: true } }) : null;
     if (!session || !event || event.committedVersion !== version || !settlement || settlement.sourceReceiptId !== receiptId || !revenue || revenue.category !== 'MISSED_LATE'
-      || !notification || notification.eventCode !== 'SESSION_MISSED' || !hold || hold.state !== 'CONSUMED' || !member?.identityId
+      || !notification || notification.eventCode !== 'SESSION_MISSED' || !hold || !member?.identityId
       || notification.recipientIdentityId !== member.identityId || revenue.amount.toString() !== settlement.creditValue.toString()
       || settlement.kind !== 'MISSED' || !settlement.creditConsumed) throw new ConflictException('No-show receipt references incomplete persisted effects');
+    if (!await tenant.packCreditMovement.findFirst({ where: { holdId: hold.id, receiptId, kind: 'CONSUME' } })) throw new ConflictException('No-show receipt has no original consumption effect');
     const pack = await tenant.sessionPack.findUnique({ where: { id: hold.packId }, select: { issuedCredits: true } });
     const movements = await tenant.packCreditMovement.findMany({ where: { packId: hold.packId }, select: { availableDelta: true, heldDelta: true, consumedDelta: true, expiredDelta: true } });
     if (!pack) throw new ConflictException('No-show credit pack is missing');
     const balance = derivePackCreditBalance(pack.issuedCredits, movements.map(row => ({ available: row.availableDelta, held: row.heldDelta, consumed: row.consumedDelta, expired: row.expiredDelta })));
     return sessionNoShowResultSchema.parse({ receiptId, replayed, session: { id: session.id, memberId: session.memberId, trainerId: session.trainerId, state: 'MISSED',
       scheduledStartAt: session.scheduledStartAt.toISOString(), scheduledEndAt: session.scheduledEndAt.toISOString(), startedAt: null,
-      endedAt: session.endedAt?.toISOString() ?? event.createdAt.toISOString(), version },
+      endedAt: event.createdAt.toISOString(), version },
       creditEffect: { holdId: hold.id, packId: hold.packId, creditOrdinal: hold.creditOrdinal, resolution: 'CONSUMED',
         creditValue: minorUnitsDecimal(hold.creditValueMinorUnits, 2), balance: balance.available },
       recognizedRevenue: { recordId: revenue.id, amount: revenue.amount.toString(), currency: revenue.currency },
@@ -468,6 +480,7 @@ export class SessionLifecycleService {
             masterGymId: access.gymId, actorIdentityId: access.identityId, commandKind: 'START_PT_SESSION',
             idempotencyKey: parsed.data.idempotencyKey, normalizedIntent: { sessionId, expectedVersion: parsed.data.expectedVersion },
           }, async (tx, receipt) => {
+            await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${`pt-settlement:${access.gymId}`}, 0))`;
             const base = await tx.pTSession.findUnique({ where: { id: sessionId }, include: { member: true, trainer: true, creditHold: true } });
             if (!base) throw new NotFoundException('Session not found');
             if (base.trainer.status !== 'ACTIVE' || base.trainer.registrationState !== 'COMPLETE' || base.trainer.identityId !== targets.find(t => t.role === 'TRAINER')?.identityId) throw new ForbiddenException('Assigned trainer is inactive');
@@ -508,12 +521,14 @@ export class SessionLifecycleService {
     const session = await tenant.pTSession.findUnique({ where: { id: sessionId } });
     const event = await tenant.sessionStateEvent.findFirst({ where: { receiptId, sessionId, toState: 'ACTIVE' }, orderBy: { createdAt: 'asc' } });
     const notification = await tenant.notification.findUnique({ where: { id: notificationId } });
-    if (!session || !event || event.committedVersion !== version || !session.startedAt || !notification) throw new ConflictException('Start receipt references incomplete persisted effects');
+    const later = session ? await tenant.pTSessionAdjustment.findFirst({ where: { sessionId, committedVersion: { gt: version } }, orderBy: { committedVersion: 'asc' } }) : null;
+    const originalStart = later ? later.previousStartedAt : session?.startedAt;
+    if (!session || !event || event.committedVersion !== version || !originalStart || !notification) throw new ConflictException('Start receipt references incomplete persisted effects');
     const member = await tenant.member.findUnique({ where: { id: session!.memberId }, select: { identityId: true } });
     if (!member?.identityId || notification!.recipientIdentityId !== member.identityId || notification.eventCode !== 'SESSION_STARTED') throw new ConflictException('Start receipt notification does not match the session member');
     return sessionStartResultSchema.parse({ receiptId, replayed, session: { id: session!.id, memberId: session!.memberId, trainerId: session!.trainerId,
       state: 'ACTIVE', scheduledStartAt: session!.scheduledStartAt.toISOString(), scheduledEndAt: session!.scheduledEndAt.toISOString(),
-      startedAt: session!.startedAt!.toISOString(), endedAt: null, version }, notificationOutcome: { eventId: notification!.id,
+      startedAt: originalStart!.toISOString(), endedAt: null, version }, notificationOutcome: { eventId: notification!.id,
       recipient: { role: 'MEMBER', actorId: session!.memberId }, gymSlug: access.slug, state, retryable: false } });
   }
 
@@ -529,6 +544,7 @@ export class SessionLifecycleService {
           const command = await new CommandReceiptFoundationService(tenant).execute({ masterGymId: access.gymId, actorIdentityId: access.identityId,
             commandKind: 'UPDATE_PT_SESSION_NOTES', idempotencyKey: parsed.data.idempotencyKey,
             normalizedIntent: { sessionId, notes, expectedVersion: parsed.data.expectedVersion } }, async (tx, receipt) => {
+            await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${`pt-settlement:${access.gymId}`}, 0))`;
             await tx.$queryRaw`SELECT "id" FROM "PTSession" WHERE "id" = ${sessionId} FOR UPDATE`;
             const session = await tx.pTSession.findUnique({ where: { id: sessionId }, include: { trainer: true } });
             if (!session) throw new NotFoundException('Session not found');
@@ -561,6 +577,7 @@ export class SessionLifecycleService {
           const command = await retrySessionTransaction(() => new CommandReceiptFoundationService(tenant).execute({ masterGymId: access.gymId,
             actorIdentityId: access.identityId, commandKind: 'COMPLETE_PT_SESSION', idempotencyKey: parsed.data.idempotencyKey,
             normalizedIntent: { sessionId, expectedVersion: parsed.data.expectedVersion } }, async (tx, receipt) => {
+            await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${`pt-settlement:${access.gymId}`}, 0))`;
             const preflight = await tx.pTSession.findUnique({ where: { id: sessionId }, select: { scheduledStartAt: true, gymTimezone: true, configurationVersion: true } });
             if (!preflight) throw new NotFoundException('Session not found');
             const version = await tx.gymConfigurationVersion.findFirst({ where: { gymConfigurationId: 'current', configurationVersion: preflight.configurationVersion } });
@@ -666,13 +683,17 @@ export class SessionLifecycleService {
       tenant.sessionCreditHold.findUnique({ where: { sessionId } }),
     ]);
     const correction = pay ? null : await tenant.trainerPayCorrection.findUnique({ where: { id: payId } });
+    const later = session ? await tenant.pTSessionAdjustment.findFirst({ where: { sessionId, committedVersion: { gt: version } }, orderBy: { committedVersion: 'asc' } }) : null;
+    const originalStart = later ? later.previousStartedAt : session?.startedAt;
+    const originalEnd = later ? later.previousEndedAt : session?.endedAt;
     const member = session ? await tenant.member.findUnique({ where: { id: session.memberId }, select: { identityId: true } }) : null;
-    if (!session || !event || event.committedVersion !== version || !session.endedAt || !settlement || !revenue || (!pay && !correction) || !period || !notification || !hold || !member?.identityId
+    if (!session || !event || event.committedVersion !== version || !originalStart || !originalEnd || !settlement || !revenue || (!pay && !correction) || !period || !notification || !hold || !member?.identityId
       || notification.recipientIdentityId !== member.identityId || notification.eventCode !== 'SESSION_COMPLETED' || settlement.sessionId !== session.id
-      || settlement.sourceReceiptId !== receiptId || revenue.sessionId !== session.id || revenue.category !== 'COMPLETED_SESSION' || hold.state !== 'CONSUMED'
+      || settlement.sourceReceiptId !== receiptId || revenue.sessionId !== session.id || revenue.category !== 'COMPLETED_SESSION'
       || (!correction && (!pay || pay.id !== payId || pay.sessionId !== session.id || pay.periodId !== periodId))
       || (correction && (correction.id !== payId || correction.sessionId !== session.id || correction.originalEarningId !== revenue.id
         || correction.correctionPeriodId !== periodId || correction.correctionPeriodId !== period.id))) throw new ConflictException('Completion receipt references incomplete persisted effects');
+    if (!await tenant.packCreditMovement.findFirst({ where: { holdId: hold.id, receiptId, kind: 'CONSUME' } })) throw new ConflictException('Completion receipt has no original consumption effect');
     const payable = correction ?? pay;
     if (!payable) throw new ConflictException('Completion receipt has no persisted trainer earning');
     const payPeriodId = correction?.correctionPeriodId ?? pay?.periodId;
@@ -683,7 +704,7 @@ export class SessionLifecycleService {
       consumed: movement.consumedDelta, expired: movement.expiredDelta })));
     const result = sessionCompleteResultSchema.parse({ receiptId, replayed, session: { id: session.id, memberId: session.memberId, trainerId: session.trainerId,
       state: 'COMPLETED', scheduledStartAt: session.scheduledStartAt.toISOString(), scheduledEndAt: session.scheduledEndAt.toISOString(),
-      startedAt: session.startedAt!.toISOString(), endedAt: session.endedAt.toISOString(), version },
+      startedAt: originalStart!.toISOString(), endedAt: originalEnd!.toISOString(), version },
       creditEffect: { holdId: hold.id, packId: hold.packId, creditOrdinal: hold.creditOrdinal, delta: -1 as const,
         creditValue: minorUnitsDecimal(hold.creditValueMinorUnits, 2), balance: balance.available },
       recognizedRevenue: { recordId: revenue.id, amount: revenue.amount.toString(), currency: revenue.currency },

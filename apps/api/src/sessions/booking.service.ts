@@ -1,3 +1,4 @@
+import { creditUnits, eligibleUnits } from './credit-unit-projection.js';
 import { randomUUID } from 'node:crypto';
 import { ConflictException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { PrismaClient } from '../generated/tenant/client.js';
@@ -7,7 +8,6 @@ import { DatabaseService } from '../database.service.js';
 import { withGymAccessFence } from '../identity/gym-access-fence.js';
 import { appendTenantNotification } from '../notifications.service.js';
 import { TenantSchemaGateService, type TenantGateContext } from '../tenancy/tenant-schema-gate.service.js';
-import { derivePackCreditBalance } from './session-state.js';
 import { reserveSessionCredit } from './credit-holds.js';
 import { allowedStartMinutes, type AvailabilityRule } from './availability-policy.js';
 import { retrySessionTransaction } from './session-transactions.js';
@@ -59,7 +59,7 @@ function addDays(date: string, days: number) {
 }
 function decimal(value: { toString(): string } | string | null | undefined) { return value == null ? null : typeof value === 'string' ? value : value.toString(); }
 function minorUnitsAmount(value: bigint) { return `${value / 100n}.${(value % 100n).toString().padStart(2, '0')}`; }
-function decimalSum(a: string, b: string) {
+export function decimalSum(a: string, b: string) {
   const [aw = '0', af = ''] = a.split('.'); const [bw = '0', bf = ''] = b.split('.');
   const scale = Math.max(af.length, bf.length); const factor = 10n ** BigInt(scale);
   const left = BigInt(aw) * factor + BigInt((af + '0'.repeat(scale)).slice(0, scale) || '0');
@@ -68,7 +68,7 @@ function decimalSum(a: string, b: string) {
   return fraction ? `${whole}.${fraction}` : whole.toString();
 }
 function totalPages(total: number, size: number) { return Math.ceil(total / size); }
-function withinShift(start: Date, end: Date, timeZone: string, shiftStart: string | null, shiftEnd: string | null) {
+export function withinShift(start: Date, end: Date, timeZone: string, shiftStart: string | null, shiftEnd: string | null) {
   if (!shiftStart || !shiftEnd) return true;
   const localStart = partsAt(start, timeZone); const localEnd = partsAt(new Date(end.getTime() - 60_000), timeZone);
   const startMinute = localStart.hour * 60 + localStart.minute;
@@ -97,7 +97,7 @@ function conflictFromDatabase(error: unknown): never {
 export class SessionBookingService {
   constructor(private readonly database: DatabaseService, private readonly tenantGate: TenantSchemaGateService) {}
 
-  private async publishedBindings(tenant: PrismaClient, gymId: string, role: 'MEMBER' | 'TRAINER') {
+  async publishedBindings(tenant: PrismaClient, gymId: string, role: 'MEMBER' | 'TRAINER') {
     const links = await this.database.master.gymAccess.findMany({ where: { gymId, role, actorKind: role, linkStatus: 'ACTIVE', tenantActorId: { not: null }, enrollmentOperationId: { not: null } },
       select: { userId: true, tenantActorId: true, enrollmentOperationId: true } });
     if (!links.length) return [];
@@ -146,13 +146,8 @@ export class SessionBookingService {
         const memberPageRows = membersAll.slice((query.memberPage - 1) * query.memberPageSize, query.memberPage * query.memberPageSize);
         const trainerPageRows = trainersAll.slice((query.trainerPage - 1) * query.trainerPageSize, query.trainerPage * query.trainerPageSize);
         const makeMemberOption = async (member: { id: string; fullName: string }) => {
-          const [termCount, packs] = await Promise.all([
-            tenant.membershipTerm.count({ where: { memberId: member.id, startDate: { lte: localDateValue }, endDateExclusive: { gt: localDateValue } } }),
-            tenant.sessionPack.findMany({ where: { memberId: member.id, startDate: { lte: localDateValue }, endDateExclusive: { gt: localDateValue }, currency },
-              include: { creditMovements: { select: { availableDelta: true, heldDelta: true, consumedDelta: true, expiredDelta: true } } } }),
-          ]);
-          const availableCredits = packs.reduce((total, pack) => total + derivePackCreditBalance(pack.issuedCredits, pack.creditMovements.map(movement => ({ available: movement.availableDelta,
-            held: movement.heldDelta, consumed: movement.consumedDelta, expired: movement.expiredDelta }))).available, 0);
+          const termCount = await tenant.membershipTerm.count({ where: { memberId: member.id, startDate: { lte: localDateValue }, endDateExclusive: { gt: localDateValue } } });
+          const availableCredits = eligibleUnits(await creditUnits(tenant, member.id), localDate).filter(unit => unit.currency === currency).length;
           return { memberId: member.id, name: member.fullName, availableCredits,
             eligibility: termCount === 0 ? 'NO_ACTIVE_MEMBERSHIP' as const : availableCredits === 0 ? 'NO_CREDIT' as const : 'ELIGIBLE' as const };
         };
@@ -178,29 +173,9 @@ export class SessionBookingService {
       }));
   }
 
-  async book(access: Access, raw: unknown, idempotencyHeader?: string) {
-    if (access.role !== 'OWNER') throw new ForbiddenException('Only gym owners can book sessions');
-    const parsed = sessionBookingInputSchema.safeParse(raw);
-    if (!parsed.success) throw new UnprocessableEntityException('Enter valid session booking details');
-    const input = parsed.data;
-    if (idempotencyHeader && idempotencyHeader !== input.idempotencyKey) throw new ConflictException('Idempotency header and request key differ');
-    return this.tenantGate.withVerifiedTenant(access, async tenant => {
-      const [memberBinding] = await this.publishedBindings(tenant, access.gymId, 'MEMBER').then(rows => rows.filter(row => row.actorId === input.memberId));
-      const [trainerBinding] = await this.publishedBindings(tenant, access.gymId, 'TRAINER').then(rows => rows.filter(row => row.actorId === input.trainerId));
-      if (!memberBinding || !trainerBinding) throw new NotFoundException('Member or trainer not found');
-      const targets = [
-        { identityId: access.identityId, gymId: access.gymId, role: 'OWNER' as const },
-        { identityId: memberBinding.identityId, gymId: access.gymId, role: 'MEMBER' as const, tenantActorId: memberBinding.actorId },
-        { identityId: trainerBinding.identityId, gymId: access.gymId, role: 'TRAINER' as const, tenantActorId: trainerBinding.actorId },
-      ];
-      return withGymAccessFence(this.database.master, targets, async locked => {
-        if (locked.length !== 3 || locked.some(item => item.gymId !== access.gymId)) throw new ForbiddenException('Booking access changed; reload and try again');
-        try {
-          const command = await retrySessionTransaction(() => new CommandReceiptFoundationService(tenant).execute({ masterGymId: access.gymId,
-            actorIdentityId: access.identityId, commandKind: 'BOOK_PT_SESSION', idempotencyKey: input.idempotencyKey,
-            normalizedIntent: { gymId: access.gymId, memberId: input.memberId, trainerId: input.trainerId, localDate: input.localDate,
-              localTime: input.localTime, timeZone: input.timeZone, offset: input.offset ?? null, type: input.type, durationMinutes: input.durationMinutes, notes: input.notes ?? null } },
-          async (tx, receipt) => {
+  async bookInTransaction(tx: import('../generated/tenant/client.js').Prisma.TransactionClient, receipt: { id: string }, access: Access,
+    input: import('@gymos/contracts').SessionBookingInput,
+    memberBinding: { identityId: string; operationId: string; actorId: string }, trainerBinding: { identityId: string; operationId: string; actorId: string }, forcedSessionId?: string) {
             await tx.$queryRaw`SELECT "id" FROM "Member" WHERE "id" = ${input.memberId} FOR UPDATE`;
             await tx.$queryRaw`SELECT "id" FROM "Trainer" WHERE "id" = ${input.trainerId} FOR UPDATE`;
             const config = await tx.gymConfiguration.findUnique({ where: { id: 'current' } });
@@ -239,12 +214,12 @@ export class SessionBookingService {
             const coveredByShift = withinShift(start.instant, end, config.timezone, trainer.shiftStart, trainer.shiftEnd);
             const rate = trainer.level === 'LEVEL_2' ? config.level2BaseRate : config.level1BaseRate;
             const confirmationRate = coveredByShift ? rate : decimalSum(rate.toString(), config.offShiftPremium.toString());
-            const sessionId = randomUUID();
+            const sessionId = forcedSessionId ?? randomUUID();
             const session = await tx.pTSession.create({ data: { id: sessionId, memberId: member.id, trainerId: trainer.id, state: 'SCHEDULED',
               type: input.type, scheduledStartAt: start.instant, scheduledEndAt: end, gymTimezone: config.timezone,
               fee: fee.toString(), currency: config.currency, confirmationRate, confirmationLevel: trainer.level!,
               confirmationShiftStart: trainer.shiftStart, confirmationShiftEnd: trainer.shiftEnd, configurationVersion: config.version,
-              confirmedAt: clock!.now, notes: (input.notes ?? '').replace(/\r\n?/g, '\n') || null, createdByIdentityId: access.identityId } });
+              confirmedAt: clock!.now, availabilityVersion: (await tx.trainer.findUniqueOrThrow({ where: { id: trainer.id }, select: { version: true } })).version, notes: (input.notes ?? '').replace(/\r\n?/g, '\n') || null, createdByIdentityId: access.identityId } });
             await reserveSessionCredit(tx, { masterGymId: access.gymId, sessionId: session.id, memberId: member.id, trainerId: trainer.id,
               scheduledLocalDate: input.localDate, actorIdentityId: access.identityId, receiptId: receipt.id });
             const eventKey = tenantAuditKey({ masterGymId: access.gymId, receiptId: receipt.id, eventCode: 'PT_SESSION_BOOKED', resourceType: 'PT_SESSION', resourceId: session.id, eventOrdinal: 0 });
@@ -252,10 +227,35 @@ export class SessionBookingService {
               actorIdentityId: access.identityId, receiptId: receipt.id, eventKey } });
             const notification = await appendTenantNotification(tx, { masterGymId: access.gymId, receiptId: receipt.id, eventCode: 'SESSION_BOOKED', resourceId: session.id,
               recipientIdentityId: member.identityId! });
-            return { result: { resourceIds: [session.id, notification.id], notificationState: 'AVAILABLE' }, resourceType: 'PT_SESSION', resourceId: session.id,
+            const trainerNotice = await appendTenantNotification(tx, { masterGymId: access.gymId, receiptId: receipt.id, eventCode: 'SESSION_BOOKED', resourceId: session.id, recipientIdentityId: trainer.identityId!, linkKind: 'TRAINER_SCHEDULE' });
+            return { result: { resourceIds: [session.id, notification.id, trainerNotice.id], notificationState: 'AVAILABLE' as const }, resourceType: 'PT_SESSION', resourceId: session.id,
               audits: [{ actorIdentityId: access.identityId, eventCode: 'PT_SESSION_BOOKED', resourceType: 'PT_SESSION', resourceId: session.id,
                 transition: { to: 'SCHEDULED', version: 0 } }] };
-          }));
+  }
+
+  async book(access: Access, raw: unknown, idempotencyHeader?: string) {
+    if (access.role !== 'OWNER') throw new ForbiddenException('Only gym owners can book sessions');
+    const parsed = sessionBookingInputSchema.safeParse(raw);
+    if (!parsed.success) throw new UnprocessableEntityException('Enter valid session booking details');
+    const input = parsed.data;
+    if (idempotencyHeader && idempotencyHeader !== input.idempotencyKey) throw new ConflictException('Idempotency header and request key differ');
+    return this.tenantGate.withVerifiedTenant(access, async tenant => {
+      const [memberBinding] = await this.publishedBindings(tenant, access.gymId, 'MEMBER').then(rows => rows.filter(row => row.actorId === input.memberId));
+      const [trainerBinding] = await this.publishedBindings(tenant, access.gymId, 'TRAINER').then(rows => rows.filter(row => row.actorId === input.trainerId));
+      if (!memberBinding || !trainerBinding) throw new NotFoundException('Member or trainer not found');
+      const targets = [
+        { identityId: access.identityId, gymId: access.gymId, role: 'OWNER' as const },
+        { identityId: memberBinding.identityId, gymId: access.gymId, role: 'MEMBER' as const, tenantActorId: memberBinding.actorId },
+        { identityId: trainerBinding.identityId, gymId: access.gymId, role: 'TRAINER' as const, tenantActorId: trainerBinding.actorId },
+      ];
+      return withGymAccessFence(this.database.master, targets, async locked => {
+        if (locked.length !== 3 || locked.some(item => item.gymId !== access.gymId)) throw new ForbiddenException('Booking access changed; reload and try again');
+        try {
+          const command = await retrySessionTransaction(() => new CommandReceiptFoundationService(tenant).execute({ masterGymId: access.gymId,
+            actorIdentityId: access.identityId, commandKind: 'BOOK_PT_SESSION', idempotencyKey: input.idempotencyKey,
+            normalizedIntent: { gymId: access.gymId, memberId: input.memberId, trainerId: input.trainerId, localDate: input.localDate,
+              localTime: input.localTime, timeZone: input.timeZone, offset: input.offset ?? null, type: input.type, durationMinutes: input.durationMinutes, notes: input.notes ?? null } },
+          (tx, receipt) => this.bookInTransaction(tx, receipt, access, input, memberBinding, trainerBinding)));
           const sessionId = command.result.resourceIds?.[0];
           const eventId = command.result.resourceIds?.[1];
           if (!sessionId || !eventId) throw new ConflictException('Booking receipt has no session or notification resource');

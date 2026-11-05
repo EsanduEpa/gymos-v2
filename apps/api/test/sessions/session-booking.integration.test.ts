@@ -96,7 +96,8 @@ it('serves sanitized owner booking options and atomically books, reserves, audit
   expect(replay).toMatchObject({ receiptId: result.receiptId, replayed: true, session: { id: result.session.id } });
   expect(await tenant.pTSession.count({ where: { id: result.session.id } })).toBe(1);
   expect(await tenant.packCreditMovement.count({ where: { holdId: result.creditReservation.holdId } })).toBe(1);
-  expect(await tenant.notification.count({ where: { resourceId: result.session.id } })).toBe(1);
+  expect(await tenant.notification.count({ where: { resourceId: result.session.id } })).toBe(2);
+  expect(await tenant.notification.count({ where: { resourceId: result.session.id, recipientIdentityId: fixture.users.trainerUser.id, eventCode: 'SESSION_BOOKED' } })).toBe(1);
   const altered = { ...booking, notes: 'changed body' };
   await expect(service.book(access, altered, altered.idempotencyKey)).rejects.toMatchObject({ status: 409 });
   expect(await tenant.pTSession.count({ where: { id: result.session.id } })).toBe(1);

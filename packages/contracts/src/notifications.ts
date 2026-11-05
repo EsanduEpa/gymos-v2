@@ -40,7 +40,7 @@ export const auditEventCodeSchema = z.enum([
   'TRAINER_SHIFT_APPROVED', 'TRAINER_DEACTIVATED', 'TRAINER_REACTIVATED', 'MEMBER_STATUS_CHANGED',
   'MEMBER_SESSION_PACK_ISSUED', 'PT_SESSION_BOOKED', 'PT_SESSION_REQUESTED', 'PT_SESSION_ACCEPTED',
   'PT_SESSION_DECLINED', 'PT_SESSION_STARTED', 'PT_SESSION_COMPLETED', 'PT_SESSION_MISSED', 'PT_SESSION_CANCELLED',
-  'PT_SESSION_NOTES_UPDATED', 'PT_SESSION_EXPIRED', 'PT_SESSION_EXPIRY_SKIPPED', 'EXPENSE_CREATED', 'BUDGET_SET', 'PAY_PERIOD_CLOSED', 'PAY_PERIOD_APPROVED', 'CSV_EXPORTED',
+  'PT_SESSION_NOTES_UPDATED', 'PT_SESSION_RESCHEDULED', 'PT_SESSION_CORRECTED', 'PT_CREDIT_REMEDY_APPROVED', 'PT_SESSION_EXPIRED', 'PT_SESSION_EXPIRY_SKIPPED', 'EXPENSE_CREATED', 'BUDGET_SET', 'PAY_PERIOD_CLOSED', 'PAY_PERIOD_APPROVED', 'CSV_EXPORTED',
 ]);
 export const auditQuerySchema = z.strictObject({
   actionType: auditEventCodeSchema.optional(),
@@ -70,6 +70,7 @@ export const auditPageSchema = z.strictObject({
 export function notificationHref(slug: string, item: Pick<z.infer<typeof notificationSchema>, 'linkKind' | 'resourceId'>): string {
   const safeSlug = gymSlugSchema.parse(slug);
   const sessionId = item.resourceId ? encodeURIComponent(idSchema.parse(item.resourceId)) : null;
+  if (sessionId) return `/gyms/${safeSlug}/sessions/${sessionId}`;
   if (item.linkKind === 'OWNER_SESSIONS') return `/gyms/${safeSlug}/owner/sessions`;
   if (item.linkKind === 'TRAINER_SCHEDULE') return `/gyms/${safeSlug}/trainer/schedule`;
   if (item.linkKind === 'TRAINER_REQUESTS') return `/gyms/${safeSlug}/trainer/requests`;

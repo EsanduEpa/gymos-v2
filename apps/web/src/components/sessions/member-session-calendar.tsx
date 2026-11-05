@@ -110,7 +110,7 @@ export function MemberSessionCalendar({ slug, month, today, timeZone, sessions, 
         {selectedSessions.length || selectedMeals.length ? <ul>{selectedSessions.map(session => <li key={session.id} className={styles.event}>
           <span className={`${styles.statePill} ${styles[`pill${session.state}`]}`}>{status[session.state]}</span>
           <strong>{localTime(session.scheduledStartAt, timeZone)}–{localTime(session.scheduledEndAt, timeZone)}</strong>
-          <span>PT session with {session.trainerName}</span>
+          <a className="platform-text-link" href={`/gyms/${encodeURIComponent(slug)}/sessions/${encodeURIComponent(session.id)}`}>PT session with {session.trainerName}</a>
           <small>{session.type.replaceAll('_', ' ').toLowerCase()}</small>
           {session.notes ? <small className={styles.note}>{session.notes}</small> : null}
         </li>)}{selectedMeals.map(entry => <li key={`${entry.planName}:${entry.id}`} className={`${styles.event} ${styles.mealEvent}`}>

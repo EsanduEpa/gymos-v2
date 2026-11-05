@@ -1,3 +1,4 @@
+import { creditTotals } from '../sessions/credit-unit-projection.js';
 import { ConflictException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { Prisma } from '../generated/tenant/client.js';
 import {
@@ -438,38 +439,7 @@ export class CoachingService {
   }
 
   private async packSummaries(tx: Prisma.TransactionClient, memberIds: string[], localDate: string) {
-    const result = new Map<string, { available: number; held: number; consumed: number; expired: number }>();
-    if (!memberIds.length) return result;
-    const rows = await tx.$queryRaw<Array<{ memberId: string; issued: bigint; ledgerAvailable: bigint; ledgerHeld: bigint; ledgerConsumed: bigint; ledgerExpired: bigint;
-      available: bigint; held: bigint; consumed: bigint; expired: bigint }>>`
-      SELECT p."memberId",
-        COALESCE(SUM(p."issuedCredits"), 0)::bigint AS issued,
-        COALESCE(SUM(m.available), 0)::bigint AS "ledgerAvailable",
-        COALESCE(SUM(m.held), 0)::bigint AS "ledgerHeld",
-        COALESCE(SUM(m.consumed), 0)::bigint AS "ledgerConsumed",
-        COALESCE(SUM(m.expired), 0)::bigint AS "ledgerExpired",
-        COALESCE(SUM(CASE WHEN p."startDate" <= ${localDate}::date AND p."endDateExclusive" > ${localDate}::date THEN m.available ELSE 0 END), 0)::bigint AS available,
-        COALESCE(SUM(CASE WHEN p."startDate" <= ${localDate}::date AND p."endDateExclusive" > ${localDate}::date THEN m.held ELSE 0 END), 0)::bigint AS held,
-        COALESCE(SUM(m.consumed), 0)::bigint AS consumed,
-        COALESCE(SUM(m.expired + CASE WHEN p."endDateExclusive" <= ${localDate}::date THEN m.available ELSE 0 END), 0)::bigint AS expired
-      FROM "SessionPack" p
-      LEFT JOIN (
-        SELECT "packId", SUM("availableDelta") AS available, SUM("heldDelta") AS held,
-          SUM("consumedDelta") AS consumed, SUM("expiredDelta") AS expired
-        FROM "PackCreditMovement"
-        WHERE "packId" IN (SELECT id FROM "SessionPack" WHERE "memberId" = ANY(${memberIds}::text[]))
-        GROUP BY "packId"
-      ) m ON m."packId" = p.id
-      WHERE p."memberId" = ANY(${memberIds}::text[])
-      GROUP BY p."memberId"`;
-    for (const row of rows) {
-      const balance = { available: Number(row.available), held: Number(row.held), consumed: Number(row.consumed), expired: Number(row.expired) };
-      const ledgerTotal = Number(row.ledgerAvailable) + Number(row.ledgerHeld) + Number(row.ledgerConsumed) + Number(row.ledgerExpired);
-      if (!Number.isSafeInteger(Number(row.issued)) || !Number.isSafeInteger(ledgerTotal) || ledgerTotal !== Number(row.issued)) {
-        throw new Error('Session pack credit ledger invariant failed');
-      }
-      result.set(row.memberId, balance);
-    }
-    return result;
+    const totals = await creditTotals(tx, memberIds, localDate, true);
+    return new Map([...totals].map(([id, total]) => [id, { available: total.available, held: total.held, consumed: total.consumed, expired: total.expired }]));
   }
 }

@@ -35,7 +35,7 @@ export const availabilitySchema = z.strictObject({
   closures: z.array(date).max(500),
 });
 
-export const availabilitySlotsQuerySchema = z.strictObject({ trainerId: id, localDate: date, memberId: id.optional() });
+export const availabilitySlotsQuerySchema = z.strictObject({ trainerId: id, localDate: date, memberId: id.optional(), excludeSessionId: id.optional() });
 export const availabilitySlotsSchema = z.strictObject({ trainerId: id, localDate: date, timeZone: z.string().min(1).max(100), asOf: z.iso.datetime({ offset: true }),
   availabilityVersion: z.number().int().nonnegative(), durationMinutes: z.literal(60), slots: z.array(z.strictObject({ startAt: z.iso.datetime({ offset: true }), endAt: z.iso.datetime({ offset: true }), localTime: z.string().regex(/^[0-2][0-9]:[0-5][0-9]$/), offset: z.string().regex(/^(?:\+|-)[0-9]{2}:[0-9]{2}$/) })).max(96),
   reason: z.enum(['NO_AVAILABILITY', 'CLOSED', 'NO_ELIGIBLE_SLOT']).nullable() });

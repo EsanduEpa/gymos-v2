@@ -12,7 +12,7 @@ test('notification list limit and output are bounded', () => {
 test('mark-all through instant is validated and hrefs are built from typed local destinations', () => {
   assert.deepEqual(notificationReadAllInputSchema.parse({}), {});
   assert.equal(notificationReadAllInputSchema.safeParse({ through: 'tomorrow' }).success, false);
-  assert.equal(notificationHref('gym-alpha', { linkKind: 'MEMBER_SESSIONS', resourceId: 'session_1' }), '/gyms/gym-alpha/member/sessions?session=session_1');
-  assert.equal(notificationHref('gym-alpha', { linkKind: 'TRAINER_REQUESTS', resourceId: 'session_1' }), '/gyms/gym-alpha/trainer/requests');
+  assert.equal(notificationHref('gym-alpha', { linkKind: 'MEMBER_SESSIONS', resourceId: 'session_1' }), '/gyms/gym-alpha/sessions/session_1');
+  assert.equal(notificationHref('gym-alpha', { linkKind: 'TRAINER_REQUESTS', resourceId: 'session_1' }), '/gyms/gym-alpha/sessions/session_1');
   assert.throws(() => notificationHref('https://evil.test', { linkKind: 'MEMBER_SESSIONS', resourceId: null }));
 });

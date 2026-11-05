@@ -101,7 +101,7 @@ export const sessionNoShowResultSchema = z.strictObject({
   auditState: z.literal('AVAILABLE'),
 });
 export const sessionCancelInputSchema = z.strictObject({
-  expectedVersion: version, policyVersion: version, idempotencyKey: key, acknowledgmentToken: z.string().min(32).max(2048).nullable().optional(),
+  expectedVersion: version, policyVersion: version, idempotencyKey: key, acknowledgmentToken: z.string().min(32).max(2048).nullable().optional(), reason: z.string().trim().min(1).max(500).optional(), initiatedBy: z.enum(['MEMBER','TRAINER','GYM']).optional(),
 });
 export const sessionNoShowInputSchema = z.strictObject({
   expectedVersion: version, policyVersion: version, idempotencyKey: key, acknowledgmentToken: z.string().min(32).max(2048),

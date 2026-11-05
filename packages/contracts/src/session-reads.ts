@@ -66,3 +66,32 @@ export type SessionReadQuery = z.infer<typeof sessionReadQuerySchema>;
 export type SessionReadPage = z.infer<typeof sessionReadPageSchema>;
 export type MemberSessionOverviewQuery = z.infer<typeof memberSessionOverviewQuerySchema>;
 export type MemberSessionOverview = z.infer<typeof memberSessionOverviewSchema>;
+
+export const sessionDetailQuerySchema = z.strictObject({ timelinePage: positivePage.default(1) });
+export const sessionAttentionQuerySchema = z.strictObject({ page: positivePage.default(1), pageSize: pageSize.default(25) });
+export const sessionAttentionReasonSchema = z.enum(['SCHEDULED_PAST_END', 'ACTIVE_PAST_END', 'REQUEST_EXPIRED', 'CREDIT_REMEDY_REQUIRED']);
+export const sessionDetailSchema = z.strictObject({
+  session: sessionReadItemSchema,
+  location: z.string().max(2000).nullable(),
+  creditCost: z.literal(1),
+  reservation: z.enum(['NONE', 'HELD', 'CONSUMED', 'RELEASED']),
+  settlement: z.enum(['COMPLETED', 'MISSED', 'LATE_CANCELLED', 'FREE_CANCELLED', 'WITHDRAWN', 'LIFECYCLE_RELEASE']).nullable(),
+  creditConsumed: z.boolean().nullable(),
+  cancellationDeadline: isoInstantSchema.nullable(),
+  minimumCompletionMinutes: z.number().int().nonnegative().nullable(),
+  completionAvailableAt: isoInstantSchema.nullable(),
+  expiryAwaitingSweep: z.boolean(),
+  ownerAttention: sessionAttentionReasonSchema.nullable(),
+  creditRemedyStatus: z.enum(['AWAITING_OWNER', 'APPROVED']).nullable(), restoredCreditExpiry: localDateSchema.nullable(),
+  replacementSessionId: idSchema.nullable(), originalSessionId: idSchema.nullable(),
+  ownerRecovery: z.strictObject({ latestEventId: idSchema.nullable(), allowedKinds: z.array(z.enum(['CANCEL','RESCHEDULE','CORRECTION','REMEDY'])).max(4), latestReason: z.string().max(500).nullable() }).nullable(),
+  timeline: z.array(z.strictObject({ from: sessionReadStateSchema.nullable(), to: sessionReadStateSchema, at: isoInstantSchema, notesUpdated: z.boolean(), adjustmentKind: z.enum(['CORRECTION','RESCHEDULE','REMEDY','CANCELLATION']).nullable() })).max(50),
+  timelinePage: z.number().int().positive(), timelineTotal: z.number().int().nonnegative(), timelinePages: z.number().int().nonnegative(),
+  asOf: isoInstantSchema,
+});
+export const sessionAttentionPageSchema = z.strictObject({
+  items: z.array(z.strictObject({ session: sessionReadItemSchema, reason: sessionAttentionReasonSchema })).max(100),
+  page: z.number().int().positive(), pageSize: z.number().int().min(1).max(100), totalCount: z.number().int().nonnegative(), totalPages: z.number().int().nonnegative(), asOf: isoInstantSchema,
+});
+export type SessionDetail = z.infer<typeof sessionDetailSchema>;
+export type SessionAttentionPage = z.infer<typeof sessionAttentionPageSchema>;

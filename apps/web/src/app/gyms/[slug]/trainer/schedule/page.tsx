@@ -34,7 +34,7 @@ export default async function TrainerSchedulePage({ params, searchParams }: {
     <TrainerScheduleOverview slug={slug} data={loaded.data} filters={loaded.filters} pendingCount={requests?.success ? requests.data.items.length : null}/>
     {requests?.success && requests.data.items.length > 0 ? <Card className="trainer-pending-card"><CardHeader eyebrow="PENDING SESSION REQUESTS" title={`Pending session requests (${requests.data.items.length})`}/>
       <div className="trainer-schedule-requests">{requests.data.items.map(item => <article className="trainer-schedule-request trainer-request-row" key={item.id}>
-        <div className="trainer-schedule-request-main"><div className="trainer-schedule-request-title"><h2>{item.memberName}</h2>
+        <div className="trainer-schedule-request-main"><div className="trainer-schedule-request-title"><h2><a href={`/gyms/${encodeURIComponent(slug)}/sessions/${encodeURIComponent(item.id)}`}>{item.memberName}</a></h2>
           <time dateTime={item.scheduledStartAt}>{new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: item.timeZone, timeZoneName: 'short' }).format(new Date(item.scheduledStartAt))}</time>
           <span>{item.durationMinutes} min · {item.type.replace('_', ' ').toLowerCase()}</span>
           {item.notes ? <details className="trainer-request-member-note"><summary>Member note</summary><p>{item.notes}</p></details> : <span className="trainer-request-no-note">No member note</span>}

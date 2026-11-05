@@ -112,7 +112,7 @@ export class SessionAvailabilityService {
       }));
     });
   }
-  async slots(access: Access, input: { trainerId: string; localDate: string; memberId?: string }) {
+  async slots(access: Access, input: { trainerId: string; localDate: string; memberId?: string; excludeSessionId?: string }) {
     return this.gate.withVerifiedTenant(access, async tenant => {
       const binding = await this.binding(tenant, access, input.trainerId);
       const targets = access.role === 'OWNER'
@@ -137,7 +137,12 @@ export class SessionAvailabilityService {
         const dayOffsetMinutes = dayZeroOffset ? (dayZeroOffset[0] === '-' ? -1 : 1) * (Number(dayZeroOffset.slice(1, 3)) * 60 + Number(dayZeroOffset.slice(4, 6))) : 0;
         const localDayStart = new Date(dayStartMinute - dayOffsetMinutes * 60000 - 86400000);
         const localDayEnd = new Date(dayStartMinute - dayOffsetMinutes * 60000 + 2 * 86400000);
-        const occupied = await tenant.pTSession.findMany({ where: { state: { in: ['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE'] },
+        if (input.excludeSessionId) {
+          if (access.role !== 'OWNER') throw new ForbiddenException('Only owners can select a replacement slot');
+          const source = await tenant.pTSession.findFirst({ where: { id: input.excludeSessionId, trainerId: input.trainerId, memberId: input.memberId ?? '', state: 'SCHEDULED', startedAt: null } });
+          if (!source) throw new NotFoundException('Replacement source booking not found');
+        }
+        const occupied = await tenant.pTSession.findMany({ where: { ...(input.excludeSessionId ? { id: { not: input.excludeSessionId } } : {}), state: { in: ['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE'] },
           AND: [{ OR: [{ state: { not: 'PENDING_CONFIRMATION' } }, { requestExpiresAt: { gt: now } }] }], trainerId: input.trainerId, scheduledStartAt: { lt: localDayEnd }, scheduledEndAt: { gt: localDayStart } }, select: { scheduledStartAt: true, scheduledEndAt: true } });
         const slots = candidates.filter(slot => !occupied.some(row => row.scheduledStartAt < slot.end && row.scheduledEndAt > slot.start));
         let memberId: string | undefined;
@@ -147,7 +152,7 @@ export class SessionAvailabilityService {
           if (!member?.identityId || !await this.db.master.gymAccess.findFirst({ where: { gymId: access.gymId, role: 'MEMBER', actorKind: 'MEMBER', tenantActorId: member.id, userId: member.identityId, linkStatus: 'ACTIVE' }, select: { userId: true } })) throw new NotFoundException('Member not found');
           memberId = member.id;
         }
-        const memberOccupied = memberId ? await tenant.pTSession.findMany({ where: { memberId, state: { in: ['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE'] },
+        const memberOccupied = memberId ? await tenant.pTSession.findMany({ where: { memberId, ...(input.excludeSessionId ? { id: { not: input.excludeSessionId } } : {}), state: { in: ['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE'] },
           AND: [{ OR: [{ state: { not: 'PENDING_CONFIRMATION' } }, { requestExpiresAt: { gt: now } }] }], scheduledStartAt: { lt: localDayEnd }, scheduledEndAt: { gt: localDayStart } }, select: { scheduledStartAt: true, scheduledEndAt: true } }) : [];
         const freeForMember = slots.filter(slot => !memberOccupied.some(row => row.scheduledStartAt < slot.end && row.scheduledEndAt > slot.start));
         return availabilitySlotsSchema.parse({ trainerId: input.trainerId, localDate: input.localDate, timeZone: config.timezone, asOf: now.toISOString(), availabilityVersion: binding.trainer.version, durationMinutes: 60,

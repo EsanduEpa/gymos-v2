@@ -8,10 +8,10 @@ import { availabilitySlotsSchema, availabilityUpdateSchema } from '@gymos/contra
 import { apiUrl, SESSION_COOKIE } from '@/lib/gymos';
 
 export type AvailabilityState = { error?: string; success?: string; currentKey?: string; nextKey?: string };
-export async function loadSessionSlots(slug: string, trainerId: string, localDate: string, memberId?: string) {
+export async function loadSessionSlots(slug: string, trainerId: string, localDate: string, memberId?: string, excludeSessionId?: string) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || !/^[A-Za-z0-9_:-]{1,128}$/.test(trainerId) || !/^\d{4}-\d{2}-\d{2}$/.test(localDate)) return { error: 'Choose a valid date and trainer.' };
   const token = (await cookies()).get(SESSION_COOKIE)?.value; if (!token) redirect('/login');
-  const params = new URLSearchParams({ trainerId, localDate, ...(memberId ? { memberId } : {}) });
+  const params = new URLSearchParams({ trainerId, localDate, ...(memberId ? { memberId } : {}), ...(excludeSessionId ? { excludeSessionId } : {}) });
   try {
     const response = await fetch(apiUrl(`/gyms/${encodeURIComponent(slug)}/session-slots?${params}`), { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' });
     if (response.status === 401) redirect('/login?error=expired');

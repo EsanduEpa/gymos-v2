@@ -1,3 +1,4 @@
+import { creditTotals } from './credit-unit-projection.js';
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '../generated/tenant/client.js';
 import { DatabaseService } from '../database.service.js';
@@ -54,18 +55,7 @@ export class MemberSessionOverviewService {
         const [terms, packRows, sessionGroups, matchingRows] = await Promise.all([
           tx.membershipTerm.findMany({ where: { memberId: { in: memberIds } }, orderBy: [{ memberId: 'asc' }, { startDate: 'desc' }, { id: 'desc' }],
             select: { memberId: true, planNameSnapshot: true, startDate: true, endDateExclusive: true } }),
-          tx.$queryRaw<{ memberId: string; total: number; remaining: number; used: number; expiredUnused: number }[]>`
-            WITH target_packs AS (SELECT "id" FROM "SessionPack" WHERE "memberId" IN (${Prisma.join(memberIds)})), ledger AS (
-              SELECT "packId", SUM("availableDelta")::int AS available, SUM("heldDelta")::int AS held,
-                SUM("consumedDelta")::int AS consumed, SUM("expiredDelta")::int AS expired
-              FROM "PackCreditMovement" WHERE "packId" IN (SELECT "id" FROM target_packs) GROUP BY "packId"
-            )
-            SELECT p."memberId", COALESCE(SUM(p."issuedCredits"), 0)::int AS total,
-              COALESCE(SUM(CASE WHEN p."endDateExclusive" <= ${nowRows[0]!.today}::date THEN 0 ELSE COALESCE(l.available, 0) + COALESCE(l.held, 0) END), 0)::int AS remaining,
-              COALESCE(SUM(COALESCE(l.consumed, 0)), 0)::int AS used,
-              COALESCE(SUM(COALESCE(l.expired, 0) + CASE WHEN p."endDateExclusive" <= ${nowRows[0]!.today}::date THEN COALESCE(l.available, 0) ELSE 0 END), 0)::int AS "expiredUnused"
-            FROM "SessionPack" p LEFT JOIN ledger l ON l."packId" = p."id"
-            WHERE p."memberId" IN (${Prisma.join(memberIds)}) GROUP BY p."memberId"`,
+          creditTotals(tx, memberIds, nowRows[0]!.today).then(totals => [...totals].map(([memberId, total]) => ({ memberId, total: total.total, remaining: total.available + total.held, used: total.consumed, expiredUnused: total.expired }))),
           tx.pTSession.groupBy({ by: ['memberId', 'state'], where: { memberId: { in: memberIds }, scheduledStartAt: { gte: bounds.start, lt: bounds.end }, AND: [{ OR: [{ state: { not: 'PENDING_CONFIRMATION' } }, { requestExpiresAt: { gt: now } }] }] }, _count: { _all: true } }),
           tx.pTSession.groupBy({ by: ['memberId'], where: { memberId: { in: memberIds }, scheduledStartAt: { gte: bounds.start, lt: bounds.end }, AND: [{ OR: [{ state: { not: 'PENDING_CONFIRMATION' } }, { requestExpiresAt: { gt: now } }] }] }, _count: { _all: true } }),
         ]);

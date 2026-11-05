@@ -105,10 +105,13 @@ export async function verifyInstalledTenant(
       AND NOT trg.tgisinternal
     ORDER BY trg.tgname
   `;
+  const columnSurfaces = [...applicationTables, ...(manifest.postconditions.views ?? [])];
+  const views = manifest.postconditions.views ? await client.$queryRaw<Array<{ name: string }>>`SELECT c.relname AS name FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='v' ORDER BY c.relname` : [];
+  if (manifest.postconditions.views) requireExact('View', views.map(row => row.name), manifest.postconditions.views);
   const columns = await client.$queryRaw<Array<{ table_name: string; column_name: string }>>`
     SELECT table_name, column_name
     FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = ANY(${applicationTables})
+    WHERE table_schema = 'public' AND table_name = ANY(${columnSurfaces})
     ORDER BY table_name, column_name
   `;
 
@@ -123,6 +126,7 @@ export async function verifyInstalledTenant(
 
   const verifiedMigrations = completed.map((row) => ({ name: row.migration_name, checksum: row.checksum }));
   const postconditionEvidence = {
+    ...(manifest.postconditions.views ? { views: sorted(views.map(row => row.name)) } : {}),
     tables: sorted(tables.map((row) => row.name)),
     types: sorted(types.map((row) => row.name)),
     indexes: sorted(indexes.map((row) => row.name)),
