@@ -14,10 +14,14 @@ function monthBounds(month: string) {
 }
 function averagePerSession(total: string, count: number) {
   if (!count) return '0.0000';
-  return (Number(total) / count).toFixed(4);
+  const [whole, fraction = ''] = total.split('.');
+  const units = BigInt(whole!) * BigInt(10000) + BigInt(fraction.padEnd(4, '0'));
+  const average = (units + BigInt(Math.floor(count / 2))) / BigInt(count);
+  return `${average / BigInt(10000)}.${String(average % BigInt(10000)).padStart(4, '0')}`;
 }
 function formatMoney(amount: string, currency: string) {
-  return `${currency} ${Number(amount).toFixed(2)}`;
+  const [whole, fraction = ''] = amount.split('.');
+  return `${currency} ${BigInt(whole!).toLocaleString('en-US')}.${fraction.replace(/0+$/, '').padEnd(2, '0')}`;
 }
 
 export default async function TrainerEarningsPage({ params, searchParams }: {

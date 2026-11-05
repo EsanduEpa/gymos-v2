@@ -664,7 +664,7 @@ test('trainer registration enforces owner and selected-gym access, then hands of
     await expect(trainerPage.locator('.ui-feedback-success')).toContainText('Password updated');
     await trainerPage.getByRole('button', { name: 'Continue to sign in' }).click();
     await loginWithPassword(trainerPage, email, replacement);
-    await expect(trainerPage).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/trainer/earnings$`));
+    await expect(trainerPage).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/trainer/schedule$`));
     expect((await fixture.master.user.findUniqueOrThrow({ where: { id: identity.id } })).mustChangePassword).toBe(false);
   } finally { await trainerContext.close(); }
 });
@@ -891,12 +891,12 @@ test('role shell supports keyboard drawer, safe switching and current context', 
   const before = await fixture.master.$transaction([fixture.master.user.count(), fixture.master.gymAccess.count(), fixture.master.operation.count()]);
   for (const [user, role, label] of [
     [fixture.users.ownerA, 'owner', 'Dashboard'],
-    [fixture.users.trainerUser, 'trainer', 'My earnings'],
+    [fixture.users.trainerUser, 'trainer', 'My Schedule'],
     [fixture.users.memberUser, 'member', 'Member workspace'],
   ] as const) {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await openGymWithTestSession(page, user.id, fixture.gyms[0].slug);
-    await expect(page).toHaveURL(new RegExp(`/${role === 'trainer' ? 'trainer/earnings' : role}$`));
+    await expect(page).toHaveURL(new RegExp(`/${role === 'trainer' ? 'trainer/schedule' : role}$`));
     await expect(page.locator('.shell-profile')).toContainText(user.displayName!);
     await expect(page.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link', { name: label, exact: true })).toHaveAttribute('aria-current', 'page');
     expect(await page.locator('.shell-sidebar').evaluate(el => el.getBoundingClientRect().width)).toBe(224);
@@ -1629,12 +1629,14 @@ test('owner appearance upgrades live operations with accurate metrics and recove
   const values = await page.locator('.dashboard-metric strong').allTextContents();
   expect(errors).toEqual([]);
   await page.route(`**${base}`, route => route.request().method() === 'POST' && route.request().headers()['next-action'] ? route.abort('failed') : route.continue());
+  const abortedRefresh = page.waitForEvent('requestfailed', request => request.method() === 'POST' && Boolean(request.headers()['next-action']));
   await page.getByRole('button', { name: 'Refresh live status', exact: true }).click();
+  expect((await abortedRefresh).failure()?.errorText).toContain('ERR_FAILED');
   await expect(page.locator('.owner-dashboard-live').getByRole('alert')).toContainText('last loaded values remain visible');
   expect(await page.locator('.dashboard-metric strong').allTextContents()).toEqual(values);
-  // Next reports the deliberately aborted server-action transport as a page error.
-  // Assert that exact injected failure, then check the recovery path independently.
-  expect(errors).toEqual(['Failed to fetch']);
+  // Depending on the Next runtime, the deliberately aborted transport may also
+  // emit a page error. Only that expected message is allowed during injection.
+  expect(errors.filter(message => message !== 'Failed to fetch')).toEqual([]);
   errors.length = 0;
   await page.unroute(`**${base}`);
   await page.getByRole('button', { name: 'Refresh live status', exact: true }).click();
@@ -1708,7 +1710,7 @@ test('owner appearance covers directories profiles sessions finance and configur
   await expect(page.getByRole('heading', { name: 'Choose a gym' })).toBeVisible();
   await page.getByRole('link', { name: /Test Gym Beta/ }).click();
   await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[1].slug}/owner$`));
-  await expect(page.locator('.owner-header-gym')).toHaveText('Test Gym Beta');
+  await expect(page.locator('.workspace-header-gym')).toHaveText('Test Gym Beta');
   await expect(page.locator('html')).toHaveAttribute('data-appearance', 'dark');
   await openWithTestSession(page, fixture.users.memberUser.id, `${base}/members`);
   await expect(page.locator('.owner-workspace')).toHaveCount(0);

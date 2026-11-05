@@ -10,30 +10,30 @@
 .grid th { height:38px; background:var(--classic-surface-muted); color:var(--classic-text-muted); font-size:11px; font-weight:700; text-transform:uppercase; }
 .grid td { height:90px; padding:3px; border:1px solid var(--classic-border); vertical-align:top; }
 .grid td:first-child { border-left:0; }.grid td:last-child { border-right:0; }
-.outside { background:#fafbfc; }
+.outside { background:var(--classic-page); }
 .day { display:flex; width:100%; height:100%; min-height:78px; flex-direction:column; align-items:flex-start; gap:5px; padding:7px; border:1px solid transparent; border-radius:9px; background:transparent; color:var(--classic-text); text-align:left; }
 .day:hover { background:var(--classic-surface-hover); }
 .day:focus-visible { outline:3px solid var(--classic-focus); outline-offset:1px; }
-.selected .day { border-color:var(--gym-color); background:color-mix(in srgb,var(--gym-color) 9%,white); }
-.today .dayNumber { display:grid; width:24px; height:24px; place-items:center; border-radius:50%; background:var(--gym-color); color:var(--gym-on-color,#fff); }
+.selected .day { border-color:var(--primary,var(--gym-color)); background:var(--classic-primary-soft); }
+.today .dayNumber { display:grid; width:24px; height:24px; place-items:center; border-radius:50%; background:var(--classic-primary); color:var(--classic-on-primary); }
 .dayNumber { display:grid; min-width:24px; height:24px; place-items:center; font-size:13px; font-weight:750; }
 .eventCount { color:var(--classic-text-secondary); font-size:10px; font-weight:700; }
-.noEvents { color:#aeb6bf; font-size:12px; }
+.noEvents { color:var(--classic-text-muted); font-size:12px; }
 .dots { display:flex; gap:4px; }
-.dots i,.legend i { display:block; width:7px; height:7px; border-radius:50%; background:#7b8490; }
-.statePENDING_CONFIRMATION { background:#d98519!important; }.stateSCHEDULED { background:#2873c8!important; }.stateACTIVE { background:#7a50be!important; }.stateCOMPLETED { background:#267a4f!important; }.stateCANCELLED,.stateDECLINED,.stateMISSED { background:#78818c!important; }
-.mealDot { background:#c35c88!important; }
+.dots i,.legend i { display:block; width:7px; height:7px; border-radius:50%; background:var(--classic-text-muted); }
+.statePENDING_CONFIRMATION { background:var(--classic-warning)!important; }.stateSCHEDULED { background:var(--classic-info)!important; }.stateACTIVE { background:var(--classic-primary)!important; }.stateCOMPLETED { background:var(--classic-success)!important; }.stateCANCELLED,.stateDECLINED,.stateMISSED { background:var(--classic-text-muted)!important; }
+.mealDot { background:var(--member-meal,var(--classic-success))!important; }
 .dayPanel { display:flex; min-width:0; flex-direction:column; gap:12px; padding:18px; border:1px solid var(--classic-border); border-radius:14px; background:var(--classic-surface); }
-.panelEyebrow { color:var(--gym-color); font-size:10px; font-weight:800; letter-spacing:.12em; }
+.panelEyebrow { color:var(--classic-primary); font-size:10px; font-weight:800; letter-spacing:.12em; }
 .dayPanel h3 { margin:-5px 0 0; font-size:18px; letter-spacing:-.025em; }
 .dayPanel ul { display:grid; gap:10px; margin:0; padding:0; list-style:none; }
-.event { display:grid; justify-items:start; gap:6px; padding:12px; border:1px solid var(--classic-border); border-left:3px solid var(--gym-color); border-radius:9px; background:var(--classic-surface-muted); }
+.event { display:grid; justify-items:start; gap:6px; padding:12px; border:1px solid var(--classic-border); border-left:3px solid var(--classic-primary); border-radius:9px; background:var(--classic-surface-muted); }
 .event strong { font-size:13px; font-variant-numeric:tabular-nums; }.event > span:not(.statePill) { font-size:12px; line-height:1.4; }
 .event small { color:var(--classic-text-muted); font-size:10px; text-transform:capitalize; }.event .note { white-space:pre-wrap; }
-.statePill { display:inline-flex; padding:4px 8px; border-radius:99px; background:#e8eef6; color:#275d98; font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
-.mealEvent { border-left-color:#c35c88; }.mealPill { display:inline-flex; padding:4px 8px; border-radius:99px; background:#fae8ef; color:#8e3458; font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
-.pillPENDING_CONFIRMATION { background:#fff1dc; color:#814500; }.pillACTIVE { background:#efe8fb; color:#604192; }.pillCOMPLETED { background:#e2f3e9; color:#1d6540; }.pillCANCELLED,.pillDECLINED,.pillMISSED { background:#eef0f2; color:#535d68; }
-.empty { display:grid; justify-items:start; gap:7px; padding:12px 4px; }.empty > span { color:var(--gym-color); font-size:25px; }.empty strong { font-size:13px; }.empty p { margin:0; color:var(--classic-text-muted); font-size:11px; line-height:1.45; }
+.statePill { display:inline-flex; padding:4px 8px; border-radius:99px; background:var(--classic-info-soft); color:var(--classic-info); font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+.mealEvent { border-left-color:var(--member-meal,var(--classic-success)); }.mealPill { display:inline-flex; padding:4px 8px; border-radius:99px; background:var(--member-meal-soft,var(--classic-success-soft)); color:var(--member-meal,var(--classic-success)); font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+.pillPENDING_CONFIRMATION { background:var(--classic-warning-soft); color:var(--classic-warning); }.pillACTIVE { background:var(--classic-primary-soft); color:var(--classic-primary); }.pillCOMPLETED { background:var(--classic-success-soft); color:var(--classic-success); }.pillCANCELLED,.pillDECLINED,.pillMISSED { background:var(--classic-surface-muted); color:var(--classic-text-secondary); }
+.empty { display:grid; justify-items:start; gap:7px; padding:12px 4px; }.empty > span { color:var(--classic-primary); font-size:25px; }.empty strong { font-size:13px; }.empty p { margin:0; color:var(--classic-text-muted); font-size:11px; line-height:1.45; }
 .dayPanel > a { margin-top:auto; }
 .legend { display:flex; flex-wrap:wrap; gap:8px 15px; color:var(--classic-text-muted); font-size:10px; }
 .legend span { display:inline-flex; align-items:center; gap:6px; }.legend i { width:8px; height:8px; }

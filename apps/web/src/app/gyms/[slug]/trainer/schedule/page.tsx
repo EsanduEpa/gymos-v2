@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { notFound, redirect } from 'next/navigation';
 import { trainerSessionRequestsSchema } from '@gymos/contracts';
 import { resolveGymBrandColors } from '@gymos/theme-tokens';
+import { TrainerScheduleOverview } from '@/components/trainer/schedule-overview';
 import { Card, CardHeader } from '@/components/ui';
 import { DashboardChrome } from '@/components/navigation/dashboard-chrome';
 import { SessionReadView } from '@/components/sessions/read-views/session-read-view';
@@ -28,8 +29,9 @@ export default async function TrainerSchedulePage({ params, searchParams }: {
   const brand = resolveGymBrandColors(theme.primaryColor);
   const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
   return <DashboardChrome identityId={session.identityId} key={`${session.identityId}:${gym.id}:${gym.role}`} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'} style={style}>
-    <div className="gym-banner"><div><span className="eyebrow">SCHEDULE</span><h1>Trainer Daily Schedule</h1><p>Manage incoming session requests, your confirmed schedule, and completion notes.</p></div>
-      <a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/trainer/requests`}>All hire requests{requests?.success && requests.data.items.length ? ` (${requests.data.items.length})` : ''}</a></div>
+    <div className="gym-banner"><div><span className="eyebrow">SCHEDULE</span><h1>Trainer Daily Schedule</h1><p>Your sessions, incoming requests and coaching notes in one place.</p></div>
+      <div className="trainer-schedule-links"><a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/trainer/calendar`}>Open calendar</a><a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/trainer/requests`}>Review requests{requests?.success && requests.data.items.length ? ` (${requests.data.items.length})` : ''}</a></div></div>
+    <TrainerScheduleOverview slug={slug} data={loaded.data} filters={loaded.filters} pendingCount={requests?.success ? requests.data.items.length : null}/>
     {requests?.success && requests.data.items.length > 0 ? <Card className="trainer-pending-card"><CardHeader eyebrow="PENDING SESSION REQUESTS" title={`Pending session requests (${requests.data.items.length})`}/>
       <div className="trainer-schedule-requests">{requests.data.items.map(item => <article className="trainer-schedule-request" key={item.id}>
         <div className="trainer-schedule-request-main"><div className="trainer-schedule-request-title"><h2>{item.memberName}</h2><span className="ui-badge ui-badge-info">Pending confirmation</span></div>
@@ -42,7 +44,7 @@ export default async function TrainerSchedulePage({ params, searchParams }: {
           <SessionRequestDecisionForm slug={slug} sessionId={item.id} expectedVersion={item.version} action="DECLINE" requestKey={randomUUID()}/>
         </div>
       </article>)}</div>
-    </Card> : requests && !requests.success ? <Card><CardHeader eyebrow="PENDING REQUESTS" title="Requests unavailable"/><p role="alert">We couldn’t check for new requests. Open the request page to retry.</p><a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/trainer/requests`}>Open requests</a></Card> : null}
+    </Card> : !requests?.success ? <Card><CardHeader eyebrow="PENDING REQUESTS" title="Requests unavailable"/><p role="alert">We couldn’t check for new requests. Open the request page to retry.</p><a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/trainer/requests`}>Open requests</a></Card> : null}
     <SessionReadView slug={slug} role="TRAINER" filters={loaded.filters} data={loaded.data} loadError={loaded.failed} style={style}/>
   </DashboardChrome>;
 }

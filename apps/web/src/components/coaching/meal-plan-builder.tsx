@@ -34,8 +34,8 @@ export function MealPlanBuilder({ slug, memberId, memberName, initialKey }: { sl
         <div><dt>Carbs</dt><dd>{totals.carbsGrams.toFixed(2)} g</dd></div><div><dt>Fat</dt><dd>{totals.fatsGrams.toFixed(2)} g</dd></div></dl>
     </section>
     <div className={styles.rowHeader}><div><h2>Meals</h2><p>Days are Monday to Sunday. Nutrition values are nonnegative.</p></div>
-      <button type="button" className="ui-button ui-button-secondary" disabled={rows.length >= 100} onClick={() => setRows(current => [...current, newRow()])}>Add meal</button></div>
-    <div className={styles.rows}>{rows.map((row, index) => <fieldset className={styles.row} key={row.id}><legend>Meal {index + 1}</legend>
+      <button type="button" className="ui-button ui-button-secondary" disabled={pending || rows.length >= 100} onClick={() => setRows(current => [...current, newRow()])}>Add meal</button></div>
+    <div className={styles.rows}>{rows.map((row, index) => <fieldset className={styles.row} key={row.id} disabled={pending}><legend>Meal {index + 1}</legend>
       <div className={styles.fields}>
         <label>Day<select value={row.dayOfWeek} name={`entry-${index}-dayOfWeek`} onChange={event => update(index, { dayOfWeek: event.currentTarget.value })}>{days.map((day, dayIndex) => <option value={dayIndex + 1} key={day}>{day}</option>)}</select></label>
         <label>Meal type<select value={row.mealType} name={`entry-${index}-mealType`} onChange={event => update(index, { mealType: event.currentTarget.value })}>{mealTypes.map(type => <option key={type}>{type}</option>)}</select></label>

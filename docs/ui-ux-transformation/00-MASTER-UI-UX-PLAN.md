@@ -1,10 +1,10 @@
 # GymOS UI/UX transformation
 
-## Current increment: Gym Owner
+## Current increment: Member (delivered)
 
-Extend the approved Atlas Light and Midnight Blue foundation from the delivered `/admin` workspace to the existing Gym Owner routes. Retain the current Next.js App Router/server-action architecture, backend contracts, authentication, role checks, tenant isolation and operational state machines. Recheck the current source against the completed discovery before each feature increment.
+Extend the approved Atlas Light and Midnight Blue foundation from the delivered `/admin` workspace to the existing Member routes. Retain the current Next.js App Router/server-action architecture, backend contracts, authentication, role checks, tenant isolation and operational state machines. Recheck the current source against the completed discovery before each feature increment.
 
-This increment extends the delivered shared appearance foundation to the Gym Owner workspace. Trainer and Member workspaces remain on Classic pending their own transformations. Shared primitives consume the semantic appearance through scoped compatibility aliases; there is one component tree for both appearances.
+This increment adds a Member home and extends the delivered shared appearance foundation to all existing Member pages. Super Admin, Owner and Trainer are delivered. Shared primitives consume the semantic appearance through scoped compatibility aliases; there is one component tree for both appearances.
 
 ## Shared visual foundation
 
@@ -21,7 +21,7 @@ This increment extends the delivered shared appearance foundation to the Gym Own
 | Accent surface | `#EAF1FF` | `#153C4D` |
 | Secondary surface | `#F4F7FC` | `#1C2D47` |
 
-Additional semantic tokens define focus, inputs, hover, success, warning, error and their surfaces. Status colors remain distinct from selection colors. The shared `.themed-workspace` implementation lives in `apps/web/src/app/platform.css`, with Owner composition in `owner.css`; migrated components must consume semantics rather than page-specific palette literals.
+Additional semantic tokens define focus, inputs, hover, success, warning, error and their surfaces. Status colors remain distinct from selection colors. The shared `.themed-workspace` implementation lives in `apps/web/src/app/platform.css`, with shared gym shell composition in `workspace.css` and role composition in `owner.css` / `trainer.css` / `member.css`; migrated components must consume semantics rather than page-specific palette literals.
 
 Typography uses the locally served Geist Sans package through Next font support. Platform spacing follows a 4px scale, controls use 8px radii and cards 12px. Lucide supplies one consistent outline icon family. Icon-only controls have accessible names. Reduced motion disables nonessential transitions.
 
@@ -30,9 +30,9 @@ A display-only localStorage preference initializes in the document head before w
 ## Delivery order
 
 1. **Super Admin foundation and dashboard:** themes, navigation, verified overview, registry, onboarding, support and lifecycle interaction polish. Delivered.
-2. **Owner experience (current, user-approved order):** dashboard, navigation, people, enrollment, PT, operational finance, analytics, settings and audit. See [Owner mapping and QA](features/gym-owner-workspace.md).
-3. **Member experience:** redesign actual trainer directory, requests, own sessions/calendar and assigned plan reading. A new home may summarize only authorized existing data. Completion/progress/profile/membership additions need explicit capability mapping first.
-4. **Trainer experience:** requests, daily execution, relationship-scoped clients, coaching and own earnings.
+2. **Owner experience (delivered):** dashboard, navigation, people, enrollment, PT, operational finance, analytics, settings and audit. See [Owner mapping and QA](features/gym-owner-workspace.md).
+3. **Trainer experience (delivered):** schedule landing, requests, daily execution, relationship-scoped clients, coaching and own earnings. See [Trainer mapping and QA](features/trainer-workspace.md).
+4. **Member experience (delivered):** personal home, navigation, trainer directory, requests, own sessions/calendar and assigned plan reading using verified data. See [Member mapping and QA](features/member-workspace.md). Completion/progress/profile/membership additions remain separate capability work.
 5. **Platform follow-ups:** any remaining operations/history features backed by approved APIs. SaaS billing, cash payments, physical attendance, payouts and arbitrary role management remain separate product work.
 
 For each increment: inspect actual code → define layout/state behavior → map existing actions → implement with current contracts → run role/tenant/responsive/theme/keyboard checks → document evidence and gaps. Do not create native apps, mock operational data, duplicate light/dark pages or remove actions to accommodate appearance.

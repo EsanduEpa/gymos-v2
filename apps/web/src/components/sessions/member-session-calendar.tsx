@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type KeyboardEvent } from 'react';
 import type { MemberMealPlanPage, SessionReadPage, SessionReadState } from '@gymos/contracts';
 import styles from './member-session-calendar.module.css';
 
@@ -53,6 +53,18 @@ export function MemberSessionCalendar({ slug, month, today, timeZone, sessions, 
     }
     return grouped;
   }, [sessions, timeZone]);
+  const partial = totalCount > sessions.length || mealPlansTruncated;
+  function moveDay(event: KeyboardEvent<HTMLButtonElement>, date: string) {
+    const offset = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[event.key];
+    if (offset === undefined && event.key !== 'Home' && event.key !== 'End') return;
+    event.preventDefault();
+    const current = new Date(`${date}T12:00:00Z`);
+    const weekday = (current.getUTCDay() + 6) % 7;
+    const day = Math.max(1, Math.min(daysInMonth, current.getUTCDate() + (offset ?? (event.key === 'Home' ? -weekday : 6 - weekday))));
+    const next = `${month}-${String(day).padStart(2, '0')}`;
+    setSelectedDay(next);
+    event.currentTarget.closest('table')?.querySelector<HTMLButtonElement>(`[data-calendar-date="${next}"]`)?.focus();
+  }
   const selectedSessions = byDay.get(selectedDay) ?? [];
   const selectedWeekday = new Date(`${selectedDay}T12:00:00Z`).getUTCDay() || 7;
   const selectedMeals = mealPlans.flatMap(plan => plan.entries.filter(entry => entry.dayOfWeek === selectedWeekday).map(entry => ({ ...entry, planName: plan.name })));
@@ -71,6 +83,7 @@ export function MemberSessionCalendar({ slug, month, today, timeZone, sessions, 
       <a className="ui-button ui-button-secondary" href={calendarUrl(next)} aria-label={`Go to ${monthLabel(next)}`}><span className={styles.wideLabel}>Next month</span> ›</a>
     </div>
     <p className={styles.timezone}>Times are shown in {timeZone} · Select a date to see your sessions.</p>
+    {partial ? <p className={styles.limit} role="status">This calendar is a partial preview. PT Sessions and Meal Plans contain the full paged records.</p> : null}
     <div className={styles.layout}>
       <div className={styles.gridWrap}>
         <table className={styles.grid} aria-label={`${monthLabel(month)} session calendar`}>
@@ -82,7 +95,7 @@ export function MemberSessionCalendar({ slug, month, today, timeZone, sessions, 
             const itemCount = events.length + meals;
             const dayNumber = Number(date.slice(-2));
             return <td key={date} className={`${date === selectedDay ? styles.selected : ''} ${date === today ? styles.today : ''}`}>
-              <button type="button" className={styles.day} aria-pressed={date === selectedDay} aria-label={`${date}${itemCount ? `, ${itemCount} schedule item${itemCount === 1 ? '' : 's'}` : ', no scheduled items'}`} onClick={() => setSelectedDay(date)}>
+              <button type="button" className={styles.day} data-calendar-date={date} tabIndex={date === selectedDay ? 0 : -1} onKeyDown={event => moveDay(event, date)} aria-pressed={date === selectedDay} aria-label={`${date}${itemCount ? `, ${itemCount} schedule item${itemCount === 1 ? '' : 's'}` : partial ? ', no loaded items' : ', no scheduled items'}`} onClick={() => setSelectedDay(date)}>
                 <span className={styles.dayNumber}>{dayNumber}</span>
                 {itemCount ? <span className={styles.eventCount}>{itemCount} <span className={styles.eventWord}>item{itemCount === 1 ? '' : 's'}</span></span> : <span className={styles.noEvents}>—</span>}
                 {itemCount ? <span className={styles.dots} aria-hidden="true">{events.slice(0, 2).map(event => <i key={event.id} className={styles[`state${event.state}`]}/>)}{meals ? <i className={styles.mealDot}/> : null}</span> : null}
@@ -105,7 +118,8 @@ export function MemberSessionCalendar({ slug, month, today, timeZone, sessions, 
           <strong>{entry.mealType}</strong>
           <span>{entry.foodItem}</span>
           <small>{entry.planName} · repeats weekly on this day</small>
-        </li>)}</ul> : <div className={styles.empty}><span aria-hidden="true">▦</span><strong>No scheduled activities this day</strong><p>Choose another date to view your schedule.</p></div>}
+        </li>)}</ul> : <div className={styles.empty}><span aria-hidden="true">▦</span><strong>{partial ? 'No loaded activities this day' : 'No scheduled activities this day'}</strong><p>{partial ? 'Check the full session and meal-plan pages for more records.' : 'Choose another date to view your schedule.'}</p></div>}
+        <a className="ui-button ui-button-secondary ui-button-full" href={`/gyms/${encodeURIComponent(slug)}/member/sessions?mode=day&date=${selectedDay}`}>View this day’s sessions</a>
         <a className="ui-button ui-button-primary ui-button-full" href={`/gyms/${encodeURIComponent(slug)}/member/trainers`}>Find a trainer</a>
       </aside>
     </div>

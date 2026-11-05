@@ -44,11 +44,11 @@ export default async function MemberCalendarPage({ params, searchParams }: {
       return null;
     }
   };
-  const discovery = await fetchPage('page=1&pageSize=1');
+  const discovery = await fetchPage(requestedMonth ? `month=${requestedMonth}&page=1&pageSize=100` : 'page=1&pageSize=1');
   const today = discovery?.success ? localDate(discovery.data.asOf, discovery.data.timeZone) : new Intl.DateTimeFormat('en-CA', { timeZone: 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
   const month = requestedMonth ?? today.slice(0, 7);
   const [data, mealData] = await Promise.all([
-    discovery?.success ? fetchPage(`month=${month}&page=1&pageSize=100`) : Promise.resolve(null),
+    requestedMonth ? Promise.resolve(discovery) : discovery?.success ? fetchPage(`month=${month}&page=1&pageSize=100`) : Promise.resolve(null),
     fetchMealPlans(),
   ]);
   const parsed = data?.success ? data.data : null;

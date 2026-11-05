@@ -1,22 +1,4 @@
 /* Owner-specific composition; palette, controls and appearance state are shared. */
-.owner-workspace { --ink: var(--foreground); --line: var(--border); --paper: var(--background); --brand: var(--primary); }
-.owner-workspace .shell-sidebar { overflow-y: auto; scrollbar-width: thin; }
-.owner-workspace .shell-sidebar nav { padding-top: 0; }
-.owner-workspace .shell-drawer-panel { display: flex; flex-direction: column; }
-.owner-workspace .shell-sidebar-footer { margin-top: auto; }
-.owner-workspace .shell-header { position: sticky; top: 0; z-index: 20; }
-.owner-workspace .shell-content { width: 100%; padding-bottom: 48px; }
-.owner-brand { min-height: 100px; }
-.owner-brand .platform-brand-copy { min-width: 0; }
-.owner-brand .platform-brand-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 18px; letter-spacing: -.025em; }
-.owner-brand-mark { border: 1px solid var(--border); background: var(--accent); color: var(--accent-foreground); font-size: 14px; font-weight: 650; box-shadow: inset 3px 0 var(--gym-color); }
-.owner-nav-group { display: grid; gap: 4px; margin-bottom: 12px; }
-.owner-nav-group .platform-nav-label { margin: 8px 12px; }
-.owner-workspace .shell-sidebar nav a, .owner-workspace .shell-drawer nav a { min-height: 42px; padding: 10px 12px; }
-.owner-header-gym, .owner-header-page { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.owner-header-gym { max-width: 200px; color: var(--muted-foreground); }
-.owner-workspace .shell-gym-name { min-width: 0; }
-.owner-workspace .skip-link { background: var(--card); color: var(--foreground); }
 .owner-workspace .gym-banner, .owner-workspace .owner-page-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 0 0 28px; color: var(--foreground); }
 .owner-workspace .gym-banner h1, .owner-workspace .owner-page-header h1 { margin: 0 0 8px; font-size: 30px; font-weight: 650; letter-spacing: -.045em; line-height: 1.2; }
 .owner-workspace .gym-banner .platform-eyebrow { margin-bottom: 8px; }
@@ -125,7 +107,7 @@
   .owner-workspace .config-grid, .owner-workspace .shell-content .dashboard-grid { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 1023px) {
-  .owner-header-gym { display: none; }
+  .workspace-header-gym { display: none; }
   .owner-workspace .finance-budget-row { grid-template-columns: minmax(0, 1fr); }
   .owner-workspace .owner-member-filters { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .owner-workspace .trainer-profile-session-metrics { grid-template-columns: minmax(0, 1fr); }

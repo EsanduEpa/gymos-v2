@@ -1,7 +1,8 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useRef, useState } from 'react';
 import type { SessionReadPage } from '@gymos/contracts';
+import { ConfirmDialog } from '@/components/ui';
 import { completeSession, saveSessionNotes, startSession, type SessionLifecycleActionState } from '@/app/session-lifecycle-actions';
 
 type Session = SessionReadPage['items'][number];
@@ -9,7 +10,7 @@ const initialState: SessionLifecycleActionState = {};
 
 function ActionNotice({ state }: { state: SessionLifecycleActionState }) {
   if (!state.error && !state.success) return null;
-  return <p role={state.error ? 'alert' : 'status'} aria-live="polite">{state.error ?? state.success}</p>;
+  return <p className={`ui-feedback ${state.error ? 'ui-feedback-error' : 'ui-feedback-success'}`} role={state.error ? 'alert' : 'status'} aria-live="polite">{state.error ?? state.success}</p>;
 }
 
 function CommandForm({ slug, session, kind }: { slug: string; session: Session; kind: 'start' | 'complete' }) {
@@ -18,13 +19,16 @@ function CommandForm({ slug, session, kind }: { slug: string; session: Session; 
     ? startSession.bind(null, slug, session.id, session.version, initialKey)
     : completeSession.bind(null, slug, session.id, session.version, initialKey);
   const [state, formAction, pending] = useActionState(action, initialState);
-  return <form action={formAction}>
+  const form = useRef<HTMLFormElement>(null);
+  const confirmed = useRef(false);
+  const [confirming, setConfirming] = useState(false);
+  return <form ref={form} action={formAction} onSubmit={event => { if (kind === 'complete' && !confirmed.current) { event.preventDefault(); setConfirming(true); } }}>
     <input type="hidden" name="idempotencyKey" value={state.currentKey ?? state.nextKey ?? initialKey}/>
-    <button className="ui-button ui-button-secondary" type="submit" disabled={pending}
-      onClick={kind === 'complete' ? event => { if (!window.confirm('Complete this started session? This will consume its held credit and create the stored trainer earning.')) event.preventDefault(); } : undefined}>
+    <button className="ui-button ui-button-primary" type="submit" disabled={pending}>
       {pending ? 'Saving…' : kind === 'start' ? 'Start session' : 'Complete session'}
     </button>
     <ActionNotice state={state}/>
+    <ConfirmDialog open={confirming} title="Complete this session?" description="Completing this started session consumes its held credit and records the stored trainer earning." confirmLabel="Complete session" onClose={() => setConfirming(false)} onConfirm={() => { confirmed.current = true; form.current?.requestSubmit(); confirmed.current = false; setConfirming(false); }}/>
   </form>;
 }
 
@@ -49,6 +53,6 @@ export function SessionLifecycleControls({ slug, session }: { slug: string; sess
   return <div className="session-lifecycle-controls" data-session-lifecycle={session.id}>
     {session.commandAffordances.includes('START') ? <CommandForm key={`start-${session.id}-${session.version}`} slug={slug} session={session} kind="start"/> : null}
     {session.commandAffordances.includes('COMPLETE') ? <CommandForm key={`complete-${session.id}-${session.version}`} slug={slug} session={session} kind="complete"/> : null}
-    {session.commandAffordances.includes('UPDATE_NOTES') ? <details className="trainer-notes-editor"><summary>Edit Notes</summary><NotesForm key={`notes-${session.id}-${session.version}`} slug={slug} session={session}/></details> : null}
+    {session.commandAffordances.includes('UPDATE_NOTES') ? <details className="trainer-notes-editor"><summary>Edit Notes</summary><NotesForm key={`notes-${session.id}`} slug={slug} session={session}/></details> : null}
   </div>;
 }

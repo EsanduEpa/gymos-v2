@@ -1,0 +1,154 @@
+/* Trainer composition reuses the shared appearance and gym workspace shell. */
+.trainer-workspace { --ui-border: var(--border); --ui-surface: var(--card); --ui-muted: var(--muted-foreground); --ui-subtle: var(--muted); }
+.trainer-workspace .shell-content { padding: 32px; }
+.trainer-workspace .gym-banner { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin: 0 0 28px; }
+.trainer-workspace .gym-banner h1 { margin: 8px 0; font-size: 30px; font-weight: 650; line-height: 1.2; letter-spacing: -.045em; }
+.trainer-workspace .gym-banner p { margin: 0; color: var(--muted-foreground); font-size: 14px; line-height: 1.6; }
+.trainer-workspace .gym-banner .eyebrow { color: var(--muted-foreground); opacity: 1; }
+.trainer-schedule-links { display: flex; flex-wrap: wrap; gap: 10px; }
+.trainer-calendar-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.trainer-calendar-summary > span { display: flex; align-items: baseline; gap: 8px; min-width: 0; padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--muted); color: var(--secondary-foreground); font-size: 12px; }
+.trainer-calendar-summary strong { color: var(--foreground); font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.trainer-session-calendar .platform-text-link { font-size: 11px; text-transform: none; }
+.trainer-workspace .eyebrow { color: var(--muted-foreground); font-size: 10px; font-weight: 600; letter-spacing: .12em; }
+.trainer-workspace .ui-card { padding: 24px; margin-bottom: 24px; background: var(--card); box-shadow: none; }
+.trainer-workspace .ui-card-header { margin-bottom: 20px; }
+.trainer-workspace .ui-card-header h2 { font-size: 20px; font-weight: 600; letter-spacing: -.025em; }
+.trainer-workspace .ui-empty-state { display: grid; justify-items: center; gap: 8px; padding: 32px 20px; text-align: center; }
+.trainer-workspace .ui-empty-state h2 { margin: 0; font-size: 16px; }
+.trainer-workspace .ui-empty-state p { margin: 0; color: var(--muted-foreground); font-size: 13px; line-height: 1.6; }
+.trainer-workspace .ui-field-label { color: var(--foreground); text-transform: none; font-size: 12px; }
+.trainer-workspace input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), .trainer-workspace select, .trainer-workspace textarea { min-width: 0; width: 100%; max-width: 100%; height: auto; min-height: 44px; padding: 10px 12px; border: 1px solid var(--input); border-radius: 8px; background: var(--card); color: var(--foreground); font: inherit; font-size: 13px; }
+.trainer-workspace textarea { min-height: 80px; resize: vertical; }
+.trainer-workspace input::placeholder, .trainer-workspace textarea::placeholder { color: var(--muted-foreground); }
+.trainer-workspace :is(input, select, textarea):focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.trainer-workspace input[type="checkbox"] { width: 18px; height: 18px; min-height: 18px; padding: 0; accent-color: var(--primary); }
+.trainer-workspace .muted, .trainer-workspace .stack-form small { color: var(--muted-foreground); }
+.trainer-workspace form label { min-width: 0; font-size: 12px; font-weight: 500; }
+.trainer-workspace fieldset { transition: border-color 180ms; }
+.trainer-workspace fieldset:focus-within { border-color: var(--input); }
+.trainer-workspace fieldset:disabled { opacity: .7; }
+.trainer-workspace form :is(h2, legend) { font-size: 17px; font-weight: 600; }
+.trainer-workspace form > button[type="submit"] { justify-self: start; }
+.trainer-workspace .ui-pager { flex-wrap: wrap; background: var(--card); border-color: var(--border); }
+.trainer-workspace .notification-popover { max-width: calc(100vw - 32px); }
+.trainer-workspace .notification-unread-count { background: var(--destructive-button); color: var(--destructive-foreground); }
+.trainer-workspace .notification-error { color: var(--destructive); }
+.trainer-workspace .notification-bell-trigger:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.trainer-overview { margin-bottom: 28px; }
+.trainer-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-bottom: 20px; }
+.trainer-metric { min-width: 0; padding: 20px 24px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
+.trainer-metric > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted-foreground); font-size: 12px; }
+.trainer-metric svg { color: var(--primary); }
+.trainer-metric > strong { display: block; margin: 16px 0 8px; color: var(--foreground); font-size: 32px; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.trainer-metric > p { margin: 0; color: var(--muted-foreground); font-size: 11px; line-height: 1.6; }
+.trainer-focus-panel { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 24px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
+.trainer-focus-copy { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.trainer-focus-copy > div { min-width: 0; }
+.trainer-focus-copy h2 { margin: 8px 0; font-size: 20px; font-weight: 600; letter-spacing: -.025em; overflow-wrap: anywhere; }
+.trainer-focus-copy p { margin: 0; color: var(--muted-foreground); font-size: 13px; }
+.trainer-focus-panel > a { flex-shrink: 0; }
+.trainer-workspace .ui-card.trainer-pending-card { padding: 0; overflow: hidden; border-color: var(--border); }
+.trainer-workspace .trainer-pending-card > .ui-card-header { padding: 20px 24px; margin: 0; border-color: var(--border); background: var(--accent); }
+.trainer-workspace .trainer-pending-card > .ui-card-header :is(.eyebrow,h2) { color: var(--accent-foreground); }
+.trainer-workspace .trainer-schedule-request { gap: 24px; padding: 24px; }
+.trainer-workspace .trainer-schedule-request-main { flex: 1; }
+.trainer-workspace .trainer-schedule-request-main .trainer-schedule-request-note, .trainer-workspace .trainer-request-details em { background: var(--muted); border-color: var(--border); color: var(--secondary-foreground); }
+.trainer-workspace .trainer-schedule-request-actions { align-items: flex-end; flex-wrap: wrap; }
+.trainer-workspace .session-request-decision { display: grid; gap: 12px; justify-items: start; max-width: 100%; }
+.trainer-workspace .session-request-decision .ui-feedback { margin: 0; }
+.trainer-workspace .session-request-decision textarea { width: 100%; max-width: 300px; }
+.trainer-workspace .session-request-card { padding: 24px; box-shadow: none; background: var(--card); }
+.trainer-workspace .trainer-request-summary .ui-card { margin-bottom: 0; background: var(--card); }
+.trainer-workspace .trainer-request-summary .ui-card-header h2 { font-size: 32px; }
+.trainer-workspace .trainer-request-summary .ui-card-header { margin-bottom: 0; }
+.trainer-workspace .session-request-actions { align-items: flex-end; flex-wrap: wrap; gap: 16px; margin-top: 24px; }
+.trainer-workspace .trainer-request-details { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.trainer-workspace .trainer-request-details p { font-size: 13px; }
+.trainer-workspace .trainer-request-details p strong { font-size: 11px; }
+.trainer-workspace .trainer-session-toolbar { gap: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.trainer-workspace .trainer-session-toolbar p { display: block; max-width: 620px; font-size: 12px; }
+.trainer-workspace .trainer-session-switcher { margin: 20px 0; }
+.trainer-workspace .trainer-session-switcher a { min-height: 40px; }
+.trainer-workspace .trainer-session-filters { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr) auto; padding: 20px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
+.trainer-workspace .trainer-session-filters label { gap: 8px; }
+.trainer-workspace .trainer-session-cards { grid-template-columns: minmax(0, 1fr); gap: 16px; margin-top: 24px; }
+.trainer-workspace article.trainer-session-card { grid-template-columns: 92px minmax(0, 1fr) !important; gap: 20px; padding: 24px; background: var(--card); box-shadow: none; scroll-margin-top: 100px; }
+.trainer-workspace .trainer-session-date { width: 100%; display: grid; align-content: center; gap: 8px; align-self: stretch; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--muted); color: var(--foreground); }
+.trainer-workspace .trainer-session-date strong { font-size: 18px; }
+.trainer-workspace .trainer-session-date small { color: var(--muted-foreground); font-size: 12px; }
+.trainer-workspace .trainer-session-content { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.trainer-workspace .trainer-session-content > h2 { font-size: 18px; font-weight: 600; }
+.trainer-workspace .trainer-session-content > p { color: var(--secondary-foreground); }
+.trainer-workspace .trainer-session-content > .session-lifecycle-controls { grid-column: 1; grid-row: auto; justify-self: stretch; display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: flex-start; gap: 12px; }
+.trainer-workspace .trainer-session-content .trainer-notes-editor { min-width: 0; flex: 1 1 260px; grid-column: auto; grid-row: auto; }
+.trainer-workspace .trainer-notes-editor summary { background: var(--muted); color: var(--foreground); border-color: var(--border); }
+.trainer-workspace .trainer-notes-editor form { justify-items: start; }
+.trainer-workspace .trainer-notes-editor label { width: 100%; }
+.trainer-workspace .trainer-notes-editor textarea { width: 100%; max-width: 100%; }
+.trainer-workspace .session-lifecycle-controls form { max-width: 100%; min-width: 0; }
+.trainer-workspace .session-lifecycle-controls .ui-feedback { margin-bottom: 0; }
+.trainer-workspace .trainer-client-search { gap: 12px; margin-bottom: 24px; }
+.trainer-workspace .trainer-client-search label { min-width: min(100%, 320px); gap: 8px; }
+.trainer-workspace .trainer-client-table { font-size: 13px; background: var(--card); }
+.trainer-workspace .trainer-client-table th { font-size: 10px; color: var(--muted-foreground); }
+.trainer-workspace .trainer-client-table td { padding: 16px; }
+.trainer-workspace .trainer-client-table-wrap { overscroll-behavior-x: contain; }
+.trainer-workspace #overview, .trainer-workspace #workouts, .trainer-workspace #meals, .trainer-workspace #history { scroll-margin-top: 96px; margin-top: 24px; }
+.trainer-workspace .trainer-earnings-metrics { gap: 20px; }
+.trainer-workspace .trainer-earnings-metrics .ui-card { margin-bottom: 0; }
+.trainer-workspace .trainer-earnings-metrics .ui-card-header { margin-bottom: 8px; }
+.trainer-workspace .trainer-earnings-metrics .ui-card-header h2 { overflow-wrap: anywhere; font-size: 26px; }
+.trainer-workspace .trainer-earnings-metrics .ui-card > p { color: var(--muted-foreground); }
+.trainer-workspace .member-directory-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin: 20px 0; }
+.trainer-workspace .member-row { background: var(--card); border-color: var(--border); color: var(--foreground); }
+.trainer-workspace .member-row :is(small,span) { color: var(--muted-foreground); overflow-wrap: anywhere; white-space: normal; }
+@media (max-width: 1279px) {
+  .trainer-workspace .trainer-schedule-request { flex-direction: column; align-items: stretch; }
+  .trainer-workspace .trainer-schedule-request-actions { width: 100%; }
+}
+@media (max-width: 1023px) {
+  .trainer-workspace .shell-content { padding: 28px 24px; }
+  .trainer-workspace .trainer-session-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .trainer-workspace .trainer-metrics { gap: 12px; }
+  .trainer-workspace .trainer-metric { padding: 20px; }
+}
+@media (max-width: 767px) {
+  .trainer-workspace .shell-content { padding: 24px 20px; }
+  .trainer-workspace .gym-banner { align-items: flex-start; flex-direction: column; gap: 16px; }
+  .trainer-workspace .gym-banner h1 { font-size: 28px; }
+  .trainer-focus-panel { flex-direction: column; align-items: flex-start; padding: 20px; }
+  .trainer-workspace .notification-popover { position: fixed; top: 72px; right: 16px; }
+}
+@media (max-width: 560px) {
+  .trainer-calendar-summary { grid-template-columns: 1fr; gap: 8px; }
+  .trainer-calendar-summary > span { justify-content: space-between; padding: 8px 12px; }
+  .trainer-calendar-summary strong { font-size: 19px; }
+  .trainer-workspace .shell-content { padding: 24px 16px 32px; }
+  .trainer-workspace .gym-banner p { font-size: 13px; }
+  .trainer-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .trainer-metric:last-child { grid-column: 1 / -1; }
+  .trainer-workspace .trainer-metric { padding: 16px; }
+  .trainer-metric > div { flex-direction: column-reverse; align-items: flex-start; gap: 8px; }
+  .trainer-metric > strong { font-size: 28px; }
+  .trainer-metric > p { font-size: 11px; }
+  .trainer-focus-copy { align-items: flex-start; gap: 12px; }
+  .trainer-focus-copy > .platform-section-icon { display: none; }
+  .trainer-workspace .ui-card, .trainer-workspace .session-request-card { padding: 20px; }
+  .trainer-workspace .ui-card-header { flex-wrap: wrap; gap: 12px; }
+  .trainer-workspace .trainer-request-details, .trainer-workspace .trainer-session-filters, .trainer-workspace .trainer-earnings-metrics { grid-template-columns: minmax(0, 1fr); }
+  .trainer-workspace .trainer-schedule-request { padding: 20px; }
+  .trainer-workspace .trainer-schedule-request-actions, .trainer-workspace .session-request-actions { flex-direction: column; align-items: stretch; }
+  .trainer-workspace .session-request-actions form, .trainer-workspace .trainer-schedule-request-actions form, .trainer-workspace .session-request-decision textarea { width: 100%; max-width: 100%; }
+  .trainer-workspace article.trainer-session-card { grid-template-columns: minmax(0, 1fr) !important; gap: 16px; padding: 20px; }
+  .trainer-workspace .trainer-session-date { display: flex; align-items: center; justify-content: space-between; padding: 12px; }
+  .trainer-workspace .trainer-session-content > .session-lifecycle-controls { flex-direction: column; align-items: stretch; }
+  .trainer-workspace .trainer-session-content .trainer-notes-editor { flex: none; width: 100%; }
+  .trainer-workspace .trainer-notes-editor form { width: 100%; }
+  .trainer-workspace .trainer-client-search { display: grid; }
+  .trainer-workspace .trainer-client-search input { width: 100%; }
+  .trainer-workspace .member-row { flex-wrap: wrap; gap: 12px; }
+  .trainer-workspace .ui-button { min-height: 44px; white-space: normal; }
+  .trainer-workspace input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), .trainer-workspace select, .trainer-workspace textarea { font-size: 16px; }
+  .trainer-workspace .trainer-session-content > .session-lifecycle-controls button { white-space: normal; }
+}

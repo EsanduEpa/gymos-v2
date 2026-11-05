@@ -1,0 +1,21 @@
+/* Shared shell for migrated gym workspaces. */
+.gym-workspace { --ink: var(--foreground); --line: var(--border); --paper: var(--background); --brand: var(--primary); }
+.gym-workspace .shell-sidebar { overflow-y: auto; scrollbar-width: thin; }
+.gym-workspace .shell-sidebar nav { padding-top: 0; }
+.gym-workspace .shell-drawer-panel { display: flex; flex-direction: column; }
+.gym-workspace .shell-sidebar-footer { margin-top: auto; }
+.gym-workspace .shell-header { position: sticky; top: 0; z-index: 20; }
+.gym-workspace .shell-content { width: 100%; padding-bottom: 48px; }
+.workspace-brand { min-height: 100px; }
+.workspace-brand .platform-brand-copy { min-width: 0; }
+.workspace-brand .platform-brand-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 18px; letter-spacing: -.025em; }
+.workspace-brand-mark { border: 1px solid var(--border); background: var(--accent); color: var(--accent-foreground); font-size: 14px; font-weight: 650; box-shadow: inset 3px 0 var(--gym-color); }
+.workspace-nav-group { display: grid; gap: 4px; margin-bottom: 12px; }
+.workspace-nav-group .platform-nav-label { margin: 8px 12px; }
+.gym-workspace .shell-sidebar nav a, .gym-workspace .shell-drawer nav a { min-height: 42px; padding: 10px 12px; }
+.workspace-header-gym, .workspace-header-page { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-header-gym { max-width: 200px; color: var(--muted-foreground); }
+.gym-workspace .shell-gym-name { min-width: 0; }
+.gym-workspace .skip-link { background: var(--card); color: var(--foreground); }
+@media (max-width: 1023px) { .workspace-header-gym { display: none; } }
+@media (max-width: 767px) { .gym-workspace .shell-header { gap: 8px; }.gym-workspace .shell-header .platform-header-divider { display: none; } }

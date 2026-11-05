@@ -5,7 +5,10 @@ import { GeistSans } from "geist/font/sans";
 import { appearanceInitScript } from "@/lib/appearance";
 import "./globals.css";
 import "./platform.css";
+import "./workspace.css";
 import "./owner.css";
+import "./trainer.css";
+import "./member.css";
 
 export const metadata: Metadata = {
   title: "GymOS V2",

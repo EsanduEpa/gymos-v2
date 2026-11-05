@@ -83,8 +83,8 @@ function SessionCard({ session, role, slug }: { session: Session; role: Role; sl
     <SessionPolicyControls slug={slug} session={session} role={role}/>
     <Affordances session={session} role={role}/>
   </>;
-  return <article className={`${styles.sessionCard} ${role === 'TRAINER' ? 'trainer-session-card' : ''}`}>
-    {role === 'TRAINER' ? <div className="trainer-session-date"><strong><time dateTime={session.scheduledStartAt}>{new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', timeZone: session.gymTimeZone }).format(new Date(session.scheduledStartAt))}</time></strong><small>{new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', timeZone: session.gymTimeZone }).format(new Date(session.scheduledStartAt))}</small></div> : null}
+  return <article id={`session-${session.id}`} tabIndex={-1} className={`${styles.sessionCard} ${role === 'TRAINER' ? 'trainer-session-card' : ''}`}>
+    {role === 'TRAINER' ? <div className="trainer-session-date"><strong><time dateTime={session.scheduledStartAt}>{new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: session.gymTimeZone }).format(new Date(session.scheduledStartAt))}</time></strong><small>{new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', timeZone: session.gymTimeZone }).format(new Date(session.scheduledStartAt))}</small></div> : null}
     <div className={role === 'TRAINER' ? 'trainer-session-content' : undefined}>{content}</div>
   </article>;
 }
@@ -110,7 +110,7 @@ export function SessionReadView({ slug, role, filters, data, stateCounts = [], c
   const retry = noQueryUrl(slug, role, filters);
   const states = sessionReadStateSchema.options;
   return <section className={role === 'TRAINER' ? 'trainer-session-view' : undefined} style={style} aria-label={`${role.toLowerCase()} session view`}>
-    <div className={`${styles.toolbar} ${role === 'TRAINER' ? 'trainer-session-toolbar' : ''}`}><p>Refreshing this active view every 30 seconds and when you return to the tab. Session reads never change booking or credit records.</p><SessionReadRefresh href={retry}/></div>
+    <div className={`${styles.toolbar} ${role === 'TRAINER' ? 'trainer-session-toolbar' : ''}`}><p>Updates every 30 seconds and when you return to this tab.</p><SessionReadRefresh href={retry}/></div>
     <div className={`${styles.switcher} ${role === 'TRAINER' ? 'trainer-session-switcher' : ''}`} aria-label="Session date range">
       <a href={href(slug, role, filters, { mode: 'day', date: selectedDay, month: undefined, page: 1 })} aria-current={mode === 'day' ? 'page' : undefined}>Daily view</a>
       <a href={href(slug, role, filters, { mode: 'month', month: selectedMonth, date: undefined, page: 1 })} aria-current={mode === 'month' ? 'page' : undefined}>Monthly view</a>

@@ -144,9 +144,10 @@ export class CoachingService {
           const packSummaries = await this.packSummaries(tx, orderedRows.map(row => row.id), today);
           return trainerClientPageSchema.parse({ items: orderedRows.map(row => {
             const session = row.sessionsAsMember[0];
+            const balance = packSummaries.get(row.id);
             return { id: row.id, fullName: row.fullName, email: row.email, phone: row.phone, status: row.status,
               latestSession: session ? { id: session.id, state: session.state, scheduledStartAt: session.scheduledStartAt.toISOString(), scheduledEndAt: session.scheduledEndAt.toISOString() } : null,
-              usablePackBalance: packSummaries.get(row.id) ?? { available: 0, held: 0 } };
+              usablePackBalance: { available: balance?.available ?? 0, held: balance?.held ?? 0 } };
           }), page: query.page, pageSize: query.pageSize, totalCount, totalPages: Math.ceil(totalCount / query.pageSize),
             asOf: now.toISOString(), timeZone: configuration.timezone });
         });
