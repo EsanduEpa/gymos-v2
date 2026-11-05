@@ -1014,6 +1014,83 @@ test('web sessions enforce cookie, origin, expiry, revocation and logout boundar
   await page.screenshot({ path: join(evidence, 'fresh-identity.png'), animations: 'disabled' });
 });
 
+test('platform appearance persists across reloads and supports responsive keyboard workflows', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await openWithTestSession(page, fixture.users.admin.id, '/admin');
+  await expect(page.getByRole('heading', { name: 'Platform overview', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Atlas Light', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.platform-metric').nth(2).locator('strong')).toHaveText('—');
+  await page.getByRole('button', { name: 'Refresh first 25 gyms', exact: true }).click();
+  await expect(page.locator('.platform-health-tag')).toHaveText('Summaries are current');
+  const expectedMembers = (await Promise.all(fixture.tenants.map(tenant => tenant.member.count()))).reduce((sum, count) => sum + count, 0);
+  await expect(page.locator('.platform-metric').nth(2).locator('strong')).toHaveText(expectedMembers.toLocaleString('en-US'));
+  const evidence = join(webDirectory, 'test-results/ui-transformation/super-admin');
+  await mkdir(evidence, { recursive: true });
+  await page.evaluate(() => document.fonts.ready);
+  const geometry: Record<string, { x: number; y: number; width: number; height: number }> = {};
+  for (const mode of ['light', 'dark'] as const) {
+    await page.getByRole('button', { name: mode === 'light' ? 'Atlas Light' : 'Midnight Blue', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('data-appearance', mode);
+    for (const width of [1440, 1024, 768, 390, 320]) {
+      await page.setViewportSize({ width, height: width < 768 ? 844 : 1000 });
+      await page.evaluate(() => window.scrollTo(0, 0));
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      const box = await page.locator('.platform-metrics').boundingBox();
+      expect(box).not.toBeNull();
+      if (mode === 'light') geometry[String(width)] = box!;
+      else expect(box).toEqual(geometry[String(width)]);
+      const firstMetric = page.locator('.platform-metric').first();
+      await expect(firstMetric).toHaveCSS('background-color', mode === 'light' ? 'rgb(255, 255, 255)' : 'rgb(23, 36, 59)');
+      expect(await contrastRatio(page, '.platform-metric')).toBeGreaterThanOrEqual(4.5);
+      await page.screenshot({ path: join(evidence, `${mode}-${width}.png`), fullPage: true, animations: 'disabled' });
+    }
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-appearance', mode);
+    await expect(page.getByRole('button', { name: mode === 'light' ? 'Atlas Light' : 'Midnight Blue', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const row = page.getByRole('table', { name: 'Registered gym tenants' }).getByRole('row').filter({ has: page.getByText('Test Gym Alpha', { exact: true }) });
+    const support = row.getByRole('button', { name: 'Open support', exact: true });
+    await support.click();
+    const dialog = page.getByRole('dialog', { name: 'Enter read-only support', exact: true });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Enter support', exact: true }).click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('textbox', { name: /^Support reason/ })).toBeFocused();
+    expect(await fixture.master.supportSession.count({ where: { actorIdentityId: fixture.users.admin.id } })).toBe(0);
+    await dialog.getByRole('textbox', { name: /^Support reason/ }).fill('Synthetic workspace access review');
+    for (const width of [1440, 320]) {
+      await page.setViewportSize({ width, height: width < 768 ? 844 : 1000 });
+      const modalBox = await dialog.boundingBox();
+      expect(modalBox).not.toBeNull();
+      expect(modalBox!.x + modalBox!.width / 2).toBeCloseTo(width / 2, 0);
+      expect(modalBox!.height).toBeLessThanOrEqual(width < 768 ? 812 : 968);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await page.screenshot({ path: join(evidence, `${mode}-support-dialog-${width}.png`), animations: 'disabled' });
+    }
+    await page.keyboard.press('Escape');
+    await expect(dialog).not.toBeVisible();
+    await expect(support).toBeFocused();
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.getByRole('button', { name: 'Collapse sidebar', exact: true }).click();
+  await expect(page.locator('.shell-sidebar')).toHaveCSS('width', '80px');
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Expand sidebar', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Expand sidebar', exact: true }).click();
+  await expect(page.locator('.shell-sidebar')).toHaveCSS('width', '248px');
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.getByRole('button', { name: 'Open navigation menu' }).click();
+  const drawer = page.getByRole('dialog', { name: 'Navigation menu' });
+  await expect(drawer).toBeVisible();
+  await page.screenshot({ path: join(evidence, 'dark-mobile-navigation.png'), animations: 'disabled' });
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Open navigation menu' })).toBeFocused();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(page.locator('.ui-button-primary').first()).toHaveCSS('transition-duration', '0s');
+  expect(errors).toEqual([]);
+});
+
 test('platform form reserves one pending gym with safe status and a stable retry key', async ({ page, request }) => {
   await openWithTestSession(page, fixture.users.admin.id, '/admin');
   const before = await fixture.master.gym.count();
@@ -1022,23 +1099,26 @@ test('platform form reserves one pending gym with safe status and a stable retry
   await page.getByLabel('Gym name', { exact: true }).fill(input.name);
   await page.getByRole('textbox', { name: /^Gym slug/ }).fill(input.slug);
   await page.getByRole('textbox', { name: /^Owner email/ }).fill(input.ownerEmail);
-  await page.getByLabel('Currency', { exact: true }).fill(input.currency);
+  await page.getByLabel('Currency', { exact: true }).selectOption(input.currency);
   await page.getByRole('textbox', { name: /^Timezone/ }).fill(input.timezone);
   await page.getByRole('button', { name: 'Create gym', exact: true }).click();
   const status = page.getByRole('region', { name: 'Provisioning status' });
   await expect(status).toContainText('PENDING');
+  await expect(page.getByLabel('Gym name', { exact: true })).toHaveValue(input.name);
+  await expect(page.getByRole('textbox', { name: /^Gym slug/ })).toHaveValue(input.slug);
+  await expect(page.getByRole('textbox', { name: /^Owner email/ })).toHaveValue(input.ownerEmail);
   await expect(status).toContainText('remains unavailable');
   const cookie = (await page.context().cookies()).find(item => item.name === 'gymos_access_token')!;
   const replay = await request.post(`${apiBase}/admin/gyms`, { headers: { authorization: `Bearer ${cookie.value}`, 'idempotency-key': key }, data: input });
   expect(replay.status()).toBe(202);
   const result = await replay.json();
-  await expect(status).toContainText(result.operationId);
+  await expect(status.locator('code')).toHaveText(result.operationId);
   expect(await fixture.master.gym.count()).toBe(before + 1);
   expect(await fixture.master.user.count({ where: { email: input.ownerEmail } })).toBe(0);
   const stored = await fixture.master.operation.findUniqueOrThrow({ where: { id: result.operationId } });
   expect((await page.content()).includes(stored.databaseName!)).toBe(false);
   await page.getByRole('button', { name: 'Refresh status' }).click();
-  await expect(status).toContainText(result.operationId);
+  await expect(status.locator('code')).toHaveText(result.operationId);
   await page.setViewportSize({ width: 320, height: 700 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await mkdir(join(webDirectory, 'test-results/migration-evidence/GYMOS-MIG-021'), { recursive: true });
@@ -1049,6 +1129,7 @@ test('platform form reserves one pending gym with safe status and a stable retry
   await environment.registerProvisionedDatabase(await fixture.master.operation.findUniqueOrThrow({where:{id:stored.id}}));
   await page.goto(`${webBase}/admin`);
   const row=page.getByRole('table',{name:'Registered gym tenants'}).getByRole('row').filter({has:page.getByText(input.name,{exact:true})});
+  await row.locator('summary').filter({ hasText: 'Setup details' }).click();
   await row.getByRole('button',{name:'Owner credential handoff'}).click();
   await expect(row.getByRole('button',{name:'I delivered this credential'})).toBeVisible();
   expect(await fixture.master.credentialDelivery.count({where:{operationId:stored.id}})).toBe(1);
@@ -1084,11 +1165,11 @@ test('platform registry supports audited read-only gym selection, switching, exi
   for(const width of [1440,768,390,320]){
     await page.setViewportSize({width,height:width<400?844:900});
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-    if(width===768) await expect(alpha.getByRole('button',{name:'View dashboard'})).toBeVisible();
+    if(width===768) await expect(alpha.getByRole('button',{name:'Open support'})).toBeVisible();
     await page.screenshot({path:join(evidence,`registry-${width}.png`),fullPage:true,animations:'disabled'});
   }
   await page.setViewportSize({width:1280,height:720});
-  await alpha.getByRole('button',{name:'View dashboard'}).focus();
+  await alpha.getByRole('button',{name:'Open support'}).focus();
   await page.keyboard.press('Enter');
   const reason=page.getByRole('textbox',{name:/^Support reason/});await reason.fill('Synthetic owner-summary diagnosis');
   await page.getByRole('button',{name:'Enter support',exact:true}).click();
@@ -1114,7 +1195,7 @@ test('platform registry supports audited read-only gym selection, switching, exi
   await expect(oldTab.locator('.support-banner')).toContainText('Viewing Test Gym Alpha');
   await page.getByRole('navigation',{name:'Main navigation'}).getByRole('link',{name:'All Gyms'}).click();
   const beta=page.getByRole('table',{name:'Registered gym tenants'}).getByRole('row').filter({has:page.getByText('Test Gym Beta',{exact:true})});
-  await beta.getByRole('button',{name:'View dashboard'}).click();
+  await beta.getByRole('button',{name:'Open support'}).click();
   await page.getByRole('textbox',{name:/^Support reason/}).fill('Synthetic second-gym diagnosis');
   await page.getByRole('button',{name:'Enter support',exact:true}).click();
   await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[1].slug}/owner$`));

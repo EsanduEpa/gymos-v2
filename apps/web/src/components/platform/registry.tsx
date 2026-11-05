@@ -3,26 +3,57 @@ import { useRef, useState } from 'react';
 import type { RegistryPage } from '@gymos/contracts/platform';
 import { LifecycleControl } from './lifecycle-control';
 import { enterSupport, exitSupport, retryProvisioning, ownerCredential } from '@/app/platform-actions';
-import { Button, Feedback, Field, StatusBadge, Card, CardHeader, EmptyState, ConfirmDialog } from '@/components/ui';
+import { Button, Feedback, Field, StatusBadge, Card, EmptyState, ConfirmDialog } from '@/components/ui';
+import { ArrowRight, ArrowUpRight, Building2, ChevronDown, Plus, ShieldCheck } from 'lucide-react';
 
 type Page=RegistryPage;
-export function Registry({page,selectedSlug,supportExpiresAt,hasCursor}:{page:Page;selectedSlug?:string;supportExpiresAt?:string;hasCursor:boolean}){
- const [selected,setSelected]=useState('');const [error,setError]=useState('');const [pending,setPending]=useState(false);
- async function enter(data:FormData){setPending(true);setError('');try{const result=await enterSupport(data);if(result.destination){const channel=new BroadcastChannel('gymos-session');channel.postMessage('support-changed');channel.close();window.location.assign(result.destination);}else setError(result.error??'Support unavailable.');}finally{setPending(false);}}
- return <Card><CardHeader eyebrow="WORKSPACES" title={`Registered gym tenants (${page.total})`} />
- {selectedSlug?<div className="support-banner" role="status"><div><strong>Viewing {page.items.find(gym=>gym.slug===selectedSlug)?.name??selectedSlug} · read-only support</strong>{supportExpiresAt?<small>Expires <time dateTime={supportExpiresAt}>{new Date(supportExpiresAt).toLocaleString('en-GB',{timeZone:'UTC'})} UTC</time></small>:null}</div><a href={`/gyms/${encodeURIComponent(selectedSlug)}/owner`}>Open summary</a><form action={exitSupport} data-support-exit><Button variant="secondary">Exit support</Button></form></div>:null}
- {error?<Feedback tone="error">{error}</Feedback>:null}
- {page.items.length===0?<EmptyState title="No gyms yet." hint="Create the first one using the form."/>:<><p className="platform-page-count">Showing {page.items.length} gyms on this page · {page.total} registered · counts are sanitized and may be unavailable until verified.</p><div className="ui-table-shell platform-registry"><div className="ui-table-scroll"><table role="table" aria-label="Registered gym tenants"><thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Gym name · public identity</th><th role="columnheader" scope="col">Owner</th><th role="columnheader" scope="col">Members</th><th role="columnheader" scope="col">Lifecycle status</th><th role="columnheader" scope="col">Provisioning</th><th role="columnheader" scope="col">Action</th></tr></thead><tbody role="rowgroup">
- {page.items.map(gym=><tr role="row" key={gym.id} data-selected={gym.slug===selectedSlug||gym.id===selected||undefined}><td role="cell" data-label="Gym name · public identity"><strong>{gym.name}</strong><small>{gym.slug}</small></td><td role="cell" data-label="Owner">{gym.ownerName??'Name unavailable'}</td><td role="cell" data-label="Members">{gym.memberCount??'Unavailable'}{gym.observedAt?<small>Observed {new Date(gym.observedAt).toLocaleString('en-GB')} · {gym.health.replaceAll('_',' ')}</small>:<small>{gym.health.replaceAll('_',' ')}</small>}</td><td role="cell" data-label="Lifecycle status"><StatusBadge status={gym.status}/></td><td role="cell" data-label="Provisioning">{gym.operation?<><span>{gym.operation.state.replaceAll('_',' ')}</span><small>Current step: {gym.operation.step.replaceAll('_',' ')}</small><OperationControls operation={gym.operation}/></>:'No provisioning operation available'}</td><td role="cell" data-label="Action"><Button variant="secondary" type="button" aria-pressed={gym.id===selected||gym.slug===selectedSlug} disabled={pending||gym.slug===selectedSlug} onClick={()=>setSelected(gym.id)}>{gym.slug===selectedSlug?'In support':gym.id===selected?'Selected for support':'View dashboard'}</Button><LifecycleControl gym={gym}/></td></tr>)}
- </tbody></table></div></div></>}
- <nav className="platform-pagination" aria-label="Registry pages">{page.total>25?<span>Up to 25 gyms per page</span>:null}{hasCursor?<a href="/admin" rel="prev">← First page</a>:null}{page.nextCursor?<a href={`/admin?cursor=${encodeURIComponent(page.nextCursor)}`} rel="next">Next 25 gyms →</a>:null}</nav>
- {selected?<form action={enter} className="stack-form support-entry" data-support-change>
- <h3>Enter read-only support for {page.items.find(gym=>gym.id===selected)?.name}</h3><input type="hidden" name="gymId" value={selected}/>
- <label className="ui-field"><span className="ui-field-label">Reason code</span><select name="reasonCode" required defaultValue="DIAGNOSE_ACCESS"><option value="DIAGNOSE_ACCESS">Access diagnosis</option><option value="DIAGNOSE_CONFIGURATION">Configuration diagnosis</option><option value="DIAGNOSE_PROVISIONING">Provisioning diagnosis</option></select></label>
- <Field label="Support reason" name="explanation" minLength={10} maxLength={500} required hint="Explain the support task. Do not enter passwords, health notes or other private member information."/>
- <p>Read-only summary access expires after 15 minutes. Entering replaces your previous support context.</p>
- <div><Button type="submit" pending={pending} pendingLabel="Entering…">Enter support</Button> <Button type="button" variant="secondary" disabled={pending} onClick={()=>setSelected('')}>Cancel</Button></div>
- </form>:null}</Card>;
+export function Registry({ page, selectedSlug, supportExpiresAt, hasCursor }: { page: Page; selectedSlug?: string; supportExpiresAt?: string; hasCursor: boolean }) {
+  const [selected, setSelected] = useState('');
+  const [error, setError] = useState('');
+  const [pending, setPending] = useState(false);
+  const [explanation, setExplanation] = useState('');
+  const [reasonCode, setReasonCode] = useState('DIAGNOSE_ACCESS');
+  const supportForm = useRef<HTMLFormElement>(null);
+  const selectedGym = page.items.find(gym => gym.id === selected);
+  const attention = page.items.filter(gym => gym.status !== 'ACTIVE' || gym.health !== 'VERIFIED' || gym.operation?.ownerVerificationRequired).length;
+  async function enter(data: FormData) {
+    setPending(true); setError('');
+    try {
+      const result = await enterSupport(data);
+      if (result.destination) {
+        if (typeof BroadcastChannel !== 'undefined') {
+          const channel = new BroadcastChannel('gymos-session'); channel.postMessage('support-changed'); channel.close();
+        }
+        window.location.assign(result.destination);
+      } else setError(result.error ?? 'Support unavailable.');
+    } finally { setPending(false); }
+  }
+  return <Card id="gym-registry" className="platform-registry-card">
+    <div className="platform-registry-heading"><div><span className="platform-eyebrow">WORKSPACE DIRECTORY</span><h2>Gym registry <span className="platform-count">{page.total}</span></h2><p>Manage your gym workspaces and enter secure, read-only support.</p></div><a className="ui-button ui-button-secondary" href="#create-gym"><Plus size={16}/> Add a gym</a></div>
+    {selectedSlug ? <div className="support-banner" role="status"><span className="platform-section-icon"><ShieldCheck size={20}/></span><div><strong>Viewing {page.items.find(gym => gym.slug === selectedSlug)?.name ?? selectedSlug} · read-only support</strong>{supportExpiresAt ? <small>Expires <time dateTime={supportExpiresAt}>{new Date(supportExpiresAt).toLocaleString('en-GB', { timeZone: 'UTC' })} UTC</time></small> : null}</div><a className="platform-text-link" href={`/gyms/${encodeURIComponent(selectedSlug)}/owner`}>Open summary <ArrowUpRight size={15}/></a><form action={exitSupport} data-support-exit><Button variant="secondary">Exit support</Button></form></div> : null}
+    <div className="platform-registry-caption"><span>Showing {page.items.length} of {page.total} gyms</span><span><i className={`health-dot ${attention ? 'is-warning' : 'is-success'}`}/>{attention ? `${attention} need attention on this page` : 'No workspace alerts on this page'}</span></div>
+    {page.items.length === 0 ? <EmptyState title="Your first gym starts here" hint="Create a dedicated workspace to welcome a gym and its owner." icon={<Building2 size={24}/>}/> : <div className="ui-table-shell platform-registry"><div className="ui-table-scroll"><table role="table" aria-label="Registered gym tenants"><thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Gym workspace</th><th role="columnheader" scope="col">Owner</th><th role="columnheader" scope="col">Members</th><th role="columnheader" scope="col">Status</th><th role="columnheader" scope="col">Workspace health</th><th role="columnheader" scope="col">Actions</th></tr></thead><tbody role="rowgroup">
+      {page.items.map(gym => <tr role="row" key={gym.id} data-selected={gym.slug === selectedSlug || undefined}>
+        <td role="cell" data-label="Gym workspace"><div className="platform-gym-cell"><span className="platform-gym-avatar" aria-hidden="true">{gym.name.slice(0, 2).toUpperCase()}</span><div><strong>{gym.name}</strong><small>{gym.slug}</small></div></div></td>
+        <td role="cell" data-label="Owner"><span className="platform-owner-name">{gym.ownerName ?? 'Name unavailable'}</span></td>
+        <td role="cell" data-label="Members">{gym.memberCount ?? '—'}<small>{gym.memberCount === null ? 'Summary unavailable' : 'Profiles'}</small></td>
+        <td role="cell" data-label="Status"><StatusBadge status={gym.status}/></td>
+        <td role="cell" data-label="Workspace health"><span className="platform-health-label"><i className={`health-dot ${gym.health === 'VERIFIED' ? 'is-success' : gym.health === 'REPAIR_REQUIRED' ? 'is-warning' : 'is-muted'}`}/>{gym.health === 'VERIFIED' ? 'Verified' : gym.health === 'REPAIR_REQUIRED' ? 'Review required' : 'Unavailable'}</span>{gym.observedAt ? <small>Observed <time dateTime={gym.observedAt}>{new Date(gym.observedAt).toLocaleString('en-GB', { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' })} UTC</time></small> : <small>No verified observation</small>}
+          {gym.operation ? <details className="platform-operation-details"><summary>Setup details <ChevronDown size={13}/></summary><span>{gym.operation.state.replaceAll('_', ' ')}</span><small>Current step: {gym.operation.step.replaceAll('_', ' ')}</small><OperationControls operation={gym.operation}/></details> : <small>No provisioning operation available</small>}
+        </td>
+        <td role="cell" data-label="Actions"><div className="platform-row-actions"><Button variant="secondary" type="button" disabled={pending || gym.slug === selectedSlug} onClick={() => { setError(''); setExplanation(''); setReasonCode('DIAGNOSE_ACCESS'); setSelected(gym.id); }}>{gym.slug === selectedSlug ? 'In support' : <><ArrowUpRight size={15}/> Open support</>}</Button><LifecycleControl gym={gym}/></div></td>
+      </tr>)}
+    </tbody></table></div></div>}
+    <nav className="platform-pagination" aria-label="Registry pages"><span>Up to 25 gyms per page · counts reflect the last observation</span><div>{hasCursor ? <a className="ui-button ui-button-secondary" href="/admin#gym-registry" rel="prev">First page</a> : null}{page.nextCursor ? <a className="ui-button ui-button-secondary" href={`/admin?cursor=${encodeURIComponent(page.nextCursor)}#gym-registry`} rel="next">Next page <ArrowRight size={15}/></a> : null}</div></nav>
+    <ConfirmDialog open={Boolean(selectedGym)} title="Enter read-only support" description={`View a scoped summary for ${selectedGym?.name ?? 'this gym'}. Access expires after 15 minutes and replaces any previous support context.`} confirmLabel="Enter support" pending={pending} error={error} onClose={() => { setSelected(''); setError(''); }} onConfirm={() => supportForm.current?.requestSubmit()}>
+      <form ref={supportForm} action={enter} className="platform-support-form" data-support-change>
+        <input type="hidden" name="gymId" value={selected}/>
+        <label className="ui-field"><span className="ui-field-label">Reason code</span><select name="reasonCode" required value={reasonCode} onChange={event => setReasonCode(event.currentTarget.value)}><option value="DIAGNOSE_ACCESS">Access diagnosis</option><option value="DIAGNOSE_CONFIGURATION">Configuration diagnosis</option><option value="DIAGNOSE_PROVISIONING">Provisioning diagnosis</option></select></label>
+        <Field label="Support reason" name="explanation" value={explanation} onChange={event => setExplanation(event.currentTarget.value)} minLength={10} maxLength={500} required hint="Explain the task in 10–500 characters. Leave out passwords and private member information."/>
+        <p className="platform-privacy-note"><ShieldCheck size={17}/> Summary access only. Gym records and settings cannot be changed.</p>
+      </form>
+    </ConfirmDialog>
+  </Card>;
 }
 function OperationControls({operation}:{operation:Page['items'][number]['operation']}){
  const [pending,setPending]=useState(false);const [error,setError]=useState('');

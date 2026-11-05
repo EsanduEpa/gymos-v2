@@ -2,13 +2,16 @@
 
 /* eslint-disable @next/next/no-html-link-for-pages -- Full document navigation deliberately discards identity/gym router state. */
 
-import { useEffect, useRef, useState, type ReactNode, type CSSProperties, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode, type CSSProperties, type KeyboardEvent } from 'react';
 import { usePathname } from 'next/navigation';
 import { signOut } from '@/app/actions';
 import { exitSupport } from '@/app/platform-actions';
 import { gymRoleUrl, type GymAccessSummary } from '@/lib/gymos';
 import { Button, LoadingState } from '@/components/ui';
 import { NotificationsBell } from './notifications-bell';
+import { ThemeToggle } from './theme-toggle';
+import { sidebarIsCollapsed, subscribeAppearance, togglePlatformSidebar } from '@/lib/appearance';
+import { Building2, LayoutDashboard, Plus, ShieldCheck, PanelLeftClose, PanelLeftOpen, LogOut, Menu, X, Dumbbell } from 'lucide-react';
 
 // Only implemented destinations belong here. Support uses its explicit read-only
 // context; notification/subscription navigation waits for its owning slices.
@@ -22,6 +25,8 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
   const opener = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
+  const collapsed = useSyncExternalStore(subscribeAppearance, sidebarIsCollapsed, () => false);
+  const platform = !gym || Boolean(support);
   const role = support ? 'READ-ONLY SUPPORT' : gym?.role ?? 'SUPER_ADMIN';
   const destination = gym ? gymRoleUrl(gym) : '/admin';
   const label = support ? 'Owner summary' : gym ? role === 'OWNER' ? 'Dashboard' : role === 'TRAINER' ? 'Schedule' : role === 'MEMBER' ? 'Member home' : 'All Gyms' : 'All Gyms';
@@ -45,6 +50,23 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
   }
   function navigation(mobile = false) {
+    if (platform) return <>
+      <a className="platform-brand" href="/admin" aria-label="GymOS platform home"><span className="platform-brand-mark"><Dumbbell size={23}/></span><span className="platform-brand-copy"><strong>GymOS</strong><small>PLATFORM CONSOLE</small></span></a>
+      {mobile ? <button className="platform-drawer-close" type="button" onClick={close} aria-label="Close navigation menu"><X size={20}/></button> : null}
+      <nav aria-label={mobile ? 'Mobile navigation' : 'Main navigation'}>
+        <span className="platform-nav-label">WORKSPACE</span>
+        {support ? <a href={home} aria-label="Owner summary" aria-current="page" onClick={close}><ShieldCheck size={19}/><span>Owner summary</span></a> : <>
+          <a href="/admin#platform-overview" aria-label="Overview" aria-current="page" onClick={close}><LayoutDashboard size={19}/><span>Overview</span></a>
+          <a href="/admin#gym-registry" aria-label="Gyms" onClick={close}><Building2 size={19}/><span>Gyms</span></a>
+          <a href="/admin#create-gym" aria-label="Create a gym" onClick={close}><Plus size={19}/><span>Create a gym</span></a>
+        </>}
+        {support ? <a href="/admin" aria-label="All Gyms" onClick={close}><Building2 size={19}/><span>All Gyms</span></a> : null}
+      </nav>
+      <div className="platform-sidebar-note"><ShieldCheck size={20}/><strong>Built around trust</strong><p>Every gym has its own secure workspace. Support access is always read-only.</p></div>
+      <div className="shell-sidebar-footer"><div className="platform-sidebar-identity"><span className="shell-avatar" aria-hidden="true">{displayName.slice(0, 1).toUpperCase()}</span><div><strong>{displayName}</strong><small>{support ? 'Read-only support' : 'Super administrator'}</small></div></div>
+        <form action={signOut} data-session-exit><Button type="submit" variant="secondary" aria-label="Sign out"><LogOut size={16}/><span>Sign out</span></Button></form>
+      </div>
+    </>;
     return <>
       <div className="shell-brand"><span className="shell-mark" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 4 14 14M4 6l2-2m12 16 2-2M2 8l6-6m8 20 6-6M6 12l6-6m0 12 6-6" /></svg></span><div><strong>GymOS</strong><small>Management System</small></div>
         {mobile ? <button type="button" onClick={close} aria-label="Close navigation menu">×</button> : null}</div>
@@ -79,7 +101,7 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
         <form action={signOut} data-session-exit><Button type="submit" variant="secondary">Sign out</Button></form></div>
     </>;
   }
-  return <div data-session-identity={identityId} data-support-session={support?.id} data-support-expiry={support?.expiresAt} className={`application-shell ${gym ? 'gym-dashboard' : ''} ${gym?.role === 'OWNER' ? 'owner-dashboard' : ''} ${gym?.role === 'TRAINER' ? 'trainer-dashboard' : ''} ${gym?.role === 'MEMBER' ? 'member-dashboard' : ''}`} style={style}>
+  return <div data-session-identity={identityId} data-support-session={support?.id} data-support-expiry={support?.expiresAt} className={`application-shell ${platform ? 'platform-dashboard' : ''} ${gym ? 'gym-dashboard' : ''} ${gym?.role === 'OWNER' ? 'owner-dashboard' : ''} ${gym?.role === 'TRAINER' ? 'trainer-dashboard' : ''} ${gym?.role === 'MEMBER' ? 'member-dashboard' : ''}`} style={style}>
     <a className="skip-link" href="#workspace-content">Skip to content</a>
     <aside className="shell-sidebar">{navigation()}</aside>
     <dialog ref={drawer} id="primary-navigation" className="shell-drawer" aria-label="Navigation menu" onKeyDown={trap}
@@ -91,10 +113,12 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
       {/* Support and lapsed-subscription banners require server-authorized
           projections from their owning segments. Never infer them from a URL. */}
       <header className="shell-header">
-        <button ref={opener} className="shell-menu" type="button" aria-label="Open navigation menu" aria-controls="primary-navigation" aria-expanded={open} onClick={show}>☰</button>
-        <span className="shell-gym-name">{gym?.name ?? 'Platform administration'}</span>
+        <button ref={opener} className="shell-menu" type="button" aria-label="Open navigation menu" aria-controls="primary-navigation" aria-expanded={open} onClick={show}>{platform ? <Menu size={21}/> : '☰'}</button>
+        {platform ? <button type="button" className="platform-collapse" aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-expanded={!collapsed} title="Toggle sidebar" onClick={togglePlatformSidebar}><PanelLeftClose size={19} className="collapse-icon"/><PanelLeftOpen size={19} className="expand-icon"/></button> : null}
+        <span className="shell-gym-name">{platform ? <><span className="platform-header-label">Platform</span><span className="platform-header-divider">/</span>{support ? gym?.name : 'Overview'}</> : gym?.name}</span>
+        {platform ? <ThemeToggle/> : null}
         {gym && !support ? <NotificationsBell key={`${identityId}:${gym.slug}:${gym.role}`} slug={gym.slug} identityId={identityId} role={gym.role} /> : null}
-        <div className="shell-profile"><span className="shell-avatar" aria-hidden="true">{displayName.slice(0, 1).toUpperCase()}</span><div><strong>{displayName}</strong><small>{role.replaceAll('_', ' ')}</small></div></div>
+        <div className="shell-profile"><span className="shell-avatar" aria-hidden="true">{displayName.slice(0, 1).toUpperCase()}</span><div><strong>{displayName}</strong><small>{platform ? support ? 'Read-only support' : 'Super administrator' : role.replaceAll('_', ' ')}</small></div></div>
       </header>
       <main id="workspace-content" className="shell-content" tabIndex={-1}>{switching ? <LoadingState label="Loading your gyms…" /> : children}</main>
     </div>
