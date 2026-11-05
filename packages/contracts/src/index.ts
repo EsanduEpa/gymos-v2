@@ -7,6 +7,7 @@ export * from './packs.js';
 export * from './session-booking.js';
 export * from './session-reads.js';
 export * from './session-requests.js';
+export * from './session-availability.js';
 export * from './session-lifecycle.js';
 export * from './member-lifecycle.js';
 export * from './coaching.js';

@@ -52,12 +52,14 @@ import { DashboardController } from './dashboard/dashboard.controller.js';
 import { DashboardService } from './dashboard/dashboard.service.js';
 import { AnalyticsController } from './analytics/analytics.controller.js';
 import { AnalyticsService } from './analytics/analytics.service.js';
+import { SessionAvailabilityController } from './sessions/availability.controller.js';
+import { SessionAvailabilityService } from './sessions/availability.service.js';
 
 @Module({
   imports: [
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
   ],
-  controllers: [AppController, AdminController, AuthController, CredentialsController, CredentialReissueController, GymsController, TrainersController, PacksController, NotificationsController, ConfigurationController, ProvisioningOwnerController, SupportSessionController, GymLifecycleController, SessionBookingController, SessionReadsController, SessionRequestsController, MemberSessionOverviewController, CoachingController, MemberLifecycleController, SessionLifecycleController, FinanceController, DashboardController, AnalyticsController],
+  controllers: [AppController, AdminController, AuthController, CredentialsController, CredentialReissueController, GymsController, TrainersController, PacksController, NotificationsController, ConfigurationController, ProvisioningOwnerController, SupportSessionController, GymLifecycleController, SessionBookingController, SessionReadsController, SessionRequestsController, MemberSessionOverviewController, CoachingController, MemberLifecycleController, SessionLifecycleController, FinanceController, DashboardController, AnalyticsController, SessionAvailabilityController],
   providers: [
     AppService,
     DatabaseService,
@@ -87,6 +89,7 @@ import { AnalyticsService } from './analytics/analytics.service.js';
     PayrollService,
     DashboardService,
     AnalyticsService,
+    SessionAvailabilityService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: SupportScopeGuard },
   ],

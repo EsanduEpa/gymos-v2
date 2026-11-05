@@ -9,6 +9,7 @@ import { appendTenantNotification } from '../notifications.service.js';
 import { TenantSchemaGateService, type TenantGateContext } from '../tenancy/tenant-schema-gate.service.js';
 import { derivePackCreditBalance } from './session-state.js';
 import { reserveSessionCredit } from './credit-holds.js';
+import { allowedStartMinutes, type AvailabilityRule } from './availability-policy.js';
 import { retrySessionTransaction } from './session-transactions.js';
 import {
   sessionBookingInputSchema, sessionBookingOptionsSchema, sessionBookingResultSchema,
@@ -200,6 +201,7 @@ export class SessionBookingService {
             normalizedIntent: { gymId: access.gymId, memberId: input.memberId, trainerId: input.trainerId, localDate: input.localDate,
               localTime: input.localTime, timeZone: input.timeZone, offset: input.offset ?? null, type: input.type, durationMinutes: input.durationMinutes, notes: input.notes ?? null } },
           async (tx, receipt) => {
+            await tx.$queryRaw`SELECT "id" FROM "Trainer" WHERE "id" = ${input.trainerId} FOR UPDATE`;
             const config = await tx.gymConfiguration.findUnique({ where: { id: 'current' } });
             if (!config?.timezone || !config.currency || config.masterGymId !== access.gymId) throw new UnprocessableEntityException('Gym currency and time zone must be configured');
             if (input.timeZone !== config.timezone) throw new ConflictException('Gym time zone changed; reload booking options');
@@ -217,6 +219,13 @@ export class SessionBookingService {
                 registrationState: 'COMPLETE', status: 'ACTIVE', level: { not: null } }, select: { id: true, fullName: true, identityId: true, level: true, shiftStart: true, shiftEnd: true } }),
             ]);
             if (!member || !trainer) throw new UnprocessableEntityException('Member and trainer must be active and published in this gym');
+            const availability = await tx.pTAvailabilityRule.findMany({ where: { OR: [{ trainerId: trainer.id }, { kind: 'GYM_CLOSURE', localDate: new Date(`${input.localDate}T00:00:00.000Z`) }] } });
+            const startParts = partsAt(start.instant, config.timezone);
+            const startMinute = startParts.hour * 60 + startParts.minute;
+            const weekday = new Date(`${input.localDate}T00:00:00.000Z`).getUTCDay();
+            if (!allowedStartMinutes(input.localDate, availability as AvailabilityRule[], weekday).includes(startMinute)) {
+              throw new ConflictException('This time is outside the trainer’s published availability or is no longer available');
+            }
             const dateValue = new Date(`${input.localDate}T00:00:00.000Z`);
             if (await tx.membershipTerm.count({ where: { memberId: member.id, startDate: { lte: dateValue }, endDateExclusive: { gt: dateValue } } }) === 0) {
               throw new UnprocessableEntityException('Member has no active membership for the session date');

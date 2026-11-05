@@ -109,6 +109,7 @@ model Trainer {
   status                TrainerStatus            @default(ACTIVE)
   version               Int                      @default(0)
   sessions              PTSession[]              @relation("SessionTrainer")
+  availabilityRules     PTAvailabilityRule[]
   workoutPlans          WorkoutPlan[]            @relation("WorkoutPlanTrainer")
   mealPlans             MealPlan[]               @relation("MealPlanTrainer")
   createdAt             DateTime                 @default(now())
@@ -222,6 +223,39 @@ enum OperationalEarningCategory {
   LATE_CANCEL
   EXPIRED_UNUSED
   MEMBERSHIP_DAILY
+}
+
+
+enum PTAvailabilityKind {
+  WEEKLY_WINDOW
+  DATED_WINDOW
+  BLOCK
+  GYM_CLOSURE
+}
+
+model PTAvailabilityRule {
+  id                    String             @id @default(cuid())
+  trainerId             String?
+  trainer               Trainer?           @relation(fields: [trainerId], references: [id], onDelete: Restrict)
+  kind                  PTAvailabilityKind
+  weekday               Int?
+  localDate             DateTime?          @db.Date
+  startMinute           Int?
+  endMinute             Int?
+  effectiveFrom         DateTime?          @db.Date
+  effectiveToExclusive  DateTime?          @db.Date
+  reason                String?
+  version               Int                @default(0)
+  createdByIdentityId   String
+  commandReceiptId      String
+  commandReceipt        CommandReceipt     @relation(fields: [commandReceiptId], references: [id], onDelete: Restrict)
+  createdAt             DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime           @updatedAt @db.Timestamptz(3)
+
+  @@index([commandReceiptId])
+  @@index([trainerId, kind, weekday, effectiveFrom])
+  @@index([trainerId, localDate, kind])
+  @@index([localDate, kind])
 }
 
 model PTSession {
@@ -576,6 +610,7 @@ model CommandReceipt {
   committedAt             DateTime?           @db.Timestamptz(3)
   audits                  AuditLog[]
   sessionEvents           SessionStateEvent[]
+  availabilityRules       PTAvailabilityRule[]
   settlements             SessionSettlement[]
   packCreditMovements     PackCreditMovement[]
   expenses                ExpenseRecord[]

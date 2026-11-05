@@ -98,7 +98,7 @@ export const TENANT_TEMPLATE_V3: TenantTemplateManifest = Object.freeze({
     },
   },
 });
-export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
+export const TENANT_TEMPLATE_V4: TenantTemplateManifest = Object.freeze({
   ...TENANT_TEMPLATE_V3,
   version: 'tenant-2026-11-04.1',
   migrations: [...TENANT_TEMPLATE_V3.migrations, {
@@ -197,7 +197,25 @@ export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
     },
   },
 });
-export const TENANT_MANIFESTS: readonly TenantTemplateManifest[] = [TENANT_TEMPLATE_V1, TENANT_TEMPLATE_V2, TENANT_TEMPLATE_V3, TENANT_TEMPLATE_MANIFEST];
+export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
+  ...TENANT_TEMPLATE_V4,
+  version: 'tenant-2026-11-06.1',
+  migrations: [...TENANT_TEMPLATE_V4.migrations, {
+    name: '20261106010000_pt_availability', checksum: 'eb74a2f3b4534cb25fef4854250cab8315822bc8b4c46c13cbab04f83d328171',
+  }],
+  postconditions: {
+    ...TENANT_TEMPLATE_V4.postconditions,
+    tables: [...TENANT_TEMPLATE_V4.postconditions.tables, 'PTAvailabilityRule'],
+    types: [...TENANT_TEMPLATE_V4.postconditions.types, 'PTAvailabilityKind'],
+    indexes: [...TENANT_TEMPLATE_V4.postconditions.indexes, 'PTAvailabilityRule_pkey', 'PTAvailabilityRule_commandReceiptId_idx',
+      'PTAvailabilityRule_trainerId_kind_weekday_effectiveFrom_idx', 'PTAvailabilityRule_trainerId_localDate_kind_idx', 'PTAvailabilityRule_localDate_kind_idx'],
+    constraints: [...TENANT_TEMPLATE_V4.postconditions.constraints, 'PTAvailabilityRule_pkey', 'PTAvailabilityRule_trainerId_fkey',
+      'PTAvailabilityRule_commandReceiptId_fkey', 'PTAvailabilityRule_shape_check', 'PTAvailabilityRule_reason_length_check', 'PTAvailabilityRule_date_order_check'],
+    columns: { ...TENANT_TEMPLATE_V4.postconditions.columns,
+      PTAvailabilityRule: ['commandReceiptId', 'createdAt', 'createdByIdentityId', 'effectiveFrom', 'effectiveToExclusive', 'endMinute', 'id', 'kind', 'localDate', 'reason', 'startMinute', 'trainerId', 'updatedAt', 'version', 'weekday'] },
+  },
+});
+export const TENANT_MANIFESTS: readonly TenantTemplateManifest[] = [TENANT_TEMPLATE_V1, TENANT_TEMPLATE_V2, TENANT_TEMPLATE_V3, TENANT_TEMPLATE_V4, TENANT_TEMPLATE_MANIFEST];
 export function reviewedTenantManifest(version: string | null, digest: string | null) {
   return TENANT_MANIFESTS.find(manifest => manifest.version === version && tenantManifestDigest(manifest) === digest);
 }

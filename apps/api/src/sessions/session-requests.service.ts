@@ -10,6 +10,7 @@ import { TenantSchemaGateService, type TenantGateContext } from '../tenancy/tena
 import { reserveSessionCredit } from './credit-holds.js';
 import { derivePackCreditBalance, selectEligibleSessionPack } from './session-state.js';
 import { retrySessionTransaction } from './session-transactions.js';
+import { allowedStartMinutes, type AvailabilityRule } from './availability-policy.js';
 import { sessionDecisionInputSchema, sessionDecisionResultSchema, sessionRequestInputSchema, sessionRequestOptionsSchema, sessionRequestResultSchema, trainerSessionRequestsSchema } from '@gymos/contracts';
 
 type Access = TenantGateContext & { identityId: string; identityVersion: number; accessVersion: number; role: string; slug: string;
@@ -180,6 +181,10 @@ export class SessionRequestsService {
             const earliest = new Date(now.getTime() + 2 * 60 * 60_000);
             const latest = new Date(now.getTime() + 14 * 24 * 60 * 60_000);
             if (start < earliest || start > latest) throw new UnprocessableEntityException('Choose a start at least 2 hours from now and within the next 14 days');
+            const availability = await tx.pTAvailabilityRule.findMany({ where: { OR: [{ trainerId: trainer.actorId }, { kind: 'GYM_CLOSURE', localDate: new Date(`${input.data.localDate}T00:00:00.000Z`) }] } });
+            const weekday = new Date(`${input.data.localDate}T00:00:00.000Z`).getUTCDay();
+            const localMinute = Number(input.data.localTime.slice(0, 2)) * 60 + Number(input.data.localTime.slice(3));
+            if (!allowedStartMinutes(input.data.localDate, availability as AvailabilityRule[], weekday).includes(localMinute)) throw new ConflictException('This time is outside the trainer’s published availability or is no longer available');
             const day = new Date(`${input.data.localDate}T00:00:00.000Z`);
             const term = await tx.membershipTerm.findFirst({ where: { memberId: member.actorId, startDate: { lte: day }, endDateExclusive: { gt: day } }, select: { id: true } });
             if (!term) throw new UnprocessableEntityException('Member has no active membership for the session date');

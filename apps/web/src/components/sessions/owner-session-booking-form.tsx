@@ -1,8 +1,9 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useEffect, useState, useTransition } from 'react';
 import type { SessionBookingOptions } from '@gymos/contracts';
 import { createOwnerSessionBooking, type SessionBookingActionState } from '@/app/session-booking-actions';
+import { loadSessionSlots } from '@/app/availability-actions';
 
 export function OwnerSessionBookingForm({ slug, initialKey, options }: {
   slug: string; initialKey: string; options: SessionBookingOptions;
@@ -12,6 +13,8 @@ export function OwnerSessionBookingForm({ slug, initialKey, options }: {
   const [memberId, setMemberId] = useState(options.selectedMember?.memberId ?? options.members.items[0]?.memberId ?? '');
   const [trainerId, setTrainerId] = useState(options.selectedTrainer?.trainerId ?? options.trainers.items[0]?.trainerId ?? '');
   const [draft, setDraft] = useState({ localDate: options.policy.localDate, localTime: '', offset: '', durationMinutes: '60', notes: '' });
+  const [slotResult, setSlotResult] = useState<Awaited<ReturnType<typeof loadSessionSlots>>>({ error: 'Choose a date to load times.' }); const [loadingSlots, startSlotLoad] = useTransition();
+  useEffect(() => { if (!memberId || !trainerId || !draft.localDate) return; startSlotLoad(async () => { const result = await loadSessionSlots(slug, trainerId, draft.localDate, memberId); setSlotResult(result); setDraft(current => ({ ...current, localTime: '', offset: '' })); }); }, [slug, memberId, trainerId, draft.localDate]);
   const updateDraft = (field: keyof typeof draft, value: string) => setDraft(current => ({ ...current, [field]: value }));
   const fee = options.trainers.items.find(item => item.trainerId === trainerId)?.level === 'LEVEL_2'
     ? options.rateInfo.level2SessionFee ?? options.rateInfo.defaultSessionFee : options.rateInfo.defaultSessionFee;
@@ -28,8 +31,8 @@ export function OwnerSessionBookingForm({ slug, initialKey, options }: {
       {options.trainers.items.map(trainer => <option key={trainer.trainerId} value={trainer.trainerId}>{trainer.name} · {trainer.level.replace('_', ' ')} · {trainer.shiftStart && trainer.shiftEnd ? `${trainer.shiftStart}–${trainer.shiftEnd}` : 'flexible hours'}</option>)}
     </select></label>
     <label className="ui-field booking-field-half"><span className="ui-field-label">Session date ({options.policy.timeZone})</span><input type="date" name="localDate" min={today} max={maxDate} value={draft.localDate} onChange={event => updateDraft('localDate', event.target.value)} required/></label>
-    <label className="ui-field booking-field-half"><span className="ui-field-label">Start time</span><input type="time" name="localTime" value={draft.localTime} onChange={event => updateDraft('localTime', event.target.value)} required/></label>
-    <label className="ui-field booking-field-half"><span className="ui-field-label">UTC offset (only needed when clocks repeat)</span><input name="offset" inputMode="text" placeholder="e.g. +05:30" pattern="(?:\+|-)(?:0[0-9]|1[0-4]):[0-5][0-9]" value={draft.offset} onChange={event => updateDraft('offset', event.target.value)}/></label>
+    <label className="ui-field booking-field-half"><span className="ui-field-label">Available start time ({options.policy.timeZone})</span><select name="slot" disabled={loadingSlots || !slotResult.data?.slots.length} value={draft.localTime ? `${draft.localDate}T${draft.localTime}${draft.offset}` : ''} onChange={event => { const slot = slotResult.data?.slots.find(item => `${draft.localDate}T${item.localTime}${item.offset}` === event.currentTarget.value); if (slot) setDraft(current => ({ ...current, localTime: slot.localTime, offset: slot.offset })); }} required><option value="">{loadingSlots ? 'Loading times…' : slotResult.data?.slots.length ? 'Choose a time' : 'No times available'}</option>{slotResult.data?.slots.map(slot => <option key={slot.startAt} value={`${draft.localDate}T${slot.localTime}${slot.offset}`}>{slot.localTime} · UTC{slot.offset}</option>)}</select>{slotResult.error ? <small role="alert">{slotResult.error}</small> : null}{slotResult.data?.reason ? <small>{slotResult.data.reason === 'NO_AVAILABILITY' ? 'No published times for this date.' : slotResult.data.reason === 'CLOSED' ? 'The gym is closed.' : 'No available times remain.'}</small> : null}</label>
+    <input type="hidden" name="localTime" value={draft.localTime}/><input type="hidden" name="offset" value={draft.offset}/>
     <input type="hidden" name="type" value="IN_PERSON"/><input type="hidden" name="durationMinutes" value="60"/><div className="ui-feedback">In-person PT · 60 minutes · 1 credit.</div>
     <label className="ui-field booking-field-full"><span className="ui-field-label">Session notes (optional)</span><textarea name="notes" maxLength={4000} rows={4} value={draft.notes} onChange={event => updateDraft('notes', event.target.value)}/></label>
     <div className="ui-feedback ui-feedback-success booking-field-full"><strong>Server pricing and policy</strong><p>Fee: {fee} {options.rateInfo.currency} · Service: in-person · 60 minutes · 1 credit · Cancellation window: {options.policy.cancellationWindowMinutes} minutes.</p><p>The booking command checks the exact slot, membership, trainer, pack and quote again before committing.</p></div>

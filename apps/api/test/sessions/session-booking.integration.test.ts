@@ -12,6 +12,12 @@ let fixture: Awaited<ReturnType<typeof seedTwoGymFixture>>;
 beforeAll(async () => {
   run = await createDisposableEnvironment();
   fixture = await seedTwoGymFixture(run);
+  const tenant = fixture.tenants[0]!;
+  const receipt = await tenant.commandReceipt.create({ data: { actorIdentityId: fixture.users.ownerA.id, commandKind: 'TEST_AVAILABILITY', idempotencyKey: `booking-avail-${run.runId}`,
+    requestDigest: requestDigest({ runId: run.runId, availability: true }), state: 'COMMITTED', committedAt: new Date(), safeResult: { state: 'COMPLETE' } } });
+  const trainer = await tenant.trainer.findUniqueOrThrow({ where: { identityId: fixture.users.trainerUser.id } });
+  await tenant.pTAvailabilityRule.createMany({ data: Array.from({ length: 7 }, (_, weekday) => ({ id: `book_avail_${weekday}_${run.runId}`, trainerId: trainer.id, kind: 'WEEKLY_WINDOW' as const, weekday,
+    startMinute: 0, endMinute: 1440, effectiveFrom: new Date('2026-01-01T00:00:00Z'), effectiveToExclusive: new Date('2027-01-01T00:00:00Z'), createdByIdentityId: fixture.users.ownerA.id, commandReceiptId: receipt.id, updatedAt: new Date() })) });
 }, 120_000);
 
 afterAll(async () => {
@@ -101,6 +107,9 @@ it('allows only one of concurrent bookings to hold the last credit and rejects a
   const { service, tenant, gym, access } = await serviceFor();
   const member = await tenant.member.findFirstOrThrow({ where: { identityId: fixture.users.memberUser.id } });
   const trainer = await tenant.trainer.findUniqueOrThrow({ where: { identityId: fixture.users.trainerUser.id } });
+  // Consume the remaining credit from the preceding booking case so this race owns exactly one available credit.
+  const drainDate = addDays(localDate(), 1);
+  await service.book(access, input(member.id, trainer.id, drainDate, `${run.runId}-drain-a`, '09:00'));
   await issueTestEntitlement(tenant, 0, member.id, `${run.runId}-race`, 1);
   const isolatedMember = member;
   const date = addDays(localDate(), 2);
