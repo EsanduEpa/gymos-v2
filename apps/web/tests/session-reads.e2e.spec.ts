@@ -186,9 +186,11 @@ test('owner, trainer and member see the same selected-gym session ledger read-on
     receipts: await tenant.commandReceipt.count(), audits: await tenant.auditLog.count() };
   await openAs(page, fixture.users.trainerUser.id, '/gyms/' + slug + '/trainer/plans/workout/new?memberId=' + encodeURIComponent(member.id));
   await page.getByRole('heading', { name: 'Plan for Member Alpha' }).waitFor();
-  await expect(page.getByLabel('Exercise name').first()).toHaveValue('Bench Press');
+  await expect(page.getByLabel('Exercise name').first()).toHaveValue('');
+  await page.getByLabel('Exercise name').first().fill('Bench Press');
+  await page.getByLabel('Sets', { exact: true }).first().fill('4');
+  await page.getByLabel('Reps (optional)').first().fill('10');
   await page.getByLabel('Weight kg (optional)').first().fill('0');
-  await page.getByRole('button', { name: 'Remove exercise 2' }).click();
   await page.getByLabel('Plan title').fill('Browser Strength Plan');
   await page.getByRole('button', { name: 'Save and assign workout plan' }).click();
   await expect(page.getByRole('status')).toContainText('Workout plan assigned to this client.');
@@ -231,7 +233,7 @@ test('owner, trainer and member see the same selected-gym session ledger read-on
   await openAs(page, fixture.users.memberUser.id, '/gyms/' + slug + '/member/meal-plans');
   await expect(page.getByRole('heading', { name: 'Meal plans', exact: true })).toBeVisible();
   await expect(page.getByRole('article')).toContainText('Browser Nutrition Plan');
-  await expect(page.getByRole('article')).toContainText('Monday · Breakfast · Oats');
+  await expect(page.getByRole('article')).toContainText(/Monday[\s\S]*Breakfast[\s\S]*Oats/);
   await expect(page.getByRole('article')).toContainText('500 kcal');
   await expect(page.getByRole('button', { name: /Save|assign|edit/i })).toHaveCount(0);
   await page.screenshot({ path: join(evidenceDirectory, 'member-meal-plans.png'), fullPage: true });

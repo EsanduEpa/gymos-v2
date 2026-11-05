@@ -9,7 +9,9 @@ const newRow = (name = '', sets = '', reps = '', weightKg = ''): Row => ({ id: g
 const initialState: WorkoutPlanActionState = {};
 
 export function WorkoutPlanBuilder({ slug, memberId, memberName, initialKey }: { slug: string; memberId: string; memberName: string; initialKey: string }) {
-  const [rows, setRows] = useState<Row[]>([newRow('Bench Press', '4', '10', '60'), newRow('Incline DB Flyes', '3', '12', '16')]);
+  const [rows, setRows] = useState<Row[]>([newRow()]);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const action = saveWorkoutPlan.bind(null, slug, initialKey);
   const [state, formAction, pending] = useActionState(action, initialState);
   const currentKey = state.currentKey ?? state.nextKey ?? initialKey;
@@ -21,13 +23,13 @@ export function WorkoutPlanBuilder({ slug, memberId, memberName, initialKey }: {
     <input type="hidden" name="exerciseCount" value={rows.length}/>
     <input type="hidden" name="idempotencyKey" value={currentKey}/>
     <div className={styles.fields}>
-      <label>Plan title<input name="name" required maxLength={120} placeholder="Workout plan title"/></label>
-      <label>Description (optional)<textarea name="description" rows={2} maxLength={4000}/></label>
+      <label>Plan title<input name="name" value={name} onChange={event => setName(event.currentTarget.value)} required maxLength={120} placeholder="Workout plan title"/></label>
+      <label>Description (optional)<textarea name="description" value={description} onChange={event => setDescription(event.currentTarget.value)} rows={2} maxLength={4000}/></label>
       <p className={styles.assigned}>Client: <strong>{memberName}</strong>. Saving explicitly assigns this plan to this client.</p>
     </div>
     <div className={styles.rowHeader}><div><h2>Exercises</h2><p>1–100 exercises. Weight is in kilograms; zero is preserved.</p></div>
-      <button type="button" className="ui-button ui-button-secondary" disabled={rows.length >= 100} onClick={() => setRows(current => [...current, newRow()])}>Add exercise</button></div>
-    <div className={styles.rows}>{rows.map((row, index) => <fieldset className={styles.row} key={row.id}>
+      <button type="button" className="ui-button ui-button-secondary" disabled={pending || rows.length >= 100} onClick={() => setRows(current => [...current, newRow()])}>Add exercise</button></div>
+    <div className={styles.rows}>{rows.map((row, index) => <fieldset className={styles.row} key={row.id} disabled={pending}>
       <legend>Exercise {index + 1}</legend>
       <div className={styles.rowFields}>
         <label>Exercise name<input required maxLength={120} value={row.name} name={`exercise-${index}-name`} onChange={event => update(index, { name: event.currentTarget.value })}/></label>

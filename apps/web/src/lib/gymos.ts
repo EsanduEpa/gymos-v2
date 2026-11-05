@@ -32,7 +32,7 @@ export function gymRolePath(role: GymRole): string {
 }
 
 export function gymRoleLandingPath(role: GymRole): string {
-  return role === 'TRAINER' ? 'trainer/earnings' : gymRolePath(role);
+  return role === 'TRAINER' ? 'trainer/schedule' : gymRolePath(role);
 }
 
 export function gymRoleUrl(gym: Pick<GymAccessSummary, 'slug' | 'role'>): string {

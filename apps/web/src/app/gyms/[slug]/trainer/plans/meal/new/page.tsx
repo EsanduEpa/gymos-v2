@@ -25,7 +25,7 @@ export default async function NewMealPlanPage({ params, searchParams }: { params
   const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
   return <DashboardChrome identityId={session.identityId} key={session.identityId + ':' + gym.id + ':' + gym.role} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'} style={style}>
     <div className="gym-banner"><div><span className="eyebrow">MEAL PLAN</span><h1>{profile?.success ? `Plan for ${profile.data.client.fullName}` : 'Create meal plan'}</h1>
-      <p>This form is available only while the confirmed client relationship is active.</p></div></div>
+      <p>Build a personalised plan and assign it to your confirmed client.</p></div><a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/trainer/clients/${encodeURIComponent(memberId)}`}>Back to client</a></div>
     {!profile?.success ? <Card><p role="alert">The client profile could not be loaded. Refresh to retry.</p></Card> : <Card>
       <MealPlanBuilder slug={slug} memberId={profile.data.client.id} memberName={profile.data.client.fullName} initialKey={randomUUID()}/>
     </Card>}

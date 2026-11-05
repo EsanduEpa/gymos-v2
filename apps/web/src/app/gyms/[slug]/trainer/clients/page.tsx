@@ -31,12 +31,12 @@ export default async function TrainerClientsPage({ params, searchParams }: {
   const brand = resolveGymBrandColors(theme.primaryColor);
   const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
   return <DashboardChrome identityId={session.identityId} key={`${session.identityId}:${gym.id}:${gym.role}`} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'} style={style}>
-    <div className="gym-banner"><div><span className="eyebrow">TRAINER CLIENTS</span><h1>Assigned Client Roster</h1><p>Monitor your active personal training clients, session pack balances, and progress.</p></div></div>
+    <div className="gym-banner"><div><span className="eyebrow">TRAINER CLIENTS</span><h1>Assigned Client Roster</h1><p>Find your confirmed clients, review pack balances and prepare their training plans.</p></div></div>
     <Card><CardHeader eyebrow="CLIENT ROSTER" title={result?.success ? `${result.data.totalCount} matching clients` : 'Client roster'}/>
       <form method="get" className={`${styles.search} trainer-client-search`}><label>Search clients<input type="search" name="q" maxLength={100} defaultValue={query.data.q ?? ''}/></label><button className="ui-button ui-button-secondary" type="submit">Search</button></form>
       {!result?.success ? <Feedback tone="error">Clients could not be loaded. Refresh the page to retry.</Feedback> : result.data.items.length === 0 ?
         <div className="ui-empty-state"><h2>No confirmed clients</h2><p>Clients with a current confirmed relationship will appear here.</p></div> :
-        <div className="trainer-client-table-wrap"><table className="trainer-client-table"><thead><tr><th>Client name</th><th>Member status</th><th>Pack balance</th><th>Last session</th><th>Actions</th></tr></thead><tbody>{result.data.items.map(client => <tr key={client.id}>
+        <div className="trainer-client-table-wrap" tabIndex={0} role="region" aria-label="Client roster table"><table className="trainer-client-table" aria-label="Your confirmed clients"><thead><tr><th>Client name</th><th>Member status</th><th>Pack balance</th><th>Last session</th><th>Actions</th></tr></thead><tbody>{result.data.items.map(client => <tr key={client.id}>
           <td><strong>{client.fullName}</strong>{client.email ? <small>{client.email}</small> : null}</td>
           <td><StatusBadge status={client.status}/></td>
           <td><strong>{client.usablePackBalance?.available ?? '—'} sessions left</strong>{client.usablePackBalance ? <small>{client.usablePackBalance.held} held</small> : null}</td>

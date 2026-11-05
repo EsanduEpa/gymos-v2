@@ -13,6 +13,8 @@
   "dependencies": {
     "@gymos/contracts": "workspace:^",
     "@gymos/theme-tokens": "workspace:*",
+    "geist": "^1.9.1",
+    "lucide-react": "^1.68.0",
     "next": "16.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0"

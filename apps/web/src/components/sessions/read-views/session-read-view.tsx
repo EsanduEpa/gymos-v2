@@ -83,13 +83,13 @@ function SessionCard({ session, role, slug }: { session: Session; role: Role; sl
     <SessionPolicyControls slug={slug} session={session} role={role}/>
     <Affordances session={session} role={role}/>
   </>;
-  return <article className={`${styles.sessionCard} ${role === 'TRAINER' ? 'trainer-session-card' : ''}`}>
-    {role === 'TRAINER' ? <div className="trainer-session-date"><strong><time dateTime={session.scheduledStartAt}>{new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', timeZone: session.gymTimeZone }).format(new Date(session.scheduledStartAt))}</time></strong><small>{new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', timeZone: session.gymTimeZone }).format(new Date(session.scheduledStartAt))}</small></div> : null}
+  return <article id={`session-${session.id}`} tabIndex={-1} className={`${styles.sessionCard} ${role === 'TRAINER' ? 'trainer-session-card' : ''}`}>
+    {role === 'TRAINER' ? <div className="trainer-session-date"><strong><time dateTime={session.scheduledStartAt}>{new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: session.gymTimeZone }).format(new Date(session.scheduledStartAt))}</time></strong><small>{new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', timeZone: session.gymTimeZone }).format(new Date(session.scheduledStartAt))}</small></div> : null}
     <div className={role === 'TRAINER' ? 'trainer-session-content' : undefined}>{content}</div>
   </article>;
 }
 function OwnerTable({ items, slug }: { items: Session[]; slug: string }) {
-  return <div className={styles.tableWrap}><table className={styles.table} aria-label="Gym session ledger">
+  return <div className={styles.tableWrap} tabIndex={0} role="region" aria-label="Session table"><table className={styles.table} aria-label="Gym session ledger">
     <thead><tr><th>Session</th><th>Member</th><th>Trainer</th><th>Status</th><th>Fee</th><th>Notes and available actions</th></tr></thead>
     <tbody>{items.map(session => <tr key={session.id}>
       <td><time dateTime={session.scheduledStartAt}>{dateLabel(session.scheduledStartAt, session.gymTimeZone, true)}</time><small>{Math.round((new Date(session.scheduledEndAt).getTime() - new Date(session.scheduledStartAt).getTime()) / 60_000)} min · {session.type.replaceAll('_', ' ').toLowerCase()}</small></td>
@@ -110,7 +110,7 @@ export function SessionReadView({ slug, role, filters, data, stateCounts = [], c
   const retry = noQueryUrl(slug, role, filters);
   const states = sessionReadStateSchema.options;
   return <section className={role === 'TRAINER' ? 'trainer-session-view' : undefined} style={style} aria-label={`${role.toLowerCase()} session view`}>
-    <div className={`${styles.toolbar} ${role === 'TRAINER' ? 'trainer-session-toolbar' : ''}`}><p>Refreshing this active view every 30 seconds and when you return to the tab. Session reads never change booking or credit records.</p><SessionReadRefresh href={retry}/></div>
+    <div className={`${styles.toolbar} ${role === 'TRAINER' ? 'trainer-session-toolbar' : ''}`}><p>Updates every 30 seconds and when you return to this tab.</p><SessionReadRefresh href={retry}/></div>
     <div className={`${styles.switcher} ${role === 'TRAINER' ? 'trainer-session-switcher' : ''}`} aria-label="Session date range">
       <a href={href(slug, role, filters, { mode: 'day', date: selectedDay, month: undefined, page: 1 })} aria-current={mode === 'day' ? 'page' : undefined}>Daily view</a>
       <a href={href(slug, role, filters, { mode: 'month', month: selectedMonth, date: undefined, page: 1 })} aria-current={mode === 'month' ? 'page' : undefined}>Monthly view</a>

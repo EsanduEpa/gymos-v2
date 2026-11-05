@@ -41,6 +41,6 @@ export function OwnerSessionBookingForm({ slug, initialKey, options }: {
     {state.error ? <p role="alert" className="ui-feedback ui-feedback-error">{state.error}</p> : null}
     {state.outcomeUnknown ? <p role="status">Your retry will use the same idempotency key to resolve the original attempt.</p> : null}
     {state.booking ? <div role="status" className="ui-feedback ui-feedback-success"><strong>{state.success}</strong><p>{new Date(state.booking.scheduledStartAt).toLocaleString('en', { timeZone: state.booking.timeZone })} · {state.booking.fee} {state.booking.currency}</p><p>Held credit #{state.booking.creditOrdinal}: {state.booking.creditValue} {state.booking.currency} allocated value.</p><a href={`/gyms/${encodeURIComponent(slug)}/owner/sessions?created=${encodeURIComponent(state.booking.sessionId)}`}>Open session oversight</a></div> : null}
-    <button className="ui-button" type="submit" disabled={pending || !memberId || !trainerId || options.members.items.every(member => member.eligibility !== 'ELIGIBLE')}>{pending ? 'Booking session…' : 'Confirm and book'}</button>
+    <button className="ui-button ui-button-primary" type="submit" disabled={pending || !memberId || !trainerId || options.members.items.every(member => member.eligibility !== 'ELIGIBLE')}>{pending ? 'Booking session…' : 'Confirm and book'}</button>
   </form>;
 }

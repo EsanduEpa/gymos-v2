@@ -11,6 +11,6 @@
 .rowFields { margin-bottom: 1rem; }
 .notes { grid-column: 1 / -1; }
 .error, .success { padding: .75rem; border-radius: .5rem; }
-.error { color: #991b1b; background: #fef2f2; }
-.success { color: #166534; background: #f0fdf4; }
+.error { color: var(--classic-danger); background: var(--classic-danger-soft); }
+.success { color: var(--classic-success); background: var(--classic-success-soft); }
 @media (max-width: 640px) { .fields, .rowFields { grid-template-columns: 1fr; } .rowHeader { align-items: flex-start; flex-direction: column; } }
