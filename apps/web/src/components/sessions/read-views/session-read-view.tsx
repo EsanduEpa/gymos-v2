@@ -89,7 +89,7 @@ function SessionCard({ session, role, slug }: { session: Session; role: Role; sl
   </article>;
 }
 function OwnerTable({ items, slug }: { items: Session[]; slug: string }) {
-  return <div className={styles.tableWrap}><table className={styles.table} aria-label="Gym session ledger">
+  return <div className={styles.tableWrap} tabIndex={0} role="region" aria-label="Session table"><table className={styles.table} aria-label="Gym session ledger">
     <thead><tr><th>Session</th><th>Member</th><th>Trainer</th><th>Status</th><th>Fee</th><th>Notes and available actions</th></tr></thead>
     <tbody>{items.map(session => <tr key={session.id}>
       <td><time dateTime={session.scheduledStartAt}>{dateLabel(session.scheduledStartAt, session.gymTimeZone, true)}</time><small>{Math.round((new Date(session.scheduledEndAt).getTime() - new Date(session.scheduledStartAt).getTime()) / 60_000)} min · {session.type.replaceAll('_', ' ').toLowerCase()}</small></td>

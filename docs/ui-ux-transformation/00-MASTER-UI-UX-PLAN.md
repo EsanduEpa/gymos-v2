@@ -1,10 +1,10 @@
 # GymOS UI/UX transformation
 
-## Current increment: Super Admin
+## Current increment: Gym Owner
 
-Implement the approved Atlas Light and Midnight Blue direction on the existing `/admin` workspace and its read-only support summary. Retain the current Next.js App Router/server-action architecture, backend contracts, authentication, role checks, tenant isolation and operational state machines. Recheck the current source against the completed discovery before each feature increment.
+Extend the approved Atlas Light and Midnight Blue foundation from the delivered `/admin` workspace to the existing Gym Owner routes. Retain the current Next.js App Router/server-action architecture, backend contracts, authentication, role checks, tenant isolation and operational state machines. Recheck the current source against the completed discovery before each feature increment.
 
-This increment establishes shared appearance semantics and upgrades the Super Admin experience. Owner, Trainer and Member workspaces remain on Classic pending their own transformations. Shared primitives consume the semantic appearance through scoped compatibility aliases; there is one component tree for both appearances.
+This increment extends the delivered shared appearance foundation to the Gym Owner workspace. Trainer and Member workspaces remain on Classic pending their own transformations. Shared primitives consume the semantic appearance through scoped compatibility aliases; there is one component tree for both appearances.
 
 ## Shared visual foundation
 
@@ -21,7 +21,7 @@ This increment establishes shared appearance semantics and upgrades the Super Ad
 | Accent surface | `#EAF1FF` | `#153C4D` |
 | Secondary surface | `#F4F7FC` | `#1C2D47` |
 
-Additional semantic tokens define focus, inputs, hover, success, warning, error and their surfaces. Status colors remain distinct from selection colors. The implementation lives in `apps/web/src/app/platform.css`; migrated components must consume semantics rather than page-specific palette literals.
+Additional semantic tokens define focus, inputs, hover, success, warning, error and their surfaces. Status colors remain distinct from selection colors. The shared `.themed-workspace` implementation lives in `apps/web/src/app/platform.css`, with Owner composition in `owner.css`; migrated components must consume semantics rather than page-specific palette literals.
 
 Typography uses the locally served Geist Sans package through Next font support. Platform spacing follows a 4px scale, controls use 8px radii and cards 12px. Lucide supplies one consistent outline icon family. Icon-only controls have accessible names. Reduced motion disables nonessential transitions.
 
@@ -29,21 +29,21 @@ A display-only localStorage preference initializes in the document head before w
 
 ## Delivery order
 
-1. **Super Admin foundation and dashboard:** themes, navigation, verified overview, registry, onboarding, support and lifecycle interaction polish. This increment.
-2. **Member experience:** redesign actual trainer directory, requests, own sessions/calendar and assigned plan reading. A new home may summarize only authorized existing data. Completion/progress/profile/membership additions need explicit capability mapping first.
-3. **Owner experience:** people, enrollment, PT, operational finance and settings, with audit correctness issues handled as explicit functional tasks.
+1. **Super Admin foundation and dashboard:** themes, navigation, verified overview, registry, onboarding, support and lifecycle interaction polish. Delivered.
+2. **Owner experience (current, user-approved order):** dashboard, navigation, people, enrollment, PT, operational finance, analytics, settings and audit. See [Owner mapping and QA](features/gym-owner-workspace.md).
+3. **Member experience:** redesign actual trainer directory, requests, own sessions/calendar and assigned plan reading. A new home may summarize only authorized existing data. Completion/progress/profile/membership additions need explicit capability mapping first.
 4. **Trainer experience:** requests, daily execution, relationship-scoped clients, coaching and own earnings.
 5. **Platform follow-ups:** any remaining operations/history features backed by approved APIs. SaaS billing, cash payments, physical attendance, payouts and arbitrary role management remain separate product work.
 
 For each increment: inspect actual code → define layout/state behavior → map existing actions → implement with current contracts → run role/tenant/responsive/theme/keyboard checks → document evidence and gaps. Do not create native apps, mock operational data, duplicate light/dark pages or remove actions to accommodate appearance.
 
-## Navigation and responsive rules for this increment
+## Delivered Super Admin navigation and responsive rules
 
 Desktop: white/navy left sidebar, collapsible to icon navigation, top header with breadcrumb, appearance controls and identity. Existing destinations become same-page Overview, Gyms and Create a gym anchors; no unsupported platform sections are added. Support mode retains the approved owner summary, All Gyms and explicit expiry/exit.
 
 1440px: four summary cards, full registry table, creation form and explanatory sidebar. Below 1280px: registry becomes accessible labeled cards with the same six logical columns/actions. Tablet: two-column metrics and a single creation panel. Below 768px: focus-managed navigation drawer. At 390/320px: two-column compact metrics, single-column forms and labeled registry cards with accessible actions. Dialogs scroll within the viewport. Both appearances retain identical geometry.
 
-## Constraints and risks
+## Super Admin constraints and risks
 
 - Profile totals can be unavailable or withheld. Never replace them with zero or infer billing/revenue metrics.
 - Summary freshness and unavailable counts are backend projections; stale summaries are included in unavailable, so these categories are not a mutually exclusive chart distribution.

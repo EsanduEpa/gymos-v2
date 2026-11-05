@@ -20,7 +20,7 @@ export function OwnerMonthOverview({ slug, month, q, data, failed }: {
       {data ? <p>{data.matchingMemberCount} matching members · as of {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: data.timeZone }).format(new Date(data.asOf))}</p> : null}</div>
     {failed || !data ? <div className={styles.error} role="alert">Monthly member totals could not be loaded. Use the page refresh control to retry. Session details below remain a separate filtered read.</div> : data.items.length === 0 ?
       <div className={styles.empty}>No members match this search.</div> : <>
-        <div className={styles.wrap}><table className={styles.table} aria-label="Monthly member session overview">
+        <div className={styles.wrap} tabIndex={0} role="region" aria-label="Monthly member sessions"><table className={styles.table} aria-label="Monthly member session overview">
           <thead><tr><th>Member</th><th>Latest membership</th><th>Pack credits · lifetime</th><th>Sessions · {data.month}</th><th>More</th></tr></thead>
           <tbody>{data.items.map(row => <tr key={row.member.id}>
             <td><strong>{row.member.fullName}</strong><small>{row.member.email ?? 'No email'} · {row.member.status.toLowerCase()}</small></td>

@@ -621,7 +621,7 @@ test('trainer registration enforces owner and selected-gym access, then hands of
   // to /owner, so navigating there and immediately calling goto again races
   // with that client redirect in CI.
   await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${fixture.gyms[0].slug}/owner/trainers/new`);
-  await expect(page.getByRole('heading', { name: 'Register a trainer' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Add New Personal Trainer' })).toBeVisible();
   await page.setViewportSize({ width: 320, height: 700 });
   await expect(page.getByRole('button', { name: 'Register trainer' })).toBeVisible();
   await page.getByLabel('Years of experience').fill('-1');
@@ -1580,4 +1580,136 @@ test('member roster and profile expose accessible loading states while tenant re
     }
     await expect(page.getByRole('heading', { name: path.endsWith('/members') ? 'Test Gym Alpha' : member.fullName, level: 1 })).toBeVisible();
   }
+});
+
+test('owner appearance upgrades live operations with accurate metrics and recoverable refresh', async ({ page, request }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const base = `/gyms/${fixture.gyms[0].slug}/owner`;
+  await openWithTestSession(page, fixture.users.ownerA.id, base);
+  await expect(page.locator('.owner-workspace')).toBeVisible();
+  const token = (await page.context().cookies()).find(cookie => cookie.name === 'gymos_access_token')!.value;
+  const response = await request.get(`${apiBase}/gyms/${fixture.gyms[0].slug}/dashboard`, { headers: { authorization: `Bearer ${token}` } });
+  expect(response.ok()).toBe(true);
+  const snapshot = await response.json();
+  await expect(page.locator('.dashboard-metric').nth(0).locator('strong')).toHaveText(String(snapshot.metrics.membersInGym.value));
+  await expect(page.locator('.dashboard-metric').nth(1).locator('strong')).toHaveText(String(snapshot.metrics.activeSessions.value));
+  await expect(page.locator('.dashboard-metric').nth(3).locator('strong')).toHaveText(String(snapshot.metrics.trainersOnFloor.value));
+  await expect(page.locator('.owner-request-summary')).toContainText(`${snapshot.metrics.pendingRequests.value} pending PT`);
+  await expect(page.locator('main')).not.toContainText('Members in Gym');
+  const evidence = join(webDirectory, 'test-results/ui-transformation/gym-owner');
+  await mkdir(evidence, { recursive: true });
+  const geometry: Record<number, unknown> = {};
+  for (const mode of ['light', 'dark'] as const) {
+    await page.getByRole('button', { name: mode === 'light' ? 'Atlas Light' : 'Midnight Blue', exact: true }).click();
+    await page.evaluate(() => document.fonts.ready);
+    for (const width of [1440, 1024, 768, 390, 320]) {
+      await page.setViewportSize({ width, height: 1000 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      const box = await page.locator('.dashboard-metrics').boundingBox();
+      if (mode === 'light') geometry[width] = box;
+      else expect(box).toEqual(geometry[width]);
+      await expect(page.locator('.dashboard-metric').first()).toHaveCSS('background-color', mode === 'light' ? 'rgb(255, 255, 255)' : 'rgb(23, 36, 59)');
+      expect(await contrastRatio(page, '.dashboard-metric')).toBeGreaterThanOrEqual(4.5);
+      await page.screenshot({ path: join(evidence, `${mode}-dashboard-${width}.png`), fullPage: true, animations: 'disabled' });
+    }
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-appearance', mode);
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.getByRole('button', { name: 'Collapse sidebar', exact: true }).click();
+  await expect(page.locator('.shell-sidebar')).toHaveCSS('width', '80px');
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Expand sidebar', exact: true })).toBeVisible();
+  await page.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link', { name: 'Members', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Member Management' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-appearance', 'dark');
+  await page.getByRole('button', { name: 'Expand sidebar', exact: true }).click();
+  await page.goto(`${webBase}${base}`);
+  const values = await page.locator('.dashboard-metric strong').allTextContents();
+  expect(errors).toEqual([]);
+  await page.route(`**${base}`, route => route.request().method() === 'POST' && route.request().headers()['next-action'] ? route.abort('failed') : route.continue());
+  await page.getByRole('button', { name: 'Refresh live status', exact: true }).click();
+  await expect(page.locator('.owner-dashboard-live').getByRole('alert')).toContainText('last loaded values remain visible');
+  expect(await page.locator('.dashboard-metric strong').allTextContents()).toEqual(values);
+  // Next reports the deliberately aborted server-action transport as a page error.
+  // Assert that exact injected failure, then check the recovery path independently.
+  expect(errors).toEqual(['Failed to fetch']);
+  errors.length = 0;
+  await page.unroute(`**${base}`);
+  await page.getByRole('button', { name: 'Refresh live status', exact: true }).click();
+  await expect(page.locator('.owner-dashboard-live').getByRole('alert')).toHaveCount(0);
+  await page.setViewportSize({ width: 320, height: 844 });
+  const menu = page.getByRole('button', { name: 'Open navigation menu' });
+  await menu.click();
+  const drawer = page.getByRole('dialog', { name: 'Navigation menu' });
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByRole('button', { name: 'Close navigation menu' })).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(drawer.getByRole('button', { name: 'Sign out' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeFocused();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(page.getByRole('button', { name: 'Refresh live status', exact: true })).toHaveCSS('transition-duration', '0s');
+  expect(errors).toEqual([]);
+});
+
+test('owner appearance covers directories profiles sessions finance and configuration in both themes', async ({ page, request }) => {
+  test.setTimeout(180_000);
+  const base = `/gyms/${fixture.gyms[0].slug}/owner`;
+  const member = await fixture.tenants[0].member.findUniqueOrThrow({ where: { identityId: fixture.users.memberUser.id } });
+  const trainer = await fixture.tenants[0].trainer.findUniqueOrThrow({ where: { identityId: fixture.users.trainerUser.id } });
+  const evidence = join(webDirectory, 'test-results/ui-transformation/gym-owner');
+  await mkdir(evidence, { recursive: true });
+  await openWithTestSession(page, fixture.users.ownerA.id, `${base}/members`);
+  const paths = ['/members', '/members/new', `/members/${member.id}`, '/trainers', '/trainers/new', `/trainers/${trainer.id}`, '/sessions', '/sessions?view=list&mode=month', '/sessions/book', '/financials', '/financials?tab=expenses', '/financials?tab=payroll', '/analytics', '/gym-config', '/audit', '/subscription'];
+  for (const mode of ['light', 'dark'] as const) {
+    await page.getByRole('button', { name: mode === 'light' ? 'Atlas Light' : 'Midnight Blue', exact: true }).click();
+    for (const [index, path] of paths.entries()) {
+      await page.goto(`${webBase}${base}${path}`);
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      await expect(page.locator('html')).toHaveAttribute('data-appearance', mode);
+      await expect(page.locator('.owner-workspace')).toBeVisible();
+      for (const width of [1440, 320]) {
+        await page.setViewportSize({ width, height: 1000 });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${mode} ${path} at ${width}px`).toBe(true);
+        await page.screenshot({ path: join(evidence, `${mode}-screen-${index}-${width}.png`), fullPage: true, animations: 'disabled' });
+      }
+    }
+    await page.goto(`${webBase}${base}/gym-config`);
+    for (const name of ['Gym Profile', 'Membership Plans', 'PT Session Rates', 'Trainer Pay Rates', 'Cancellation Policy']) {
+      await page.getByRole('tab', { name, exact: true }).click();
+      await expect(page.getByRole('tabpanel')).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${mode} config ${name}`).toBe(true);
+    }
+  }
+  await page.goto(`${webBase}${base}/members`);
+  await page.getByLabel('Search', { exact: true }).fill('no-owner-ui-match');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(page.getByText('No matching members.', { exact: true })).toBeVisible();
+  await page.getByLabel('Search', { exact: true }).fill(member.fullName);
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(page.getByRole('table', { name: 'Gym members' })).toContainText(member.fullName);
+  const token = (await page.context().cookies()).find(cookie => cookie.name === 'gymos_access_token')!.value;
+  expect((await request.get(`${apiBase}/gyms/${fixture.gyms[1].slug}/dashboard`, { headers: { authorization: `Bearer ${token}` } })).status()).toBe(403);
+  await page.goto(`${webBase}${base}/financials?tab=expenses`);
+  const expenseForm = page.locator('form').filter({ has: page.getByRole('button', { name: 'Save expense', exact: true }) });
+  await expect(expenseForm.getByRole('checkbox')).toHaveCSS('width', '18px');
+  await expect(expenseForm.getByRole('checkbox')).toHaveCSS('height', '18px');
+  await expenseForm.getByLabel('Amount (LKR)').fill('12.34');
+  await expenseForm.getByLabel('Description', { exact: true }).fill('Owner UI verification expense');
+  await expenseForm.getByRole('button', { name: 'Save expense', exact: true }).click();
+  await expect(expenseForm.locator('.ui-feedback-success')).toBeVisible();
+  expect(await fixture.tenants[0].expenseRecord.count({ where: { description: 'Owner UI verification expense' } })).toBe(1);
+  expect(await fixture.tenants[1].expenseRecord.count({ where: { description: 'Owner UI verification expense' } })).toBe(0);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await openWithTestSession(page, fixture.users.multiOwner.id, base);
+  await page.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link', { name: 'Switch gym', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Choose a gym' })).toBeVisible();
+  await page.getByRole('link', { name: /Test Gym Beta/ }).click();
+  await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[1].slug}/owner$`));
+  await expect(page.locator('.owner-header-gym')).toHaveText('Test Gym Beta');
+  await expect(page.locator('html')).toHaveAttribute('data-appearance', 'dark');
+  await openWithTestSession(page, fixture.users.memberUser.id, `${base}/members`);
+  await expect(page.locator('.owner-workspace')).toHaveCount(0);
 });

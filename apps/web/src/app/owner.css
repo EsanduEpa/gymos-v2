@@ -1,0 +1,190 @@
+/* Owner-specific composition; palette, controls and appearance state are shared. */
+.owner-workspace { --ink: var(--foreground); --line: var(--border); --paper: var(--background); --brand: var(--primary); }
+.owner-workspace .shell-sidebar { overflow-y: auto; scrollbar-width: thin; }
+.owner-workspace .shell-sidebar nav { padding-top: 0; }
+.owner-workspace .shell-drawer-panel { display: flex; flex-direction: column; }
+.owner-workspace .shell-sidebar-footer { margin-top: auto; }
+.owner-workspace .shell-header { position: sticky; top: 0; z-index: 20; }
+.owner-workspace .shell-content { width: 100%; padding-bottom: 48px; }
+.owner-brand { min-height: 100px; }
+.owner-brand .platform-brand-copy { min-width: 0; }
+.owner-brand .platform-brand-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 18px; letter-spacing: -.025em; }
+.owner-brand-mark { border: 1px solid var(--border); background: var(--accent); color: var(--accent-foreground); font-size: 14px; font-weight: 650; box-shadow: inset 3px 0 var(--gym-color); }
+.owner-nav-group { display: grid; gap: 4px; margin-bottom: 12px; }
+.owner-nav-group .platform-nav-label { margin: 8px 12px; }
+.owner-workspace .shell-sidebar nav a, .owner-workspace .shell-drawer nav a { min-height: 42px; padding: 10px 12px; }
+.owner-header-gym, .owner-header-page { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.owner-header-gym { max-width: 200px; color: var(--muted-foreground); }
+.owner-workspace .shell-gym-name { min-width: 0; }
+.owner-workspace .skip-link { background: var(--card); color: var(--foreground); }
+.owner-workspace .gym-banner, .owner-workspace .owner-page-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 0 0 28px; color: var(--foreground); }
+.owner-workspace .gym-banner h1, .owner-workspace .owner-page-header h1 { margin: 0 0 8px; font-size: 30px; font-weight: 650; letter-spacing: -.045em; line-height: 1.2; }
+.owner-workspace .gym-banner .platform-eyebrow { margin-bottom: 8px; }
+.owner-workspace .gym-banner p, .owner-workspace .owner-page-header p { margin: 0; color: var(--muted-foreground); font-size: 14px; line-height: 1.6; }
+.owner-workspace .owner-header-actions { gap: 8px; }
+.owner-workspace .ui-card { padding: 24px; border-radius: 12px; box-shadow: none; }
+.owner-workspace .ui-card-header { margin-bottom: 20px; }
+.owner-workspace .ui-card-header h2 { font-size: 19px; font-weight: 600; letter-spacing: -.025em; }
+.owner-workspace .eyebrow { color: var(--muted-foreground); font-size: 10px; font-weight: 600; letter-spacing: .12em; }
+.owner-workspace .ui-field-label { color: var(--foreground); font-size: 12px; text-transform: none; }
+.owner-workspace .ui-field { font-size: 12px; gap: 8px; }
+.owner-workspace input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), .owner-workspace select, .owner-workspace textarea { min-width: 0; max-width: 100%; min-height: 42px; height: auto; padding: 10px 12px; border: 1px solid var(--input); border-radius: 8px; background: var(--card); color: var(--foreground); font: inherit; font-size: 13px; }
+.owner-workspace input::placeholder, .owner-workspace textarea::placeholder { color: var(--muted-foreground); }
+.owner-workspace input[readonly], .owner-workspace input:disabled, .owner-workspace select:disabled { background: var(--muted); color: var(--muted-foreground); }
+.owner-workspace :is(input, select, textarea):focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.owner-workspace input[type="checkbox"], .owner-workspace input[type="radio"] { accent-color: var(--primary); }
+.owner-workspace .muted, .owner-workspace .stack-form small, .owner-workspace .stack-form .optional { color: var(--muted-foreground); }
+.owner-workspace .ui-table-shell th { font-size: 10px; color: var(--muted-foreground); }
+.owner-workspace .ui-table-shell td { padding: 16px; font-size: 13px; }
+.owner-workspace .ui-table-scroll { min-width: 0; overscroll-behavior-x: contain; }
+.owner-workspace .ui-table-shell table { min-width: 640px; }
+.owner-workspace .ui-pager { flex-wrap: wrap; margin-top: 16px; padding: 16px 0 0; background: transparent; }
+.owner-workspace .ui-pager > div { flex-wrap: wrap; }
+.owner-workspace .member-directory-filters { gap: 16px; }
+.owner-workspace .trainer-directory-card { border-radius: 12px; padding: 20px; }
+.owner-workspace .trainer-avatar { background: var(--accent); color: var(--accent-foreground); border-color: var(--border); }
+.owner-workspace .trainer-level.is-senior { background: var(--info-soft); color: var(--info); }
+.owner-workspace .finance-tabs { gap: 4px; margin: 0 0 24px; }
+.owner-workspace .finance-tab { padding: 12px 16px; font-size: 13px; }
+.owner-workspace .finance-tab[aria-current="page"] { color: var(--accent-foreground); box-shadow: inset 0 -2px var(--primary); }
+.owner-workspace .finance-metrics { gap: 16px; }
+.owner-workspace .finance-metric { padding: 20px; }
+.owner-workspace .finance-metric strong { font-size: 24px; font-weight: 600; }
+.owner-workspace .finance-budget-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
+.owner-workspace .finance-payroll-row { grid-template-columns: minmax(0, 1fr) auto; }
+.owner-workspace .session-pack-form button { background: var(--primary); color: var(--primary-foreground); }
+.owner-workspace .owner-utilization-track { background: var(--muted); }
+.owner-workspace .owner-utilization-track > i, .owner-workspace .owner-analytics-bars i { background: var(--primary); }
+.owner-workspace .owner-analytics-bars { overflow-x: auto; }
+.owner-workspace .owner-analytics-bars small { font-size: 10px; }
+.owner-workspace .config-grid { gap: 24px; }
+.owner-workspace .config-plan-row { grid-template-columns: minmax(0, 1.5fr) minmax(0, .7fr) minmax(0, .9fr) auto; }
+.owner-workspace .config-notice, .owner-workspace .config-readonly-grid > div, .owner-workspace .config-fixed-policy { background: var(--muted); }
+.owner-workspace .member-registration-card, .owner-workspace .owner-form-card { width: min(800px, 100%); }
+.owner-workspace .member-registration-fields, .owner-workspace .trainer-registration-fields, .owner-workspace .owner-booking-form { gap: 20px; }
+.owner-workspace .member-profile-panel { overflow-wrap: anywhere; }
+.owner-workspace .credential-handoff, .owner-workspace .credential-handoff output { overflow-wrap: anywhere; }
+.owner-workspace .notification-unread-count { background: var(--destructive-button); color: var(--destructive-foreground); }
+.owner-workspace .notification-error { color: var(--destructive); }
+.owner-workspace .notification-bell-trigger:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.owner-workspace .notification-popover { max-width: calc(100vw - 32px); }
+.owner-workspace .owner-live-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin: 0 0 20px; color: var(--muted-foreground); font-size: 12px; }
+.owner-live-toolbar > div { display: flex; align-items: center; gap: 8px; }
+.owner-live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted-foreground); }
+.owner-workspace .dashboard-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; align-items: stretch; }
+.owner-workspace .dashboard-metric { display: block; min-width: 0; padding: 20px; background: var(--card); box-shadow: none; }
+.dashboard-metric > div { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.owner-workspace .dashboard-metric > div > span { color: var(--muted-foreground); font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none; }
+.dashboard-metric svg { color: var(--primary); }
+.owner-workspace .dashboard-metric strong { display: block; margin: 16px 0 8px; font-size: 30px; font-weight: 600; line-height: 1.2; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.dashboard-metric strong small { font-size: 13px; color: var(--muted-foreground); letter-spacing: 0; }
+.dashboard-metric > p { min-height: 32px; margin: 0; color: var(--muted-foreground); font-size: 11px; }
+.owner-metric-definition { margin-top: 12px; color: var(--muted-foreground); font-size: 10px; }
+.owner-metric-definition summary { cursor: pointer; }
+.owner-metric-definition p { margin: 8px 0 0; line-height: 1.6; }
+.owner-overview-grid { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(260px, 1fr); gap: 24px; margin-bottom: 24px; }
+.owner-workspace .dashboard-chart-card, .owner-workspace .dashboard-sessions-card { margin-bottom: 24px; background: var(--card); box-shadow: none; }
+.owner-overview-grid .dashboard-chart-card { margin-bottom: 0; }
+.owner-workspace .dashboard-chart-card > header, .owner-workspace .dashboard-sessions-card > header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 24px; }
+.owner-workspace .dashboard-chart-card h2, .owner-workspace .dashboard-sessions-card h2, .owner-section-heading h2 { margin: 6px 0 0; font-size: 18px; font-weight: 600; letter-spacing: -.025em; }
+.owner-workspace .dashboard-chart-card header p, .owner-workspace .dashboard-sessions-card header p, .owner-section-heading p { margin: 6px 0 0; color: var(--muted-foreground); font-size: 12px; }
+.owner-workspace .dashboard-bars { height: 230px; gap: 12px; padding: 12px 24px 16px; }
+.owner-workspace .dashboard-bar-track { width: min(36px, 80%); background: var(--muted); border-radius: 4px 4px 0 0; }
+.owner-workspace .dashboard-bar { background: var(--primary); min-height: 0; }
+.owner-workspace .dashboard-bar-value { max-width: 100%; color: var(--secondary-foreground); font-size: 10px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.owner-workspace .dashboard-bar-label { color: var(--muted-foreground); font-size: 10px; white-space: nowrap; }
+.owner-chart-end { display: none; }
+.owner-chart-footnote { margin: 0; padding: 12px 24px 20px; border-top: 1px solid var(--border); color: var(--muted-foreground); font-size: 11px; line-height: 1.6; }
+.owner-quick-panel { min-width: 0; padding: 24px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
+.owner-quick-panel h2 { margin: 8px 0 20px; font-size: 18px; font-weight: 600; letter-spacing: -.025em; }
+.owner-request-summary { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+.owner-request-summary strong { display: block; font-size: 13px; font-weight: 600; }
+.owner-request-summary p { margin: 4px 0 0; font-size: 11px; color: var(--muted-foreground); }
+.owner-quick-actions { display: grid; gap: 8px; margin-bottom: 20px; }
+.owner-quick-actions a { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; color: var(--secondary-foreground); font-size: 12px; font-weight: 500; }
+.owner-quick-actions a:hover { background: var(--muted); color: var(--foreground); }
+.owner-quick-actions a > svg:first-child { color: var(--primary); }
+.owner-quick-actions a > svg:last-child { margin-left: auto; }
+.owner-workspace .dashboard-sessions-card .ui-table-shell { border: 0; border-top: 1px solid var(--border); border-radius: 0; }
+.owner-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.owner-workspace .dashboard-trainer-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.owner-workspace .dashboard-trainer-card { padding: 20px; background: var(--card); box-shadow: none; }
+.owner-workspace .dashboard-trainer-card > div { flex-wrap: wrap; align-items: center; }
+.owner-workspace .dashboard-trainer-card > div > a { flex: 1; min-width: 80px; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.owner-workspace .dashboard-trainer-card > div > a:hover { text-decoration: underline; }
+.owner-workspace .dashboard-trainer-card > div > .owner-trainer-avatar { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 36px; padding: 0; border-radius: 10px; background: var(--accent); color: var(--accent-foreground); }
+.owner-workspace .dashboard-trainer-card > div > span.is-on-floor { background: var(--success-soft); color: var(--success); }
+.owner-workspace .dashboard-trainer-card dt { font-size: 11px; }
+.owner-workspace .dashboard-trainer-card dd { font-size: 18px; font-weight: 600; }
+@media (max-width: 1279px) {
+  .owner-workspace .dashboard-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .owner-overview-grid { grid-template-columns: minmax(0, 1fr); }
+  .owner-quick-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .owner-quick-actions a { flex-wrap: wrap; }
+  .owner-workspace .dashboard-trainer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .owner-workspace .config-grid, .owner-workspace .shell-content .dashboard-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 1023px) {
+  .owner-header-gym { display: none; }
+  .owner-workspace .finance-budget-row { grid-template-columns: minmax(0, 1fr); }
+  .owner-workspace .owner-member-filters { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .owner-workspace .trainer-profile-session-metrics { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 767px) {
+  .owner-workspace .shell-header { gap: 8px; }
+  .owner-workspace .shell-header .platform-header-divider { display: none; }
+  .owner-workspace .notification-popover { position: fixed; top: 72px; right: 16px; }
+  .owner-workspace .gym-banner, .owner-workspace .owner-page-header { align-items: flex-start; flex-direction: column; gap: 16px; }
+  .owner-workspace .gym-banner h1, .owner-workspace .owner-page-header h1 { font-size: 28px; }
+}
+@media (max-width: 560px) {
+  .owner-workspace .shell-content { padding-bottom: 32px; }
+  .owner-workspace .ui-card { padding: 20px; }
+  .owner-workspace .ui-card-header { flex-wrap: wrap; gap: 12px; }
+  .owner-workspace .gym-banner p, .owner-workspace .owner-page-header p { font-size: 13px; }
+  .owner-workspace .dashboard-metrics { gap: 12px; }
+  .owner-workspace .dashboard-metric { padding: 16px; }
+  .owner-workspace .dashboard-metric > div { flex-direction: column-reverse; gap: 8px; }
+  .owner-workspace .dashboard-metric strong { font-size: 26px; }
+  .owner-workspace .dashboard-metric strong small { display: block; font-size: 11px; margin-bottom: 4px; }
+  .owner-workspace .dashboard-metric > p { min-height: 48px; font-size: 11px; }
+  .owner-workspace .owner-live-toolbar { align-items: flex-start; flex-direction: column; }
+  .owner-workspace .dashboard-chart-card > header, .owner-workspace .dashboard-sessions-card > header { flex-wrap: wrap; padding: 20px; }
+  .owner-workspace .dashboard-bars { gap: 4px; padding: 12px 12px 16px; }
+  .owner-workspace .dashboard-bar-value, .owner-workspace .dashboard-bar-label { font-size: 9px; }
+  .owner-chart-footnote { padding: 12px 20px 20px; }
+  .owner-quick-panel { padding: 20px; }
+  .owner-quick-actions, .owner-workspace .dashboard-trainer-grid { grid-template-columns: minmax(0, 1fr); }
+  .owner-workspace .owner-member-filters, .owner-workspace .trainer-directory-search, .owner-workspace .session-pack-form { grid-template-columns: minmax(0, 1fr); }
+  .owner-workspace .config-two-cols, .owner-workspace .config-readonly-grid { grid-template-columns: minmax(0, 1fr); }
+  .owner-workspace .config-plan-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .owner-workspace .config-plan-row > div { grid-column: 1 / -1; }
+  .owner-workspace .finance-metrics { grid-template-columns: minmax(0, 1fr); }
+  .owner-workspace .finance-payroll-row { grid-template-columns: minmax(0, 1fr); }
+  .owner-workspace .owner-booking-form > .ui-field { grid-column: 1; }
+  .owner-workspace .ui-button { min-height: 44px; }
+  .owner-workspace input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), .owner-workspace select, .owner-workspace textarea { min-height: 44px; font-size: 16px; }
+  .owner-section-heading { align-items: flex-start; flex-direction: column; }
+}
+
+/* Profile information uses the same readable surfaces as the directories. */
+.owner-workspace .member-profile-panel { padding-top: 20px; }
+.owner-workspace .member-profile-panel h3 { margin: 24px 0 12px; font-size: 16px; font-weight: 600; }
+.owner-workspace .member-profile-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 20px 0; }
+.owner-workspace .member-profile-details > div { min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--muted); }
+.owner-workspace .member-profile-details dt { color: var(--muted-foreground); font-size: 12px; }
+.owner-workspace .member-profile-details dd { margin: 8px 0 0; font-size: 14px; overflow-wrap: anywhere; }
+.owner-workspace .member-history-list { display: grid; gap: 12px; }
+.owner-workspace .member-history-list article { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 16px; padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--muted); font-size: 13px; }
+.owner-workspace .member-history-list small { display: block; margin-top: 6px; color: var(--muted-foreground); font-size: 12px; }
+.owner-workspace .session-pack-form > button, .owner-workspace .session-pack-form > .ui-feedback, .owner-workspace .session-pack-form > small { grid-column: 1 / -1; }
+.owner-workspace .session-pack-form button:disabled { opacity: .6; cursor: wait; }
+@media (max-width: 560px) { .owner-workspace .member-profile-details { grid-template-columns: minmax(0, 1fr); } }
+
+/* Keep native checkboxes out of legacy text-input sizing rules. */
+.owner-workspace input[type="checkbox"], .owner-workspace input[type="radio"] { flex: 0 0 18px; width: 18px; min-width: 18px; max-width: 18px; height: 18px; min-height: 18px; margin: 2px 0; padding: 0; }
+.owner-workspace .stack-form > label:has(input[type="checkbox"]) { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; font-weight: 500; line-height: 1.5; }
+.owner-workspace .member-directory-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin: 16px 0 20px; }
+.owner-workspace .member-directory-filters > label { flex: 1 1 140px; min-width: 0; }
+.owner-workspace .owner-member-filters { display: grid; margin-top: 0; }
+@media (max-width: 560px) { .owner-workspace .member-directory-filters { flex-direction: column; align-items: stretch; }.owner-workspace .member-directory-filters > label { flex: none; } }

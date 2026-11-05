@@ -11,7 +11,7 @@ import { Button, LoadingState } from '@/components/ui';
 import { NotificationsBell } from './notifications-bell';
 import { ThemeToggle } from './theme-toggle';
 import { sidebarIsCollapsed, subscribeAppearance, togglePlatformSidebar } from '@/lib/appearance';
-import { Building2, LayoutDashboard, Plus, ShieldCheck, PanelLeftClose, PanelLeftOpen, LogOut, Menu, X, Dumbbell } from 'lucide-react';
+import { Building2, LayoutDashboard, Plus, ShieldCheck, PanelLeftClose, PanelLeftOpen, LogOut, Menu, X, Dumbbell, UsersRound, CalendarDays, Wallet, ChartNoAxesCombined, Settings2, ScrollText, CreditCard, ArrowLeftRight } from 'lucide-react';
 
 // Only implemented destinations belong here. Support uses its explicit read-only
 // context; notification/subscription navigation waits for its owning slices.
@@ -27,12 +27,19 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
   const [switching, setSwitching] = useState(false);
   const collapsed = useSyncExternalStore(subscribeAppearance, sidebarIsCollapsed, () => false);
   const platform = !gym || Boolean(support);
+  const owner = gym?.role === 'OWNER' && !support;
+  const themed = platform || owner;
+  const ownerSections = [
+    { label: 'WORKSPACE', items: [{ label: 'Dashboard', path: '', icon: LayoutDashboard }, { label: 'Members', path: '/members', icon: UsersRound }, { label: 'Trainers', path: '/trainers', icon: Dumbbell }, { label: 'Sessions', path: '/sessions', icon: CalendarDays }] },
+    { label: 'BUSINESS', items: [{ label: 'Financials', path: '/financials', icon: Wallet }, { label: 'Analytics', path: '/analytics', icon: ChartNoAxesCombined }] },
+    { label: 'MANAGEMENT', items: [{ label: 'Gym Configuration', path: '/gym-config', icon: Settings2 }, { label: 'Audit Log', path: '/audit', icon: ScrollText }, { label: 'Subscription', path: '/subscription', icon: CreditCard }] },
+  ];
   const role = support ? 'READ-ONLY SUPPORT' : gym?.role ?? 'SUPER_ADMIN';
   const destination = gym ? gymRoleUrl(gym) : '/admin';
   const label = support ? 'Owner summary' : gym ? role === 'OWNER' ? 'Dashboard' : role === 'TRAINER' ? 'Schedule' : role === 'MEMBER' ? 'Member home' : 'All Gyms' : 'All Gyms';
   const home = gym?.role === 'TRAINER' ? `${destination}/schedule` : destination;
   function close() { drawer.current?.close(); setOpen(false); opener.current?.focus(); }
-  function show() { drawer.current?.showModal(); setOpen(true); }
+  function show() { drawer.current?.showModal(); drawer.current?.querySelector<HTMLButtonElement>('button')?.focus(); setOpen(true); }
   useEffect(() => {
     if (!open) return;
     const previous = document.body.style.overflow;
@@ -50,6 +57,15 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
   }
   function navigation(mobile = false) {
+    if (owner && gym) return <>
+      {mobile ? <button className="platform-drawer-close" type="button" onClick={close} aria-label="Close navigation menu"><X size={20}/></button> : null}
+      <a className="platform-brand owner-brand" href={home} aria-label={`${gym.name} dashboard`}><span className="platform-brand-mark owner-brand-mark" aria-hidden="true">{gym.name.slice(0, 2).toUpperCase()}</span><span className="platform-brand-copy"><strong title={gym.name}>{gym.name}</strong><small>OWNER WORKSPACE</small></span></a>
+      <nav aria-label={mobile ? 'Mobile navigation' : 'Main navigation'}>
+        {ownerSections.map(section => <div className="owner-nav-group" key={section.label}><span className="platform-nav-label">{section.label}</span>{section.items.map(({ label: itemLabel, path, icon: Icon }) => <a key={path} href={`${destination}${path}`} title={itemLabel} aria-label={itemLabel} aria-current={(path ? pathname.startsWith(`${destination}${path}`) : pathname === home || pathname === `/gyms/${gym.slug}`) ? 'page' : undefined} onClick={close}><Icon size={19}/><span>{itemLabel}</span></a>)}</div>)}
+        {gyms.length > 1 ? <a href="/gyms/select" title="Switch gym" aria-label="Switch gym" onClick={() => { close(); setSwitching(true); }}><ArrowLeftRight size={19}/><span>Switch gym</span></a> : null}
+      </nav>
+      <div className="shell-sidebar-footer"><div className="platform-sidebar-identity"><span className="shell-avatar" aria-hidden="true">{displayName.slice(0, 1).toUpperCase()}</span><div><strong>{displayName}</strong><small>Gym owner</small></div></div><form action={signOut} data-session-exit><Button type="submit" variant="secondary" aria-label="Sign out"><LogOut size={16}/><span>Sign out</span></Button></form></div>
+    </>;
     if (platform) return <>
       <a className="platform-brand" href="/admin" aria-label="GymOS platform home"><span className="platform-brand-mark"><Dumbbell size={23}/></span><span className="platform-brand-copy"><strong>GymOS</strong><small>PLATFORM CONSOLE</small></span></a>
       {mobile ? <button className="platform-drawer-close" type="button" onClick={close} aria-label="Close navigation menu"><X size={20}/></button> : null}
@@ -101,7 +117,7 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
         <form action={signOut} data-session-exit><Button type="submit" variant="secondary">Sign out</Button></form></div>
     </>;
   }
-  return <div data-session-identity={identityId} data-support-session={support?.id} data-support-expiry={support?.expiresAt} className={`application-shell ${platform ? 'platform-dashboard' : ''} ${gym ? 'gym-dashboard' : ''} ${gym?.role === 'OWNER' ? 'owner-dashboard' : ''} ${gym?.role === 'TRAINER' ? 'trainer-dashboard' : ''} ${gym?.role === 'MEMBER' ? 'member-dashboard' : ''}`} style={style}>
+  return <div data-session-identity={identityId} data-support-session={support?.id} data-support-expiry={support?.expiresAt} className={`application-shell ${themed ? 'themed-workspace' : ''} ${platform ? 'platform-dashboard' : ''} ${owner ? 'owner-workspace' : ''} ${gym ? 'gym-dashboard' : ''} ${gym?.role === 'OWNER' ? 'owner-dashboard' : ''} ${gym?.role === 'TRAINER' ? 'trainer-dashboard' : ''} ${gym?.role === 'MEMBER' ? 'member-dashboard' : ''}`} style={style}>
     <a className="skip-link" href="#workspace-content">Skip to content</a>
     <aside className="shell-sidebar">{navigation()}</aside>
     <dialog ref={drawer} id="primary-navigation" className="shell-drawer" aria-label="Navigation menu" onKeyDown={trap}
@@ -113,10 +129,10 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
       {/* Support and lapsed-subscription banners require server-authorized
           projections from their owning segments. Never infer them from a URL. */}
       <header className="shell-header">
-        <button ref={opener} className="shell-menu" type="button" aria-label="Open navigation menu" aria-controls="primary-navigation" aria-expanded={open} onClick={show}>{platform ? <Menu size={21}/> : '☰'}</button>
-        {platform ? <button type="button" className="platform-collapse" aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-expanded={!collapsed} title="Toggle sidebar" onClick={togglePlatformSidebar}><PanelLeftClose size={19} className="collapse-icon"/><PanelLeftOpen size={19} className="expand-icon"/></button> : null}
-        <span className="shell-gym-name">{platform ? <><span className="platform-header-label">Platform</span><span className="platform-header-divider">/</span>{support ? gym?.name : 'Overview'}</> : gym?.name}</span>
-        {platform ? <ThemeToggle/> : null}
+        <button ref={opener} className="shell-menu" type="button" aria-label="Open navigation menu" aria-controls="primary-navigation" aria-expanded={open} onClick={show}>{themed ? <Menu size={21}/> : '☰'}</button>
+        {themed ? <button type="button" className="platform-collapse" aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-expanded={!collapsed} title="Toggle sidebar" onClick={togglePlatformSidebar}><PanelLeftClose size={19} className="collapse-icon"/><PanelLeftOpen size={19} className="expand-icon"/></button> : null}
+        <span className="shell-gym-name">{platform ? <><span className="platform-header-label">Platform</span><span className="platform-header-divider">/</span>{support ? gym?.name : 'Overview'}</> : owner ? <><span className="owner-header-gym" title={gym?.name}>{gym?.name}</span><span className="platform-header-divider">/</span><span className="owner-header-page">{ownerSections.flatMap(section => section.items).find(item => item.path && pathname.startsWith(`${destination}${item.path}`))?.label ?? 'Dashboard'}</span></> : gym?.name}</span>
+        {themed ? <ThemeToggle/> : null}
         {gym && !support ? <NotificationsBell key={`${identityId}:${gym.slug}:${gym.role}`} slug={gym.slug} identityId={identityId} role={gym.role} /> : null}
         <div className="shell-profile"><span className="shell-avatar" aria-hidden="true">{displayName.slice(0, 1).toUpperCase()}</span><div><strong>{displayName}</strong><small>{platform ? support ? 'Read-only support' : 'Super administrator' : role.replaceAll('_', ' ')}</small></div></div>
       </header>

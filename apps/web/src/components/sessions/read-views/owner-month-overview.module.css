@@ -13,5 +13,5 @@
 .pager { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding-top:12px; color:var(--classic-text-muted); font-size:12px; }
 .pagerLinks { display:flex; gap:8px; }
 .empty,.error { padding:14px; border:1px dashed var(--classic-border); border-radius:9px; color:var(--classic-text-muted); font-size:13px; }
-.error { border-color:#efc2c2; color:#8d2727; }
+.error { border-color:var(--classic-danger); color:var(--classic-danger); }
 @media(max-width:560px) { .overview { padding:12px; }.pager { align-items:stretch; flex-direction:column; }.pagerLinks .ui-button { flex:1; justify-content:center; } }

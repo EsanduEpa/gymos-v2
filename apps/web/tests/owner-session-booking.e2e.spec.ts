@@ -93,9 +93,9 @@ test.afterAll('stop owner booking servers and clean fixtures', async () => {
 test('owner can choose a same-gym member/trainer and see the committed quote, credit allocation and slot result', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await loginAsOwner(page);
-  await expect(page.getByRole('heading', { name: 'Book a session' })).toBeVisible();
-  await page.getByLabel('Member').selectOption(memberId);
-  await page.getByLabel('Trainer').selectOption(trainerId);
+  await expect(page.getByRole('heading', { name: 'Book Personal Training Session' })).toBeVisible();
+  await page.getByLabel(/^Select member/).selectOption(memberId);
+  await page.getByLabel(/^Select personal trainer/).selectOption(trainerId);
   await page.getByLabel(/Session date/).fill(bookingDate);
   await page.getByLabel('Start time').fill('15:00');
   await page.getByLabel('Session type').selectOption('IN_PERSON');
