@@ -6,9 +6,9 @@ import { memberSessionOverviewSchema, type MemberSessionOverviewQuery } from '@g
 
 type Access = TenantGateContext & { identityId: string; role: string };
 type MonthBounds = { start: Date; end: Date };
-type MonthCounts = { pending: number; scheduled: number; active: number; completed: number; missed: number; cancelled: number; declined: number };
+type MonthCounts = { pending: number; scheduled: number; active: number; completed: number; missed: number; cancelled: number; declined: number; expired: number };
 const stateMap = {
-  PENDING_CONFIRMATION: 'pending', SCHEDULED: 'scheduled', ACTIVE: 'active', COMPLETED: 'completed', MISSED: 'missed', CANCELLED: 'cancelled', DECLINED: 'declined',
+  PENDING_CONFIRMATION: 'pending', SCHEDULED: 'scheduled', ACTIVE: 'active', COMPLETED: 'completed', MISSED: 'missed', CANCELLED: 'cancelled', DECLINED: 'declined', EXPIRED: 'expired',
 } as const;
 
 function monthEnd(month: string) {
@@ -66,15 +66,15 @@ export class MemberSessionOverviewService {
               COALESCE(SUM(COALESCE(l.expired, 0) + CASE WHEN p."endDateExclusive" <= ${nowRows[0]!.today}::date THEN COALESCE(l.available, 0) ELSE 0 END), 0)::int AS "expiredUnused"
             FROM "SessionPack" p LEFT JOIN ledger l ON l."packId" = p."id"
             WHERE p."memberId" IN (${Prisma.join(memberIds)}) GROUP BY p."memberId"`,
-          tx.pTSession.groupBy({ by: ['memberId', 'state'], where: { memberId: { in: memberIds }, scheduledStartAt: { gte: bounds.start, lt: bounds.end } }, _count: { _all: true } }),
-          tx.pTSession.groupBy({ by: ['memberId'], where: { memberId: { in: memberIds }, scheduledStartAt: { gte: bounds.start, lt: bounds.end } }, _count: { _all: true } }),
+          tx.pTSession.groupBy({ by: ['memberId', 'state'], where: { memberId: { in: memberIds }, scheduledStartAt: { gte: bounds.start, lt: bounds.end }, AND: [{ OR: [{ state: { not: 'PENDING_CONFIRMATION' } }, { requestExpiresAt: { gt: now } }] }] }, _count: { _all: true } }),
+          tx.pTSession.groupBy({ by: ['memberId'], where: { memberId: { in: memberIds }, scheduledStartAt: { gte: bounds.start, lt: bounds.end }, AND: [{ OR: [{ state: { not: 'PENDING_CONFIRMATION' } }, { requestExpiresAt: { gt: now } }] }] }, _count: { _all: true } }),
         ]);
         const latestTerms = new Map<string, (typeof terms)[number]>();
         for (const term of terms) if (!latestTerms.has(term.memberId)) latestTerms.set(term.memberId, term);
         const packByMember = new Map(packRows.map(pack => [pack.memberId, pack]));
         const countsByMember = new Map<string, MonthCounts>();
         for (const row of sessionGroups) {
-          const counts = countsByMember.get(row.memberId) ?? { pending: 0, scheduled: 0, active: 0, completed: 0, missed: 0, cancelled: 0, declined: 0 };
+          const counts = countsByMember.get(row.memberId) ?? { pending: 0, scheduled: 0, active: 0, completed: 0, missed: 0, cancelled: 0, declined: 0, expired: 0 };
           counts[stateMap[row.state]] = row._count._all;
           countsByMember.set(row.memberId, counts);
         }
@@ -86,7 +86,7 @@ export class MemberSessionOverviewService {
             member,
             latestMembership: term ? { planName: term.planNameSnapshot, startDate: localDate(term.startDate), endDateExclusive: localDate(term.endDateExclusive) } : null,
             packTotals: { total: pack?.total ?? 0, remaining: pack?.remaining ?? 0, used: pack?.used ?? 0, expiredUnused: pack?.expiredUnused ?? 0, basis: 'LIFETIME' as const },
-            monthSessionCounts: countsByMember.get(member.id) ?? { pending: 0, scheduled: 0, active: 0, completed: 0, missed: 0, cancelled: 0, declined: 0 },
+            monthSessionCounts: countsByMember.get(member.id) ?? { pending: 0, scheduled: 0, active: 0, completed: 0, missed: 0, cancelled: 0, declined: 0, expired: 0 },
             matchingSessionCount: sessionsByMember.get(member.id) ?? 0,
           };
         });

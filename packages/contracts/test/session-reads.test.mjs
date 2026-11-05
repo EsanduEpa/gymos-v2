@@ -16,7 +16,7 @@ test('session read filters accept only one local date range and bounded paging',
 test('session page schema validates the role-safe projection shape and summary totals', () => {
   const item = { id: 'session-1', memberId: 'member-1', memberName: 'Member One', trainerId: 'trainer-1', trainerName: 'Trainer One',
     state: 'SCHEDULED', type: 'IN_PERSON', version: 0, scheduledStartAt: '2026-09-01T00:00:00.000Z', scheduledEndAt: '2026-09-01T00:30:00.000Z',
-    gymTimeZone: 'Asia/Colombo', startedAt: null, endedAt: null, confirmedAt: null, createdAt: '2026-08-31T00:00:00.000Z', fee: '100', currency: 'LKR',
+    gymTimeZone: 'Asia/Colombo', startedAt: null, endedAt: null, confirmedAt: null, requestExpiresAt: null, createdAt: '2026-08-31T00:00:00.000Z', fee: '100', currency: 'LKR',
     notes: null, declineReason: null, trainerPay: null, commandAffordances: [] };
   const page = { items: [item], page: 1, pageSize: 25, totalCount: 1, totalPages: 1, asOf: '2026-09-01T00:00:00.000Z',
     timeZone: 'Asia/Colombo', rangeStart: null, rangeEndExclusive: null, filterTotal: 1,

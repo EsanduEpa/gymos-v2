@@ -39,7 +39,7 @@ function trainerPageSchema<T extends z.ZodType>(item: T) {
 export const trainerListSchema = trainerPageSchema(trainerSummarySchema);
 const trainerRecentSessionSchema = z.strictObject({
   id: idSchema,
-  state: z.enum(['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE', 'COMPLETED', 'MISSED', 'CANCELLED', 'DECLINED']),
+  state: z.enum(['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE', 'COMPLETED', 'MISSED', 'CANCELLED', 'DECLINED', 'EXPIRED']),
   type: z.enum(['IN_PERSON', 'VIRTUAL', 'INTRODUCTORY']),
   scheduledStartAt: z.iso.datetime({ offset: true }),
   scheduledEndAt: z.iso.datetime({ offset: true }),

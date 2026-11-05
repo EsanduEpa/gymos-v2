@@ -29,6 +29,7 @@ export default async function TrainerRequestsPage({ params }: { params: Promise<
         <div className="session-request-list">{result.data.items.map(item => <article className="session-request-card trainer-request-row" key={item.id}>
           <div className="trainer-request-details"><h2>{item.memberName}</h2>
             <time dateTime={item.scheduledStartAt}>{new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: item.timeZone, timeZoneName: 'short' }).format(new Date(item.scheduledStartAt))}</time>
+            <span>Respond by {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: item.timeZone }).format(new Date(item.requestExpiresAt))}</span>
             <span>{item.durationMinutes} min · {item.type.replace('_', ' ').toLowerCase()}</span>
             {item.notes ? <details className="trainer-request-member-note"><summary>Member note</summary><p>{item.notes}</p></details> : <span className="trainer-request-no-note">No member note</span>}
             <span className="ui-badge ui-badge-info">Pending</span>

@@ -80,7 +80,7 @@ async function scheduled(ctx: Awaited<ReturnType<typeof context>>, tag: string, 
 
 async function pending(ctx: Awaited<ReturnType<typeof context>>, tag: string) {
   return ctx.tenant.pTSession.create({ data: { memberId: ctx.member.id, trainerId: ctx.trainer.id, state: 'PENDING_CONFIRMATION', type: 'IN_PERSON',
-    scheduledStartAt: new Date(Date.now() + 60 * 60_000), scheduledEndAt: new Date(Date.now() + 120 * 60_000), gymTimezone: ctx.config.timezone ?? 'Asia/Colombo',
+    scheduledStartAt: new Date(Date.now() + 60 * 60_000), scheduledEndAt: new Date(Date.now() + 120 * 60_000), requestExpiresAt: new Date(Date.now() + 12 * 60 * 60_000), gymTimezone: ctx.config.timezone ?? 'Asia/Colombo',
     fee: '100.0000', currency: ctx.config.currency ?? 'LKR', configurationVersion: ctx.configVersion.configurationVersion,
     createdByIdentityId: ctx.memberAccess.identityId, notes: tag } });
 }

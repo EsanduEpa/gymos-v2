@@ -7,7 +7,7 @@ import styles from '@/components/sessions/member-session-calendar.module.css';
 type Session = SessionReadPage['items'][number];
 const status: Record<SessionReadState, string> = {
   PENDING_CONFIRMATION: 'Needs response', SCHEDULED: 'Confirmed', ACTIVE: 'In progress', COMPLETED: 'Completed',
-  MISSED: 'No show', CANCELLED: 'Cancelled', DECLINED: 'Declined',
+  MISSED: 'No show', CANCELLED: 'Cancelled', DECLINED: 'Declined', EXPIRED: 'Expired',
 };
 const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 function localDate(value: string, zone: string) {

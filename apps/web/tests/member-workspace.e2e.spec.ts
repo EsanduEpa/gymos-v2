@@ -172,7 +172,7 @@ async function seedCoachingCredits() {
     const tomorrow = new Date(`${today}T00:00:00Z`); tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
     const date = tomorrow.toISOString().slice(0,10);
     const time = new Date(`${date}T${i ? '19' : '17'}:00:00+05:30`);
-    await tenant.pTSession.create({ data: { memberId, trainerId, state: 'PENDING_CONFIRMATION', type: 'IN_PERSON', fee: '50', currency: 'LKR', configurationVersion: 0, scheduledStartAt: time, scheduledEndAt: new Date(time.getTime() + 30 * 60000), gymTimezone: 'Asia/Colombo', createdByIdentityId: fixture.users.memberUser.id, notes: `Trainer UI request ${i}` } });
+    await tenant.pTSession.create({ data: { memberId, trainerId, state: 'PENDING_CONFIRMATION', type: 'IN_PERSON', fee: '50', currency: 'LKR', configurationVersion: 0, scheduledStartAt: time, scheduledEndAt: new Date(time.getTime() + 30 * 60000), requestExpiresAt: new Date(Date.now() + 12 * 3600000), gymTimezone: 'Asia/Colombo', createdByIdentityId: fixture.users.memberUser.id, notes: `Trainer UI request ${i}` } });
   }
 }
 

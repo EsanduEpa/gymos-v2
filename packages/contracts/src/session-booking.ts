@@ -8,7 +8,7 @@ const currency = z.enum(['LKR', 'USD']);
 const level = z.enum(['LEVEL_1', 'LEVEL_2']);
 const sessionType = z.enum(['IN_PERSON', 'VIRTUAL', 'INTRODUCTORY']);
 const newSessionType = z.literal('IN_PERSON');
-const sessionState = z.enum(['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE', 'COMPLETED', 'MISSED', 'CANCELLED', 'DECLINED']);
+const sessionState = z.enum(['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE', 'COMPLETED', 'MISSED', 'CANCELLED', 'DECLINED', 'EXPIRED']);
 const pageSchema = <T extends z.ZodType>(item: T) => z.strictObject({
   items: z.array(item).max(100), page: z.number().int().min(1), pageSize: z.number().int().min(1).max(100),
   totalCount: z.number().int().nonnegative(), totalPages: z.number().int().nonnegative(), asOf: z.iso.datetime({ offset: true }),

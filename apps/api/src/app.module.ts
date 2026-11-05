@@ -54,6 +54,7 @@ import { AnalyticsController } from './analytics/analytics.controller.js';
 import { AnalyticsService } from './analytics/analytics.service.js';
 import { SessionAvailabilityController } from './sessions/availability.controller.js';
 import { SessionAvailabilityService } from './sessions/availability.service.js';
+import { SessionExpiryRunner } from './sessions/session-expiry-runner.js';
 
 @Module({
   imports: [
@@ -90,6 +91,7 @@ import { SessionAvailabilityService } from './sessions/availability.service.js';
     DashboardService,
     AnalyticsService,
     SessionAvailabilityService,
+    SessionExpiryRunner,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: SupportScopeGuard },
   ],

@@ -19,8 +19,14 @@ Requirement IDs: R01–R03, R05, R11, R13. New owner booking/member request cont
 
 Next exact action: complete PT-02 controlled disposable integration and browser visual verification, then mark Verified only when those pass.
 
-### PT-03 — Not started
-Next exact action after PT-02: add two-pending limit, absolute expiry and explicit terminal outcome; establish bounded server-side tenant runner before exposing expiry-dependent flows.
+### PT-03 — Implemented, not Verified
+Requirement IDs: R06–R07, R11, R13. Added an explicit `EXPIRED` state, tenant-local absolute `requestExpiresAt` and `availabilityVersion`, a backfill for existing pending rows, and the expiry constraint/index in additive migration `20261106020000_pt_request_expiry`. The new tenant manifest is `tenant-2026-11-06.2`; `tenant-2026-11-06.1` remains available as the preceding template. New requests persist the earlier of creation +12 hours or session start −1 hour; at most two live pending requests per member are allowed. Expiry is checked during trainer decision and member withdrawal under the existing member → trainer → session serialization, so a late command cannot accept, decline, or withdraw a due request as if it were live. Expired pending rows no longer block availability, conflict checks, owner booking, lifecycle sweeps, dashboards, or active-request lists. Expiry writes a state event, audit and in-app notifications; it reserves no credit. Owner booking now shares the member → trainer lock order and rejects conflicting pending requests.
+
+Established the PT-03 expiry worker before reminder work: it is bounded, scans active gyms on the installed current tenant manifest, verifies tenant installation evidence, serializes per-gym sweeps, processes a bounded ordered batch, and uses stable local receipts/audit for idempotency and recovery. It is disabled in tests and can be disabled with `PT_EXPIRY_RUNNER_ENABLED=false`.
+
+Fast checks run: contracts build and tests (55 passed); focused API unit tests (18 passed); tenant manifest verifier (1 passed); API and web TypeScript checks; Prisma tenant schema validation; all passed. `git diff --check` is being rerun after documentation edits. Not run: disposable PostgreSQL migration/request/runner/permission/concurrency integration and mobile/desktop browser review in light/dark themes. These are deferred under the user’s quick-check instruction; PT-03 is not Verified based on compilation/unit tests alone.
+
+Next exact action: run `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/api exec vitest run --config vitest.config.sessions.ts test/session-requests/session-requests.integration.test.ts test/sessions/session-lifecycle-cancel.integration.test.ts --disableConsoleIntercept` in an environment that permits the owned Docker socket; then add/run an owned runner integration covering expiry, retry/idempotency, tenant isolation and failure recovery, and do the deferred UI review. Continue with PT-04 only after the user’s requested milestone sequence proceeds; keep PT-03 marked not Verified until that evidence exists.
 
 ### PT-04 — Not started
 Next exact action: shared role-authorized booking detail and delivery projection after PT-03.

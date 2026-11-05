@@ -75,13 +75,15 @@ export class SessionAvailabilityService {
         const priorClosureDates = new Set(priorClosures.flatMap(row => row.localDate ? [row.localDate.toISOString().slice(0, 10)] : []));
         const newClosureDates = input.closures.filter(date => !priorClosureDates.has(date));
         if (newClosureDates.length) {
-          const closureSessions = await tx.pTSession.findMany({ where: { state: { in: ['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE'] }, scheduledStartAt: { gte: startBound, lte: new Date(startBound.getTime() + 14 * 86400000) } }, take: 501,
+          const closureSessions = await tx.pTSession.findMany({ where: { state: { in: ['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE'] },
+            AND: [{ OR: [{ state: { not: 'PENDING_CONFIRMATION' } }, { requestExpiresAt: { gt: startBound } }] }], scheduledStartAt: { gte: startBound, lte: new Date(startBound.getTime() + 14 * 86400000) } }, take: 501,
             select: { id: true, scheduledStartAt: true } });
           if (closureSessions.length > 500) throw new ConflictException('Too many live sessions to review closure impact; narrow the closure edit and try again');
           const hit = closureSessions.filter(session => { const p = localParts(session.scheduledStartAt, gymConfig.timezone!); return newClosureDates.includes(`${p.year}-${p.month}-${p.day}`); });
           if (hit.length) throw new ConflictException({ message: 'Gym closures require resolving existing live sessions first', affectedSessionIds: hit.map(session => session.id) });
         }
-        const affected = await tx.pTSession.findMany({ where: { trainerId, state: { in: ['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE'] }, scheduledEndAt: { gt: startBound } }, select: { id: true, scheduledStartAt: true, scheduledEndAt: true } });
+        const affected = await tx.pTSession.findMany({ where: { trainerId, state: { in: ['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE'] },
+          AND: [{ OR: [{ state: { not: 'PENDING_CONFIRMATION' } }, { requestExpiresAt: { gt: startBound } }] }], scheduledEndAt: { gt: startBound } }, select: { id: true, scheduledStartAt: true, scheduledEndAt: true } });
         const rules: Array<{ kind: 'WEEKLY_WINDOW' | 'DATED_WINDOW' | 'BLOCK' | 'GYM_CLOSURE'; weekday: number | null; localDate: string | null; startMinute: number | null; endMinute: number | null; effectiveFrom: string | null; effectiveToExclusive: string | null; reason?: string | null }> = [
           ...input.weekly.flatMap(day => day.windows.map(window => ({ kind: 'WEEKLY_WINDOW' as const, weekday: day.weekday, localDate: null, startMinute: window.startMinute, endMinute: window.endMinute, effectiveFrom: day.effectiveFrom, effectiveToExclusive: day.effectiveToExclusive }))),
           ...input.dated.flatMap(day => day.windows.map(window => ({ kind: 'DATED_WINDOW' as const, weekday: null, localDate: day.localDate, startMinute: window.startMinute, endMinute: window.endMinute, effectiveFrom: null, effectiveToExclusive: null }))),
@@ -135,7 +137,8 @@ export class SessionAvailabilityService {
         const dayOffsetMinutes = dayZeroOffset ? (dayZeroOffset[0] === '-' ? -1 : 1) * (Number(dayZeroOffset.slice(1, 3)) * 60 + Number(dayZeroOffset.slice(4, 6))) : 0;
         const localDayStart = new Date(dayStartMinute - dayOffsetMinutes * 60000 - 86400000);
         const localDayEnd = new Date(dayStartMinute - dayOffsetMinutes * 60000 + 2 * 86400000);
-        const occupied = await tenant.pTSession.findMany({ where: { state: { in: ['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE'] }, trainerId: input.trainerId, scheduledStartAt: { lt: localDayEnd }, scheduledEndAt: { gt: localDayStart } }, select: { scheduledStartAt: true, scheduledEndAt: true } });
+        const occupied = await tenant.pTSession.findMany({ where: { state: { in: ['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE'] },
+          AND: [{ OR: [{ state: { not: 'PENDING_CONFIRMATION' } }, { requestExpiresAt: { gt: now } }] }], trainerId: input.trainerId, scheduledStartAt: { lt: localDayEnd }, scheduledEndAt: { gt: localDayStart } }, select: { scheduledStartAt: true, scheduledEndAt: true } });
         const slots = candidates.filter(slot => !occupied.some(row => row.scheduledStartAt < slot.end && row.scheduledEndAt > slot.start));
         let memberId: string | undefined;
         if (access.role === 'MEMBER') memberId = access.actor!.id;
@@ -144,7 +147,8 @@ export class SessionAvailabilityService {
           if (!member?.identityId || !await this.db.master.gymAccess.findFirst({ where: { gymId: access.gymId, role: 'MEMBER', actorKind: 'MEMBER', tenantActorId: member.id, userId: member.identityId, linkStatus: 'ACTIVE' }, select: { userId: true } })) throw new NotFoundException('Member not found');
           memberId = member.id;
         }
-        const memberOccupied = memberId ? await tenant.pTSession.findMany({ where: { memberId, state: { in: ['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE'] }, scheduledStartAt: { lt: localDayEnd }, scheduledEndAt: { gt: localDayStart } }, select: { scheduledStartAt: true, scheduledEndAt: true } }) : [];
+        const memberOccupied = memberId ? await tenant.pTSession.findMany({ where: { memberId, state: { in: ['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE'] },
+          AND: [{ OR: [{ state: { not: 'PENDING_CONFIRMATION' } }, { requestExpiresAt: { gt: now } }] }], scheduledStartAt: { lt: localDayEnd }, scheduledEndAt: { gt: localDayStart } }, select: { scheduledStartAt: true, scheduledEndAt: true } }) : [];
         const freeForMember = slots.filter(slot => !memberOccupied.some(row => row.scheduledStartAt < slot.end && row.scheduledEndAt > slot.start));
         return availabilitySlotsSchema.parse({ trainerId: input.trainerId, localDate: input.localDate, timeZone: config.timezone, asOf: now.toISOString(), availabilityVersion: binding.trainer.version, durationMinutes: 60,
           slots: freeForMember.map(slot => ({ startAt: slot.start.toISOString(), endAt: slot.end.toISOString(), localTime: slot.localTime, offset: slot.offset })), reason: freeForMember.length ? null : rules.some(r => r.kind === 'GYM_CLOSURE') ? 'CLOSED' : allowed.length ? 'NO_ELIGIBLE_SLOT' : 'NO_AVAILABILITY' });

@@ -5,13 +5,15 @@ export type SessionState =
   | 'COMPLETED'
   | 'MISSED'
   | 'CANCELLED'
-  | 'DECLINED';
+  | 'DECLINED'
+  | 'EXPIRED';
 
 export type SessionCommand =
   | 'OWNER_BOOK'
   | 'MEMBER_REQUEST'
   | 'TRAINER_ACCEPT'
   | 'TRAINER_DECLINE'
+  | 'SYSTEM_EXPIRE_REQUEST'
   | 'MEMBER_WITHDRAW'
   | 'START'
   | 'COMPLETE'
@@ -22,11 +24,21 @@ export type SessionCommand =
 
 export type SessionActorRole = 'OWNER' | 'TRAINER' | 'MEMBER' | 'SYSTEM';
 
+export function requestExpiryInstant(createdAt: Date, scheduledStartAt: Date): Date {
+  if (!Number.isFinite(createdAt.getTime()) || !Number.isFinite(scheduledStartAt.getTime()) || scheduledStartAt <= createdAt) throw new RangeError('Invalid request expiry inputs');
+  return new Date(Math.min(createdAt.getTime() + 12 * 60 * 60_000, scheduledStartAt.getTime() - 60 * 60_000));
+}
+
+export function requestCanBeAccepted(now: Date, expiresAt: Date): boolean {
+  return Number.isFinite(now.getTime()) && Number.isFinite(expiresAt.getTime()) && now < expiresAt;
+}
+
 const TRANSITIONS: Readonly<Record<SessionCommand, Readonly<{ from: readonly (SessionState | null)[]; roles: readonly SessionActorRole[]; to: SessionState | null }>>> = {
   OWNER_BOOK: { from: [null], roles: ['OWNER'], to: 'SCHEDULED' },
   MEMBER_REQUEST: { from: [null], roles: ['MEMBER'], to: 'PENDING_CONFIRMATION' },
   TRAINER_ACCEPT: { from: ['PENDING_CONFIRMATION'], roles: ['TRAINER'], to: 'SCHEDULED' },
   TRAINER_DECLINE: { from: ['PENDING_CONFIRMATION'], roles: ['TRAINER'], to: 'DECLINED' },
+  SYSTEM_EXPIRE_REQUEST: { from: ['PENDING_CONFIRMATION'], roles: ['SYSTEM'], to: 'EXPIRED' },
   MEMBER_WITHDRAW: { from: ['PENDING_CONFIRMATION'], roles: ['MEMBER'], to: 'CANCELLED' },
   START: { from: ['SCHEDULED'], roles: ['TRAINER', 'OWNER'], to: 'ACTIVE' },
   COMPLETE: { from: ['ACTIVE'], roles: ['TRAINER', 'OWNER'], to: 'COMPLETED' },

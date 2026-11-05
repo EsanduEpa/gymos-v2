@@ -82,6 +82,8 @@ it('creates a pending request without a hold, audits/notifies once and accepts i
   const requestReceipt = await tenant.commandReceipt.findUniqueOrThrow({ where: { id: pending.receiptId } });
   expect(requestReceipt.safeResult).toMatchObject({ resourceIds: [pending.session.id, pending.notificationOutcome.eventId], notificationState: 'AVAILABLE', retryable: false });
   expect(await tenant.sessionCreditHold.count({ where: { sessionId: pending.session.id } })).toBe(0);
+  const persistedRequest = await tenant.pTSession.findUniqueOrThrow({ where: { id: pending.session.id } });
+  expect(persistedRequest.requestExpiresAt?.getTime()).toBe(Math.min(persistedRequest.createdAt.getTime() + 12 * 60 * 60_000, persistedRequest.scheduledStartAt.getTime() - 60 * 60_000));
   expect(await tenant.packCreditMovement.count({ where: { packId: mainPack.id } })).toBe(1);
   expect(await tenant.sessionSettlement.count({ where: { sessionId: pending.session.id } })).toBe(0);
   expect(await tenant.revenueRecord.count({ where: { sessionId: pending.session.id } })).toBe(0);
@@ -126,7 +128,7 @@ it('declines without reserving credit; stale decisions and foreign trainer reque
   expect(await tenant.pTSession.findUniqueOrThrow({ where: { id: pending.session.id } })).toMatchObject({ declineReason: 'Unavailable\nthis week' });
 });
 
-it('rejects legacy request terms outside fixed PT policy and requests that have expired before acceptance', async () => {
+it('rejects legacy request terms and expires a request exactly at its deadline without reserving credit', async () => {
   const { service, tenant, trainer, memberAccess, trainerAccess } = await setup();
   await entitlement(tenant, `${run.runId}-policy`, 2);
   const request = await service.request(memberAccess, requestBody(`${run.runId}-policy`, trainer.id, '11:00'));
@@ -134,11 +136,25 @@ it('rejects legacy request terms outside fixed PT policy and requests that have 
     await expect(service.decide(trainerAccess, request.session.id, { action: 'ACCEPT', expectedVersion: 0, idempotencyKey: `short-${run.runId}-0123456789` })).rejects.toMatchObject({ status: 422 });
     expect(await tenant.pTSession.findUniqueOrThrow({ where: { id: request.session.id } })).toMatchObject({ state: 'PENDING_CONFIRMATION', version: 0 });
     expect(await tenant.sessionCreditHold.count({ where: { sessionId: request.session.id } })).toBe(0);
-    await tenant.pTSession.update({ where: { id: request.session.id }, data: { scheduledStartAt: new Date('2020-01-01T10:00:00Z'), scheduledEndAt: new Date('2020-01-01T11:00:00Z') } });
+    await tenant.pTSession.update({ where: { id: request.session.id }, data: { scheduledStartAt: new Date('2020-01-01T10:00:00Z'), scheduledEndAt: new Date('2020-01-01T11:00:00Z'), requestExpiresAt: new Date(Date.now() - 1) } });
     await expect(service.decide(trainerAccess, request.session.id, { action: 'ACCEPT', expectedVersion: 0, idempotencyKey: `expired-${run.runId}-0123456789` })).rejects.toMatchObject({ status: 409 });
-    expect(await tenant.pTSession.findUniqueOrThrow({ where: { id: request.session.id } })).toMatchObject({ state: 'PENDING_CONFIRMATION', version: 0 });
+    expect(await tenant.pTSession.findUniqueOrThrow({ where: { id: request.session.id } })).toMatchObject({ state: 'EXPIRED', version: 1 });
     expect(await tenant.sessionCreditHold.count({ where: { sessionId: request.session.id } })).toBe(0);
 
+});
+
+it('serializes a two-live-pending limit and ignores requests whose deadline has passed', async () => {
+  const { service, tenant, trainer, member, memberAccess } = await setup();
+  await tenant.pTSession.updateMany({ where: { memberId: member.id, state: 'PENDING_CONFIRMATION' }, data: { requestExpiresAt: new Date(Date.now() - 1) } });
+  await entitlement(tenant, `${run.runId}-pending-limit`, 3);
+  const first = await service.request(memberAccess, { ...requestBody(`${run.runId}-limit-a`, trainer.id, '10:00'), localDate: datePlus(4) });
+  const second = await service.request(memberAccess, { ...requestBody(`${run.runId}-limit-b`, trainer.id, '12:00'), localDate: datePlus(4) });
+  expect(await tenant.sessionCreditHold.count({ where: { sessionId: { in: [first.session.id, second.session.id] } } })).toBe(0);
+  await expect(service.request(memberAccess, { ...requestBody(`${run.runId}-limit-c`, trainer.id, '14:00'), localDate: datePlus(4) })).rejects.toMatchObject({ status: 409 });
+  await tenant.pTSession.update({ where: { id: first.session.id }, data: { requestExpiresAt: new Date(Date.now() - 1) } });
+  const third = await service.request(memberAccess, { ...requestBody(`${run.runId}-limit-d`, trainer.id, '14:00'), localDate: datePlus(4) });
+  expect(third.session.state).toBe('PENDING_CONFIRMATION');
+  expect(await tenant.pTSession.count({ where: { memberId: member.id, state: 'PENDING_CONFIRMATION', requestExpiresAt: { gt: new Date() } } })).toBe(2);
 });
 
 it('rolls back the entire pending request when the required trainer notification insert fails', async () => {

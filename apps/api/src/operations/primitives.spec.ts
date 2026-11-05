@@ -40,6 +40,8 @@ it('validates printable16–128 idempotency keys and safe allowlisted replay res
   for (const key of ['short', 'contains whitespace1', 'a'.repeat(129)]) expect(() => idempotencyKey(key)).toThrow();
   expect(safeResult({ operationId: 'op', resourceIds: ['member-1'], refreshScopes: ['people/member-1'], retryable: false })).toEqual({ operationId: 'op', resourceIds: ['member-1'], refreshScopes: ['people/member-1'], retryable: false });
   expect(safeResult({ notesSnapshot: 'shared note', version: 2 })).toEqual({ notesSnapshot: 'shared note', version: 2 });
+  expect(safeResult({ requestOutcome: 'EXPIRED', resourceIds: ['session-1'] })).toEqual({ requestOutcome: 'EXPIRED', resourceIds: ['session-1'] });
+  expect(() => safeResult({ requestOutcome: 'DECLINED' })).toThrow();
   for (const notesSnapshot of [42, 'n'.repeat(4001)]) expect(() => safeResult({ notesSnapshot })).toThrow();
   for (const value of [{ password: 'private' }, { databaseName: 'private' }, { unexpected: {} }, { version: -1 }, { state: 'RUNNING' }]) expect(() => safeResult(value)).toThrow();
 });

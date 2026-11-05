@@ -195,7 +195,7 @@ export class SessionLifecycleService {
     let requiresAcknowledgment = false;
     if (action === 'CANCEL') {
       if (session.state === 'PENDING_CONFIRMATION' && actorRole === 'MEMBER') {
-        consequence = 'PENDING_WITHDRAWAL'; eligible = true;
+        consequence = 'PENDING_WITHDRAWAL'; eligible = Boolean(session.requestExpiresAt && session.requestExpiresAt > now);
       } else if (session.state === 'SCHEDULED') {
         consequence = cancellationConsequence(now.getTime(), session.scheduledStartAt.getTime(), policy.cancellationWindowMinutes, policy.lateCancelDeduction);
         eligible = hold?.state === 'HELD'; requiresAcknowledgment = consequence === 'LATE_CANCELLATION';
@@ -253,6 +253,17 @@ export class SessionLifecycleService {
             const { policy, policyVersion } = await this.currentPolicy(tx as unknown as PrismaClient, session);
             const [clock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS "now"`;
             const now = clock!.now;
+            if (session.state === 'PENDING_CONFIRMATION' && role === 'MEMBER' && session.requestExpiresAt && session.requestExpiresAt <= now) {
+              const expired = await tx.pTSession.update({ where: { id: sessionId, version: session.version, state: 'PENDING_CONFIRMATION' }, data: { state: 'EXPIRED', version: { increment: 1 } } });
+              const eventCode = 'PT_SESSION_EXPIRED';
+              const eventKey = tenantAuditKey({ masterGymId: access.gymId, receiptId: receipt.id, eventCode, resourceType: 'PT_SESSION', resourceId: sessionId, eventOrdinal: expired.version });
+              await tx.sessionStateEvent.create({ data: { sessionId, fromState: 'PENDING_CONFIRMATION', toState: 'EXPIRED', committedVersion: expired.version,
+                actorIdentityId: access.identityId, receiptId: receipt.id, eventKey, createdAt: now } });
+              await appendTenantNotification(tx, { masterGymId: access.gymId, receiptId: receipt.id, eventCode: 'SESSION_EXPIRED', resourceId: sessionId, recipientIdentityId: session.member.identityId! });
+              await appendTenantNotification(tx, { masterGymId: access.gymId, receiptId: receipt.id, eventCode: 'SESSION_EXPIRED', resourceId: sessionId, recipientIdentityId: session.trainer.identityId!, linkKind: 'TRAINER_REQUESTS' });
+              return { result: { resourceIds: [sessionId], version: expired.version, requestOutcome: 'EXPIRED' }, resourceType: 'PT_SESSION', resourceId: sessionId,
+                audits: [{ actorIdentityId: access.identityId, eventCode, resourceType: 'PT_SESSION', resourceId: sessionId, transition: { from: 'PENDING_CONFIRMATION', to: 'EXPIRED', version: expired.version } }] };
+            }
             const freshQuote = this.buildQuote(access, session, policy, session.creditHold, now, 'CANCEL');
             if (session.version !== parsed.data.expectedVersion || policyVersion !== parsed.data.policyVersion) {
               throw new ConflictException({ code: 'STALE_QUOTE', message: 'Session or cancellation policy changed; review the refreshed quote', quote: freshQuote });
@@ -303,6 +314,7 @@ export class SessionLifecycleService {
               audits: [{ actorIdentityId: access.identityId, eventCode, resourceType: 'PT_SESSION', resourceId: sessionId,
                 transition: { from: session.state, to: 'CANCELLED', version: ended.version } }] };
           }));
+          if (command.result.requestOutcome === 'EXPIRED') throw new ConflictException('This request expired before withdrawal; no credit was used.');
           return this.cancelResult(tenant, access, command.receiptId, command.result.resourceIds ?? [], command.result.version ?? 0,
             command.result.notificationState ?? 'FAILED', command.replayed);
         } catch (error) { return conflict(error); }

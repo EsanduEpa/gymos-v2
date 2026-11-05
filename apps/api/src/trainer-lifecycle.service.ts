@@ -232,7 +232,8 @@ export class TrainerLifecycleService {
     for (;;) {
       const [clock] = await tenant.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS "now"`;
       const now = clock!.now;
-      const sessions = await tenant.pTSession.findMany({ where: { trainerId, state: { in: ['PENDING_CONFIRMATION', 'SCHEDULED'] }, scheduledStartAt: { gt: now } },
+      const sessions = await tenant.pTSession.findMany({ where: { trainerId, state: { in: ['PENDING_CONFIRMATION', 'SCHEDULED'] },
+        AND: [{ OR: [{ state: { not: 'PENDING_CONFIRMATION' } }, { requestExpiresAt: { gt: now } }] }], scheduledStartAt: { gt: now } },
         orderBy: [{ scheduledStartAt: 'asc' }, { id: 'asc' }], take: 50, select: { id: true, version: true } });
       if (!sessions.length) return;
       for (const candidate of sessions) {
@@ -243,10 +244,11 @@ export class TrainerLifecycleService {
             commandKind: 'TRAINER_LIFECYCLE_RELEASE', idempotencyKey: commandKey,
             normalizedIntent: { operationId, sessionId: candidate.id, targetStatus: 'DEACTIVATED' } }, async (tx, receipt) => {
             await tx.$queryRaw`SELECT "id" FROM "PTSession" WHERE "id" = ${candidate.id} FOR UPDATE`;
-            const current = await tx.pTSession.findUnique({ where: { id: candidate.id }, select: { id: true, state: true, version: true, scheduledStartAt: true,
+            const current = await tx.pTSession.findUnique({ where: { id: candidate.id }, select: { id: true, state: true, version: true, scheduledStartAt: true, requestExpiresAt: true,
               member: { select: { identityId: true } } } });
             const [databaseClock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS "now"`;
-            if (!current || !['PENDING_CONFIRMATION', 'SCHEDULED'].includes(current.state) || current.scheduledStartAt <= databaseClock!.now) {
+            if (!current || !['PENDING_CONFIRMATION', 'SCHEDULED'].includes(current.state) || current.scheduledStartAt <= databaseClock!.now
+              || current.state === 'PENDING_CONFIRMATION' && (!current.requestExpiresAt || current.requestExpiresAt <= databaseClock!.now)) {
               return { result: { operationId, state: 'COMPLETE', step: 'TRAINER_ACCESS_FINALIZED', version: current?.version ?? candidate.version,
                 resourceIds: [candidate.id] }, resourceType: 'PT_SESSION', resourceId: candidate.id,
                 audits: [{ actorIdentityId: access.identityId, eventCode: 'TRAINER_SESSION_RELEASE_SKIPPED', resourceType: 'PT_SESSION', resourceId: candidate.id,

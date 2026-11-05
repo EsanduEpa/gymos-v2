@@ -6,7 +6,7 @@ import styles from './member-session-calendar.module.css';
 
 const status: Record<SessionReadState, string> = {
   PENDING_CONFIRMATION: 'Pending', SCHEDULED: 'Confirmed', ACTIVE: 'In progress', COMPLETED: 'Completed',
-  MISSED: 'No show', CANCELLED: 'Cancelled', DECLINED: 'Declined',
+  MISSED: 'No show', CANCELLED: 'Cancelled', DECLINED: 'Declined', EXPIRED: 'Expired',
 };
 const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 type SessionReadItem = SessionReadPage['items'][number];

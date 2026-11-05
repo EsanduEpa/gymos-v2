@@ -59,7 +59,7 @@ async function addSession(input: { memberId: string; trainerId: string; state: '
   const start = input.startAt ?? (input.endedAt ? new Date(input.endedAt.getTime() - 60 * 60_000) : new Date(now.getTime() + 24 * 60 * 60_000));
   const confirmed = input.state !== 'PENDING_CONFIRMATION';
   return fixture.tenants[0]!.pTSession.create({ data: { id: `coach-session-${randomUUID()}`, memberId: input.memberId, trainerId: input.trainerId,
-    state: input.state, type: 'IN_PERSON', scheduledStartAt: start, scheduledEndAt: new Date(start.getTime() + 60 * 60_000), gymTimezone: 'Asia/Colombo',
+    state: input.state, type: 'IN_PERSON', scheduledStartAt: start, scheduledEndAt: new Date(start.getTime() + 60 * 60_000), requestExpiresAt: confirmed ? null : new Date(Date.now() + 12 * 60 * 60_000), gymTimezone: 'Asia/Colombo',
     fee: '100.0000', currency: 'LKR', confirmationRate: confirmed ? '0.4' : null, confirmationLevel: confirmed ? 'LEVEL_1' : null, configurationVersion: 0,
     confirmedAt: confirmed ? new Date() : null,
     startedAt: input.state === 'ACTIVE' || input.state === 'COMPLETED' ? start : null,

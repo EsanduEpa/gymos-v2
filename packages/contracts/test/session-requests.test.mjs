@@ -28,7 +28,7 @@ test('request options exclude private trainer fields', () => {
 
 test('request replay outcome binds a stable event id to a selected gym recipient', () => {
   const result = { receiptId: 'receipt', replayed: true, session: { id: 'session', memberId: 'member', trainerId: 'trainer', state: 'PENDING_CONFIRMATION', type: 'IN_PERSON',
-    scheduledStartAt: '2026-12-01T04:00:00Z', scheduledEndAt: '2026-12-01T05:00:00Z', timeZone: 'Asia/Colombo', durationMinutes: 60, notes: null, version: 0 },
+    scheduledStartAt: '2026-12-01T04:00:00Z', scheduledEndAt: '2026-12-01T05:00:00Z', timeZone: 'Asia/Colombo', requestExpiresAt: '2026-11-06T12:00:00Z', durationMinutes: 60, notes: null, version: 0 },
     notificationOutcome: { eventId: 'notification', recipient: { role: 'TRAINER', actorId: 'trainer' }, gymSlug: 'sample-gym', state: 'AVAILABLE', retryable: false } };
   assert.equal(sessionRequestResultSchema.parse(result).notificationOutcome.eventId, 'notification');
   assert.equal(sessionRequestResultSchema.safeParse({ ...result, notificationOutcome: { ...result.notificationOutcome, href: '/unsafe' } }).success, false);

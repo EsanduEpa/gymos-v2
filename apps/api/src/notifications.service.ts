@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { Prisma as TenantPrisma } from './generated/tenant/client.js';
 import { canonicalJson, OperationIntegrityError, reference } from './operations/primitives.js';
 
-type NotificationEvent = 'HIRE_REQUEST' | 'SESSION_BOOKED' | 'SESSION_DECLINED' | 'SESSION_CANCELLED' | 'SESSION_MISSED' | 'SESSION_STARTED' | 'SESSION_COMPLETED';
+type NotificationEvent = 'HIRE_REQUEST' | 'SESSION_BOOKED' | 'SESSION_DECLINED' | 'SESSION_CANCELLED' | 'SESSION_MISSED' | 'SESSION_STARTED' | 'SESSION_COMPLETED' | 'SESSION_EXPIRED';
 type NotificationLink = 'TRAINER_REQUESTS' | 'MEMBER_SESSIONS' | 'TRAINER_SCHEDULE';
 const CONTENT: Readonly<Record<NotificationEvent, { title: string; message: string; linkKind: NotificationLink }>> = {
   HIRE_REQUEST: { title: 'New session request', message: 'A member requested a personal training session.', linkKind: 'TRAINER_REQUESTS' },
@@ -12,6 +12,7 @@ const CONTENT: Readonly<Record<NotificationEvent, { title: string; message: stri
   SESSION_MISSED: { title: 'Session marked missed', message: 'Your personal training session was marked as missed.', linkKind: 'MEMBER_SESSIONS' },
   SESSION_STARTED: { title: 'Session started', message: 'Your personal training session has started.', linkKind: 'MEMBER_SESSIONS' },
   SESSION_COMPLETED: { title: 'Session completed', message: 'Your personal training session is complete.', linkKind: 'MEMBER_SESSIONS' },
+  SESSION_EXPIRED: { title: 'Session request expired', message: 'A personal training session request expired before confirmation.', linkKind: 'MEMBER_SESSIONS' },
 };
 
 export type AppendNotificationInput = {

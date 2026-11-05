@@ -46,3 +46,22 @@ Checks and actual results:
 PT-02 remains not Verified. Remaining evidence: successful disposable migration/API/permissions/concurrency integration; UI browser checks with synthetic disposable accounts; screenshots at mobile and desktop widths in both current appearances. No shared or production database was touched, no deployment occurred, and no pilot claim is made.
 
 Next exact action: in an environment authorized to access the owned Docker socket, run `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/api exec vitest run --config vitest.config.sessions.ts test/sessions/session-availability.integration.test.ts --disableConsoleIntercept`; then run browser availability and booking/request flows against rebuilt artifacts, capture 320/390/768/1440-width light/dark evidence, fix issues, and update this record. Because PT-01 also remains unverified, keep the milestone sequence and close PT-01’s exact timing-boundary/browser evidence before proceeding to PT-03.
+
+## PT-03 — Implemented, not Verified (2026-11-06)
+
+- Added tenant migration `20261106020000_pt_request_expiry` (SHA-256 `a1ae2e3a23f0e189e479a48ce037102ff9c1d697f0bbc9a2490776af08caa688`) and manifest `tenant-2026-11-06.2`. The migration backfills pending deadlines, adds `EXPIRED`, adds request deadline/availability version columns, enforces a deadline on pending rows, and adds an ordered expiry index. The prior PT-02 template remains addressable.
+- Enforced the two-live-pending limit and absolute request deadline. Decision and withdrawal paths resolve due requests to `EXPIRED` under existing serialization; due requests are excluded from active reads/conflicts and cannot be accepted or withdrawn. Expiry preserves credits, writes audit/event evidence and sends in-app notices. Owner booking uses the shared lock order and respects pending conflicts.
+- Added the bounded active-tenant expiry runner, installed-manifest verification, per-gym serialization, stable expiry receipts, and `PT_EXPIRY_RUNNER_ENABLED` operational control. This is code inspection evidence only; the worker has not been exercised against PostgreSQL in this session.
+
+Fast checks and actual results:
+- `pnpm --dir packages/contracts build && pnpm --dir packages/contracts test` — passed; 55 tests.
+- `pnpm --dir apps/api exec vitest run src/sessions/session-state.spec.ts src/sessions/availability-policy.spec.ts src/operations/primitives.spec.ts` — passed; 18 tests.
+- `pnpm --dir apps/api exec vitest run --config vitest.config.tenancy.ts test/tenancy/tenant-template-manifest.test.ts` — passed; 1 test.
+- `pnpm --dir apps/api exec tsc --noEmit --incremental false --pretty false` — passed.
+- `pnpm --dir apps/web exec tsc --noEmit --incremental false --pretty false` — passed.
+- `pnpm exec prisma validate --schema packages/database-tenant/prisma/schema.prisma` — passed.
+- `git diff --check` — pending rerun after this evidence edit.
+
+Deferred checks: the PT request and lifecycle integration suites were not run against an owned disposable PostgreSQL database, so migration application, permissions, lock races, credit conservation, notification/audit atomicity, runner idempotency, tenant isolation, and failure recovery remain unverified. No browser checks or screenshots at mobile/desktop sizes in either existing theme were taken. Prior PT-02 evidence records the environment’s owned Docker socket denial (`unix:///Users/esanduepa/.docker/run/docker.sock`); no production/shared database was accessed.
+
+Next exact action: run the PT request and lifecycle integration suites in an environment permitting the owned Docker socket, then add/run an owned-database expiry-runner integration covering retries, idempotency, tenant isolation and recovery. Perform the deferred browser/theme review afterward. Do not mark PT-03 Verified until those results are recorded.

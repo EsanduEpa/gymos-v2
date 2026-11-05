@@ -201,6 +201,7 @@ export class SessionBookingService {
             normalizedIntent: { gymId: access.gymId, memberId: input.memberId, trainerId: input.trainerId, localDate: input.localDate,
               localTime: input.localTime, timeZone: input.timeZone, offset: input.offset ?? null, type: input.type, durationMinutes: input.durationMinutes, notes: input.notes ?? null } },
           async (tx, receipt) => {
+            await tx.$queryRaw`SELECT "id" FROM "Member" WHERE "id" = ${input.memberId} FOR UPDATE`;
             await tx.$queryRaw`SELECT "id" FROM "Trainer" WHERE "id" = ${input.trainerId} FOR UPDATE`;
             const config = await tx.gymConfiguration.findUnique({ where: { id: 'current' } });
             if (!config?.timezone || !config.currency || config.masterGymId !== access.gymId) throw new UnprocessableEntityException('Gym currency and time zone must be configured');
@@ -226,6 +227,10 @@ export class SessionBookingService {
             if (!allowedStartMinutes(input.localDate, availability as AvailabilityRule[], weekday).includes(startMinute)) {
               throw new ConflictException('This time is outside the trainer’s published availability or is no longer available');
             }
+            const overlap = await tx.pTSession.findFirst({ where: { state: { in: ['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE'] },
+              AND: [{ OR: [{ state: { not: 'PENDING_CONFIRMATION' } }, { requestExpiresAt: { gt: clock!.now } }] }],
+              OR: [{ memberId: input.memberId }, { trainerId: input.trainerId }], scheduledStartAt: { lt: end }, scheduledEndAt: { gt: start.instant } }, select: { id: true } });
+            if (overlap) throw new ConflictException('Member or trainer already has a request or session in that time range. Resolve it before booking directly.');
             const dateValue = new Date(`${input.localDate}T00:00:00.000Z`);
             if (await tx.membershipTerm.count({ where: { memberId: member.id, startDate: { lte: dateValue }, endDateExclusive: { gt: dateValue } } }) === 0) {
               throw new UnprocessableEntityException('Member has no active membership for the session date');

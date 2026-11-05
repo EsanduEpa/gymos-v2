@@ -46,8 +46,8 @@ export class DashboardService {
             WHERE s."scheduledStartAt" >= ${start} AND s."scheduledStartAt" < ${end}
               AND r."currency" = ${currency} AND r."category" <> 'EXPIRED_UNUSED'
             GROUP BY 1 ORDER BY 1`,
-          tx.pTSession.count({ where: { state: 'PENDING_CONFIRMATION' } }),
-          tx.pTSession.findMany({ where: { scheduledStartAt: { gte: start, lt: end } }, orderBy: [{ scheduledStartAt: 'asc' }, { id: 'asc' }], take: 10,
+          tx.pTSession.count({ where: { state: 'PENDING_CONFIRMATION', requestExpiresAt: { gt: asOf } } }),
+          tx.pTSession.findMany({ where: { scheduledStartAt: { gte: start, lt: end }, OR: [{ state: { not: 'PENDING_CONFIRMATION' } }, { requestExpiresAt: { gt: asOf } }] }, orderBy: [{ scheduledStartAt: 'asc' }, { id: 'asc' }], take: 10,
             include: { member: { select: { fullName: true } }, trainer: { select: { fullName: true } } } }),
           tx.pTSession.groupBy({ by: ['trainerId'], where: { scheduledStartAt: { gte: start, lt: end } }, _count: { _all: true } }),
         ]);

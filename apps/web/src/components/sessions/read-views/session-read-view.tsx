@@ -15,7 +15,7 @@ type Filters = { date?: string; month?: string; state?: string; q?: string; memb
 type StateCount = { state: SessionReadState; totalCount: number };
 
 const stateLabels: Record<Session['state'], string> = {
-  PENDING_CONFIRMATION: 'Pending', SCHEDULED: 'Scheduled', ACTIVE: 'In progress', COMPLETED: 'Completed', MISSED: 'No show', CANCELLED: 'Cancelled', DECLINED: 'Declined',
+  PENDING_CONFIRMATION: 'Pending', SCHEDULED: 'Scheduled', ACTIVE: 'In progress', COMPLETED: 'Completed', MISSED: 'No show', CANCELLED: 'Cancelled', DECLINED: 'Declined', EXPIRED: 'Expired',
 };
 const actionLabels: Record<Session['commandAffordances'][number], string> = {
   ACCEPT: 'Accept request', DECLINE: 'Decline request', START: 'Start session', UPDATE_NOTES: 'Edit session notes', CANCEL: 'Cancel session', WITHDRAW: 'Withdraw request', NO_SHOW: 'Mark no-show', COMPLETE: 'Complete session',
@@ -74,6 +74,7 @@ function SessionCard({ session, role, slug }: { session: Session; role: Role; sl
     <div className={styles.sessionMeta}><StatusBadge status={session.state}/><span>{session.type.replaceAll('_', ' ').toLowerCase()}</span></div>
     <h2>{counterpart}</h2>
     {role === 'TRAINER' ? <p>{duration} minutes{session.trainerPay !== null ? ` · Trainer earning: ${session.currency ?? ''} ${session.trainerPay}` : ''}</p> : <p><time dateTime={session.scheduledStartAt}>{dateLabel(session.scheduledStartAt, session.gymTimeZone, true)}</time><br/>{duration} minutes</p>}
+    {role === 'MEMBER' && session.state === 'PENDING_CONFIRMATION' && session.requestExpiresAt ? <p>Trainer response due by <time dateTime={session.requestExpiresAt}>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: session.gymTimeZone }).format(new Date(session.requestExpiresAt))}</time></p> : null}
     {session.state === 'ACTIVE' && session.startedAt && role === 'TRAINER' ? <ElapsedSessionClock startedAt={session.startedAt}/> : null}
     {session.fee !== null && session.currency ? <p>Session fee: {session.currency} {session.fee}</p> : null}
     {role !== 'TRAINER' && session.trainerPay !== null ? <p>Trainer earning: {session.currency ?? ''} {session.trainerPay}</p> : null}

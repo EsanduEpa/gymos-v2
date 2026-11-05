@@ -197,7 +197,7 @@ export const TENANT_TEMPLATE_V4: TenantTemplateManifest = Object.freeze({
     },
   },
 });
-export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
+export const TENANT_TEMPLATE_V5: TenantTemplateManifest = Object.freeze({
   ...TENANT_TEMPLATE_V4,
   version: 'tenant-2026-11-06.1',
   migrations: [...TENANT_TEMPLATE_V4.migrations, {
@@ -215,7 +215,19 @@ export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
       PTAvailabilityRule: ['commandReceiptId', 'createdAt', 'createdByIdentityId', 'effectiveFrom', 'effectiveToExclusive', 'endMinute', 'id', 'kind', 'localDate', 'reason', 'startMinute', 'trainerId', 'updatedAt', 'version', 'weekday'] },
   },
 });
-export const TENANT_MANIFESTS: readonly TenantTemplateManifest[] = [TENANT_TEMPLATE_V1, TENANT_TEMPLATE_V2, TENANT_TEMPLATE_V3, TENANT_TEMPLATE_V4, TENANT_TEMPLATE_MANIFEST];
+export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
+  ...TENANT_TEMPLATE_V5,
+  version: 'tenant-2026-11-06.2',
+  migrations: [...TENANT_TEMPLATE_V5.migrations, { name: '20261106020000_pt_request_expiry', checksum: 'a1ae2e3a23f0e189e479a48ce037102ff9c1d697f0bbc9a2490776af08caa688' }],
+  postconditions: {
+    ...TENANT_TEMPLATE_V5.postconditions,
+    indexes: [...TENANT_TEMPLATE_V5.postconditions.indexes, 'PTSession_state_requestExpiresAt_id_idx'],
+    constraints: [...TENANT_TEMPLATE_V5.postconditions.constraints, 'PTSession_request_expiry_check'],
+    columns: { ...TENANT_TEMPLATE_V5.postconditions.columns,
+      PTSession: [...TENANT_TEMPLATE_V5.postconditions.columns.PTSession, 'requestExpiresAt', 'availabilityVersion'] },
+  },
+});
+export const TENANT_MANIFESTS: readonly TenantTemplateManifest[] = [TENANT_TEMPLATE_V1, TENANT_TEMPLATE_V2, TENANT_TEMPLATE_V3, TENANT_TEMPLATE_V4, TENANT_TEMPLATE_V5, TENANT_TEMPLATE_MANIFEST];
 export function reviewedTenantManifest(version: string | null, digest: string | null) {
   return TENANT_MANIFESTS.find(manifest => manifest.version === version && tenantManifestDigest(manifest) === digest);
 }

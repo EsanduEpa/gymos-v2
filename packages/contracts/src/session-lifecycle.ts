@@ -61,7 +61,7 @@ export const sessionQuoteActionSchema = z.enum(['CANCEL', 'NO_SHOW']);
 export const sessionLifecycleQuoteSchema = z.strictObject({
   sessionId: id,
   action: sessionQuoteActionSchema,
-  state: z.enum(['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE', 'COMPLETED', 'MISSED', 'CANCELLED', 'DECLINED']),
+  state: z.enum(['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE', 'COMPLETED', 'MISSED', 'CANCELLED', 'DECLINED', 'EXPIRED']),
   sessionVersion: version,
   policyVersion: version,
   asOf: instant,

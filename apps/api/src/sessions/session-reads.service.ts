@@ -54,6 +54,7 @@ function item(row: SessionRow, role: string, now: Date) {
     state: row.state, type: row.type, version: row.version,
     scheduledStartAt: row.scheduledStartAt.toISOString(), scheduledEndAt: row.scheduledEndAt.toISOString(), gymTimeZone: row.gymTimezone,
     startedAt: row.startedAt?.toISOString() ?? null, endedAt: row.endedAt?.toISOString() ?? null, confirmedAt: row.confirmedAt?.toISOString() ?? null,
+    requestExpiresAt: row.requestExpiresAt?.toISOString() ?? null,
     declineReason: role === 'MEMBER' ? row.declineReason : null,
     createdAt: row.createdAt.toISOString(), fee: role === 'OWNER' ? row.fee?.toString() ?? null : null,
     currency: role === 'OWNER' || role === 'TRAINER' && row.payRecord ? row.currency ?? null : null, notes: row.notes,
@@ -89,21 +90,24 @@ export class SessionReadsService {
       const actorFilter: Prisma.PTSessionWhereInput = access.role === 'OWNER'
         ? { ...(query.memberId ? { memberId: query.memberId } : {}), ...(query.trainerId ? { trainerId: query.trainerId } : {}) }
         : access.role === 'MEMBER' ? { memberId: access.actor!.id } : { trainerId: access.actor!.id };
-      const where: Prisma.PTSessionWhereInput = {
+      const whereBase: Prisma.PTSessionWhereInput = {
         ...actorFilter,
         ...(query.state ? { state: query.state } : {}),
         ...(rangeStart && rangeEndExclusive ? { scheduledStartAt: { gte: rangeStart, lt: rangeEndExclusive } } : {}),
-        ...(query.q ? { OR: [{ member: { fullName: { contains: query.q, mode: 'insensitive' } } }, { trainer: { fullName: { contains: query.q, mode: 'insensitive' } } }] } : {}),
       };
       return tenant.$transaction(async tx => {
         await tx.$executeRaw`SET TRANSACTION READ ONLY`;
         const nowRows = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
         const now = nowRows[0]!.now;
+        const where: Prisma.PTSessionWhereInput = { ...whereBase, AND: [
+          { OR: [{ state: { not: 'PENDING_CONFIRMATION' } }, { requestExpiresAt: { gt: now } }] },
+          ...(query.q ? [{ OR: [{ member: { fullName: { contains: query.q, mode: 'insensitive' as const } } }, { trainer: { fullName: { contains: query.q, mode: 'insensitive' as const } } }] }] : []),
+        ] };
         const [totalCount, rows, monthBookings, lifetimePackCredits] = await Promise.all([
           tx.pTSession.count({ where }),
           tx.pTSession.findMany({ where, orderBy: [{ scheduledStartAt: 'asc' }, { id: 'asc' }], skip: (query.page - 1) * query.pageSize, take: query.pageSize,
             include: { member: { select: { fullName: true } }, trainer: { select: { fullName: true } }, payRecord: { select: { amount: true } } } }),
-          query.month && rangeStart && rangeEndExclusive ? tx.pTSession.count({ where: { ...actorFilter, scheduledStartAt: { gte: rangeStart, lt: rangeEndExclusive } } }) : Promise.resolve(null),
+          query.month && rangeStart && rangeEndExclusive ? tx.pTSession.count({ where: { ...actorFilter, scheduledStartAt: { gte: rangeStart, lt: rangeEndExclusive }, AND: [{ OR: [{ state: { not: 'PENDING_CONFIRMATION' } }, { requestExpiresAt: { gt: now } }] }] } }) : Promise.resolve(null),
           access.role === 'MEMBER' ? this.memberPackBalance(tx, access.actor!.id, timeZone, now) : Promise.resolve(null),
         ]);
         return sessionReadPageSchema.parse({ items: rows.map(row => item(row, access.role, now)), page: query.page, pageSize: query.pageSize,
@@ -127,13 +131,14 @@ export class SessionReadsService {
       if (!published || member.registrationState !== 'COMPLETE') throw new NotFoundException('Member not found');
       return tenant.$transaction(async tx => {
         await tx.$executeRaw`SET TRANSACTION READ ONLY`;
-        const [nowRows, totalCount, rows] = await Promise.all([
-          tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`,
-          tx.pTSession.count({ where: { memberId } }),
-          tx.pTSession.findMany({ where: { memberId }, orderBy: [{ scheduledStartAt: 'desc' }, { id: 'desc' }], take: 10,
+        const [nowRows] = await Promise.all([tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`]);
+        const now = nowRows[0]!.now;
+        const where = { memberId, OR: [{ state: { not: 'PENDING_CONFIRMATION' as const } }, { requestExpiresAt: { gt: now } }] };
+        const [totalCount, rows] = await Promise.all([
+          tx.pTSession.count({ where }),
+          tx.pTSession.findMany({ where, orderBy: [{ scheduledStartAt: 'desc' }, { id: 'desc' }], take: 10,
             include: { member: { select: { fullName: true } }, trainer: { select: { fullName: true } }, payRecord: { select: { amount: true } } } }),
         ]);
-        const now = nowRows[0]!.now;
         return recentSessionListSchema.parse({ items: rows.map(row => item(row, 'OWNER', now)), limit: 10, totalCount, hasMore: totalCount > rows.length,
           asOf: now.toISOString(), timeZone: config.timezone });
       });
