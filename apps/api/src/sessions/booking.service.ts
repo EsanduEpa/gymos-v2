@@ -166,8 +166,8 @@ export class SessionBookingService {
           members: { items: members, page: query.memberPage, pageSize: query.memberPageSize, totalCount: membersAll.length, totalPages: totalPages(membersAll.length, query.memberPageSize), asOf: now.toISOString() },
           trainers: { items: trainers, page: query.trainerPage, pageSize: query.trainerPageSize, totalCount: trainersAll.length, totalPages: totalPages(trainersAll.length, query.trainerPageSize), asOf: now.toISOString() },
           selectedMember, selectedTrainer: selectedTrainerRow ? { trainerId: selectedTrainerRow.id, name: selectedTrainerRow.fullName, level: selectedTrainerRow.level!, shiftStart: selectedTrainerRow.shiftStart, shiftEnd: selectedTrainerRow.shiftEnd } : null,
-          policy: { timeZone, localDate, minimumDurationMinutes: config.minimumSessionDurationMinutes, maximumDurationMinutes: 480 as const,
-            scheduleHorizonDays: 365 as const, configurationVersion: config.version, cancellationWindowMinutes: config.cancellationWindowMinutes },
+          policy: { timeZone, localDate, minimumDurationMinutes: 60 as const, maximumDurationMinutes: 60 as const,
+            scheduleHorizonDays: 14 as const, configurationVersion: config.version, cancellationWindowMinutes: config.cancellationWindowMinutes },
           rateInfo: { currency, defaultSessionFee: config.defaultSessionFee.toString(), level2SessionFee: decimal(config.level2SessionFee), introSessionFee: decimal(config.introSessionFee),
             level1BaseRate: config.level1BaseRate.toString(), level2BaseRate: config.level2BaseRate.toString(), offShiftPremium: config.offShiftPremium.toString() },
           noEligibleMembersReason: membersAll.length === 0 || members.every(item => item.eligibility !== 'ELIGIBLE') ? 'NO_ACTIVE_MEMBERSHIP_OR_CREDIT' as const : null,
@@ -206,11 +206,10 @@ export class SessionBookingService {
             const start = resolveSessionLocalTime(input.localDate, input.localTime, config.timezone, input.offset);
             const end = new Date(start.instant.getTime() + input.durationMinutes * 60_000);
             const [clock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
-            const localToday = localDateAt(clock!.now, config.timezone);
-            if (input.durationMinutes < config.minimumSessionDurationMinutes) throw new UnprocessableEntityException(`Session duration must be at least ${config.minimumSessionDurationMinutes} minutes`);
-            if (input.localDate < localToday || input.localDate > addDays(localToday, 365) || start.instant <= clock!.now) {
-              throw new UnprocessableEntityException('Choose a future date within the 365-day booking horizon');
-            }
+            if (input.type !== 'IN_PERSON' || input.durationMinutes !== 60) throw new UnprocessableEntityException('New PT bookings must be in-person and 60 minutes');
+            const earliest = new Date(clock!.now.getTime() + 2 * 60 * 60_000);
+            const latest = new Date(clock!.now.getTime() + 14 * 24 * 60 * 60_000);
+            if (start.instant < earliest || start.instant > latest) throw new UnprocessableEntityException('Choose a start at least 2 hours from now and within the next 14 days');
             const [member, trainer] = await Promise.all([
               tx.member.findFirst({ where: { id: input.memberId, identityId: memberBinding.identityId, enrollmentOperationId: memberBinding.operationId,
                 registrationState: 'COMPLETE', status: 'ACTIVE' }, select: { id: true, fullName: true, identityId: true } }),
@@ -222,8 +221,7 @@ export class SessionBookingService {
             if (await tx.membershipTerm.count({ where: { memberId: member.id, startDate: { lte: dateValue }, endDateExclusive: { gt: dateValue } } }) === 0) {
               throw new UnprocessableEntityException('Member has no active membership for the session date');
             }
-            const fee = input.type === 'INTRODUCTORY' ? config.introSessionFee ?? config.defaultSessionFee
-              : trainer.level === 'LEVEL_2' ? config.level2SessionFee ?? config.defaultSessionFee : config.defaultSessionFee;
+            const fee = trainer.level === 'LEVEL_2' ? config.level2SessionFee ?? config.defaultSessionFee : config.defaultSessionFee;
             const coveredByShift = withinShift(start.instant, end, config.timezone, trainer.shiftStart, trainer.shiftEnd);
             const rate = trainer.level === 'LEVEL_2' ? config.level2BaseRate : config.level1BaseRate;
             const confirmationRate = coveredByShift ? rate : decimalSum(rate.toString(), config.offShiftPremium.toString());

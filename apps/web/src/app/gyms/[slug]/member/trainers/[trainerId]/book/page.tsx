@@ -39,7 +39,7 @@ export default async function RequestTrainerSessionPage({ params }: { params: Pr
         <p><strong>Session credits available today:</strong> {options.data.availableCredits} · <strong>Held:</strong> {options.data.heldCredits} · <strong>Expired:</strong> {options.data.expiredCredits}</p>
         {!options.data.activeMembershipToday ? <p role="status">There is no active membership today. A session request is eligible only when both your membership and a pack cover the selected gym-local date; the API will recheck this when you submit.</p> : options.data.availableCredits === 0 ? <p role="status">No unheld, unexpired session credits are available today{options.data.expiredCredits ? `; ${options.data.expiredCredits} credit${options.data.expiredCredits === 1 ? ' is' : 's are'} expired` : ''}. You may still choose a future date; membership and pack eligibility are checked for that date when submitted.</p> : <p>One credit is reserved only if the trainer accepts. Eligibility is checked again for your selected date.</p>}
         <SessionRequestForm slug={slug} trainerId={trainerId} timeZone={options.data.timeZone}
-          minimumDurationMinutes={options.data.minimumDurationMinutes} requestKey={randomUUID()} minDate={dateInZone(options.data.asOf, options.data.timeZone)}/>
+          requestKey={randomUUID()} minDate={dateInZone(options.data.asOf, options.data.timeZone)}/>
       </>}
     </Card>
   </DashboardChrome>;

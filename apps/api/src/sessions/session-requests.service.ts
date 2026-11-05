@@ -121,7 +121,7 @@ export class SessionRequestsService {
           (pack.endDateExclusive.toISOString().slice(0, 10) <= localToday ? balance.available : 0), 0);
         return sessionRequestOptionsSchema.parse({ trainerId, trainerName: trainer.fullName, level: trainer.level, specialisations: trainer.specialisations,
           shiftStart: trainer.shiftStart, shiftEnd: trainer.shiftEnd,
-          timeZone: config.timezone, minimumDurationMinutes: config.minimumSessionDurationMinutes, maximumDurationMinutes: 480,
+          timeZone: config.timezone, minimumDurationMinutes: 60, maximumDurationMinutes: 60,
           currency: config.currency, availableCredits: currentlyEligible.reduce((total, row) => total + row.balance.available, 0),
           heldCredits: balances.reduce((total, row) => total + row.balance.held, 0), expiredCredits,
           activeMembershipToday: Boolean(membership), asOf: asOf.toISOString() });
@@ -176,10 +176,10 @@ export class SessionRequestsService {
             if (input.data.timeZone !== config.timezone) throw new UnprocessableEntityException('Use the configured gym time zone');
             const start = resolveLocal(input.data.localDate, input.data.localTime, config.timezone, input.data.offset);
             const end = new Date(start.getTime() + input.data.durationMinutes * 60_000); const now = clockRows[0]!.now;
-            const today = localDateAt(now, config.timezone);
-            if (input.data.durationMinutes < config.minimumSessionDurationMinutes || input.data.localDate < today) throw new UnprocessableEntityException('Choose an allowed future session time and duration');
-            const max = new Date(`${today}T00:00:00.000Z`); max.setUTCDate(max.getUTCDate() + 365);
-            if (input.data.localDate > max.toISOString().slice(0, 10) || start <= now) throw new UnprocessableEntityException('Choose a future date within the 365-day booking horizon');
+            if (input.data.type !== 'IN_PERSON' || input.data.durationMinutes !== 60) throw new UnprocessableEntityException('New PT requests must be in-person and 60 minutes');
+            const earliest = new Date(now.getTime() + 2 * 60 * 60_000);
+            const latest = new Date(now.getTime() + 14 * 24 * 60 * 60_000);
+            if (start < earliest || start > latest) throw new UnprocessableEntityException('Choose a start at least 2 hours from now and within the next 14 days');
             const day = new Date(`${input.data.localDate}T00:00:00.000Z`);
             const term = await tx.membershipTerm.findFirst({ where: { memberId: member.actorId, startDate: { lte: day }, endDateExclusive: { gt: day } }, select: { id: true } });
             if (!term) throw new UnprocessableEntityException('Member has no active membership for the session date');
@@ -197,7 +197,7 @@ export class SessionRequestsService {
             const id = randomUUID();
             await tx.pTSession.create({ data: { id, memberId: member.actorId, trainerId: trainer.actorId, state: 'PENDING_CONFIRMATION',
               type: input.data.type, scheduledStartAt: start, scheduledEndAt: end, gymTimezone: config.timezone,
-              fee: (input.data.type === 'INTRODUCTORY' ? config.introSessionFee ?? config.defaultSessionFee : trainerRow.level === 'LEVEL_2' ? config.level2SessionFee ?? config.defaultSessionFee : config.defaultSessionFee).toString(),
+              fee: (trainerRow.level === 'LEVEL_2' ? config.level2SessionFee ?? config.defaultSessionFee : config.defaultSessionFee).toString(),
               currency: config.currency, confirmationShiftStart: trainerRow.shiftStart, confirmationShiftEnd: trainerRow.shiftEnd,
               configurationVersion: config.version, notes: (input.data.notes ?? '').replace(/\r\n?/g, '\n') || null, createdByIdentityId: member.identityId } });
             const eventKey = tenantAuditKey({ masterGymId: access.gymId, receiptId: receipt.id, eventCode: 'PT_SESSION_REQUESTED', resourceType: 'PT_SESSION', resourceId: id, eventOrdinal: 0 });
@@ -254,12 +254,10 @@ export class SessionRequestsService {
               const local = localDateAt(session.scheduledStartAt, config.timezone); const day = new Date(`${local}T00:00:00.000Z`);
               if (session.scheduledStartAt <= clockRows[0]!.now) throw new ConflictException('This request time has passed and cannot be accepted');
               const durationMinutes = Math.round((session.scheduledEndAt.getTime() - session.scheduledStartAt.getTime()) / 60_000);
-              if (durationMinutes < config.minimumSessionDurationMinutes) throw new UnprocessableEntityException('Current gym policy requires a longer session duration');
-              const today = localDateAt(clockRows[0]!.now, config.timezone); const horizon = new Date(`${today}T00:00:00.000Z`); horizon.setUTCDate(horizon.getUTCDate() + 365);
-              if (local > horizon.toISOString().slice(0, 10)) throw new UnprocessableEntityException('This request is outside the current booking horizon');
+              if (session.type !== 'IN_PERSON' || durationMinutes !== 60) throw new UnprocessableEntityException('This legacy request cannot be accepted under current PT policy');
               const term = await tx.membershipTerm.findFirst({ where: { memberId: session.memberId, startDate: { lte: day }, endDateExclusive: { gt: day } }, select: { id: true } });
               if (!term) throw new UnprocessableEntityException('Member has no active membership for the session date');
-              const fee = session.type === 'INTRODUCTORY' ? config.introSessionFee ?? config.defaultSessionFee : session.trainer.level === 'LEVEL_2' ? config.level2SessionFee ?? config.defaultSessionFee : config.defaultSessionFee;
+              const fee = session.trainer.level === 'LEVEL_2' ? config.level2SessionFee ?? config.defaultSessionFee : config.defaultSessionFee;
               const rate = session.trainer.level === 'LEVEL_2' ? config.level2BaseRate : config.level1BaseRate;
               const coveredByShift = shiftCovered(session.scheduledStartAt, session.scheduledEndAt, config.timezone, session.trainer.shiftStart, session.trainer.shiftEnd);
               const confirmationRate = coveredByShift ? rate.toString() : addDecimal(rate.toString(), config.offShiftPremium.toString());
