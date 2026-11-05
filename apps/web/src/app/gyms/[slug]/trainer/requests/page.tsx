@@ -26,11 +26,12 @@ export default async function TrainerRequestsPage({ params }: { params: Promise<
     <Card><CardHeader eyebrow="PENDING SESSION REQUESTS" title={result?.success ? `${result.data.items.length} requests` : 'Session requests'}/>
       {!result?.success ? <Feedback tone="error">Requests could not be loaded. Refresh to try again.</Feedback> : result.data.items.length === 0 ?
         <div className="ui-empty-state"><h2>No pending requests</h2><p>New member requests will appear here.</p></div> :
-        <div className="session-request-list">{result.data.items.map(item => <article className="session-request-card" key={item.id}>
-          <div className="trainer-request-details"><div><h2>{item.memberName}</h2><span className="ui-badge ui-badge-info">Pending confirmation</span></div>
-            <p><strong>Requested time</strong><br/><time dateTime={item.scheduledStartAt}>{new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: item.timeZone, timeZoneName: 'short' }).format(new Date(item.scheduledStartAt))}</time></p>
-            <p><strong>Duration &amp; type</strong><br/>{item.durationMinutes} min · {item.type.replace('_', ' ').toLowerCase()}</p>
-            <p><strong>Member goal / note</strong><br/>{item.notes ? <em>“{item.notes}”</em> : <span>No note provided</span>}</p>
+        <div className="session-request-list">{result.data.items.map(item => <article className="session-request-card trainer-request-row" key={item.id}>
+          <div className="trainer-request-details"><h2>{item.memberName}</h2>
+            <time dateTime={item.scheduledStartAt}>{new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: item.timeZone, timeZoneName: 'short' }).format(new Date(item.scheduledStartAt))}</time>
+            <span>{item.durationMinutes} min · {item.type.replace('_', ' ').toLowerCase()}</span>
+            {item.notes ? <details className="trainer-request-member-note"><summary>Member note</summary><p>{item.notes}</p></details> : <span className="trainer-request-no-note">No member note</span>}
+            <span className="ui-badge ui-badge-info">Pending</span>
           </div>
           <div className="session-request-actions">
             <SessionRequestDecisionForm slug={slug} sessionId={item.id} expectedVersion={item.version} action="ACCEPT" requestKey={randomUUID()}/>

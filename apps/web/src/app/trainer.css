@@ -51,6 +51,30 @@
 .trainer-workspace .ui-card.trainer-pending-card { padding: 0; overflow: hidden; border-color: var(--border); }
 .trainer-workspace .trainer-pending-card > .ui-card-header { padding: 20px 24px; margin: 0; border-color: var(--border); background: var(--accent); }
 .trainer-workspace .trainer-pending-card > .ui-card-header :is(.eyebrow,h2) { color: var(--accent-foreground); }
+.trainer-workspace .trainer-request-row { display: flex; align-items: center; gap: 18px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--card); box-shadow: none; }
+.trainer-workspace .trainer-request-row:last-child { border-bottom: 0; }
+.trainer-workspace .trainer-request-row .trainer-request-details { display: flex; flex: 1 1 auto; align-items: center; gap: 14px; min-width: 0; }
+.trainer-workspace .trainer-request-row .trainer-request-details h2 { flex: 1 1 120px; min-width: 110px; margin: 0; font-size: 13px; font-weight: 600; }
+.trainer-workspace .trainer-request-row .trainer-request-details > :is(time,span) { color: var(--secondary-foreground); font-size: 11px; white-space: nowrap; }
+.trainer-workspace .trainer-request-row .trainer-request-details .ui-badge { flex: 0 0 auto; }
+.trainer-workspace .trainer-request-no-note { color: var(--muted-foreground) !important; }
+.trainer-workspace .trainer-request-member-note { position: relative; flex: 0 0 auto; }
+.trainer-workspace .trainer-request-member-note summary,.trainer-workspace .session-request-message summary { color: var(--primary); cursor: pointer; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.trainer-workspace .trainer-request-member-note p { position: absolute; z-index: 2; top: 100%; left: 0; width: min(320px, 75vw); padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--foreground); box-shadow: var(--shadow-md); font-size: 12px; white-space: pre-wrap; }
+.trainer-workspace .session-request-message { display: block; }
+.trainer-workspace .trainer-request-row .session-request-decision { display: flex; align-items: center; gap: 8px; }
+.trainer-workspace .session-request-message .ui-field { margin-top: 8px; }
+.trainer-workspace .session-request-message textarea { min-height: 60px; }
+.trainer-workspace .trainer-request-row .session-request-actions { flex: 0 0 auto; gap: 8px; margin-top: 0; }
+.trainer-workspace .trainer-request-row .session-request-actions button { min-height: 36px; padding: 7px 11px; font-size: 11px; }
+.trainer-workspace .trainer-schedule-request.trainer-request-row { padding: 12px 16px; }
+.trainer-workspace .trainer-request-row .trainer-schedule-request-main { flex: 1 1 auto; }
+.trainer-workspace .trainer-request-row .trainer-schedule-request-title { flex-wrap: nowrap; gap: 14px; }
+.trainer-workspace .trainer-request-row .trainer-schedule-request-title > :is(h2,time,span) { flex: 0 0 auto; margin: 0; color: var(--secondary-foreground); font-size: 11px; white-space: nowrap; }
+.trainer-workspace .trainer-request-row .trainer-schedule-request-title h2 { flex: 1 1 120px; min-width: 110px; color: var(--foreground); font-size: 13px; }
+.trainer-workspace .trainer-request-row .trainer-schedule-request-title .ui-badge { color: var(--info); }
+.trainer-workspace .trainer-request-row .trainer-schedule-request-actions { gap: 8px; }
+.trainer-workspace .trainer-request-row .trainer-schedule-request-actions button { min-height: 36px; padding: 7px 11px; font-size: 11px; }
 .trainer-workspace .trainer-schedule-request { gap: 24px; padding: 24px; }
 .trainer-workspace .trainer-schedule-request-main { flex: 1; }
 .trainer-workspace .trainer-schedule-request-main .trainer-schedule-request-note, .trainer-workspace .trainer-request-details em { background: var(--muted); border-color: var(--border); color: var(--secondary-foreground); }
@@ -106,6 +130,7 @@
 @media (max-width: 1279px) {
   .trainer-workspace .trainer-schedule-request { flex-direction: column; align-items: stretch; }
   .trainer-workspace .trainer-schedule-request-actions { width: 100%; }
+  .trainer-workspace .trainer-schedule-request.trainer-request-row { flex-direction: row; align-items: center; }
 }
 @media (max-width: 1023px) {
   .trainer-workspace .shell-content { padding: 28px 24px; }
@@ -114,6 +139,14 @@
   .trainer-workspace .trainer-metric { padding: 20px; }
 }
 @media (max-width: 767px) {
+  .trainer-workspace .trainer-request-row { align-items: flex-start; flex-wrap: wrap; }
+  .trainer-workspace .trainer-request-row .trainer-request-details { flex-wrap: wrap; gap: 8px 12px; }
+  .trainer-workspace .trainer-request-row .trainer-request-details h2 { flex: 1 0 100%; }
+  .trainer-workspace .trainer-request-row .trainer-schedule-request-main { width: 100%; }
+  .trainer-workspace .trainer-request-row .trainer-schedule-request-title { flex-wrap: wrap; }
+  .trainer-workspace .trainer-request-row .trainer-schedule-request-title h2 { flex: 1 0 100%; }
+  .trainer-workspace .trainer-request-row .session-request-actions,.trainer-workspace .trainer-request-row .trainer-schedule-request-actions { width: 100%; flex-direction: row; align-items: center; }
+  .trainer-workspace .trainer-request-row .session-request-actions form { width: auto; }
   .trainer-workspace .shell-content { padding: 24px 20px; }
   .trainer-workspace .gym-banner { align-items: flex-start; flex-direction: column; gap: 16px; }
   .trainer-workspace .gym-banner h1 { font-size: 28px; }

@@ -38,7 +38,7 @@ export function SessionRequestDecisionForm({ slug, sessionId, expectedVersion, a
   const [state, formAction, pending] = useActionState<SessionCommandState, FormData>(bound, {});
   return <form action={formAction} className="ui-form-stack session-request-decision">
     <input type="hidden" name="idempotencyKey" value={state.currentKey ?? state.nextKey ?? requestKey}/>
-    {action === 'DECLINE' ? <label className="ui-field"><span className="ui-field-label">Optional message for the member</span><textarea name="reason" maxLength={500} rows={3}/></label> : null}
+    {action === 'DECLINE' ? <details className="session-request-message"><summary>Add optional message for member</summary><label className="ui-field"><span className="ui-field-label">Message for member</span><textarea name="reason" maxLength={500} rows={2}/></label></details> : null}
     {state.error ? <p role="alert" className="ui-feedback ui-feedback-error">{state.error}</p> : null}
     {state.success ? <p role="status" className="ui-feedback ui-feedback-success">{state.success}</p> : null}
     <button className={action === 'ACCEPT' ? 'ui-button ui-button-primary' : 'ui-button ui-button-secondary'} disabled={pending} type="submit">{pending ? 'Saving…' : action === 'ACCEPT' ? 'Accept and reserve one credit' : 'Decline request'}</button>

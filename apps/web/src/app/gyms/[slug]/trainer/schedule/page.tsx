@@ -33,11 +33,12 @@ export default async function TrainerSchedulePage({ params, searchParams }: {
       <div className="trainer-schedule-links"><a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/trainer/calendar`}>Open calendar</a><a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/trainer/requests`}>Review requests{requests?.success && requests.data.items.length ? ` (${requests.data.items.length})` : ''}</a></div></div>
     <TrainerScheduleOverview slug={slug} data={loaded.data} filters={loaded.filters} pendingCount={requests?.success ? requests.data.items.length : null}/>
     {requests?.success && requests.data.items.length > 0 ? <Card className="trainer-pending-card"><CardHeader eyebrow="PENDING SESSION REQUESTS" title={`Pending session requests (${requests.data.items.length})`}/>
-      <div className="trainer-schedule-requests">{requests.data.items.map(item => <article className="trainer-schedule-request" key={item.id}>
-        <div className="trainer-schedule-request-main"><div className="trainer-schedule-request-title"><h2>{item.memberName}</h2><span className="ui-badge ui-badge-info">Pending confirmation</span></div>
-          <p><time dateTime={item.scheduledStartAt}>{new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: item.timeZone, timeZoneName: 'short' }).format(new Date(item.scheduledStartAt))}</time>
-            {' · '}{item.type.replace('_', ' ')} · {item.durationMinutes} min</p>
-          {item.notes ? <p className="trainer-schedule-request-note">“{item.notes}”</p> : null}
+      <div className="trainer-schedule-requests">{requests.data.items.map(item => <article className="trainer-schedule-request trainer-request-row" key={item.id}>
+        <div className="trainer-schedule-request-main"><div className="trainer-schedule-request-title"><h2>{item.memberName}</h2>
+          <time dateTime={item.scheduledStartAt}>{new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: item.timeZone, timeZoneName: 'short' }).format(new Date(item.scheduledStartAt))}</time>
+          <span>{item.durationMinutes} min · {item.type.replace('_', ' ').toLowerCase()}</span>
+          {item.notes ? <details className="trainer-request-member-note"><summary>Member note</summary><p>{item.notes}</p></details> : <span className="trainer-request-no-note">No member note</span>}
+          <span className="ui-badge ui-badge-info">Pending</span></div>
         </div>
         <div className="trainer-schedule-request-actions">
           <SessionRequestDecisionForm slug={slug} sessionId={item.id} expectedVersion={item.version} action="ACCEPT" requestKey={randomUUID()}/>
