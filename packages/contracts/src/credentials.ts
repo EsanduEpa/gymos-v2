@@ -51,7 +51,7 @@ export const recoveryCompleteInputSchema = z.strictObject({
 });
 export const recoveryCompleteResultSchema = z.strictObject({ success: z.literal(true) });
 export const identitySecurityEventSchema = z.strictObject({
-  event: z.enum(['PASSWORD_CHANGED', 'PASSWORD_RECOVERED']),
+  event: z.enum(['PASSWORD_CHANGED', 'PASSWORD_RECOVERED', 'SESSIONS_REVOKED']),
   createdAt: z.iso.datetime({ offset: true }),
 });
 export const identitySecurityEventListSchema = z.strictObject({ items: z.array(identitySecurityEventSchema).max(50) });

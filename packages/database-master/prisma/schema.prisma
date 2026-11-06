@@ -56,6 +56,7 @@ enum RecoveryCredentialScope {
 enum IdentitySecurityEventType {
   PASSWORD_CHANGED
   PASSWORD_RECOVERED
+  SESSIONS_REVOKED
 }
 
 model User {
@@ -83,6 +84,7 @@ model User {
   recoveryCredentials       RecoveryCredential[]             @relation("RecoverySubject")
   issuedRecoveryCredentials RecoveryCredential[]             @relation("RecoveryIssuer")
   securityEvents            IdentitySecurityEvent[]
+  securityEventReads        IdentitySecurityEventRead[]      @relation("IdentitySecurityEventReadSubject")
   profileCommandReceipts    ProfileCommandReceipt[]
   emailCorrectionRequests   IdentityEmailCorrectionRequest[] @relation("EmailCorrectionSubject")
   reviewedEmailCorrections  IdentityEmailCorrectionRequest[] @relation("EmailCorrectionReviewer")
@@ -139,13 +141,25 @@ model RecoveryCredential {
 }
 
 model IdentitySecurityEvent {
-  id         String                    @id @default(cuid())
-  identityId String
-  identity   User                      @relation(fields: [identityId], references: [id], onDelete: Restrict)
-  event      IdentitySecurityEventType
-  createdAt  DateTime                  @default(now()) @db.Timestamptz(3)
+  readReceipt IdentitySecurityEventRead?
+  id          String                     @id @default(cuid())
+  identityId  String
+  identity    User                       @relation(fields: [identityId], references: [id], onDelete: Restrict)
+  event       IdentitySecurityEventType
+  createdAt   DateTime                   @default(now()) @db.Timestamptz(3)
 
   @@index([identityId, createdAt])
+}
+
+model IdentitySecurityEventRead {
+  id              String                @id @default(cuid())
+  securityEventId String                @unique
+  securityEvent   IdentitySecurityEvent @relation(fields: [securityEventId], references: [id], onDelete: Restrict)
+  identityId      String
+  identity        User                  @relation("IdentitySecurityEventReadSubject", fields: [identityId], references: [id], onDelete: Restrict)
+  readAt          DateTime              @default(now()) @db.Timestamptz(3)
+
+  @@index([identityId, readAt])
 }
 
 model ProfileCommandReceipt {

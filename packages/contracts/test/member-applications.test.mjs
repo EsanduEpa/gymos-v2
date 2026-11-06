@@ -30,7 +30,7 @@ test('applicant status exposes no credentials and application target routing is 
   assert.equal(memberApplicationStatusSchema.parse(status).state, 'PROCESSING');
   assert.equal(memberApplicationStatusSchema.safeParse({ ...status, passwordHash: 'secret' }).success, false);
   assert.equal(notificationHref('gym-alpha', { linkKind: 'MEMBER_APPLICATIONS', resourceId: 'application_1' }),
-    '/applications?applicationId=application_1');
+    '/applications#application_1');
   assert.equal(notificationHref('gym-alpha', { linkKind: 'OWNER_APPLICATIONS', resourceId: null }),
     '/gyms/gym-alpha/owner/applications');
 });

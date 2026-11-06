@@ -123,17 +123,21 @@ export class AuthSessionService {
       const changed = await tx.identitySession.updateMany({ where: { id: sessionId, identityId, revokedAt: null },
         data: { revokedAt: now, revocationReason: 'CURRENT_DEVICE_LOGOUT' } });
       if (!changed.count) throw new UnauthorizedException('Session is already revoked or unavailable');
+      await tx.identitySecurityEvent.create({ data: { identityId, event: 'SESSIONS_REVOKED', createdAt: now } });
       await revokeSupportForActor(tx, identityId, 'LOGOUT_REVOKED');
     });
   }
 
   async revokeOther(identityId: string, sessionId: string, targetSessionId: string) {
     if (targetSessionId === sessionId) return { revoked: false as const };
-    const [{ now }] = await this.database.master.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
-    const changed = await this.database.master.identitySession.updateMany({ where: { id: targetSessionId, identityId, revokedAt: null },
-      data: { revokedAt: now, revocationReason: 'ADMIN_REVOKED' } });
-    if (!changed.count) return { revoked: false as const };
-    return { revoked: true as const };
+    return this.database.master.$transaction(async tx => {
+      const [{ now }] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
+      const changed = await tx.identitySession.updateMany({ where: { id: targetSessionId, identityId, revokedAt: null },
+        data: { revokedAt: now, revocationReason: 'ADMIN_REVOKED' } });
+      if (!changed.count) return { revoked: false as const };
+      await tx.identitySecurityEvent.create({ data: { identityId, event: 'SESSIONS_REVOKED', createdAt: now } });
+      return { revoked: true as const };
+    });
   }
 
   async revokeAll(identityId: string) {
@@ -142,6 +146,7 @@ export class AuthSessionService {
       await tx.identitySession.updateMany({ where: { identityId, revokedAt: null },
         data: { revokedAt: now, revocationReason: 'ALL_DEVICE_LOGOUT' } });
       await tx.user.updateMany({ where: { id: identityId }, data: { authVersion: { increment: 1 } } });
+      await tx.identitySecurityEvent.create({ data: { identityId, event: 'SESSIONS_REVOKED', createdAt: now } });
       await revokeSupportForActor(tx, identityId, 'LOGOUT_REVOKED');
     });
   }
@@ -157,6 +162,7 @@ export class AuthSessionService {
       const [{ now }] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
       await tx.identitySession.updateMany({ where: { identityId, revokedAt: null },
         data: { revokedAt: now, revocationReason: 'ALL_DEVICE_LOGOUT' } });
+      await tx.identitySecurityEvent.create({ data: { identityId, event: 'SESSIONS_REVOKED', createdAt: now } });
       await revokeSupportForActor(tx, identityId, 'LOGOUT_REVOKED');
       return true;
     });

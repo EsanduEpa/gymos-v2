@@ -116,7 +116,9 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
           <nav className="shell-account-panel" aria-label="Account destinations">
             {!support ? <a href={gym ? `/gyms/${encodeURIComponent(gym.slug)}/profile` : '/account/profile'}>Profile</a> : null}
             <a href="/security">Security</a>
-            {gym && !support ? <a href="#notification-center" onClick={(event) => { event.preventDefault(); document.querySelector<HTMLButtonElement>('.notification-bell-trigger')?.click(); document.querySelector('.shell-account-menu')?.removeAttribute('open'); }}>Notifications</a> : null}
+            {!support ? <a href="/account/notifications">Account notifications</a> : null}
+            {gym && !support ? <a href={`/gyms/${encodeURIComponent(gym.slug)}/notifications`}>Gym notifications</a> : null}
+            {gym && !support ? <a href="#notification-center" onClick={(event) => { event.preventDefault(); document.querySelector<HTMLButtonElement>('.notification-bell-trigger')?.click(); document.querySelector('.shell-account-menu')?.removeAttribute('open'); }}>Notification preview</a> : null}
             <a href="/help">Help</a>
             <form action={signOut} data-session-exit><Button type="submit" variant="secondary"><LogOut size={16}/><span>Sign out this device</span></Button></form>
           </nav>

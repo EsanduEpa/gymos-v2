@@ -1170,6 +1170,9 @@ it('keeps global and gym profiles separate, fences self edits, versions and repl
   expect(changedMember.dateOfBirth?.toISOString().slice(0, 10)).toBe(correctionBody.dateOfBirth);
   const ownerAudit = await tenant.auditLog.findFirstOrThrow({ where: { eventCode: 'OWNER_MEMBER_PROFILE_CORRECTED', resourceId: member.id } });
   expect(ownerAudit.transition).toEqual({ from: String(self.version + 2), to: String(self.version + 3), version: self.version + 3, reasonCode: 'MEMBER_REQUEST' });
+  const profileNotice = await tenant.notification.findFirstOrThrow({ where: { recipientIdentityId: member.identityId!, eventCode: 'MEMBER_PROFILE_CORRECTED' } });
+  expect(profileNotice).toMatchObject({ title: 'Membership profile updated', message: 'A gym owner updated your membership profile. Review your profile details.', linkKind: 'MEMBER_PROFILE', resourceId: member.id });
+  expect(profileNotice.message).not.toMatch(/Synthetic|1992|9477|MEMBER_REQUEST/);
   await expect(profileController.correctMember({ gymAccess: owner } as GymRequest, member.id, 'profile-owner-correct-0002',
     { ...correctionBody, expectedVersion: self.version + 3, status: 'SUSPENDED' })).rejects.toBeInstanceOf(UnprocessableEntityException);
   expect((await tenant.member.findUniqueOrThrow({ where: { id: member.id } })).status).toBe(member.status);

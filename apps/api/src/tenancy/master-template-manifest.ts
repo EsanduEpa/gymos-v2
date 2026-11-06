@@ -1,7 +1,7 @@
 import { contentDigest } from '../operations/primitives.js';
 // Immutable reviewed chain; schema deployment is an explicit owned runner command.
 export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
-  version: 'master-2026-11-06.7',
+  version: 'master-2026-11-06.8',
   migrations: [
     {
       name: '20261021100256_init_master',
@@ -80,6 +80,10 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       name: '20261106100000_identity_email_correction_requests',
       checksum: 'b5444d2ae4391cf6f1d5a770636b506d392d8b66c7e12fa68e34746a66f89387',
     },
+    {
+      name: '20261106110000_account_notification_read_receipts',
+      checksum: '7e3bbbd82046e3562fbe445657b94e8c51b4d62dd71d71f7bf7e3e5b3ed2e6fd',
+    },
   ],
   postconditions: {
     tables: [
@@ -99,6 +103,7 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       'MemberApplicationNotice',
       'ProfileCommandReceipt',
       'IdentityEmailCorrectionRequest',
+      'IdentitySecurityEventRead',
       'Operation',
       'PlatformAuditLog',
       'ProvisioningIntent',
@@ -133,6 +138,7 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       'MemberApplicationNotice_immutable',
       'ProfileCommandReceipt_immutable',
       'IdentityEmailCorrectionRequest_immutable',
+      'IdentitySecurityEventRead_append_only',
     ],
     requiredColumns: {
       Theme: ['id', 'gymId', 'primaryColor', 'logoUrl', 'version'],
@@ -195,6 +201,7 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       IdentitySecurityEvent: ['id', 'identityId', 'event', 'createdAt'],
       ProfileCommandReceipt: ['id', 'actorIdentityId', 'commandKind', 'idempotencyKey', 'requestDigest', 'resourceId', 'resultVersion', 'createdAt'],
       IdentityEmailCorrectionRequest: ['id', 'identityId', 'requestedEmail', 'state', 'resolution', 'version', 'idempotencyKey', 'requestDigest', 'submittedAt', 'resolvedAt', 'resolvedByIdentityId'],
+      IdentitySecurityEventRead: ['id', 'securityEventId', 'identityId', 'readAt'],
     },
   },
 } as const);

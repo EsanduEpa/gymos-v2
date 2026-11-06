@@ -50,11 +50,10 @@ Automated coverage: current-password rejection, canonical target normalization, 
 
 Remaining risks and deferred acceptance: an email address entered in a request is not proof of mailbox control, and staff follow-up only records an existing process; a real login identity update remains unavailable until a separately authorized proof and reconciliation process exists. Manual browser, visual/mobile, keyboard/focus/accessibility, real staff follow-up, and live outage acceptance remain deferred. CF-05 is not marked Verified.
 
-Next task: implement **CF-06 notification center, paging, account/application inbox scopes, and typed target routing**, preserving PT notification/reminder behavior and separating Master identity events from tenant operational notices.
+Next task: implement **CF-07 common help, error, privacy and account-lifecycle consistency**, carrying forward the CF-06 automated browser route issue for resolution as part of the owned browser evidence work in CF-08.
 
 ## Remaining milestones
 
-- CF-06: notification center, paging, inbox scopes and broader event history.
 - CF-07: common help/error/privacy/lifecycle behavior and operational visibility.
 - CF-08: owned integration/browser, upgrade, recovery and release evidence; no milestone is Verified by compilation alone.
 
@@ -106,3 +105,19 @@ Automated coverage: contracts test strict field separation and restricted inputs
 Remaining gaps: no tracked Member DOB correction request is created (the profile directs the member to ask the Owner); no proposed-health-update workflow or avatar upload is included. The Notifications item opens the existing bell; paged notification history remains CF-06. Help gives the existing gym-contact route but does not create or verify contact details. Browser, mobile, visual, keyboard/focus, accessibility, offline UI and real multi-gym role switching acceptance remain deferred. CF-04 is not marked Verified. PT files and PT progress/evidence/runbook were not modified.
 
 Next task: implement **CF-05 safe login-email correction workflow**, keeping login identity, tenant contact snapshots, verification evidence, and session invalidation distinct.
+
+## CF-06 — Core implementation complete; browser verification unresolved
+
+Bounded scope: full tenant notification history for the existing gym bell, explicit Account versus Gym inboxes, application/account-security event history, typed local targets, mark-one and snapshot-bounded mark-all, and the Owner Member-profile correction outcome notice. No broad notification preferences, external messaging, cross-database combined feed, runner rebuild, or delete action was added.
+
+Ownership and authorization: Master remains authoritative for applicant/owner application notices, password changes/recovery and session revocation. Master security events remain append-only; a separate subject-bound `IdentitySecurityEventRead` receipt stores read state. Gym operational/PT notifications and Owner profile-correction notices remain in the selected tenant. Gym history uses the existing gym authorization guard and recipient identity filter; Account history queries only the signed-in subject. Owner queue notices are visible only while the recipient retains active Owner access to that active gym. Applicant notices remain readable without active GymAccess. Each inbox has its own bounded cursor/snapshot and unread count; no cross-database atomic mark-all is claimed.
+
+Confirmed architecture choices: existing PT notification dedupe, supersession, reminder scheduling, polling and focus/context guards remain the source of truth. Notification destinations are typed session/application/profile/security/authorized-owner-queue paths; event content cannot supply an arbitrary URL. Member profile corrections create one generic notice in the same tenant command transaction, with no changed field values or private reason in its text. Account session-revocation events are recorded in the same Master transaction as session revocation. Essential notices have no opt-out setting in CF-06. Proposed/undecided policy: notification retention duration and archival timing remain product decisions; immutable application/security events are not deleted by inbox controls.
+
+Implementation: Master migration `20261106110000_account_notification_read_receipts` and manifest `.8`; tenant migration `20261106120000_member_profile_notifications` and manifest `.6`; separate Account and Gym paged APIs; typed target contracts; `/account/notifications` and `/gyms/[slug]/notifications`; bell View all link; Account/Gym notification destinations; generic Member correction notice; and duplicate application-notice feed fetches removed from status/queue pages. The Account inbox remains usable independently of tenant availability. No PT progress/evidence/runbook or PT source was changed.
+
+Automated coverage passed for typed contract validation, tenant and Master manifest checks, identity-scoped Account notices for a pending applicant, security append-only/read receipts, safe generic application text, mark-read and snapshot mark-all, tenant pagination snapshot stability, gym recipient isolation, superseded-item mark-all exclusion, Owner profile-notice transaction and privacy, the CF-01 application/enrollment suite, existing identity/session/recovery regressions, and PT reminder/upgrade behavior. Exact commands and results are in `EVIDENCE.md`.
+
+Status: API, contract, database, workspace, type, lint, build, CF-01, identity and PT automated suites passed. The automated Playwright notification-bell journey did not pass: its synthetic API preflights for the current session, gym access and notification-history endpoint succeeded, but the Next.js browser journey still reached `/login?error=expired` while opening the bell. The test source was restored to its original state after diagnosis. This remains an automated browser verification gap; no manual browser walkthrough or acceptance test was performed. CF-06 is not marked Ready for review or Verified until the browser issue is resolved and rerun.
+
+Next task: implement **CF-07 common help, error, privacy and account-lifecycle consistency**, then resolve and rerun the notification browser journey within the owned automated browser evidence work in CF-08. No deploy, merge, pilot, external message or shared/production database change occurred.

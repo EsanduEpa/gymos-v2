@@ -72,6 +72,24 @@ it('keeps selected-gym notification reads and marks within the authenticated rec
   expect((await call(`/gyms/${gymA.slug}/me/notifications`, ownerB)).status).toBe(403);
   expect((await call(`/gyms/${gymA.slug}/me/notifications?limit=101`, member)).status).toBe(422);
 
+  const historyResponse = await call(`/gyms/${gymA.slug}/me/notification-history?pageSize=1&filter=ALL`, member);
+  expect(historyResponse.status).toBe(200);
+  const history = await historyResponse.json();
+  expect(history.items).toHaveLength(1);
+  expect(history.unreadCount).toBe(2);
+  expect(history.nextCursor).toBeTruthy();
+  const pageTwoItem = await tenant.notification.create({ data: { recipientIdentityId: fixture.users.memberUser.id,
+    sourceEventKey: `after-snapshot-${run.runId}`, eventCode: 'SESSION_BOOKED', title: 'Later confirmation',
+    message: 'A later personal training session was confirmed.', linkKind: 'MEMBER_SESSIONS', resourceId: `after-${run.runId}`,
+    createdAt: new Date(Date.parse(history.asOf) + 1000), readAt: new Date(Date.parse(history.asOf) + 2000) } });
+  const pageTwoResponse = await call(`/gyms/${gymA.slug}/me/notification-history?pageSize=1&filter=ALL&cursor=${encodeURIComponent(history.nextCursor)}`, member);
+  expect(pageTwoResponse.status).toBe(200);
+  const pageTwo = await pageTwoResponse.json();
+  expect(pageTwo.items).toHaveLength(1);
+  expect(pageTwo.items[0].id).not.toBe(pageTwoItem.id);
+  expect(pageTwo.asOf).toBe(history.asOf);
+  expect((await call(`/gyms/${gymA.slug}/me/notification-history?filter=INVALID`, member)).status).toBe(422);
+
   const target = await tenant.notification.findFirstOrThrow({ where: { recipientIdentityId: fixture.users.memberUser.id }, orderBy: { createdAt: 'asc' } });
   const readPath = `/gyms/${gymA.slug}/me/notifications/${target.id}/read`;
   expect((await call(readPath, member, {}, 'POST')).status).toBe(201);
@@ -89,6 +107,39 @@ it('keeps selected-gym notification reads and marks within the authenticated rec
   expect(markAllBody).toMatchObject({ changedCount: 1, unreadCount: 1, through });
   expect((await call(`/gyms/${gymA.slug}/me/notifications/read-all`, member, { through: new Date(Date.now() + 60_000).toISOString() }, 'POST')).status).toBe(422);
   expect(await fixture.tenants[1]!.notification.count({ where: { recipientIdentityId: fixture.users.memberUser.id, readAt: null } })).toBe(1);
+});
+
+it('keeps the account inbox identity-scoped and security history append-only', async () => {
+  const pending = await bearer(fixture.users.pendingUser.id);
+  const other = await bearer(fixture.users.memberUser.id);
+  const first = await fixture.master.identitySecurityEvent.create({ data: { id: `security_${run.runId}_1`, identityId: fixture.users.pendingUser.id, event: 'PASSWORD_CHANGED', createdAt: new Date(Date.now() - 1000) } });
+  const application = await fixture.master.memberApplication.create({ data: { id: `application_${run.runId}`, gymId: fixture.gyms[0]!.id,
+    identityId: fixture.users.pendingUser.id, fullName: 'Pending synthetic applicant', phone: '+94770000000', consentedAt: new Date(Date.now() - 500) } });
+  await fixture.master.memberApplicationNotice.create({ data: { id: `application_notice_${run.runId}`, applicationId: application.id,
+    gymId: fixture.gyms[0]!.id, recipientId: fixture.users.pendingUser.id, event: 'APPLICANT_SUBMITTED' } });
+  const response = await call('/auth/notifications?pageSize=10', pending);
+  expect(response.status).toBe(200);
+  const page = await response.json();
+  expect(page.items).toHaveLength(2);
+  expect(page.items).toEqual(expect.arrayContaining([
+    expect.objectContaining({ sourceId: first.id, kind: 'SECURITY', target: { kind: 'ACCOUNT_SECURITY' } }),
+    expect.objectContaining({ sourceId: `application_notice_${run.runId}`, kind: 'APPLICATION', target: { kind: 'APPLICATION_STATUS', applicationId: application.id } }),
+  ]));
+  expect(JSON.stringify(page.items)).not.toMatch(/example\.test|passwordHash|health|private note/i);
+  expect((await call('/auth/notifications', other)).status).toBe(200);
+  expect((await (await call('/auth/notifications', other)).json()).items).toHaveLength(0);
+  expect((await call(`/auth/notifications/SECURITY/${first.id}/read`, other, {}, 'POST')).status).toBe(404);
+  const mark = await call(`/auth/notifications/SECURITY/${first.id}/read`, pending, {}, 'POST');
+  expect(mark.status).toBe(201);
+  expect((await mark.json()).unreadCount).toBe(1);
+  const markAll = await call('/auth/notifications/read-all', pending, { through: page.asOf }, 'POST');
+  expect(markAll.status).toBe(201);
+  expect((await markAll.json()).changedCount).toBe(1);
+  const later = await fixture.master.identitySecurityEvent.create({ data: { id: `security_${run.runId}_later`, identityId: fixture.users.pendingUser.id,
+    event: 'SESSIONS_REVOKED', createdAt: new Date(Date.parse(page.asOf) + 1000) } });
+  expect(later.id).toBeTruthy();
+  expect((await (await call('/auth/notifications', pending)).json()).unreadCount).toBe(1);
+  await expect(fixture.master.identitySecurityEvent.update({ where: { id: first.id }, data: { createdAt: new Date() } })).rejects.toThrow();
 });
 
 it('provides owner-only paged audit rows with a safe transition projection', async () => {

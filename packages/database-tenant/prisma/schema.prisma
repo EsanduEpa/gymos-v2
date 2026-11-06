@@ -520,6 +520,7 @@ enum NotificationLinkKind {
   TRAINER_SCHEDULE
   MEMBER_SESSIONS
   TRAINER_REQUESTS
+  MEMBER_PROFILE
 }
 
 model Notification {

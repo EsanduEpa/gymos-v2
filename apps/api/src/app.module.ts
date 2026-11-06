@@ -34,6 +34,7 @@ import { TrainerEnrollmentService } from './trainer-enrollment.service.js';
 import { TrainersController } from './trainers.controller.js';
 import { PacksController } from './packs.controller.js';
 import { NotificationsController } from './notifications.controller.js';
+import { AccountNotificationsController } from './account-notifications.controller.js';
 import { TrainerLifecycleService } from './trainer-lifecycle.service.js';
 import { SessionBookingController } from './sessions/booking.controller.js';
 import { SessionBookingService } from './sessions/booking.service.js';
@@ -68,7 +69,7 @@ import { AuthSessionGuard } from './identity/auth-session.guard.js';
   imports: [
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
   ],
-  controllers: [SessionExceptionsController, AppController, AdminController, AuthController, AccountProfileController, GymProfileController, EmailCorrectionController, AdminEmailCorrectionController, CredentialsController, CredentialReissueController, AccountRecoveryController, OperatorRecoveryController, GymsController, MemberApplicationsController, TrainersController, PacksController, NotificationsController, ConfigurationController, ProvisioningOwnerController, SupportSessionController, GymLifecycleController, SessionBookingController, SessionReadsController, SessionRequestsController, MemberSessionOverviewController, CoachingController, MemberLifecycleController, SessionLifecycleController, FinanceController, DashboardController, AnalyticsController, SessionAvailabilityController],
+  controllers: [SessionExceptionsController, AppController, AdminController, AuthController, AccountProfileController, GymProfileController, EmailCorrectionController, AdminEmailCorrectionController, AccountNotificationsController, CredentialsController, CredentialReissueController, AccountRecoveryController, OperatorRecoveryController, GymsController, MemberApplicationsController, TrainersController, PacksController, NotificationsController, ConfigurationController, ProvisioningOwnerController, SupportSessionController, GymLifecycleController, SessionBookingController, SessionReadsController, SessionRequestsController, MemberSessionOverviewController, CoachingController, MemberLifecycleController, SessionLifecycleController, FinanceController, DashboardController, AnalyticsController, SessionAvailabilityController],
   providers: [SessionExceptionsService,
     AppService,
     DatabaseService,

@@ -217,6 +217,9 @@ export class GymProfileController {
           await appendTenantAudit(tx, { masterGymId: access.gymId, receiptId: receipt.id, actorIdentityId: access.identityId,
             eventCode: 'OWNER_MEMBER_PROFILE_CORRECTED', resourceType: 'MEMBER_PROFILE', resourceId: member.id,
             transition: { from: String(member.version), to: String(version), version, reasonCode: parsed.data.reason } });
+          await tx.notification.create({ data: { recipientIdentityId: binding.userId, sourceEventKey: `profile-correction:${receipt.id}`,
+            eventCode: 'MEMBER_PROFILE_CORRECTED', title: 'Membership profile updated',
+            message: 'A gym owner updated your membership profile. Review your profile details.', linkKind: 'MEMBER_PROFILE', resourceId: member.id } });
           return profileCommandResultSchema.parse({ version, replayed: false });
         });
       });

@@ -2,6 +2,7 @@ import { Body, Controller, ForbiddenException, Get, NotFoundException, Param, Po
 import { auditQuerySchema, auditPageSchema, notificationListQuerySchema, notificationListSchema,
   ptScheduledWorkHealthSchema, notificationReadAllInputSchema, notificationReadAllSchema, notificationReadSchema } from '@gymos/contracts';
 import type { Prisma } from './generated/tenant/client.js';
+import { notificationHistoryQuerySchema, notificationHistorySchema } from '@gymos/contracts';
 import { GymAccessGuard, type GymRequest } from './gym-access.guard.js';
 import { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js';
 
@@ -48,6 +49,44 @@ export class NotificationsController {
     }));
   }
 
+  @Get('me/notification-history')
+  async history(@Req() request: GymRequest, @Query() query: unknown) {
+    const access = request.gymAccess;
+    if (!access || !['OWNER', 'TRAINER', 'MEMBER'].includes(access.role)) throw new ForbiddenException('Gym access is required');
+    const parsed = notificationHistoryQuerySchema.safeParse(query ?? {});
+    if (!parsed.success) invalid('Enter valid notification page filters');
+    const cursor = (() => {
+      if (!parsed.data.cursor) return null;
+      try {
+        const value = JSON.parse(Buffer.from(parsed.data.cursor, 'base64url').toString('utf8')) as { asOf?: unknown; createdAt?: unknown; id?: unknown; filter?: unknown };
+        if (typeof value.asOf !== 'string' || !Number.isFinite(Date.parse(value.asOf)) || typeof value.createdAt !== 'string'
+          || !Number.isFinite(Date.parse(value.createdAt)) || typeof value.id !== 'string' || !/^[A-Za-z0-9_:-]{1,128}$/.test(value.id)
+          || value.filter !== parsed.data.filter) invalid('Notification cursor is invalid');
+        return { asOf: new Date(value.asOf), createdAt: new Date(value.createdAt), id: value.id };
+      } catch { invalid('Notification cursor is invalid'); }
+    })();
+    return this.tenantGate.withVerifiedTenant(access, async tenant => tenant.$transaction(async tx => {
+      await tx.$executeRaw`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`;
+      const [clock] = cursor ? [null] : await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
+      const asOf = cursor?.asOf ?? clock!.now;
+      const where = { recipientIdentityId: access.identityId, supersededAt: null, createdAt: { lte: asOf },
+        ...(parsed.data.filter === 'UNREAD' ? { readAt: null } : {}),
+        ...(cursor ? { OR: [{ createdAt: { lt: cursor.createdAt } }, { createdAt: cursor.createdAt, id: { lt: cursor.id } }] } : {}) };
+      const [rows, unreadCount] = await Promise.all([
+        tx.notification.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: parsed.data.pageSize + 1,
+          select: { id: true, eventCode: true, title: true, message: true, linkKind: true, resourceId: true, readAt: true, createdAt: true } }),
+        tx.notification.count({ where: { recipientIdentityId: access.identityId, readAt: null, supersededAt: null } }),
+      ]);
+      const hasMore = rows.length > parsed.data.pageSize;
+      const items = rows.slice(0, parsed.data.pageSize);
+      const last = items.at(-1);
+      const nextCursor = hasMore && last ? Buffer.from(JSON.stringify({ asOf: asOf.toISOString(), createdAt: last.createdAt.toISOString(), id: last.id,
+        filter: parsed.data.filter })).toString('base64url') : null;
+      return notificationHistorySchema.parse({ items: items.map(item => ({ ...item, readAt: item.readAt?.toISOString() ?? null, createdAt: item.createdAt.toISOString() })),
+        unreadCount, asOf: asOf.toISOString(), filter: parsed.data.filter, pageSize: parsed.data.pageSize, nextCursor });
+    }));
+  }
+
   @Post('me/notifications/:notificationId/read')
   async markOne(@Req() request: GymRequest, @Param('notificationId') notificationId: string) {
     const access = request.gymAccess;
@@ -72,7 +111,7 @@ export class NotificationsController {
       const [clock] = await tx.$queryRaw<{ asOf: Date }[]>`SELECT clock_timestamp() AS "asOf"`;
       const through = parsed.data.through ? new Date(parsed.data.through) : clock!.asOf;
       if (through > clock!.asOf) invalid('Read-through instant cannot be in the future');
-      const changed = await tx.notification.updateMany({ where: { recipientIdentityId: access.identityId, readAt: null, createdAt: { lte: through } }, data: { readAt: clock!.asOf } });
+      const changed = await tx.notification.updateMany({ where: { recipientIdentityId: access.identityId, readAt: null, supersededAt: null, createdAt: { lte: through } }, data: { readAt: clock!.asOf } });
       const unreadCount = await tx.notification.count({ where: { recipientIdentityId: access.identityId, readAt: null, supersededAt: null } });
       return notificationReadAllSchema.parse({ changedCount: changed.count, unreadCount, asOf: clock!.asOf.toISOString(), through: through.toISOString() });
     }));
