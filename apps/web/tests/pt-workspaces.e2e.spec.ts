@@ -3,13 +3,14 @@ import { recordInitialSession } from '../../api/dist/sessions/session-commands.j
 import { requestDigest } from '../../api/src/operations/primitives.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
-import { createHmac, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 import { seedTwoGymFixture } from '../../api/test/fixtures/two-gym-fixture.js';
 import { createDisposableEnvironment } from '../../api/test/support/disposable-environment.js';
+import { installBrowserSession } from './support/browser-session.js';
 
 test.use({ trace: 'off', screenshot: 'off' });
 const root = fileURLToPath(new URL('../../../', import.meta.url));
@@ -64,14 +65,7 @@ async function startApi() {
 }
 async function loginAs(page: Page, role: 'MEMBER' | 'TRAINER' | 'OWNER', path: string) {
   const user = role === 'OWNER' ? fixture.users.ownerA : role === 'TRAINER' ? fixture.users.trainerUser : fixture.users.memberUser;
-  await page.goto('about:blank');
-  await page.context().clearCookies();
-  const authVersion = (await fixture.master.user.findUniqueOrThrow({ where: { id: user.id }, select: { authVersion: true } })).authVersion;
-  const issuedAt = Math.floor(Date.now() / 1000);
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256' })).toString('base64url');
-  const payload = Buffer.from(JSON.stringify({ sub: user.id, authVersion, iss: 'gymos-v2', aud: 'gymos-api', iat: issuedAt, exp: issuedAt + 900 })).toString('base64url');
-  const signature = createHmac('sha256', jwtSecret).update(`${header}.${payload}`).digest('base64url');
-  await page.context().addCookies([{ name: 'gymos_access_token', value: `${header}.${payload}.${signature}`, url: webBase, httpOnly: true, sameSite: 'Lax' }]);
+  await installBrowserSession({ page, master: fixture.master, identityId: user.id, jwtSecret, origin: webBase });
   await page.goto(`${webBase}${path}`);
 }
 

@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
-import { createHmac, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -61,12 +61,15 @@ async function startApi() {
 }
 async function loginAs(page: Page) {
   const user = fixture.users.memberUser;
-  const authVersion = (await fixture.master.user.findUniqueOrThrow({ where: { id: user.id }, select: { authVersion: true } })).authVersion;
-  const issuedAt = Math.floor(Date.now() / 1000);
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256' })).toString('base64url');
-  const payload = Buffer.from(JSON.stringify({ sub: user.id, authVersion, iss: 'gymos-v2', aud: 'gymos-api', iat: issuedAt, exp: issuedAt + 900 })).toString('base64url');
-  const signature = createHmac('sha256', jwtSecret).update(`${header}.${payload}`).digest('base64url');
-  await page.context().addCookies([{ name: 'gymos_access_token', value: `${header}.${payload}.${signature}`, url: webBase, httpOnly: true, sameSite: 'Lax' }]);
+  const response = await fetch(`${apiBase}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: user.email, password: fixture.password, deviceClass: 'SHARED' }) });
+  if (!response.ok) throw new Error('Owned synthetic member login failed');
+  const session = await response.json() as { accessToken?: unknown; refreshToken?: unknown };
+  if (typeof session.accessToken !== 'string' || typeof session.refreshToken !== 'string') throw new Error('Owned synthetic login did not return session credentials');
+  await page.context().addCookies([
+    { name: 'gymos_access_token', value: session.accessToken, url: webBase, httpOnly: true, sameSite: 'Lax' },
+    { name: 'gymos_refresh_token', value: session.refreshToken, url: webBase, httpOnly: true, sameSite: 'Lax' },
+  ]);
   await page.goto(`${webBase}/gyms/${fixture.gyms[0]!.slug}/member`);
 }
 

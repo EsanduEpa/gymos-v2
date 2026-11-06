@@ -1,6 +1,6 @@
 import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { promisify } from 'node:util';
-import { createHmac, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
@@ -9,6 +9,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { seedTwoGymFixture } from '../../api/test/fixtures/two-gym-fixture.js';
 import { createDisposableEnvironment } from '../../api/test/support/disposable-environment.js';
 import { requestDigest } from '../../api/src/operations/primitives.js';
+import { installBrowserSession } from './support/browser-session.js';
 
 // Authentication scenarios must never persist bearer/password traffic in traces.
 test.use({ trace: 'off', screenshot: 'off' });
@@ -86,30 +87,11 @@ async function waitForSessionLifecycle(page: Page): Promise<void> {
   await ready;
 }
 
-async function openWithTestSession(page: Page, userId: string, path: string, expiresIn = 900): Promise<void> {
-  const issuedAt = Math.floor(Date.now() / 1000);
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256' })).toString('base64url');
-  const payload = Buffer.from(JSON.stringify({
-    sub: userId,
-    authVersion: (await fixture.master.user.findUniqueOrThrow({ where: { id: userId }, select: { authVersion: true } })).authVersion,
-    iss: 'gymos-v2',
-    aud: 'gymos-api',
-    iat: issuedAt,
-    exp: issuedAt + expiresIn,
-  })).toString('base64url');
-  const signature = createHmac('sha256', testJwtSecret).update(`${header}.${payload}`).digest('base64url');
-  const token = `${header}.${payload}.${signature}`;
-  // Stop any old streamed redirect before changing the identity in this tab.
-  await page.goto('about:blank');
-  await page.context().clearCookies();
-  await page.context().addCookies([{
-    name: 'gymos_access_token',
-    value: token,
-    url: webBase,
-    httpOnly: true,
-    sameSite: 'Lax',
-  }]);
+async function openWithTestSession(page: Page, userId: string, path: string, expiresIn = 900): Promise<string> {
+  const installed = await installBrowserSession({ page, master: fixture.master, identityId: userId, jwtSecret: testJwtSecret, origin: webBase,
+    accessLifetimeSeconds: expiresIn, ...(expiresIn < 0 ? { expired: true } : {}) });
   await page.goto(`${webBase}${path}`);
+  return installed.accessToken;
 }
 
 function localDate(instant: Date, timeZone: string) {
@@ -118,10 +100,10 @@ function localDate(instant: Date, timeZone: string) {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
-async function openGymWithTestSession(page: Page, userId: string, slug: string, expiresIn = 900): Promise<void> {
+async function openGymWithTestSession(page: Page, userId: string, slug: string, expiresIn = 900): Promise<string> {
   const gym = fixture.gyms.find(row => row.slug === slug);
   const link = gym ? await fixture.master.gymAccess.findUnique({ where: { userId_gymId: { userId, gymId: gym.id } }, select: { role: true } }) : null;
-  await openWithTestSession(page, userId, `/gyms/${slug}${link ? `/${link.role.toLowerCase()}` : ''}`, expiresIn);
+  return openWithTestSession(page, userId, `/gyms/${slug}${link ? `/${link.role.toLowerCase()}` : ''}`, expiresIn);
 }
 
 async function fillMemberEnrollment(page: Page, input: { name: string; email: string; planId: string; key?: string }): Promise<string> {
@@ -517,8 +499,8 @@ test('full member enrollment hands off a one-time credential and enforces first-
     await memberPage.getByRole('button', { name: 'Continue to sign in' }).click();
     await loginWithPassword(memberPage, email, replacement);
     await expect(memberPage).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/member$`));
-    await expect(memberPage.getByRole('heading', { name: 'Test Gym Alpha', exact: true })).toBeVisible();
-    await expect(memberPage.locator('.gym-banner')).toContainText('Your member workspace.');
+    await expect(memberPage.locator('.shell-gym-name')).toContainText('Test Gym Alpha');
+    await expect(memberPage.getByRole('heading', { name: /Welcome back, Browser/ })).toBeVisible();
     const memberCookie = (await memberContext.cookies()).find(cookie => cookie.name === 'gymos_access_token');
     expect(memberCookie?.httpOnly).toBe(true);
     expect((await request.get(`${apiBase}/gyms/${fixture.gyms[1].slug}/access`, {
@@ -596,7 +578,8 @@ test('existing identity explicitly consents, keeps its password, and enters the 
     await expect(memberPage).toHaveURL(/\/gyms\/select$/);
     await memberPage.getByRole('link', { name: /Test Gym Beta.*member/ }).click();
     await expect(memberPage).toHaveURL(new RegExp(`/gyms/${fixture.gyms[1].slug}/member$`));
-    await expect(memberPage.locator('.gym-banner')).toContainText('Your member workspace.');
+    await expect(memberPage.locator('.shell-gym-name')).toContainText('Test Gym Beta');
+    await expect(memberPage.getByRole('heading', { name: /Welcome back, Member/ })).toBeVisible();
   } finally { await memberContext.close(); }
 });
 
@@ -897,7 +880,7 @@ test('role shell supports keyboard drawer, safe switching and current context', 
     await page.setViewportSize({ width: 1440, height: 1000 });
     await openGymWithTestSession(page, user.id, fixture.gyms[0].slug);
     await expect(page).toHaveURL(new RegExp(`/${role === 'trainer' ? 'trainer/schedule' : role}$`));
-    await expect(page.locator('.shell-profile')).toContainText(user.displayName!);
+    await expect(page.locator('.shell-account-menu')).toContainText(user.displayName!);
     await expect(page.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link', { name: label, exact: true })).toHaveAttribute('aria-current', 'page');
     expect(await page.locator('.shell-sidebar').evaluate(el => el.getBoundingClientRect().width)).toBe(224);
     expect(await page.locator('.shell-header').evaluate(el => el.getBoundingClientRect().height)).toBe(52);
@@ -930,7 +913,7 @@ test('role shell supports keyboard drawer, safe switching and current context', 
   await page.getByRole('link', { name: 'Switch gym' }).click();
   await expect(page.getByRole('heading', { name: 'Choose a gym' })).toBeVisible();
   await page.getByRole('link', { name: /Test Gym Beta/ }).click();
-  await expect(page.getByRole('heading', { name: 'Test Gym Beta', exact: true })).toBeVisible();
+  await expect(page.locator('.shell-gym-name')).toContainText('Test Gym Beta');
   await expect(page.locator('.gym-dashboard')).toHaveCSS('--gym-color', '#7C3AED');
   await expect(page.locator('main')).not.toContainText('Test Gym Alpha');
   await page.getByRole('link', { name: 'Switch gym' }).click();
@@ -953,7 +936,7 @@ test('web sessions enforce cookie, origin, expiry, revocation and logout boundar
   const evidence = join(webDirectory, 'test-results/migration-evidence/GYMOS-MIG-020');
   await mkdir(evidence, { recursive: true });
   await openGymWithTestSession(page, fixture.users.ownerB.id, fixture.gyms[1].slug);
-  await expect(page.getByRole('heading', { name: 'Test Gym Beta', exact: true })).toBeVisible();
+  await expect(page.locator('.shell-gym-name')).toContainText('Test Gym Beta');
   const cookie = (await page.context().cookies()).find(item => item.name === 'gymos_access_token');
   const token = cookie!.value;
   expect((await page.content()).includes(token)).toBe(false);
@@ -971,7 +954,7 @@ test('web sessions enforce cookie, origin, expiry, revocation and logout boundar
   expect((await fixture.master.user.findUniqueOrThrow({ where: { id: fixture.users.ownerB.id } })).authVersion).toBe(before);
   const otherTab = await page.context().newPage();
   await otherTab.goto(`${webBase}/gyms/${fixture.gyms[1].slug}/owner`);
-  await expect(otherTab.locator('.shell-profile')).toContainText('Owner Beta');
+  await expect(otherTab.locator('.shell-account-menu')).toContainText('Owner Beta');
   await waitForSessionLifecycle(otherTab);
   await waitForSessionLifecycle(page);
   // A focus-triggered 401 during logout must not abort delivery of the
@@ -990,7 +973,9 @@ test('web sessions enforce cookie, origin, expiry, revocation and logout boundar
   await page.unrouteAll({ behavior: 'wait' });
   await expect(otherTab).toHaveURL(/\/login$/);
   expect((await page.context().cookies()).some(item => item.name === 'gymos_access_token')).toBe(false);
-  expect((await fixture.master.user.findUniqueOrThrow({ where: { id: fixture.users.ownerB.id } })).authVersion).toBe(before + 1);
+  expect((await fixture.master.user.findUniqueOrThrow({ where: { id: fixture.users.ownerB.id } })).authVersion).toBe(before);
+  expect(await fixture.master.identitySession.findFirst({ where: { identityId: fixture.users.ownerB.id, revokedAt: { not: null } },
+    select: { revocationReason: true } })).toMatchObject({ revocationReason: 'CURRENT_DEVICE_LOGOUT' });
   expect((await request.get(`${apiBase}/auth/session`, { headers: { authorization: `Bearer ${token}` } })).status()).toBe(401);
   expect((await request.get(`${apiBase}/gyms/${fixture.gyms[1].slug}/members`, { headers: { authorization: `Bearer ${token}` } })).status()).toBe(401);
   await page.goBack();
@@ -999,17 +984,21 @@ test('web sessions enforce cookie, origin, expiry, revocation and logout boundar
   await otherTab.close();
   await openGymWithTestSession(page, fixture.users.ownerA.id, fixture.gyms[0].slug, -1);
   await expect(page).toHaveURL(/\/login(?:\?|$)/);
-  await openGymWithTestSession(page, fixture.users.ownerA.id, fixture.gyms[0].slug, 3);
-  await expect(page.getByRole('heading', { name: 'Test Gym Alpha', exact: true })).toBeVisible();
-  await expect(page).toHaveURL(/\/login\?error=expired$/, { timeout: 10_000 });
+  const shortLivedToken = await openGymWithTestSession(page, fixture.users.ownerA.id, fixture.gyms[0].slug, 3);
+  await expect(page.locator('.shell-gym-name')).toContainText('Test Gym Alpha');
+  const renewedToken = (await page.context().cookies()).find(cookie => cookie.name === 'gymos_access_token')?.value;
+  expect(renewedToken).toBeTruthy();
+  expect(renewedToken).not.toBe(shortLivedToken);
+  expect((await page.request.get(`${webBase}/api/session`)).status()).toBe(200);
+  await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/owner$`));
   // A new identity in the shared cookie must never retain the old shell.
   await openGymWithTestSession(page, fixture.users.ownerA.id, fixture.gyms[0].slug);
-  await expect(page.locator('.shell-profile')).toContainText('Owner Alpha');
+  await expect(page.locator('.shell-account-menu')).toContainText('Owner Alpha');
   await fixture.master.user.update({ where: { id: fixture.users.ownerA.id }, data: { authVersion: { increment: 1 } } });
   await page.reload();
   await expect(page).toHaveURL(/\/login(?:\?|$)/);
   await openGymWithTestSession(page, fixture.users.ownerB.id, fixture.gyms[1].slug);
-  await expect(page.locator('.shell-profile')).toContainText('Owner Beta');
+  await expect(page.locator('.shell-account-menu')).toContainText('Owner Beta');
   await expect(page.locator('main')).not.toContainText('Alpha Person');
   await page.screenshot({ path: join(evidence, 'fresh-identity.png'), animations: 'disabled' });
 });
@@ -1288,7 +1277,7 @@ test('request budgets stay enabled in each owned API scenario',async({page,reque
 
 test('logout clears the browser even when API revocation is unavailable', async ({ page }) => {
   await openGymWithTestSession(page, fixture.users.ownerB.id, fixture.gyms[1].slug);
-  await expect(page.getByRole('heading', { name: 'Test Gym Beta', exact: true })).toBeVisible();
+  await expect(page.locator('.shell-gym-name')).toContainText('Test Gym Beta');
   const before = (await fixture.master.user.findUniqueOrThrow({ where: { id: fixture.users.ownerB.id } })).authVersion;
   await stop(api);
   const failedPage = await page.context().newPage();
@@ -1297,7 +1286,7 @@ test('logout clears the browser even when API revocation is unavailable', async 
   await expect(failedPage.getByRole('button', { name: 'Try again' })).toBeVisible();
   await failedPage.close();
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
-  await expect(page).toHaveURL(/\/login\?error=logout-uncertain$/);
+  await expect(page).toHaveURL(/\/login\?error=logout-uncertain(?:&|$)/);
   await expect(page.locator('.ui-feedback[role="alert"]')).toContainText('could not confirm sign-out on other devices');
   expect((await page.context().cookies()).some(item => item.name === 'gymos_access_token')).toBe(false);
   expect((await fixture.master.user.findUniqueOrThrow({ where: { id: fixture.users.ownerB.id } })).authVersion).toBe(before);

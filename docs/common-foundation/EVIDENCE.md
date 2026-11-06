@@ -225,3 +225,35 @@ Implementation: added Help links from sign-in, recovery, authenticated applicati
 - `git diff --check` — passed after final CF-07 edits.
 
 No automated browser test was run for CF-07. CF-06's existing Playwright notification journey remains failed as recorded above and must be resolved in CF-08. Manual browser walkthroughs, mobile/zoom/theme, keyboard/focus/accessibility, and real owner privacy workflow tests were not performed. No deploy, merge, pilot, external message, or shared/production DB change occurred; PT progress/evidence/runbook were not modified. CF-07 is Ready for review on its passing automated checks, not Verified; the common-foundation release remains unverified while the CF-06 automated browser failure is unresolved.
+
+## CF-08 automated verification (2026-11-06)
+
+### Browser session fixture and focused journeys
+
+- Added `apps/web/tests/support/browser-session.ts` to mint a real Master `IdentitySession`, store the matching SHA-256 refresh hash, and install a signed session-bound access token plus refresh cookie in Playwright. Updated test helpers in the two-gym, member, trainer, PT workspace and session-read specs. The notification-bell test now obtains cookies through `/auth/login`.
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web exec playwright test --config playwright.config.ts tests/notifications-bell.e2e.spec.ts` — passed, 1 test; disposable databases/container removed.
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web exec playwright test --config playwright.config.ts tests/two-gym.e2e.spec.ts --grep 'web sessions enforce'` — passed, 1 test; disposable fixture cleanup completed. The session journey verifies current-device logout and refresh lifecycle.
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web exec playwright test --config playwright.config.ts tests/two-gym.e2e.spec.ts --grep 'existing identity explicitly consents|web sessions enforce|full member enrollment'` — 2 passed, 1 failed on the initial run; the session assertion was corrected for the current shell/logout contract and subsequently passed in isolation.
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web exec playwright test --config playwright.config.ts` — 36 tests: 23 passed, 13 failed. Passed notifications, PT workspace viewports/cancellation, CF owner-created temporary-credential onboarding, existing-identity consent/credential preservation, session lifecycle after correction, and several platform journeys. Failures exposed stale selectors, outdated role/layout assertions, missing availability in owned booking fixtures, and enrollment/session journeys needing further diagnosis.
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web exec playwright test --config playwright.config.ts tests/member-workspace.e2e.spec.ts tests/owner-session-booking.e2e.spec.ts` — 4 member-workspace tests passed; the owner-booking test exposed a stale one-notice assertion (the booking correctly creates member and trainer notices). After correcting that assertion, `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web exec playwright test --config playwright.config.ts tests/owner-session-booking.e2e.spec.ts` passed, 1 test.
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web exec playwright test --config playwright.config.ts tests/member-workspace.e2e.spec.ts --grep 'member requests keep drafts'` — passed, 1 test after aligning the owned fixture with the two-live-pending-request cap and current late-cancellation quote copy.
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/web exec playwright test --config playwright.config.ts tests/session-reads.e2e.spec.ts` — passed, 1 test after correcting stale role headings/regions/dialogs and pagination expectations. The app's monthly member overview link now explicitly opens `view=list`; before the fix it landed on the calendar route despite promising filtered matching sessions.
+- The earlier 2-passed/4-failed targeted run above is superseded by these focused passing reruns. The full browser suite was not rerun after the corrections; its earlier 23-passed/13-failed result remains the latest full-suite result, so the other failures remain unresolved.
+
+### Owned API/database and regression suites
+
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm test:cf:owned` — passed, 1 file / 4 tests; cleanup removed 4 owned DBs and disposable container.
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/api exec vitest run --config vitest.config.identity.ts --disableConsoleIntercept` — passed, 1 file / 18 tests; cleanup removed 4 owned DBs and disposable container.
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/api exec vitest run --config vitest.config.notifications.ts --disableConsoleIntercept` — passed, 3 files / 15 tests, including Account/Gym notice authorization, PT reminders and tenant upgrade `.4`→`.6`; owned databases/container removed.
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm test:pt:owned` — passed, 13 files / 56 tests; owned disposable cleanup and PT upgrade rehearsal completed. Injected finance errors were expected test cases; command exited 0.
+
+### Workspace checks after latest harness edits
+
+- `pnpm --dir apps/web exec tsc --noEmit --incremental false --pretty false` — passed.
+- `pnpm --dir apps/web build` — passed after the owner month-overview drilldown source change; Next.js compiled, typechecked and generated 63 routes.
+- `pnpm typecheck:workspace` — passed.
+- `pnpm lint:workspace` — passed; API reports three existing unused-code warnings in analytics/session availability; web lint clean.
+- `pnpm check:workspace` — passed; five-package graph valid.
+- `git diff --check` — passed.
+
+Manual browser/device/accessibility acceptance, pilot, deployment and merge were not performed. No shared or production database was changed. CF-08 is incomplete because browser regressions remain; no Ready for review or Verified status is claimed. The notification-bell failure described in the earlier CF-06 record was resolved by this durable session fixture and the focused notification rerun above. Next automated work is to correct or retire stale test interactions based on current UI/API behavior, rerun the full browser suite, then record final workspace and upgrade results. PT implementation and PT progress/evidence/runbook remain untouched.

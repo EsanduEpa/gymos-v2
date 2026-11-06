@@ -6,7 +6,7 @@ const labels: Record<keyof MemberSessionOverview['items'][number]['monthSessionC
 };
 
 function href(slug: string, month: string, q: string | undefined, page: number, memberId?: string) {
-  const query = new URLSearchParams({ mode: 'month', month, page: String(page) });
+  const query = new URLSearchParams({ view: 'list', mode: 'month', month, page: String(page) });
   if (q) query.set('q', q);
   if (memberId) query.set('memberId', memberId);
   return `/gyms/${encodeURIComponent(slug)}/owner/sessions?${query}`;

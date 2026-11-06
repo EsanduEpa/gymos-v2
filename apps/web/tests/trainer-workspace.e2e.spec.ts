@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
-import { createHmac, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
@@ -9,6 +9,7 @@ import { createDisposableEnvironment } from '../../api/test/support/disposable-e
 import { reserveSessionCredit } from '../../api/dist/sessions/credit-holds.js';
 import { requestDigest } from '../../api/src/operations/primitives.js';
 import { seedTwoGymFixture } from '../../api/test/fixtures/two-gym-fixture.js';
+import { installBrowserSession } from './support/browser-session.js';
 
 test.use({ trace: 'off', screenshot: 'off', video: 'off' });
 const root = fileURLToPath(new URL('../../../', import.meta.url));
@@ -93,16 +94,7 @@ async function seedSessions() {
 
 }
 async function openAs(page: Page, userId: string, path: string) {
-  const issuedAt = Math.floor(Date.now() / 1000);
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256' })).toString('base64url');
-  const payload = Buffer.from(JSON.stringify({ sub: userId,
-    authVersion: (await fixture.master.user.findUniqueOrThrow({ where: { id: userId }, select: { authVersion: true } })).authVersion,
-    iss: 'gymos-v2', aud: 'gymos-api', iat: issuedAt, exp: issuedAt + 900 })).toString('base64url');
-  const signature = createHmac('sha256', jwtSecret).update(`${header}.${payload}`).digest('base64url');
-  const token = `${header}.${payload}.${signature}`;
-  await page.goto('about:blank');
-  await page.context().clearCookies();
-  await page.context().addCookies([{ name: 'gymos_access_token', value: token, url: webBase, httpOnly: true, sameSite: 'Lax' }]);
+  await installBrowserSession({ page, master: fixture.master, identityId: userId, jwtSecret, origin: webBase });
   await page.goto(`${webBase}${path}`);
 }
 

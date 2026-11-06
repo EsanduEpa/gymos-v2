@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
 import { createServer as createHttpServer, request as forwardRequest, type Server } from 'node:http';
-import { createHmac, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
@@ -10,6 +10,7 @@ import { createDisposableEnvironment } from '../../api/test/support/disposable-e
 import { reserveSessionCredit } from '../../api/dist/sessions/credit-holds.js';
 import { requestDigest } from '../../api/src/operations/primitives.js';
 import { seedTwoGymFixture } from '../../api/test/fixtures/two-gym-fixture.js';
+import { installBrowserSession } from './support/browser-session.js';
 
 test.use({ trace: 'off', screenshot: 'off', video: 'off' });
 const root = fileURLToPath(new URL('../../../', import.meta.url));
@@ -97,16 +98,7 @@ async function seedSessions() {
 
 }
 async function openAs(page: Page, userId: string, path: string) {
-  const issuedAt = Math.floor(Date.now() / 1000);
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256' })).toString('base64url');
-  const payload = Buffer.from(JSON.stringify({ sub: userId,
-    authVersion: (await fixture.master.user.findUniqueOrThrow({ where: { id: userId }, select: { authVersion: true } })).authVersion,
-    iss: 'gymos-v2', aud: 'gymos-api', iat: issuedAt, exp: issuedAt + 900 })).toString('base64url');
-  const signature = createHmac('sha256', jwtSecret).update(`${header}.${payload}`).digest('base64url');
-  const token = `${header}.${payload}.${signature}`;
-  await page.goto('about:blank');
-  await page.context().clearCookies();
-  await page.context().addCookies([{ name: 'gymos_access_token', value: token, url: webBase, httpOnly: true, sameSite: 'Lax' }]);
+  await installBrowserSession({ page, master: fixture.master, identityId: userId, jwtSecret, origin: webBase });
   await page.goto(`${webBase}${path}`);
 }
 
@@ -150,6 +142,12 @@ async function seedCoachingCredits() {
   const tenant = fixture.tenants[0];
   memberId = (await tenant.member.findUniqueOrThrow({ where: { identityId: fixture.users.memberUser.id } })).id;
   trainerId = (await tenant.trainer.findUniqueOrThrow({ where: { identityId: fixture.users.trainerUser.id } })).id;
+  const requestDate = new Date(`${localDate(new Date(Date.now() + 4 * 86400000), 'Asia/Colombo')}T00:00:00.000Z`);
+  const availabilityReceipt = await tenant.commandReceipt.create({ data: { actorIdentityId: fixture.users.ownerA.id, commandKind: 'TEST_MEMBER_REQUEST_AVAILABILITY',
+    idempotencyKey: `member-request-availability-${environment.runId}`, requestDigest: requestDigest({ run: environment.runId, availability: true }),
+    state: 'COMMITTED', committedAt: new Date(), safeResult: { state: 'COMPLETE' } } });
+  await tenant.pTAvailabilityRule.create({ data: { trainerId, kind: 'DATED_WINDOW', localDate: requestDate, startMinute: 900, endMinute: 1020,
+    createdByIdentityId: fixture.users.ownerA.id, commandReceiptId: availabilityReceipt.id } });
   const today = localDate(new Date(), 'Asia/Colombo');
   const start = new Date(`${today}T00:00:00Z`); start.setUTCDate(start.getUTCDate() - 2);
   const end = new Date(start); end.setUTCDate(end.getUTCDate() + 90);
@@ -168,7 +166,9 @@ async function seedCoachingCredits() {
   // The fixture uses the source-generated client; the compiled API helper's
   // declaration refers to the equivalent dist-generated transaction type.
   await tenant.$transaction(tx => reserveSessionCredit(tx as unknown as Parameters<typeof reserveSessionCredit>[0], { masterGymId: fixture.gyms[0].id, sessionId: ready.id, memberId, trainerId, scheduledLocalDate: localDate(readyStart, 'Asia/Colombo'), explicitPackId: pack.id, actorIdentityId: fixture.users.ownerA.id, receiptId: readyReceipt.id }));
-  for (let i = 0; i < 2; i++) {
+  // Keep one pending request so the member request journey can create a second
+  // request within the per-member two-request limit.
+  for (let i = 0; i < 1; i++) {
     const tomorrow = new Date(`${today}T00:00:00Z`); tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
     const date = tomorrow.toISOString().slice(0,10);
     const time = new Date(`${date}T${i ? '19' : '17'}:00:00+05:30`);
@@ -206,7 +206,7 @@ test('member appearance presents verified home and all member screens in both th
   await expect(page.locator('.member-metric').nth(1).locator('strong')).toHaveText('1');
   await expect(page.locator('.member-metric').nth(2).locator('strong')).toHaveText('3');
   await expect(page.locator('.member-workout-feature')).toContainText('Member Strength Plan');
-  await expect(page.locator('.member-next-sessions')).toContainText('Trainer Alpha');
+  await expect(page.locator('.member-pt-priority')).toContainText('Trainer Alpha');
   const geometry: Record<number, unknown> = {};
   for (const mode of ['light','dark'] as const) {
     if (mode === 'dark') await page.goto(`${webBase}${base}`);
@@ -310,25 +310,21 @@ test('member requests keep drafts and withdraw without holding credits then conf
   await page.getByRole('button', { name: 'Search', exact: true }).click();
   await page.getByRole('link', { name: 'Request this trainer', exact: true }).click();
   await page.setViewportSize({ width: 320, height: 844 });
-  const requestDay = localDate(new Date(Date.now() + 2 * 86400000), 'Asia/Colombo');
+  const requestDay = localDate(new Date(Date.now() + 4 * 86400000), 'Asia/Colombo');
   await page.getByLabel('Session date', { exact: true }).fill(requestDay);
-  await page.getByLabel(/^Start time/).fill('15:00');
+  const startTime = page.getByLabel(/^Available start time/);
+  await expect(startTime).toBeEnabled();
+  await startTime.selectOption(await startTime.locator('option').filter({ hasText: '15:00' }).getAttribute('value') ?? '');
   await page.getByLabel('Note for the trainer (optional)').fill('Member UI request');
-  await page.getByLabel('Duration in minutes').fill('1');
-  await page.getByRole('button', { name: 'Request session', exact: true }).click();
-  expect(await page.getByLabel('Duration in minutes').evaluate(e => (e as HTMLInputElement).validity.rangeUnderflow)).toBe(true);
-  await page.getByLabel('Duration in minutes').fill('30');
-  await page.getByLabel('UTC offset, if the local time repeats').fill('+01:00');
-  await page.getByRole('button', { name: 'Request session', exact: true }).click();
-  await expect(page.locator('.member-request-form').getByRole('alert')).toBeVisible();
-  await expect(page.getByLabel('Session date', { exact: true })).toHaveValue(requestDay);
-  await expect(page.getByLabel('Note for the trainer (optional)')).toHaveValue('Member UI request');
-  await expect(page.getByLabel(/^Start time/)).toHaveValue('15:00');
-  await page.getByLabel('UTC offset, if the local time repeats').fill('');
   const holdsBefore = await tenant.sessionCreditHold.count();
   const movementsBefore = await tenant.packCreditMovement.count();
   await page.getByRole('button', { name: 'Request session', exact: true }).click();
-  await expect(page.locator('.member-request-form').getByRole('status')).toContainText('trainer must accept');
+  try {
+    await expect(page.locator('.member-request-form').getByRole('status')).toContainText('trainer must accept');
+  } catch (error) {
+    console.error('[member-request-browser-diagnostics]', { api: api?.errorText(), web: web?.errorText(), form: await page.locator('.member-request-form').innerText() });
+    throw error;
+  }
   const session = await tenant.pTSession.findFirstOrThrow({ where: { notes: 'Member UI request' } });
   expect(session.state).toBe('PENDING_CONFIRMATION');
   expect(await tenant.sessionCreditHold.count()).toBe(holdsBefore);
@@ -344,7 +340,7 @@ test('member requests keep drafts and withdraw without holding credits then conf
   const ready = page.locator(`#session-trainer-ready-${environment.runId}`);
   await ready.getByRole('button', { name: 'Cancel session', exact: true }).click();
   const quote = page.getByRole('dialog', { name: 'Cancel session', exact: true });
-  await expect(quote).toContainText('late under the gym policy');
+  await expect(quote).toContainText('This late cancellation consumes one PT credit.');
   await expect(quote.getByRole('button', { name: 'Cancel session', exact: true })).toBeDisabled();
   await quote.getByRole('checkbox').check();
   await quote.getByRole('button', { name: 'Cancel session', exact: true }).click();

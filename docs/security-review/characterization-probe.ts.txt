@@ -1,0 +1,33 @@
+import { SignJWT } from 'jose';
+import { identityFromAuthorization } from './auth-token.js';
+import { AuthSessionGuard } from './identity/auth-session.guard.js';
+import { CredentialsController } from './credentials.controller.js';
+import type { ExecutionContext } from '@nestjs/common';
+import type { AuthSessionService } from './identity/auth-session.service.js';
+import type { CredentialService } from './identity/credential.service.js';
+import type { Request } from 'express';
+
+describe('security review characterization (not desired security policy)', () => {
+  const old = process.env.JWT_SECRET;
+  beforeAll(() => { process.env.JWT_SECRET = 'review-only-synthetic-signing-key-123456789'; });
+  afterAll(() => { if (old === undefined) delete process.env.JWT_SECRET; else process.env.JWT_SECRET = old; });
+  it('accepts a correctly signed token without expiration or session claims', async () => {
+    const token = await new SignJWT({ authVersion: 0 }).setProtectedHeader({ alg: 'HS256' })
+      .setSubject('synthetic-user').setIssuer('gymos-v2').setAudience('gymos-api')
+      .sign(new TextEncoder().encode(process.env.JWT_SECRET));
+    expect(await identityFromAuthorization(`Bearer ${token}`)).toEqual({ userId: 'synthetic-user', authVersion: 0 });
+  });
+  it('legacy token reaches security-events without checking revocation or authVersion', async () => {
+    const token = await new SignJWT({ authVersion: 0 }).setProtectedHeader({ alg: 'HS256' })
+      .setSubject('synthetic-user').setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('5m')
+      .sign(new TextEncoder().encode(process.env.JWT_SECRET));
+    const request = { headers: { authorization: `Bearer ${token}` } } as Request;
+    const assertActive = vi.fn().mockRejectedValue(new Error('revoked'));
+    const guard = new AuthSessionGuard({ assertActive } as unknown as AuthSessionService);
+    expect(await guard.canActivate({ switchToHttp: () => ({ getRequest: () => request }) } as ExecutionContext)).toBe(true);
+    const securityEvents = vi.fn().mockResolvedValue({ items: [] });
+    await new CredentialsController({ securityEvents } as unknown as CredentialService).securityEvents(request);
+    expect(assertActive).not.toHaveBeenCalled();
+    expect(securityEvents).toHaveBeenCalledWith('synthetic-user');
+  });
+});
