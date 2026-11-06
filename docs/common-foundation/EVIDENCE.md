@@ -115,3 +115,28 @@ Implementation review: added Master `IdentitySession` migration with immutable i
 Corrected attempts: initial identity integration exposed one stale error-message assertion and a stale replay token; both were corrected, then the full identity suite passed. The first unit run hit sandbox `listen EPERM`; rerun with local listener permission passed. Initial PT owned regression surfaced Nest dependency injection metadata because `AuthSessionService` imported `DatabaseService` type-only; switched to runtime import and reran below. The manifest test initially expected `.2`; updated to `.3` to match the additive migration. Initial unit run before the local test permission also exposed the ESM primitive import cycle in contracts; fixed by making `sessions.ts` independent of the root barrel. These failed attempts are not counted as passes.
 
 Manual browser/device selection, refresh and expiry walkthroughs, cross-device logout acceptance, visual/mobile/accessibility review, and live tenant-outage UX checks remain explicitly deferred. No manual tests were conducted and no deployment, merge, pilot, external message or shared/production database mutation occurred.
+
+## CF-03 automated checks (2026-11-06)
+
+CF-03 adds normal password-change session/recovery revocation and append-only security events; Master-owned hashed one-time recovery credentials; a reauthenticated gym Owner recovery flow for eligible ordinary identities and uniquely scoped pending applicants; a separately guarded SuperAdmin operator recovery flow; recovery completion, security history and application-facing recovery screens. Gym applicant recovery does not activate access or alter application state. Plaintext recovery credentials are returned once and delivered only in a URL fragment. Verification method and attestation are recorded; they do not prove that real-world identity checks occurred.
+
+- `pnpm --dir packages/contracts build` — passed.
+- `pnpm --dir packages/contracts test` — passed, 63 tests, including new strict staff recovery input/output coverage.
+- `pnpm exec prisma format --schema packages/database-master/prisma/schema.prisma` and `pnpm exec prisma generate --schema packages/database-master/prisma/schema.prisma` — passed.
+- `pnpm exec prisma validate --schema packages/database-master/prisma/schema.prisma` — passed.
+- `shasum -a 256 packages/database-master/prisma/migrations/20261106080000_identity_recovery/migration.sql` — `c09cd5b94716b5a7c7714f2be4f57ec54fe57bdfbd1d1a2b77a22949a24a50bd`, matches the Master template manifest.
+- `pnpm --dir apps/api exec vitest run --config vitest.config.tenancy.ts` — passed, 2 files / 2 tests (Master and tenant template manifests).
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/api exec vitest run --config vitest.config.identity.ts --disableConsoleIntercept` — passed, 1 file / 17 tests with disposable database/container cleanup. Includes normal password change and durable session invalidation; owner-assisted Member and pending-applicant recovery; fresh owner/SuperAdmin password checks; token attempts, reissue, expiry/replay and issuer downgrade; pending applicant remains without GymAccess; and separate operator recovery.
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm test:cf:owned` — passed, 1 file / 4 tests with disposable fixtures cleaned. Covers CF-01 pending access, consent/credentials, duplicate and decision concurrency, and identity-scoped notice authorization.
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/api exec vitest run --config vitest.config.tenancy-integration.ts test/tenancy/tenant-schema.integration.test.ts --disableConsoleIntercept` — passed, 1 file / 32 tests with disposable fixture cleanup; retains existing owner-created enrollment and CF-01 application-bound consent/reconciliation regression coverage.
+- `pnpm test:unit` — passed: contracts 63, API client 14, theme tokens 5, API source 18 files / 63 tests, and pool suite 3 files / 25 tests. Executed with local listener permission for the API controller test.
+- `pnpm --dir apps/api exec tsc --noEmit --incremental false --pretty false` — passed (run after the operator recovery implementation).
+- `pnpm --dir apps/web exec tsc --noEmit --incremental false --pretty false` — passed after final support-context guard changes.
+- `pnpm --dir apps/api lint && pnpm --dir apps/web lint` — passed; API reports three existing unused-variable/import warnings in analytics and session availability; web lint is clean.
+- `pnpm --dir apps/web build` — passed; routes include `/recover`, `/admin/account-recovery`, `/gyms/[slug]/owner/account-recovery`, and `/security` plus prior CF-01/02 routes.
+- `pnpm check:workspace` — passed; workspace graph valid for 5 packages.
+- `git diff --check` — passed before the final documentation addition; final documentation whitespace and diff checks are recorded below.
+
+Final documentation checks: `git diff --check` passed; `rg -n '[[:blank:]]+$' docs/common-foundation` returned no matches. No manual browser walkthrough or acceptance test was performed. No deployment, merge, pilot, external communication, or shared/production database change occurred. User-requested manual recovery, browser, visual/mobile, accessibility, support verification and outage acceptance remain deferred. Automated passing status is **Ready for review**, not Verified.
+
+Known risks: gym staff attestation cannot establish the truth of an external identity check; the SuperAdmin process does not provide dual control. Recovery help directs applicants to contact details supplied by their gym; there is no verified in-app contact directory or email reset provider.

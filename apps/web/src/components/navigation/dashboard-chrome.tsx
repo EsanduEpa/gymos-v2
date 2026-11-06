@@ -35,7 +35,7 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
   const ownerSections = [
     { label: 'WORKSPACE', items: [{ label: 'Dashboard', path: '', icon: LayoutDashboard }, { label: 'Members', path: '/members', icon: UsersRound }, { label: 'Applications', path: '/applications', icon: ClipboardCheck }, { label: 'Trainers', path: '/trainers', icon: Dumbbell }, { label: 'Sessions', path: '/sessions', icon: CalendarDays }] },
     { label: 'BUSINESS', items: [{ label: 'Financials', path: '/financials', icon: Wallet }, { label: 'Analytics', path: '/analytics', icon: ChartNoAxesCombined }] },
-    { label: 'MANAGEMENT', items: [{ label: 'Gym Configuration', path: '/gym-config', icon: Settings2 }, { label: 'Audit Log', path: '/audit', icon: ScrollText }, { label: 'Subscription', path: '/subscription', icon: CreditCard }] },
+    { label: 'MANAGEMENT', items: [{ label: 'Gym Configuration', path: '/gym-config', icon: Settings2 }, { label: 'Account Recovery', path: '/account-recovery', icon: ShieldCheck }, { label: 'Audit Log', path: '/audit', icon: ScrollText }, { label: 'Subscription', path: '/subscription', icon: CreditCard }] },
   ];
   const sections = owner ? ownerSections : member ? [{ label: 'YOUR TRAINING', items: [{ label: 'Home', path: '', icon: House }, { label: 'Workouts', path: '/workout-plans', icon: Dumbbell }, { label: 'Meal Plans', path: '/meal-plans', icon: Utensils }, { label: 'PT Sessions', path: '/sessions', icon: CalendarDays }, { label: 'Calendar', path: '/calendar', icon: CalendarDays }, { label: 'Find a Trainer', path: '/trainers', icon: UsersRound }] }] : [{ label: 'COACHING', items: [{ label: 'My Schedule', path: '/schedule', icon: CalendarDays }, { label: 'Calendar', path: '/calendar', icon: CalendarDays }, { label: 'Requests', path: '/requests', icon: ClipboardList }, { label: 'Clients', path: '/clients', icon: UsersRound }, { label: 'Earnings', path: '/earnings', icon: Wallet }] }];
   const bookingDetail = Boolean(gym && pathname.startsWith(`/gyms/${gym.slug}/sessions/`));
@@ -82,6 +82,7 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
           <a href="/admin#platform-overview" aria-label="Overview" aria-current="page" onClick={close}><LayoutDashboard size={19}/><span>Overview</span></a>
           <a href="/admin#gym-registry" aria-label="Gyms" onClick={close}><Building2 size={19}/><span>Gyms</span></a>
           <a href="/admin#create-gym" aria-label="Create a gym" onClick={close}><Plus size={19}/><span>Create a gym</span></a>
+          <a href="/admin/account-recovery" aria-label="Operator account recovery" aria-current={pathname.startsWith('/admin/account-recovery') ? 'page' : undefined} onClick={close}><ShieldCheck size={19}/><span>Account recovery</span></a>
         </>}
         {support ? <a href="/admin" aria-label="All Gyms" onClick={close}><Building2 size={19}/><span>All Gyms</span></a> : null}
       </nav>

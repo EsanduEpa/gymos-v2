@@ -1,7 +1,7 @@
 import { contentDigest } from '../operations/primitives.js';
 // Immutable reviewed chain; schema deployment is an explicit owned runner command.
 export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
-  version: 'master-2026-11-06.3',
+  version: 'master-2026-11-06.5',
   migrations: [
     {
       name: '20261021100256_init_master',
@@ -68,6 +68,10 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       name: '20261106070000_identity_sessions',
       checksum: 'd35aa4917bce8a6c1d5a490b4395ac555f0f0c0995e2d0015a42505c6a92fe60',
     },
+    {
+      name: '20261106080000_identity_recovery',
+      checksum: 'c09cd5b94716b5a7c7714f2be4f57ec54fe57bdfbd1d1a2b77a22949a24a50bd',
+    },
   ],
   postconditions: {
     tables: [
@@ -76,6 +80,8 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       'Gym',
       'GymAccess',
       'IdentitySession',
+      'RecoveryCredential',
+      'IdentitySecurityEvent',
       'GymLifecycleIntent',
       'GymRegistrySummary',
       'MasterSchemaDeployment',
@@ -111,6 +117,8 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       'SupportEvent_append_only',
       'SupportSession_immutable',
       'IdentitySession_immutable_history',
+      'RecoveryCredential_immutable_history',
+      'IdentitySecurityEvent_append_only',
       'MemberApplication_immutable_subject',
       'MemberApplicationNotice_immutable',
     ],
@@ -172,6 +180,7 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       MemberApplication: ['id', 'gymId', 'identityId', 'fullName', 'phone', 'consentedAt', 'state', 'version', 'enrollmentOperationId', 'membershipPlanId', 'dateOfBirth', 'membershipPlanName', 'membershipPrice', 'membershipCurrency', 'membershipDurationDays', 'membershipPlanVersion'],
       MemberApplicationNotice: ['id', 'applicationId', 'gymId', 'recipientId', 'event', 'createdAt', 'readAt'],
       IdentitySession: ['id', 'identityId', 'authVersion', 'deviceClass', 'deviceLabel', 'refreshTokenHash', 'version', 'createdAt', 'lastActivityAt', 'idleExpiresAt', 'absoluteExpiresAt', 'revokedAt'],
+      IdentitySecurityEvent: ['id', 'identityId', 'event', 'createdAt'],
     },
   },
 } as const);

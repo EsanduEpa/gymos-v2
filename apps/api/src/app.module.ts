@@ -7,7 +7,7 @@ import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { AdminController } from './admin.controller.js';
 import { AuthController } from './auth.controller.js';
-import { CredentialReissueController, CredentialsController } from './credentials.controller.js';
+import { AccountRecoveryController, CredentialReissueController, CredentialsController, OperatorRecoveryController } from './credentials.controller.js';
 import { CredentialService } from './identity/credential.service.js';
 import { DatabaseService } from './database.service.js';
 import { GymAccessGuard } from './gym-access.guard.js';
@@ -66,7 +66,7 @@ import { AuthSessionGuard } from './identity/auth-session.guard.js';
   imports: [
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
   ],
-  controllers: [SessionExceptionsController, AppController, AdminController, AuthController, CredentialsController, CredentialReissueController, GymsController, MemberApplicationsController, TrainersController, PacksController, NotificationsController, ConfigurationController, ProvisioningOwnerController, SupportSessionController, GymLifecycleController, SessionBookingController, SessionReadsController, SessionRequestsController, MemberSessionOverviewController, CoachingController, MemberLifecycleController, SessionLifecycleController, FinanceController, DashboardController, AnalyticsController, SessionAvailabilityController],
+  controllers: [SessionExceptionsController, AppController, AdminController, AuthController, CredentialsController, CredentialReissueController, AccountRecoveryController, OperatorRecoveryController, GymsController, MemberApplicationsController, TrainersController, PacksController, NotificationsController, ConfigurationController, ProvisioningOwnerController, SupportSessionController, GymLifecycleController, SessionBookingController, SessionReadsController, SessionRequestsController, MemberSessionOverviewController, CoachingController, MemberLifecycleController, SessionLifecycleController, FinanceController, DashboardController, AnalyticsController, SessionAvailabilityController],
   providers: [SessionExceptionsService,
     AppService,
     DatabaseService,

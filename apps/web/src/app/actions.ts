@@ -3,12 +3,14 @@
 import { platformOperationSchema, provisioningInputSchema, idempotencyKeySchema } from '@gymos/contracts/platform';
 import { existingEndpointContracts, logoutResultSchema } from '@gymos/contracts/legacy';
 import { changePasswordInputSchema, changePasswordResultSchema } from '@gymos/contracts/credentials';
+import { recoveryCompleteInputSchema, recoveryCompleteResultSchema, recoveryIssueInputSchema, recoveryIssueResultSchema,
+  operatorRecoveryIssueInputSchema } from '@gymos/contracts/credentials';
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { refreshCookieOptions, sessionCookieOptions } from '@/lib/session-transport';
 import { apiUrl, gymRoleLandingPath, SESSION_COOKIE, SESSION_REFRESH_COOKIE } from '@/lib/gymos';
-import { SUPPORT_COOKIE } from '@/lib/support-context';
+import { currentSupportCookie, SUPPORT_COOKIE } from '@/lib/support-context';
 
 function field(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -144,6 +146,58 @@ export async function finishPasswordChangeAction() {
   (await cookies()).delete(SUPPORT_COOKIE);
   revalidatePath('/', 'layout');
   redirect('/login');
+}
+
+export async function issueRecoveryAction(slug: string, identityId: string, _previous: unknown, formData: FormData) {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || !/^[A-Za-z0-9_:-]{1,128}$/.test(identityId)) return { error: 'Recovery could not be confirmed.' };
+  if (await currentSupportCookie()) return { error: 'Exit read-only support before issuing recovery.' };
+  const token = await sessionToken();
+  if (!token) redirect('/login');
+  const parsed = recoveryIssueInputSchema.safeParse({ verificationMethod: formData.get('verificationMethod'), reason: formData.get('reason') });
+  if (!parsed.success) return { error: 'Choose how identity was checked and enter a brief attestation.' };
+  let response: Response;
+  try {
+    response = await fetch(apiUrl(`/gyms/${encodeURIComponent(slug)}/owner/account-recovery/${encodeURIComponent(identityId)}`), {
+      method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify(parsed.data), cache: 'no-store', signal: AbortSignal.timeout(8000),
+    });
+  } catch { return { error: 'GymOS is temporarily unavailable. No recovery result could be confirmed.' }; }
+  if (response.status === 401) redirect('/login?error=expired');
+  if (!response.ok) return { error: response.status === 403 ? 'This account requires an independent operator recovery process. No credential was issued.' : 'Recovery could not be confirmed. Check the eligible list and try again.' };
+  const result = recoveryIssueResultSchema.safeParse(await response.json().catch(() => null));
+  if (!result.success) return { error: 'Recovery was issued but its one-time handoff could not be confirmed. Reissue a credential before handoff.' };
+  return { recovery: result.data };
+}
+
+export async function completeRecoveryAction(formData: FormData) {
+  const parsed = recoveryCompleteInputSchema.safeParse({ credentialId: formData.get('credentialId'), secret: formData.get('secret'),
+    newPassword: formData.get('newPassword'), confirmPassword: formData.get('confirmPassword') });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Check the recovery details and password requirements.' };
+  try {
+    const response = await fetch(apiUrl('/auth/recovery/complete'), { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(parsed.data), cache: 'no-store', signal: AbortSignal.timeout(10000) });
+    if (!response.ok) return { error: response.status === 429 ? 'Too many attempts. Wait a minute and try again.' : 'This recovery credential is invalid, expired, used, or locked. Ask the gym to issue a new one.' };
+    const result = recoveryCompleteResultSchema.safeParse(await response.json().catch(() => null));
+    return result.success ? { success: true as const } : { error: 'The password update could not be confirmed. Try signing in with the new password.' };
+  } catch { return { error: 'GymOS is temporarily unavailable. The recovery result could not be confirmed.' }; }
+}
+
+export async function issueOperatorRecoveryAction(_previous: unknown, formData: FormData) {
+  if (await currentSupportCookie()) return { error: 'Exit read-only support before issuing recovery.' };
+  const token = await sessionToken();
+  if (!token) redirect('/login');
+  const parsed = operatorRecoveryIssueInputSchema.safeParse({ email: field(formData, 'email').toLowerCase(),
+    verificationMethod: formData.get('verificationMethod'), reason: formData.get('reason'), currentPassword: formData.get('currentPassword') });
+  if (!parsed.success) return { error: 'Enter the identity, verification method, attestation, and current password.' };
+  let response: Response;
+  try {
+    response = await fetch(apiUrl('/admin/account-recovery'), { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify(parsed.data), cache: 'no-store', signal: AbortSignal.timeout(10000) });
+  } catch { return { error: 'GymOS is temporarily unavailable. No recovery result could be confirmed.' }; }
+  if (response.status === 401) redirect('/login?error=expired');
+  if (!response.ok) return { error: response.status === 403 ? 'Operator authorization or current-password verification failed. No recovery was issued.' : 'No recovery could be issued for that identity.' };
+  const result = recoveryIssueResultSchema.safeParse(await response.json().catch(() => null));
+  return result.success ? { recovery: result.data } : { error: 'The one-time handoff could not be confirmed. Reissue before handoff.' };
 }
 
 export async function revokeIdentitySession(sessionId: string) {

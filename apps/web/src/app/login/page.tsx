@@ -46,6 +46,7 @@ async function LoginContent({
             <p className="form-note">Shared devices stay signed in for up to 30 minutes of inactivity and 8 hours total. The shared-device setting is selected by default.</p>
             <Button fullWidth type="submit">Sign in <span>→</span></Button>
           </form>
+          <p className="form-note"><Link href="/recover">Forgot your password? Get staff help</Link></p>
           <p className="form-note"><Link href="/apply">Apply to join a gym</Link> · <Link href="/applications">Check application status</Link></p>
         </div>
       </div>

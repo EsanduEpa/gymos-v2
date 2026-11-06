@@ -43,30 +43,48 @@ enum SessionDeviceClass {
   SHARED
 }
 
+enum RecoveryVerificationMethod {
+  IN_PERSON
+  KNOWN_CONTACT
+}
+
+enum RecoveryCredentialScope {
+  GYM
+  OPERATOR
+}
+
+enum IdentitySecurityEventType {
+  PASSWORD_CHANGED
+  PASSWORD_RECOVERED
+}
+
 model User {
-  originalPlatformAudits   PlatformAuditLog[]        @relation("PlatformAuditOriginalActor")
-  initiatedOperations      Operation[]               @relation("OperationActor")
-  subjectOperations        Operation[]               @relation("OperationSubject")
-  platformAudits           PlatformAuditLog[]        @relation("PlatformAuditActor")
-  credentialDeliveries     CredentialDelivery[]      @relation("CredentialSubject")
-  issuedCredentials        CredentialDelivery[]      @relation("CredentialIssuer")
-  id                       String                    @id @default(cuid())
-  email                    String                    @unique
-  passwordHash             String
-  globalRole               GlobalRole                @default(USER)
-  displayName              String?
-  mustChangePassword       Boolean                   @default(false)
-  authVersion              Int                       @default(0)
-  version                  Int                       @default(0)
-  passwordChangedAt        DateTime?                 @db.Timestamptz(3)
-  credentialExpiresAt      DateTime?                 @db.Timestamptz(3)
-  gymAccesses              GymAccess[]
-  enrollmentProofs         EnrollmentProof[]
-  memberApplications       MemberApplication[]
-  memberApplicationNotices MemberApplicationNotice[] @relation("MemberApplicationNoticeRecipient")
-  identitySessions         IdentitySession[]
-  createdAt                DateTime                  @default(now())
-  updatedAt                DateTime                  @updatedAt
+  originalPlatformAudits    PlatformAuditLog[]        @relation("PlatformAuditOriginalActor")
+  initiatedOperations       Operation[]               @relation("OperationActor")
+  subjectOperations         Operation[]               @relation("OperationSubject")
+  platformAudits            PlatformAuditLog[]        @relation("PlatformAuditActor")
+  credentialDeliveries      CredentialDelivery[]      @relation("CredentialSubject")
+  issuedCredentials         CredentialDelivery[]      @relation("CredentialIssuer")
+  id                        String                    @id @default(cuid())
+  email                     String                    @unique
+  passwordHash              String
+  globalRole                GlobalRole                @default(USER)
+  displayName               String?
+  mustChangePassword        Boolean                   @default(false)
+  authVersion               Int                       @default(0)
+  version                   Int                       @default(0)
+  passwordChangedAt         DateTime?                 @db.Timestamptz(3)
+  credentialExpiresAt       DateTime?                 @db.Timestamptz(3)
+  gymAccesses               GymAccess[]
+  enrollmentProofs          EnrollmentProof[]
+  memberApplications        MemberApplication[]
+  memberApplicationNotices  MemberApplicationNotice[] @relation("MemberApplicationNoticeRecipient")
+  identitySessions          IdentitySession[]
+  recoveryCredentials       RecoveryCredential[]      @relation("RecoverySubject")
+  issuedRecoveryCredentials RecoveryCredential[]      @relation("RecoveryIssuer")
+  securityEvents            IdentitySecurityEvent[]
+  createdAt                 DateTime                  @default(now())
+  updatedAt                 DateTime                  @updatedAt
 }
 
 model IdentitySession {
@@ -92,6 +110,41 @@ model IdentitySession {
   @@index([absoluteExpiresAt])
 }
 
+model RecoveryCredential {
+  id                 String                     @id @default(cuid())
+  scope              RecoveryCredentialScope
+  identityId         String
+  identity           User                       @relation("RecoverySubject", fields: [identityId], references: [id], onDelete: Restrict)
+  gymId              String?
+  gym                Gym?                       @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  issuedByIdentityId String
+  issuedBy           User                       @relation("RecoveryIssuer", fields: [issuedByIdentityId], references: [id], onDelete: Restrict)
+  secretHash         String                     @unique
+  verificationMethod RecoveryVerificationMethod
+  reason             String
+  authVersion        Int
+  issuerAuthVersion  Int
+  attempts           Int                        @default(0)
+  maxAttempts        Int                        @default(5)
+  issuedAt           DateTime                   @default(now()) @db.Timestamptz(3)
+  expiresAt          DateTime                   @db.Timestamptz(3)
+  redeemedAt         DateTime?                  @db.Timestamptz(3)
+  revokedAt          DateTime?                  @db.Timestamptz(3)
+
+  @@index([identityId, issuedAt])
+  @@index([gymId, issuedAt])
+}
+
+model IdentitySecurityEvent {
+  id         String                    @id @default(cuid())
+  identityId String
+  identity   User                      @relation(fields: [identityId], references: [id], onDelete: Restrict)
+  event      IdentitySecurityEventType
+  createdAt  DateTime                  @default(now()) @db.Timestamptz(3)
+
+  @@index([identityId, createdAt])
+}
+
 model Gym {
   platformAudits               PlatformAuditLog[]
   operations                   Operation[]               @relation("OperationGym")
@@ -112,6 +165,7 @@ model Gym {
   credentialDeliveries         CredentialDelivery[]
   memberApplications           MemberApplication[]
   memberApplicationNotices     MemberApplicationNotice[]
+  recoveryCredentials          RecoveryCredential[]
   createdAt                    DateTime                  @default(now())
   updatedAt                    DateTime                  @updatedAt
 }

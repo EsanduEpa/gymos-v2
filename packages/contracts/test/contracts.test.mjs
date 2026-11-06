@@ -7,7 +7,9 @@ import {
   moneySchema, pageQuerySchema, pageSchema, readSchema, signedMoneySchema,
 } from '../dist/index.js';
 import { existingEndpointContracts } from '../dist/legacy.js';
-import { changePasswordInputSchema, credentialAcknowledgementInputSchema, credentialAcknowledgementResultSchema, credentialIssueInputSchema, credentialReissueInputSchema, credentialReissueResultSchema } from '../dist/credentials.js';
+import { changePasswordInputSchema, credentialAcknowledgementInputSchema, credentialAcknowledgementResultSchema, credentialIssueInputSchema,
+  credentialReissueInputSchema, credentialReissueResultSchema, recoveryIssueInputSchema, operatorRecoveryIssueInputSchema,
+  recoveryCompleteInputSchema, recoveryIssueResultSchema } from '../dist/credentials.js';
 import { createMembershipPlanSchema, gymConfigurationSchema, updateGymThemeSchema } from '../dist/configuration.js';
 import { memberEnrollmentConsentInputSchema, memberEnrollmentConsentResultSchema, memberListQuerySchema, memberListSchema,
   memberRegistrationInputSchema, memberRegistrationResultSchema } from '../dist/members.js';
@@ -170,6 +172,18 @@ test('credential contracts enforce password policy and one-time reissue envelope
   assert.deepEqual(credentialAcknowledgementInputSchema.parse({ deliveryVersion: 1 }), { deliveryVersion: 1 });
   assert.equal(credentialAcknowledgementInputSchema.safeParse({ deliveryVersion: -1 }).success, false);
   assert.deepEqual(credentialAcknowledgementResultSchema.parse({ status: 'ACKNOWLEDGED', deliveryVersion: 1 }), { status: 'ACKNOWLEDGED', deliveryVersion: 1 });
+});
+
+test('staff recovery contracts require fresh verification and keep the one-time secret out of durable input projections', () => {
+  const request = { verificationMethod: 'IN_PERSON', reason: 'Identity matched to the gym record.', currentPassword: 'Owner-password-42' };
+  assert.deepEqual(recoveryIssueInputSchema.parse(request), request);
+  assert.equal(recoveryIssueInputSchema.safeParse({ ...request, currentPassword: '' }).success, false);
+  assert.equal(operatorRecoveryIssueInputSchema.safeParse({ email: 'member@example.test', ...request }).success, true);
+  const completion = { credentialId: 'recovery-1', secret: 'A'.repeat(43), newPassword: 'Recovery-password-42', confirmPassword: 'Recovery-password-42' };
+  assert.deepEqual(recoveryCompleteInputSchema.parse(completion), completion);
+  assert.equal(recoveryCompleteInputSchema.safeParse({ ...completion, secret: 'short' }).success, false);
+  assert.equal(recoveryIssueResultSchema.safeParse({ credentialId: 'r1', secret: 'A'.repeat(43), expiresAt: asOf, subjectLabel: 'Member' }).success, true);
+  assert.equal(recoveryIssueResultSchema.safeParse({ credentialId: 'r1', secret: 'A'.repeat(43), expiresAt: asOf, subjectLabel: 'Member', passwordHash: 'secret' }).success, false);
 });
 
 test('shell session projection excludes credential and connection material', async () => {
