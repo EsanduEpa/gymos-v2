@@ -14,6 +14,7 @@ export * from './coaching.js';
 export * from './finance.js';
 export * from './analytics.js';
 export * from './request-safety.js';
+export * from './account-profile.js';
 
 // Transport syntax only: feature schemas own business bounds, currency support,
 // rounding and authorization. No Prisma-generated types cross this boundary.

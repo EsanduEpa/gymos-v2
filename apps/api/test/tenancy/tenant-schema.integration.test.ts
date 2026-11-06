@@ -7,6 +7,7 @@ import { PrismaClient as MasterClient } from '../../src/generated/master/client.
 import { PrismaClient as TenantClient } from '../../src/generated/tenant/client.js';
 import type { DatabaseService } from '../../src/database.service.js';
 import { GymsController } from '../../src/gyms.controller.js';
+import { AccountProfileController, GymProfileController } from '../../src/profiles.controller.js';
 import { MemberEnrollmentService } from '../../src/member-enrollment.service.js';
 import { TrainerEnrollmentService } from '../../src/trainer-enrollment.service.js';
 import { isOperationalActor } from '../../src/identity/publication-policy.js';
@@ -1108,4 +1109,85 @@ it('projects only published members with filtered totals and denies foreign or n
     tenants[0].membershipTerm.count(), tenants[0].commandReceipt.count(), tenants[1].auditLog.count(),
   ]);
   expect(after).toEqual(before);
+});
+
+it('keeps global and gym profiles separate, fences self edits, versions and replays saves, and audits owner correction without field values', async () => {
+  const memberLink = await master.gymAccess.findFirstOrThrow({ where: { gymId: gymIds[0], role: 'MEMBER', actorKind: 'MEMBER',
+    linkStatus: 'ACTIVE', tenantActorId: { not: null }, enrollmentOperationId: { not: null } } });
+  const tenant = tenants[0]!;
+  const member = await tenant.member.findUniqueOrThrow({ where: { id: memberLink.tenantActorId! } });
+  const user = await master.user.update({ where: { id: memberLink.userId }, data: { mustChangePassword: false, credentialExpiresAt: null } });
+  const jwt = await new SignJWT({ authVersion: user.authVersion, sid: `profile-${randomUUID()}` }).setProtectedHeader({ alg: 'HS256' })
+    .setSubject(user.id).setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('5m').sign(new TextEncoder().encode(guardJwtSecret));
+  const database = { master } as DatabaseService;
+  const profileController = new GymProfileController(database, gateFor());
+  const context0 = await context(0);
+  const memberAccess = { ...context0, slug: `schema-0-${run.runId}`, role: 'MEMBER', identityId: user.id,
+    identityVersion: user.authVersion, accessVersion: memberLink.version,
+    actor: { kind: 'MEMBER', id: memberLink.tenantActorId!, registrationOperationId: memberLink.enrollmentOperationId! } } as const;
+  const memberRequest = { gymAccess: memberAccess } as GymRequest;
+  const beforeGlobalName = member.fullName;
+  const accountController = new AccountProfileController(database);
+  const authRequest = { headers: { authorization: `Bearer ${jwt}` } } as never;
+  const accountSave = { displayName: 'Synthetic Global Display', expectedVersion: user.version };
+  const accountResult = await accountController.update(authRequest, 'profile-account-save-0001', accountSave);
+  expect(accountResult).toMatchObject({ version: user.version + 1, replayed: false });
+  expect(await accountController.update(authRequest, 'profile-account-save-0001', accountSave)).toMatchObject({ version: user.version + 1, replayed: true });
+  expect((await master.user.findUniqueOrThrow({ where: { id: user.id } })).displayName).toBe('Synthetic Global Display');
+  expect((await tenant.member.findUniqueOrThrow({ where: { id: member.id } })).fullName).toBe(beforeGlobalName);
+
+  const self = await profileController.getMine(memberRequest) as { memberId: string; version: number; phone: string | null };
+  expect(self).toMatchObject({ memberId: member.id, version: member.version });
+  const selfBody = { phone: '+94770001122', emergencyContact: 'Synthetic Contact · 0710000000', expectedVersion: self.version };
+  const selfResult = await profileController.updateMine(memberRequest, 'profile-member-save-0001', selfBody);
+  expect(selfResult).toMatchObject({ version: self.version + 1, replayed: false });
+  expect(await profileController.updateMine(memberRequest, 'profile-member-save-0001', selfBody)).toMatchObject({ version: self.version + 1, replayed: true });
+  expect(await tenant.member.findUniqueOrThrow({ where: { id: member.id } })).toMatchObject({ phone: selfBody.phone, emergencyContact: selfBody.emergencyContact, fullName: beforeGlobalName });
+  await expect(profileController.updateMine(memberRequest, 'profile-member-save-0002', { ...selfBody, expectedVersion: self.version, healthNotes: 'forged' }))
+    .rejects.toBeInstanceOf(UnprocessableEntityException);
+  await expect(profileController.updateMine({ gymAccess: { ...memberAccess, identityId: actorId } } as GymRequest, 'profile-member-save-0003',
+    { ...selfBody, expectedVersion: self.version + 1 })).rejects.toBeInstanceOf(ForbiddenException);
+
+  const competing = await Promise.allSettled([
+    profileController.updateMine(memberRequest, 'profile-member-race-0001', { ...selfBody, phone: '+94771110001', expectedVersion: self.version + 1 }),
+    profileController.updateMine(memberRequest, 'profile-member-race-0002', { ...selfBody, phone: '+94772220002', expectedVersion: self.version + 1 }),
+  ]);
+  expect(competing.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+  expect(competing.filter(result => result.status === 'rejected')).toHaveLength(1);
+  expect((competing.find(result => result.status === 'rejected') as PromiseRejectedResult).reason).toBeInstanceOf(ConflictException);
+
+  const ownerLink = await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: actorId, gymId: gymIds[0] } } });
+  const owner = { ...context0, slug: `schema-0-${run.runId}`, role: 'OWNER', identityId: actorId,
+    identityVersion: 0, accessVersion: ownerLink.version, actor: null } as const;
+  const correctionBody = { fullName: 'Synthetic Corrected Official Name', dateOfBirth: '1992-03-04', phone: '+94770002233',
+    emergencyContact: 'Synthetic Correction Contact', expectedVersion: self.version + 2, reason: 'MEMBER_REQUEST' };
+  const correction = await profileController.correctMember({ gymAccess: owner } as GymRequest, member.id, 'profile-owner-correct-0001', correctionBody);
+  expect(correction).toMatchObject({ version: self.version + 3, replayed: false });
+  expect(await profileController.correctMember({ gymAccess: owner } as GymRequest, member.id, 'profile-owner-correct-0001', correctionBody))
+    .toMatchObject({ version: self.version + 3, replayed: true });
+  const changedMember = await tenant.member.findUniqueOrThrow({ where: { id: member.id } });
+  expect(changedMember).toMatchObject({ fullName: correctionBody.fullName, phone: correctionBody.phone, emergencyContact: correctionBody.emergencyContact });
+  expect(changedMember.dateOfBirth?.toISOString().slice(0, 10)).toBe(correctionBody.dateOfBirth);
+  const ownerAudit = await tenant.auditLog.findFirstOrThrow({ where: { eventCode: 'OWNER_MEMBER_PROFILE_CORRECTED', resourceId: member.id } });
+  expect(ownerAudit.transition).toEqual({ from: String(self.version + 2), to: String(self.version + 3), version: self.version + 3, reasonCode: 'MEMBER_REQUEST' });
+  await expect(profileController.correctMember({ gymAccess: owner } as GymRequest, member.id, 'profile-owner-correct-0002',
+    { ...correctionBody, expectedVersion: self.version + 3, status: 'SUSPENDED' })).rejects.toBeInstanceOf(UnprocessableEntityException);
+  expect((await tenant.member.findUniqueOrThrow({ where: { id: member.id } })).status).toBe(member.status);
+
+  const trainerLink = await master.gymAccess.findFirstOrThrow({ where: { gymId: gymIds[0], role: 'TRAINER', actorKind: 'TRAINER',
+    linkStatus: 'ACTIVE', tenantActorId: { not: null }, enrollmentOperationId: { not: null } } });
+  const trainerUser = await master.user.update({ where: { id: trainerLink.userId }, data: { mustChangePassword: false, credentialExpiresAt: null } });
+  const trainerAccess = { ...context0, slug: `schema-0-${run.runId}`, role: 'TRAINER', identityId: trainerUser.id,
+    identityVersion: trainerUser.authVersion, accessVersion: trainerLink.version,
+    actor: { kind: 'TRAINER', id: trainerLink.tenantActorId!, registrationOperationId: trainerLink.enrollmentOperationId! } } as const;
+  const trainerRequest = { gymAccess: trainerAccess } as GymRequest;
+  const trainerProfile = await profileController.getMine(trainerRequest) as { trainerId: string; version: number };
+  const trainerSave = { phone: '+94773334444', biography: 'Synthetic updated trainer biography', specialisations: ['Strength', 'Mobility'],
+    yearsExperience: 9, expectedVersion: trainerProfile.version };
+  expect(await profileController.updateMine(trainerRequest, 'profile-trainer-save-0001', trainerSave)).toMatchObject({ version: trainerProfile.version + 1, replayed: false });
+  expect(await profileController.updateMine(trainerRequest, 'profile-trainer-save-0001', trainerSave)).toMatchObject({ version: trainerProfile.version + 1, replayed: true });
+  expect(await tenant.trainer.findUniqueOrThrow({ where: { id: trainerProfile.trainerId } })).toMatchObject({ phone: trainerSave.phone,
+    bio: trainerSave.biography, specialisations: trainerSave.specialisations, yearsExperience: trainerSave.yearsExperience });
+  await expect(profileController.updateMine(trainerRequest, 'profile-trainer-save-0002', { ...trainerSave, level: 'LEVEL_2' }))
+    .rejects.toBeInstanceOf(UnprocessableEntityException);
 });

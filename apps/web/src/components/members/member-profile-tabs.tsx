@@ -5,6 +5,7 @@ import type { MemberDetail } from '@gymos/contracts';
 import { Card, EmptyState, StatusBadge, Tabs } from '@/components/ui';
 import { SessionPackPanel } from '@/components/members/session-pack-panel';
 import { MemberLifecycleForm } from '@/components/members/member-lifecycle-form';
+import { OwnerMemberCorrectionForm } from '@/components/profile/profile-forms';
 
 const items = [{ id: 'overview', label: 'Overview' }, { id: 'sessions', label: 'Attendance History' }, { id: 'history', label: 'Membership & Packs' }];
 
@@ -24,6 +25,7 @@ export function MemberProfileTabs({ member, slug, requestKey }: { member: Member
         <div><h3>Health notes</h3><p>{member.healthNotes || 'No health notes have been added.'}</p><small>Private gym information.</small></div>
         <div><h3>Current registration</h3><p><StatusBadge status={member.registrationState}/></p></div>
         {member.registrationState === 'COMPLETE' ? <MemberLifecycleForm slug={slug} memberId={member.id} status={member.status} version={member.version} initialRequestKey={requestKey}/> : null}
+        {member.registrationState === 'COMPLETE' ? <OwnerMemberCorrectionForm key={`${member.id}:${member.version}`} slug={slug} member={member} requestKey={`${requestKey}-profile`}/> : null}
       </div> : null}
       {active === 'sessions' ? <div id="panel-sessions" role="tabpanel" aria-labelledby="tab-sessions" tabIndex={0} className="member-profile-panel">
         {member.recentSessions.length ? <ol>{member.recentSessions.map(session => <li key={session.id}><a className="platform-text-link" href={`/gyms/${encodeURIComponent(slug)}/sessions/${encodeURIComponent(session.id)}`}>{session.scheduledStart} · {session.state}</a></li>)}</ol>

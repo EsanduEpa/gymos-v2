@@ -3,7 +3,7 @@ import type { Prisma as TenantPrisma } from '../generated/tenant/client.js';
 import { canonicalJson, contentDigest, masterOperationAuditKey, masterVersionAuditKey,
   OperationIntegrityError, reference, tenantAuditKey } from './primitives.js';
 
-export type AuditTransition = { from?: string; to?: string; version?: number };
+export type AuditTransition = { from?: string; to?: string; version?: number; reasonCode?: string };
 export type AuditInput = {
   actorIdentityId: string; originalActorIdentityId?: string | null;
   eventCode: string; resourceType: string; resourceId: string; eventOrdinal?: number;
@@ -12,10 +12,11 @@ export type AuditInput = {
 function clean(input: AuditInput) {
   for (const name of ['actorIdentityId', 'eventCode', 'resourceType', 'resourceId'] as const) reference(input[name]);
   if (input.originalActorIdentityId) reference(input.originalActorIdentityId);
-  if (Object.keys(input.transition).some(key => !['from', 'to', 'version'].includes(key))) throw new TypeError('Audit transition contains unsupported details');
+  if (Object.keys(input.transition).some(key => !['from', 'to', 'version', 'reasonCode'].includes(key))) throw new TypeError('Audit transition contains unsupported details');
   if (input.transition.from !== undefined) reference(input.transition.from);
   if (input.transition.to !== undefined) reference(input.transition.to);
   if (input.transition.version !== undefined && (!Number.isSafeInteger(input.transition.version) || input.transition.version < 0)) throw new TypeError('Invalid transition version');
+  if (input.transition.reasonCode !== undefined && !/^[A-Z_]{3,64}$/.test(input.transition.reasonCode)) throw new TypeError('Invalid audit reason code');
   canonicalJson(input.transition, true);
   return { actorIdentityId: input.actorIdentityId, originalActorIdentityId: input.originalActorIdentityId ?? null,
     eventCode: input.eventCode, resourceType: input.resourceType, resourceId: input.resourceId,

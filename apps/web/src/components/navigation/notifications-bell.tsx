@@ -61,7 +61,7 @@ export function NotificationsBell({ slug, identityId, role }: { slug: string; id
     setPending(null);
   }
 
-  return <div className="notification-bell" data-notification-context={contextKey}>
+  return <div id="notification-center" className="notification-bell" data-notification-context={contextKey}>
     <button className="notification-bell-trigger" type="button" aria-label={list?.unreadCount ? `Notifications, ${list.unreadCount} unread` : 'Notifications'}
       aria-expanded={open} aria-controls="notification-popover" onClick={() => { setOpen(value => !value); if (!open) void refresh(); }}>
       <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

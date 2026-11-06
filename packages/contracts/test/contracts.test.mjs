@@ -186,6 +186,22 @@ test('staff recovery contracts require fresh verification and keep the one-time 
   assert.equal(recoveryIssueResultSchema.safeParse({ credentialId: 'r1', secret: 'A'.repeat(43), expiresAt: asOf, subjectLabel: 'Member', passwordHash: 'secret' }).success, false);
 });
 
+test('profile contracts keep global identity, self-service fields, and owner corrections field-scoped', async () => {
+  const { updateAccountProfileSchema, updateSelfMemberProfileSchema, updateSelfTrainerProfileSchema, ownerMemberProfileCorrectionSchema } = await import('../dist/index.js');
+  assert.equal(updateAccountProfileSchema.safeParse({ displayName: 'Synthetic account name', expectedVersion: 0, idempotencyKey: 'profile-0123456789' }).success, true);
+  assert.equal(updateAccountProfileSchema.safeParse({ displayName: 'Changed', email: 'attacker@example.test', expectedVersion: 0, idempotencyKey: 'profile-0123456789' }).success, false);
+  assert.equal(updateSelfMemberProfileSchema.safeParse({ phone: null, emergencyContact: null, expectedVersion: 0, idempotencyKey: 'member-profile-012345' }).success, true);
+  assert.equal(updateSelfMemberProfileSchema.safeParse({ phone: null, emergencyContact: null, healthNotes: 'private', expectedVersion: 0, idempotencyKey: 'member-profile-012345' }).success, false);
+  const trainer = { phone: null, biography: 'Synthetic biography', specialisations: ['Strength', 'Mobility'], yearsExperience: 8, expectedVersion: 1, idempotencyKey: 'trainer-profile-012345' };
+  assert.equal(updateSelfTrainerProfileSchema.safeParse(trainer).success, true);
+  assert.equal(updateSelfTrainerProfileSchema.safeParse({ ...trainer, specialisations: ['Strength', 'strength'] }).success, false);
+  assert.equal(updateSelfTrainerProfileSchema.safeParse({ ...trainer, level: 'LEVEL_2' }).success, false);
+  const correction = { fullName: 'Synthetic Corrected Name', dateOfBirth: null, phone: null, emergencyContact: null, expectedVersion: 2,
+    reason: 'MEMBER_REQUEST', idempotencyKey: 'owner-profile-0123456' };
+  assert.equal(ownerMemberProfileCorrectionSchema.safeParse(correction).success, true);
+  assert.equal(ownerMemberProfileCorrectionSchema.safeParse({ ...correction, status: 'SUSPENDED' }).success, false);
+});
+
 test('shell session projection excludes credential and connection material', async () => {
   const { currentSessionSchema, logoutResultSchema } = await import('../dist/legacy.js');
   const session = { identityId: 'identity-1', displayName: 'Synthetic owner', globalRole: 'USER', mustChangePassword: false,

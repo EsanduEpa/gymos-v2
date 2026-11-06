@@ -36,7 +36,6 @@ Automated coverage includes exact session response validation, global guard enfo
 
 ## Remaining milestones
 
-- CF-04: account/profile destinations and field-scoped self-service editing.
 - CF-05: safe login-email correction workflow.
 - CF-06: notification center, paging, inbox scopes and broader event history.
 - CF-07: common help/error/privacy/lifecycle behavior and operational visibility.
@@ -73,4 +72,20 @@ Automated evidence: 17 identity integration tests passed, including password/ses
 
 Remaining risks: staff attestation records the verification process but cannot prove that real-world identity verification occurred; the operator process does not implement dual control. The recovery page directs users to contact information already supplied by their gym; there is no verified in-app contact directory or email reset. Manual browser, visual, mobile, accessibility, recovery-outage and live operational acceptance are deferred. CF-03 is not marked Verified. No PT files or PT status records were modified.
 
-Next task: implement **CF-04 account/profile destinations and field-scoped self-service editing**.
+## CF-04 — Ready for review (automated checks passed; manual acceptance pending)
+
+Bounded scope: accessible shared account destinations, global account display-name editing, Member and Trainer self-editable gym profile fields, and reasoned Owner corrections for official Member fields. No email-change workflow, health-note submission/review, photo storage, or notification center was added.
+
+Data ownership and visible names: Master remains authoritative for login email and global `displayName`. Tenant `Member.fullName` and `Trainer.fullName` remain gym-local official names; the profile page labels that separation and never copies an account name into a gym record. Existing directories, client views, dashboard and PT session reads use the current tenant names; historical PT/session snapshots are unchanged. Member DOB is read-only to the Member and the page directs them to the Owner for correction.
+
+Authorization and allowlists: account display name is self-only through `/auth/profile`. Active Member and Trainer accesses can read/update only their own verified reciprocal tenant actor using `/gyms/:slug/me/profile`; Member edits phone/emergency contact, while Trainer edits phone, biography, specialisations and experience. The APIs use strict shared contracts and explicit Prisma field assignments. Owner official Member correction requires current Owner gym access and a published completed enrollment/receipt binding; it permits only full name, DOB, phone and emergency contact with an expected version and enumerated correction reason. Status, level, pay, role, membership/credits, email and health notes are excluded. Support is read-only; profile server actions refuse mutation while support context is present.
+
+Durability: profile writes use compare-and-set versions and idempotency keys. Master account edits have a new immutable Master `ProfileCommandReceipt`, matching migration/manifest update and version audit. Tenant edits use existing `CommandReceipt` plus append-only `AuditLog`; audit transitions contain version and event/reason code only, never contact or health values. Stale/concurrent writes conflict without overwriting newer data. Retry with the same key returns the committed result. Form action state preserves typed fields on validation/outage errors and exposes inline contract field errors. Profile mutation does not touch enrollment, session, PT, membership, credits, or tenant health data.
+
+Implementation: accessible account disclosure in the shared header with Profile, Security, existing in-app Notifications bell, Help and sign-out-this-device destinations; `/account/profile`, gym-scoped `/gyms/[slug]/profile`, and `/help` routes; themed forms for account and gym records; Owner correction editor on the existing Member detail page; strict contracts, API controllers, and the Master receipt migration. Tenant schema is unchanged because the fields and receipt/audit machinery already exist.
+
+Automated coverage: contracts test strict field separation and restricted inputs; owned tenant integration updates a real synthetic Member and Trainer, confirms global name does not change gym full name, denies mass assignment and wrong-subject updates, validates concurrent CAS conflict and idempotent replay, applies an Owner correction, and checks audit values contain version/reason only. Existing CF-01 application/enrollment and CF-03 identity/session/recovery suites also pass. Exact commands are in `EVIDENCE.md`.
+
+Remaining gaps: no tracked Member DOB correction request is created (the profile directs the member to ask the Owner); no proposed-health-update workflow or avatar upload is included. The Notifications item opens the existing bell; paged notification history remains CF-06. Help gives the existing gym-contact route but does not create or verify contact details. Browser, mobile, visual, keyboard/focus, accessibility, offline UI and real multi-gym role switching acceptance remain deferred. CF-04 is not marked Verified. PT files and PT progress/evidence/runbook were not modified.
+
+Next task: implement **CF-05 safe login-email correction workflow**, keeping login identity, tenant contact snapshots, verification evidence, and session invalidation distinct.

@@ -39,7 +39,7 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
   ];
   const sections = owner ? ownerSections : member ? [{ label: 'YOUR TRAINING', items: [{ label: 'Home', path: '', icon: House }, { label: 'Workouts', path: '/workout-plans', icon: Dumbbell }, { label: 'Meal Plans', path: '/meal-plans', icon: Utensils }, { label: 'PT Sessions', path: '/sessions', icon: CalendarDays }, { label: 'Calendar', path: '/calendar', icon: CalendarDays }, { label: 'Find a Trainer', path: '/trainers', icon: UsersRound }] }] : [{ label: 'COACHING', items: [{ label: 'My Schedule', path: '/schedule', icon: CalendarDays }, { label: 'Calendar', path: '/calendar', icon: CalendarDays }, { label: 'Requests', path: '/requests', icon: ClipboardList }, { label: 'Clients', path: '/clients', icon: UsersRound }, { label: 'Earnings', path: '/earnings', icon: Wallet }] }];
   const bookingDetail = Boolean(gym && pathname.startsWith(`/gyms/${gym.slug}/sessions/`));
-  const workspacePage = bookingDetail ? 'PT booking details' : trainer && pathname.includes('/plans/') ? 'Plan builder' : sections.flatMap(section => section.items).find(item => item.path && pathname.startsWith(`${gym ? gymRoleUrl(gym) : ''}${item.path}`))?.label ?? (member ? 'Home' : 'Dashboard');
+  const workspacePage = pathname.endsWith('/profile') ? 'Profile' : bookingDetail ? 'PT booking details' : trainer && pathname.includes('/plans/') ? 'Plan builder' : sections.flatMap(section => section.items).find(item => item.path && pathname.startsWith(`${gym ? gymRoleUrl(gym) : ''}${item.path}`))?.label ?? (member ? 'Home' : 'Dashboard');
   const role = support ? 'READ-ONLY SUPPORT' : gym?.role ?? 'SUPER_ADMIN';
   const destination = gym ? gymRoleUrl(gym) : '/admin';
   const home = gym?.role === 'TRAINER' ? `${destination}/schedule` : destination;
@@ -111,7 +111,15 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
         <span className="shell-gym-name">{platform ? <><span className="platform-header-label">Platform</span><span className="platform-header-divider">/</span>{support ? gym?.name : 'Overview'}</> : owner || trainer || member ? <><span className="workspace-header-gym" title={gym?.name}>{gym?.name}</span><span className="platform-header-divider">/</span><span className="workspace-header-page">{workspacePage}</span></> : gym?.name}</span>
         {themed ? <ThemeToggle/> : null}
         {gym && !support ? <NotificationsBell key={`${identityId}:${gym.slug}:${gym.role}`} slug={gym.slug} identityId={identityId} role={gym.role} /> : null}
-        <div className="shell-profile"><span className="shell-avatar" aria-hidden="true">{displayName.slice(0, 1).toUpperCase()}</span><div><strong>{displayName}</strong><small>{platform ? support ? 'Read-only support' : 'Super administrator' : role.replaceAll('_', ' ')}</small></div></div>
+        <details className="shell-account-menu"><summary aria-label={`Account menu for ${displayName}`}><span className="shell-avatar" aria-hidden="true">{displayName.slice(0, 1).toUpperCase()}</span><span className="shell-account-label"><strong>{displayName}</strong><small>{platform ? support ? 'Read-only support' : role === 'SUPER_ADMIN' ? 'Super administrator' : 'GymOS account' : role.replaceAll('_', ' ')}</small></span></summary>
+          <nav className="shell-account-panel" aria-label="Account destinations">
+            {!support ? <a href={gym ? `/gyms/${encodeURIComponent(gym.slug)}/profile` : '/account/profile'}>Profile</a> : null}
+            <a href="/security">Security</a>
+            {gym && !support ? <a href="#notification-center" onClick={(event) => { event.preventDefault(); document.querySelector<HTMLButtonElement>('.notification-bell-trigger')?.click(); document.querySelector('.shell-account-menu')?.removeAttribute('open'); }}>Notifications</a> : null}
+            <a href="/help">Help</a>
+            <form action={signOut} data-session-exit><Button type="submit" variant="secondary"><LogOut size={16}/><span>Sign out this device</span></Button></form>
+          </nav>
+        </details>
       </header>
       <main id="workspace-content" className="shell-content" tabIndex={-1}>{switching ? <LoadingState label="Loading your gyms…" /> : children}</main>
     </div>

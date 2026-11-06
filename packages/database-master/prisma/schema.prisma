@@ -83,6 +83,7 @@ model User {
   recoveryCredentials       RecoveryCredential[]      @relation("RecoverySubject")
   issuedRecoveryCredentials RecoveryCredential[]      @relation("RecoveryIssuer")
   securityEvents            IdentitySecurityEvent[]
+  profileCommandReceipts    ProfileCommandReceipt[]
   createdAt                 DateTime                  @default(now())
   updatedAt                 DateTime                  @updatedAt
 }
@@ -143,6 +144,21 @@ model IdentitySecurityEvent {
   createdAt  DateTime                  @default(now()) @db.Timestamptz(3)
 
   @@index([identityId, createdAt])
+}
+
+model ProfileCommandReceipt {
+  id              String   @id @default(cuid())
+  actorIdentityId String
+  actor           User     @relation(fields: [actorIdentityId], references: [id], onDelete: Restrict)
+  commandKind     String
+  idempotencyKey  String
+  requestDigest   String
+  resourceId      String
+  resultVersion   Int
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([actorIdentityId, commandKind, idempotencyKey])
+  @@index([actorIdentityId, createdAt])
 }
 
 model Gym {

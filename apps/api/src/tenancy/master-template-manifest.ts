@@ -1,7 +1,7 @@
 import { contentDigest } from '../operations/primitives.js';
 // Immutable reviewed chain; schema deployment is an explicit owned runner command.
 export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
-  version: 'master-2026-11-06.5',
+  version: 'master-2026-11-06.6',
   migrations: [
     {
       name: '20261021100256_init_master',
@@ -72,6 +72,10 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       name: '20261106080000_identity_recovery',
       checksum: 'c09cd5b94716b5a7c7714f2be4f57ec54fe57bdfbd1d1a2b77a22949a24a50bd',
     },
+    {
+      name: '20261106090000_profile_command_receipts',
+      checksum: 'de3417f9317369918e27fe68b0f77fd4682d721263fd4d38afcbdaab024f3fa8',
+    },
   ],
   postconditions: {
     tables: [
@@ -89,6 +93,7 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       'MemberLifecycleIntent',
       'MemberApplication',
       'MemberApplicationNotice',
+      'ProfileCommandReceipt',
       'Operation',
       'PlatformAuditLog',
       'ProvisioningIntent',
@@ -121,6 +126,7 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       'IdentitySecurityEvent_append_only',
       'MemberApplication_immutable_subject',
       'MemberApplicationNotice_immutable',
+      'ProfileCommandReceipt_immutable',
     ],
     requiredColumns: {
       Theme: ['id', 'gymId', 'primaryColor', 'logoUrl', 'version'],
@@ -181,6 +187,7 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       MemberApplicationNotice: ['id', 'applicationId', 'gymId', 'recipientId', 'event', 'createdAt', 'readAt'],
       IdentitySession: ['id', 'identityId', 'authVersion', 'deviceClass', 'deviceLabel', 'refreshTokenHash', 'version', 'createdAt', 'lastActivityAt', 'idleExpiresAt', 'absoluteExpiresAt', 'revokedAt'],
       IdentitySecurityEvent: ['id', 'identityId', 'event', 'createdAt'],
+      ProfileCommandReceipt: ['id', 'actorIdentityId', 'commandKind', 'idempotencyKey', 'requestDigest', 'resourceId', 'resultVersion', 'createdAt'],
     },
   },
 } as const);
