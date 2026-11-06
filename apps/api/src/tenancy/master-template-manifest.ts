@@ -1,7 +1,7 @@
 import { contentDigest } from '../operations/primitives.js';
 // Immutable reviewed chain; schema deployment is an explicit owned runner command.
 export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
-  version: 'master-2026-11-06.6',
+  version: 'master-2026-11-06.7',
   migrations: [
     {
       name: '20261021100256_init_master',
@@ -76,6 +76,10 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       name: '20261106090000_profile_command_receipts',
       checksum: 'de3417f9317369918e27fe68b0f77fd4682d721263fd4d38afcbdaab024f3fa8',
     },
+    {
+      name: '20261106100000_identity_email_correction_requests',
+      checksum: 'b5444d2ae4391cf6f1d5a770636b506d392d8b66c7e12fa68e34746a66f89387',
+    },
   ],
   postconditions: {
     tables: [
@@ -94,6 +98,7 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       'MemberApplication',
       'MemberApplicationNotice',
       'ProfileCommandReceipt',
+      'IdentityEmailCorrectionRequest',
       'Operation',
       'PlatformAuditLog',
       'ProvisioningIntent',
@@ -127,6 +132,7 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       'MemberApplication_immutable_subject',
       'MemberApplicationNotice_immutable',
       'ProfileCommandReceipt_immutable',
+      'IdentityEmailCorrectionRequest_immutable',
     ],
     requiredColumns: {
       Theme: ['id', 'gymId', 'primaryColor', 'logoUrl', 'version'],
@@ -188,6 +194,7 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       IdentitySession: ['id', 'identityId', 'authVersion', 'deviceClass', 'deviceLabel', 'refreshTokenHash', 'version', 'createdAt', 'lastActivityAt', 'idleExpiresAt', 'absoluteExpiresAt', 'revokedAt'],
       IdentitySecurityEvent: ['id', 'identityId', 'event', 'createdAt'],
       ProfileCommandReceipt: ['id', 'actorIdentityId', 'commandKind', 'idempotencyKey', 'requestDigest', 'resourceId', 'resultVersion', 'createdAt'],
+      IdentityEmailCorrectionRequest: ['id', 'identityId', 'requestedEmail', 'state', 'resolution', 'version', 'idempotencyKey', 'requestDigest', 'submittedAt', 'resolvedAt', 'resolvedByIdentityId'],
     },
   },
 } as const);

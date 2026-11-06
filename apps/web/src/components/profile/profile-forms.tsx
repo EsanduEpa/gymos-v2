@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import type { AccountProfile, SelfMemberProfile, SelfTrainerProfile, MemberDetail } from '@gymos/contracts';
 import { Button, Card, CardHeader, Feedback, Field } from '@/components/ui';
 import { correctMemberProfile, initialProfileActionState, updateAccountProfile, updateGymSelfProfile } from '@/app/profile-actions';
@@ -15,7 +16,8 @@ export function AccountProfileForm({ profile, requestKey }: { profile: AccountPr
     <form action={action} className="profile-form">
       <Field label="Account display name" name="displayName" defaultValue={profile.displayName ?? ''} maxLength={120} required error={state.fieldErrors?.displayName}
         hint="This name appears across your GymOS account. It does not rename your official record in each gym."/>
-      <label className="ui-field"><span className="ui-field-label">Login email</span><input value={profile.email} readOnly aria-readonly="true"/><span className="ui-field-hint">Login email changes use a separate verified workflow.</span></label>
+      <label className="ui-field"><span className="ui-field-label">Login email</span><input value={profile.email} readOnly aria-readonly="true"/><span className="ui-field-hint">Login email changes require separate staff review; this app does not verify a new mailbox.</span></label>
+      <p className="profile-email-help">Need to correct your login email? <Link href="/account/email-correction">Request staff help</Link></p>
       <input type="hidden" name="expectedVersion" value={profile.version}/><input type="hidden" name="idempotencyKey" value={requestKey}/>
       <Button type="submit" disabled={pending}>{pending ? 'Saving…' : 'Save account name'}</Button>
     </form>

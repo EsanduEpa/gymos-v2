@@ -59,33 +59,35 @@ enum IdentitySecurityEventType {
 }
 
 model User {
-  originalPlatformAudits    PlatformAuditLog[]        @relation("PlatformAuditOriginalActor")
-  initiatedOperations       Operation[]               @relation("OperationActor")
-  subjectOperations         Operation[]               @relation("OperationSubject")
-  platformAudits            PlatformAuditLog[]        @relation("PlatformAuditActor")
-  credentialDeliveries      CredentialDelivery[]      @relation("CredentialSubject")
-  issuedCredentials         CredentialDelivery[]      @relation("CredentialIssuer")
-  id                        String                    @id @default(cuid())
-  email                     String                    @unique
+  originalPlatformAudits    PlatformAuditLog[]               @relation("PlatformAuditOriginalActor")
+  initiatedOperations       Operation[]                      @relation("OperationActor")
+  subjectOperations         Operation[]                      @relation("OperationSubject")
+  platformAudits            PlatformAuditLog[]               @relation("PlatformAuditActor")
+  credentialDeliveries      CredentialDelivery[]             @relation("CredentialSubject")
+  issuedCredentials         CredentialDelivery[]             @relation("CredentialIssuer")
+  id                        String                           @id @default(cuid())
+  email                     String                           @unique
   passwordHash              String
-  globalRole                GlobalRole                @default(USER)
+  globalRole                GlobalRole                       @default(USER)
   displayName               String?
-  mustChangePassword        Boolean                   @default(false)
-  authVersion               Int                       @default(0)
-  version                   Int                       @default(0)
-  passwordChangedAt         DateTime?                 @db.Timestamptz(3)
-  credentialExpiresAt       DateTime?                 @db.Timestamptz(3)
+  mustChangePassword        Boolean                          @default(false)
+  authVersion               Int                              @default(0)
+  version                   Int                              @default(0)
+  passwordChangedAt         DateTime?                        @db.Timestamptz(3)
+  credentialExpiresAt       DateTime?                        @db.Timestamptz(3)
   gymAccesses               GymAccess[]
   enrollmentProofs          EnrollmentProof[]
   memberApplications        MemberApplication[]
-  memberApplicationNotices  MemberApplicationNotice[] @relation("MemberApplicationNoticeRecipient")
+  memberApplicationNotices  MemberApplicationNotice[]        @relation("MemberApplicationNoticeRecipient")
   identitySessions          IdentitySession[]
-  recoveryCredentials       RecoveryCredential[]      @relation("RecoverySubject")
-  issuedRecoveryCredentials RecoveryCredential[]      @relation("RecoveryIssuer")
+  recoveryCredentials       RecoveryCredential[]             @relation("RecoverySubject")
+  issuedRecoveryCredentials RecoveryCredential[]             @relation("RecoveryIssuer")
   securityEvents            IdentitySecurityEvent[]
   profileCommandReceipts    ProfileCommandReceipt[]
-  createdAt                 DateTime                  @default(now())
-  updatedAt                 DateTime                  @updatedAt
+  emailCorrectionRequests   IdentityEmailCorrectionRequest[] @relation("EmailCorrectionSubject")
+  reviewedEmailCorrections  IdentityEmailCorrectionRequest[] @relation("EmailCorrectionReviewer")
+  createdAt                 DateTime                         @default(now())
+  updatedAt                 DateTime                         @updatedAt
 }
 
 model IdentitySession {
@@ -159,6 +161,37 @@ model ProfileCommandReceipt {
 
   @@unique([actorIdentityId, commandKind, idempotencyKey])
   @@index([actorIdentityId, createdAt])
+}
+
+enum IdentityEmailCorrectionState {
+  PENDING
+  WITHDRAWN
+  CLOSED
+}
+
+enum IdentityEmailCorrectionResolution {
+  FOLLOW_UP_RECORDED
+  CLOSED_NO_CHANGE
+}
+
+model IdentityEmailCorrectionRequest {
+  id                   String                             @id @default(cuid())
+  identityId           String
+  identity             User                               @relation("EmailCorrectionSubject", fields: [identityId], references: [id], onDelete: Restrict)
+  requestedEmail       String
+  state                IdentityEmailCorrectionState       @default(PENDING)
+  resolution           IdentityEmailCorrectionResolution?
+  version              Int                                @default(0)
+  idempotencyKey       String
+  requestDigest        String
+  submittedAt          DateTime                           @default(now()) @db.Timestamptz(3)
+  resolvedAt           DateTime?                          @db.Timestamptz(3)
+  resolvedByIdentityId String?
+  reviewer             User?                              @relation("EmailCorrectionReviewer", fields: [resolvedByIdentityId], references: [id], onDelete: Restrict)
+
+  @@unique([identityId, idempotencyKey])
+  @@index([identityId, submittedAt, id])
+  @@index([state, submittedAt, id])
 }
 
 model Gym {

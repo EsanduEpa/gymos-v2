@@ -83,6 +83,7 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
           <a href="/admin#gym-registry" aria-label="Gyms" onClick={close}><Building2 size={19}/><span>Gyms</span></a>
           <a href="/admin#create-gym" aria-label="Create a gym" onClick={close}><Plus size={19}/><span>Create a gym</span></a>
           <a href="/admin/account-recovery" aria-label="Operator account recovery" aria-current={pathname.startsWith('/admin/account-recovery') ? 'page' : undefined} onClick={close}><ShieldCheck size={19}/><span>Account recovery</span></a>
+          <a href="/admin/email-correction-requests" aria-label="Email correction requests" aria-current={pathname.startsWith('/admin/email-correction-requests') ? 'page' : undefined} onClick={close}><ShieldCheck size={19}/><span>Email corrections</span></a>
         </>}
         {support ? <a href="/admin" aria-label="All Gyms" onClick={close}><Building2 size={19}/><span>All Gyms</span></a> : null}
       </nav>

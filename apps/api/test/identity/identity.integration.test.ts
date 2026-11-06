@@ -4,6 +4,7 @@ import { promisify } from 'node:util';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { ConflictException, type ExecutionContext } from '@nestjs/common';
+import type { Request } from 'express';
 import { PrismaPg } from '@prisma/adapter-pg';
 import argon2 from 'argon2';
 import { SignJWT } from 'jose';
@@ -16,7 +17,10 @@ import { isOperationalActor } from '../../src/identity/publication-policy.js';
 import { GymAccessGuard, type GymRequest } from '../../src/gym-access.guard.js';
 import type { TenantSchemaGateService } from '../../src/tenancy/tenant-schema-gate.service.js';
 import { AuthController } from '../../src/auth.controller.js';
-import { SuperAdminGuard } from '../../src/super-admin.guard.js';
+import { AuthSessionService } from '../../src/identity/auth-session.service.js';
+import { AuthSessionGuard } from '../../src/identity/auth-session.guard.js';
+import { SuperAdminGuard, type PlatformRequest } from '../../src/super-admin.guard.js';
+import { EmailCorrectionController, AdminEmailCorrectionController } from '../../src/email-correction.controller.js';
 import type { DatabaseService } from '../../src/database.service.js';
 import { assertOwnedTarget, createDisposablePostgresRun } from '../support/disposable-postgres.js';
 
@@ -273,6 +277,64 @@ it('retains login response compatibility and safe owner access while pending/unv
   await master.user.update({ where: { id: missingExpiry.id }, data: { mustChangePassword: true } });
   await expect(new AuthController(database).login({ email: 'missing-expiry@example.test', password }))
     .rejects.toThrow('Invalid email or password');
+});
+
+it('records authenticated email correction requests without changing credentials or gym contact snapshots', async () => {
+  const subject = await fixtureIdentity('correction-subject@example.test');
+  const admin = await fixtureIdentity('correction-admin@example.test');
+  await master.user.update({ where: { id: admin.id }, data: { globalRole: 'SUPER_ADMIN' } });
+  const member = await tenants[0].member.create({ data: { fullName: 'Synthetic Applicant', identityId: subject.id,
+    email: 'contact-snapshot@example.test', registrationState: 'COMPLETE', enrollmentOperationId: 'contact-snapshot-op' } });
+  const database = { master } as DatabaseService;
+  const sessions = new AuthSessionService(database);
+  const subjectSession = await sessions.create(subject.id, subject.authVersion, 'PERSONAL', 'Synthetic test device');
+  const controller = new EmailCorrectionController(database);
+  const token = subjectSession.accessToken;
+  const request = { headers: { authorization: `Bearer ${token}` } } as unknown as Request;
+  const sessionContext = { switchToHttp: () => ({ getRequest: () => request }) } as ExecutionContext;
+  await expect(new AuthSessionGuard(sessions).canActivate(sessionContext)).resolves.toBe(true);
+  await expect(controller.submit(request, 'correction-key-0001', { requestedEmail: 'correction-target@example.test', currentPassword: 'wrong' }))
+    .rejects.toThrow('Current password was not accepted');
+  const subjectPasswordHash = (await master.user.findUniqueOrThrow({ where: { id: subject.id } })).passwordHash;
+  const command = () => controller.submit(request, 'correction-key-0002', { requestedEmail: ' Correction-Target@Example.test ', currentPassword: password });
+  const [first, retry] = await Promise.all([command(), command()]);
+  expect(first).toMatchObject({ requestedEmail: 'correction-target@example.test', state: 'PENDING' });
+  expect(retry.id).toBe(first.id);
+  expect(await master.identityEmailCorrectionRequest.count({ where: { identityId: subject.id } })).toBe(1);
+  await expect(controller.submit(request, 'correction-key-0003', { requestedEmail: 'correction-target@example.test', currentPassword: password }))
+    .rejects.toThrow('pending request');
+  await expect(controller.submit(request, 'correction-key-0004', { requestedEmail: admin.email, currentPassword: password }))
+    .rejects.toThrow('cannot be requested');
+  const persistedRequest = await master.identityEmailCorrectionRequest.findUniqueOrThrow({ where: { id: first.id } });
+  expect(JSON.stringify(persistedRequest)).not.toContain(password);
+  expect((await master.user.findUniqueOrThrow({ where: { id: subject.id } })).email).toBe('correction-subject@example.test');
+  expect(await argon2.verify((await master.user.findUniqueOrThrow({ where: { id: subject.id } })).passwordHash, password)).toBe(true);
+  expect((await tenants[0].member.findUniqueOrThrow({ where: { id: member.id } })).email).toBe('contact-snapshot@example.test');
+  const own = await controller.own(request);
+  expect(own).toHaveLength(1);
+  await controller.withdraw(request, first.id);
+  expect((await controller.own(request))[0].state).toBe('WITHDRAWN');
+  const adminController = new AdminEmailCorrectionController(database);
+  const ordinaryContext = { switchToHttp: () => ({ getRequest: () => ({ headers: { authorization: `Bearer ${token}` }, method: 'GET', path: '/admin/email-correction-requests' }) }) } as unknown as ExecutionContext;
+  await expect(new SuperAdminGuard(database).canActivate(ordinaryContext)).rejects.toThrow('Super Admin access required');
+  const adminSession = await sessions.create(admin.id, admin.authVersion, 'PERSONAL', 'Synthetic reviewer');
+  const second = await controller.submit(request, 'correction-key-0005', { requestedEmail: 'second-correction@example.test', currentPassword: password });
+  const reviewer = { headers: { authorization: `Bearer ${adminSession.accessToken}` }, method: 'POST', path: `/admin/email-correction-requests/${second.id}/close` } as PlatformRequest;
+  const reviewerContext = { switchToHttp: () => ({ getRequest: () => reviewer }) } as ExecutionContext;
+  await expect(new AuthSessionGuard(sessions).canActivate(reviewerContext)).resolves.toBe(true);
+  await expect(new SuperAdminGuard(database).canActivate(reviewerContext)).resolves.toBe(true);
+  expect(await adminController.list()).toHaveLength(1);
+  const decisions = await Promise.allSettled([
+    adminController.close(reviewer, second.id, { expectedVersion: 0, resolution: 'FOLLOW_UP_RECORDED' }),
+    adminController.close(reviewer, second.id, { expectedVersion: 0, resolution: 'CLOSED_NO_CHANGE' }),
+  ]);
+  expect(decisions.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+  expect(decisions.filter(result => result.status === 'rejected')).toHaveLength(1);
+  expect(['FOLLOW_UP_RECORDED', 'CLOSED_NO_CHANGE']).toContain((await controller.own(request)).find(row => row.id === second.id)?.resolution);
+  const audit = await master.platformAuditLog.findMany({ where: { resourceType: 'EMAIL_CORRECTION_REQUEST', resourceId: first.id } });
+  expect(audit.map(event => event.eventCode)).toContain('IDENTITY_EMAIL_CORRECTION_WITHDRAWN');
+  expect(JSON.stringify(audit)).not.toContain('correction-target@example.test');
+  expect(subjectPasswordHash).toBe((await master.user.findUniqueOrThrow({ where: { id: subject.id } })).passwordHash);
 });
 
 

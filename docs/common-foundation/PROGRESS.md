@@ -34,9 +34,26 @@ Implementation: additive Master `IdentitySession` schema/migration and template-
 
 Automated coverage includes exact session response validation, global guard enforcement, session rotation/replay, concurrent refresh idempotence, passive versus active idle updates, session checks, current/all-device logout, CF-01 application/pending-access regression and existing tenant enrollment/consent reconciliation. Exact results and initial corrected attempts are recorded in `EVIDENCE.md`. Manual browser/device lifecycle and accessibility acceptance are deferred; no CF-specific browser spec was added.
 
+## CF-05 — Ready for review (automated checks passed; manual acceptance pending)
+
+Bounded scope: a self-service, fresh-password-confirmed request for login email correction; identity-scoped request status and withdrawal; a SuperAdmin follow-up queue and closure outcome; help copy and an operator runbook. No actual login email change, mailbox verification, notification, contact snapshot update, account merge, recovery claim invalidation, or session revocation is implemented because this release has no mailbox possession provider or authorized identity-change process.
+
+Data ownership: Master owns `User.email` and the new `IdentityEmailCorrectionRequest` facts. Tenant Member/Trainer email fields remain gym contact snapshots and are unchanged. Request address is normalized using the shared identity email policy and checked against current Master identities. A partial unique constraint allows at most one pending request per subject and target address. A database trigger protects request facts and allows only one versioned `PENDING` → `WITHDRAWN` or `PENDING` → `CLOSED` transition.
+
+Authorization: signed-in subject can create/read/withdraw only their own request; submission requires current password and an active session. Only SuperAdmin can read the bounded follow-up queue or close a request. Read-only support cannot mutate. Closing records `FOLLOW_UP_RECORDED` or `CLOSED_NO_CHANGE`; neither outcome changes the login identity. Audit transitions include request ID, version and outcome code only. The request's target email is held on the request row and its idempotency digest, but not copied into audit transitions. Password, current password hash and staff evidence are not stored with the request.
+
+Failure handling: normalized duplicates and already-pending requests conflict without creating extra rows; idempotent repeats return the original safe request; competing closures use version/state CAS and exactly one wins; applicant withdrawal is terminal. API outage leaves the current login usable and the UI says the outcome is unconfirmed. No tenant operation is needed, so tenant availability does not gate account security. The form clears the password after every action response.
+
+Implementation: additive Master migration `20261106100000_identity_email_correction_requests`, Master manifest `.7`, strict shared contracts, API subject and platform-review endpoints, `/account/email-correction`, `/admin/email-correction-requests`, profile/help entry points, and [the CF-05 runbook](CF-05-EMAIL-CORRECTION-RUNBOOK.md). Existing profile login email stays read-only. No changes were made to PT source or PT progress/evidence/runbook.
+
+Automated coverage: current-password rejection, canonical target normalization, case-variant duplicate handling, same-key concurrent replay, one-pending constraints, current identity collision rejection, password hash/login email preservation, tenant contact snapshot preservation, subject-only status/withdrawal behavior, safe audit data, SuperAdmin queue closure, and concurrent competing closure. The owned Master/tenant migration and existing application/enrollment/profile regression suites passed. Exact commands and actual outcomes are in `EVIDENCE.md`.
+
+Remaining risks and deferred acceptance: an email address entered in a request is not proof of mailbox control, and staff follow-up only records an existing process; a real login identity update remains unavailable until a separately authorized proof and reconciliation process exists. Manual browser, visual/mobile, keyboard/focus/accessibility, real staff follow-up, and live outage acceptance remain deferred. CF-05 is not marked Verified.
+
+Next task: implement **CF-06 notification center, paging, account/application inbox scopes, and typed target routing**, preserving PT notification/reminder behavior and separating Master identity events from tenant operational notices.
+
 ## Remaining milestones
 
-- CF-05: safe login-email correction workflow.
 - CF-06: notification center, paging, inbox scopes and broader event history.
 - CF-07: common help/error/privacy/lifecycle behavior and operational visibility.
 - CF-08: owned integration/browser, upgrade, recovery and release evidence; no milestone is Verified by compilation alone.
