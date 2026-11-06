@@ -26,11 +26,12 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
   const [open, setOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
   const collapsed = useSyncExternalStore(subscribeAppearance, sidebarIsCollapsed, () => false);
-  const platform = !gym || Boolean(support);
+  const account = !gym && pathname.startsWith('/account/');
+  const platform = (!gym && !account) || Boolean(support);
   const owner = gym?.role === 'OWNER' && !support;
   const trainer = gym?.role === 'TRAINER' && !support;
   const member = gym?.role === 'MEMBER' && !support;
-  const themed = platform || owner || trainer || member;
+  const themed = platform || account || owner || trainer || member;
   const drawerOpener = useRef<HTMLElement | null>(null);
   const ownerSections = [
     { label: 'WORKSPACE', items: [{ label: 'Dashboard', path: '', icon: LayoutDashboard }, { label: 'Members', path: '/members', icon: UsersRound }, { label: 'Applications', path: '/applications', icon: ClipboardCheck }, { label: 'Trainers', path: '/trainers', icon: Dumbbell }, { label: 'Sessions', path: '/sessions', icon: CalendarDays }] },
@@ -40,7 +41,7 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
   const sections = owner ? ownerSections : member ? [{ label: 'YOUR TRAINING', items: [{ label: 'Home', path: '', icon: House }, { label: 'Workouts', path: '/workout-plans', icon: Dumbbell }, { label: 'Meal Plans', path: '/meal-plans', icon: Utensils }, { label: 'PT Sessions', path: '/sessions', icon: CalendarDays }, { label: 'Calendar', path: '/calendar', icon: CalendarDays }, { label: 'Find a Trainer', path: '/trainers', icon: UsersRound }] }] : [{ label: 'COACHING', items: [{ label: 'My Schedule', path: '/schedule', icon: CalendarDays }, { label: 'Calendar', path: '/calendar', icon: CalendarDays }, { label: 'Requests', path: '/requests', icon: ClipboardList }, { label: 'Clients', path: '/clients', icon: UsersRound }, { label: 'Earnings', path: '/earnings', icon: Wallet }] }];
   const bookingDetail = Boolean(gym && pathname.startsWith(`/gyms/${gym.slug}/sessions/`));
   const workspacePage = pathname.endsWith('/profile') ? 'Profile' : bookingDetail ? 'PT booking details' : trainer && pathname.includes('/plans/') ? 'Plan builder' : sections.flatMap(section => section.items).find(item => item.path && pathname.startsWith(`${gym ? gymRoleUrl(gym) : ''}${item.path}`))?.label ?? (member ? 'Home' : 'Dashboard');
-  const role = support ? 'READ-ONLY SUPPORT' : gym?.role ?? 'SUPER_ADMIN';
+  const role = support ? 'READ-ONLY SUPPORT' : gym?.role ?? (account ? 'GYMOS ACCOUNT' : 'SUPER_ADMIN');
   const destination = gym ? gymRoleUrl(gym) : '/admin';
   const home = gym?.role === 'TRAINER' ? `${destination}/schedule` : destination;
   function close() { drawer.current?.close(); setOpen(false); (drawerOpener.current ?? opener.current)?.focus(); }
@@ -73,6 +74,20 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
         <a className="ui-button ui-button-secondary" href="/security" aria-label="Security settings"><ShieldCheck size={16}/><span>Security</span></a>
         <form action={signOut} data-session-exit><Button type="submit" variant="secondary" aria-label="Sign out"><LogOut size={16}/><span>Sign out</span></Button></form></div>
     </>;
+    if (account) return <>
+      <a className="platform-brand" href="/gyms/select" aria-label="GymOS account home"><span className="platform-brand-mark"><Dumbbell size={23}/></span><span className="platform-brand-copy"><strong>GymOS</strong><small>YOUR ACCOUNT</small></span></a>
+      {mobile ? <button className="platform-drawer-close" type="button" onClick={close} aria-label="Close navigation menu"><X size={20}/></button> : null}
+      <nav aria-label={mobile ? 'Mobile navigation' : 'Main navigation'}>
+        <span className="platform-nav-label">ACCOUNT</span>
+        <a href="/account/profile" onClick={close}><UsersRound size={19}/><span>Profile</span></a>
+        <a href="/account/email-correction" onClick={close}><ShieldCheck size={19}/><span>Email correction</span></a>
+        <a href="/account/notifications" onClick={close}><ClipboardList size={19}/><span>Notifications</span></a>
+        <a href="/security" onClick={close}><ShieldCheck size={19}/><span>Security</span></a>
+        <a href="/help" onClick={close}><House size={19}/><span>Help</span></a>
+        <a href="/gyms/select" onClick={close}><ArrowLeftRight size={19}/><span>Choose a gym</span></a>
+      </nav>
+      <div className="shell-sidebar-footer"><div className="platform-sidebar-identity"><span className="shell-avatar" aria-hidden="true">{displayName.slice(0, 1).toUpperCase()}</span><div><strong>{displayName}</strong><small>GymOS account</small></div></div><form action={signOut} data-session-exit><Button type="submit" variant="secondary" aria-label="Sign out"><LogOut size={16}/><span>Sign out</span></Button></form></div>
+    </>;
     if (platform) return <>
       <a className="platform-brand" href="/admin" aria-label="GymOS platform home"><span className="platform-brand-mark"><Dumbbell size={23}/></span><span className="platform-brand-copy"><strong>GymOS</strong><small>PLATFORM CONSOLE</small></span></a>
       {mobile ? <button className="platform-drawer-close" type="button" onClick={close} aria-label="Close navigation menu"><X size={20}/></button> : null}
@@ -95,7 +110,7 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
     </>;
     return null;
   }
-  return <div data-session-identity={identityId} data-support-session={support?.id} data-support-expiry={support?.expiresAt} className={`application-shell ${themed ? 'themed-workspace' : ''} ${platform ? 'platform-dashboard' : ''} ${owner || trainer || member ? 'gym-workspace' : ''} ${owner ? 'owner-workspace' : ''} ${trainer ? 'trainer-workspace' : ''} ${member ? 'member-workspace' : ''} ${gym ? 'gym-dashboard' : ''} ${gym?.role === 'OWNER' ? 'owner-dashboard' : ''} ${gym?.role === 'TRAINER' ? 'trainer-dashboard' : ''} ${gym?.role === 'MEMBER' ? 'member-dashboard' : ''}`} style={style}>
+  return <div data-session-identity={identityId} data-support-session={support?.id} data-support-expiry={support?.expiresAt} className={`application-shell ${themed ? 'themed-workspace' : ''} ${platform || account ? 'platform-dashboard' : ''} ${owner || trainer || member ? 'gym-workspace' : ''} ${owner ? 'owner-workspace' : ''} ${trainer ? 'trainer-workspace' : ''} ${member ? 'member-workspace' : ''} ${gym ? 'gym-dashboard' : ''} ${gym?.role === 'OWNER' ? 'owner-dashboard' : ''} ${gym?.role === 'TRAINER' ? 'trainer-dashboard' : ''} ${gym?.role === 'MEMBER' ? 'member-dashboard' : ''}`} style={style}>
     <a className="skip-link" href="#workspace-content">Skip to content</a>
     <aside className="shell-sidebar">{navigation()}</aside>
     <dialog ref={drawer} id="primary-navigation" className="shell-drawer" aria-label="Navigation menu" onKeyDown={trap}
@@ -109,10 +124,10 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
       <header className="shell-header">
         <button ref={opener} className="shell-menu" type="button" aria-label="Open navigation menu" aria-controls="primary-navigation" aria-expanded={open} onClick={show}>{themed ? <Menu size={21}/> : '☰'}</button>
         {themed ? <button type="button" className="platform-collapse" aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-expanded={!collapsed} title="Toggle sidebar" onClick={togglePlatformSidebar}><PanelLeftClose size={19} className="collapse-icon"/><PanelLeftOpen size={19} className="expand-icon"/></button> : null}
-        <span className="shell-gym-name">{platform ? <><span className="platform-header-label">Platform</span><span className="platform-header-divider">/</span>{support ? gym?.name : 'Overview'}</> : owner || trainer || member ? <><span className="workspace-header-gym" title={gym?.name}>{gym?.name}</span><span className="platform-header-divider">/</span><span className="workspace-header-page">{workspacePage}</span></> : gym?.name}</span>
+        <span className="shell-gym-name">{account ? <><span className="platform-header-label">Account</span><span className="platform-header-divider">/</span>{pathname.includes('email-correction') ? 'Email correction' : pathname.includes('notifications') ? 'Notifications' : 'Profile'}</> : platform ? <><span className="platform-header-label">Platform</span><span className="platform-header-divider">/</span>{support ? gym?.name : 'Overview'}</> : owner || trainer || member ? <><span className="workspace-header-gym" title={gym?.name}>{gym?.name}</span><span className="platform-header-divider">/</span><span className="workspace-header-page">{workspacePage}</span></> : gym?.name}</span>
         {themed ? <ThemeToggle/> : null}
         {gym && !support ? <NotificationsBell key={`${identityId}:${gym.slug}:${gym.role}`} slug={gym.slug} identityId={identityId} role={gym.role} /> : null}
-        <details className="shell-account-menu"><summary aria-label={`Account menu for ${displayName}`}><span className="shell-avatar" aria-hidden="true">{displayName.slice(0, 1).toUpperCase()}</span><span className="shell-account-label"><strong>{displayName}</strong><small>{platform ? support ? 'Read-only support' : role === 'SUPER_ADMIN' ? 'Super administrator' : 'GymOS account' : role.replaceAll('_', ' ')}</small></span></summary>
+        <details className="shell-account-menu"><summary aria-label={`Account menu for ${displayName}`}><span className="shell-avatar" aria-hidden="true">{displayName.slice(0, 1).toUpperCase()}</span><span className="shell-account-label"><strong>{displayName}</strong><small>{account ? 'GymOS account' : platform ? support ? 'Read-only support' : 'Super administrator' : role.replaceAll('_', ' ')}</small></span></summary>
           <nav className="shell-account-panel" aria-label="Account destinations">
             {!support ? <a href={gym ? `/gyms/${encodeURIComponent(gym.slug)}/profile` : '/account/profile'}>Profile</a> : null}
             <a href="/security">Security</a>

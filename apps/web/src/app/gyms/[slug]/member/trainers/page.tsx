@@ -36,7 +36,7 @@ export default async function MemberTrainerDirectoryPage({ params, searchParams 
           <div className="trainer-specialisations" aria-label="Specialisations">{trainer.specialisations.length ? trainer.specialisations.map(specialisation => <span key={specialisation}>{specialisation}</span>) : <span>Specialisations not listed</span>}</div>
           <p>{trainer.bio || 'No biography available.'}</p>
           <p className="trainer-rating">Rating unavailable; this gym does not collect member ratings.</p>
-          <a className="ui-button ui-button-primary ui-button-full" aria-label="Request this trainer" href={`/gyms/${encodeURIComponent(slug)}/member/trainers/${encodeURIComponent(trainer.id)}/book`}>Request session</a>
+          <a className="ui-button ui-button-primary ui-button-full" aria-label={`View ${trainer.fullName} profile`} href={`/gyms/${encodeURIComponent(slug)}/member/trainers/${encodeURIComponent(trainer.id)}`}>View profile</a>
         </article>)}</div>
         <div className="ui-pager"><span aria-live="polite">Page {result.data.page} of {Math.max(1, result.data.totalPages)} · {result.data.totalCount} active trainers</span><div>{result.data.page > 1 ? <a className="ui-button ui-button-secondary" href={`?${new URLSearchParams({ ...(filters.q ? { q: filters.q } : {}), page: String(result.data.page - 1) })}`}>Previous</a> : null}{result.data.page < result.data.totalPages ? <a className="ui-button ui-button-secondary" href={`?${new URLSearchParams({ ...(filters.q ? { q: filters.q } : {}), page: String(result.data.page + 1) })}`}>Next</a> : null}</div></div>
       </>}

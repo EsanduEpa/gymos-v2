@@ -30,7 +30,6 @@ export async function createSessionRequest(slug: string, trainerId: string, init
   const result = sessionRequestResultSchema.safeParse(await response.json().catch(() => null));
   if (!response.ok || !result.success) return { error: response.status === 422 ? 'Check the session time and eligibility, then try again.' : 'The request outcome is unknown. Retry with this same key.',
     currentKey: key, outcomeUnknown: response.status >= 500 || response.ok };
-  revalidatePath(`/gyms/${encodeURIComponent(slug)}`, 'layout');
   revalidatePath(`/gyms/${encodeURIComponent(slug)}/trainer/requests`);
   revalidatePath(`/gyms/${encodeURIComponent(slug)}/member/sessions`);
   return { success: 'Request sent. The trainer must accept before credit is reserved.', sessionId: result.data.session.id, nextKey: randomUUID() };
@@ -55,7 +54,6 @@ export async function decideSessionRequest(slug: string, sessionId: string, init
   const result = sessionDecisionResultSchema.safeParse(await response.json().catch(() => null));
   if (!response.ok || !result.success) return { error: response.status === 422 ? 'Eligibility changed. Refresh the request before trying again.' : 'The decision outcome is unknown. Retry with this same key.',
     currentKey: key, outcomeUnknown: response.status >= 500 || response.ok };
-  revalidatePath(`/gyms/${encodeURIComponent(slug)}`, 'layout');
   revalidatePath(`/gyms/${encodeURIComponent(slug)}/trainer/requests`);
   revalidatePath(`/gyms/${encodeURIComponent(slug)}/trainer/schedule`);
   revalidatePath(`/gyms/${encodeURIComponent(slug)}/member/sessions`);

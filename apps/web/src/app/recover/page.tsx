@@ -7,7 +7,7 @@ import { RecoveryForm } from '@/components/credentials/recovery-form';
 export const metadata: Metadata = { title: 'Password help | GymOS', robots: { index: false, follow: false }, referrer: 'no-referrer' };
 
 function RecoveryContent() {
-  return <main className="auth-shell"><aside className="auth-illustration"><Link href="/" className="brand-lockup"><span className="brand-mark">G</span> GymOS</Link>
+  return <main className="auth-shell themed-workspace"><aside className="auth-illustration"><Link href="/" className="brand-lockup"><span className="brand-mark">G</span> GymOS</Link>
     <div className="auth-illustration-copy"><div className="eyebrow">ACCOUNT SECURITY</div><h2>Get help with your password.</h2>
       <p>GymOS does not send password reset emails or messages.</p></div><span className="auth-footnote">GymOS V2</span></aside>
     <div className="auth-form-wrap"><Card className="auth-card"><div className="eyebrow dark">STAFF-ASSISTED RECOVERY</div><h1>Reset your password</h1>

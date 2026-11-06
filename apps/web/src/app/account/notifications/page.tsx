@@ -13,14 +13,14 @@ type Props = { searchParams: Promise<{ filter?: string; cursor?: string; error?:
 async function AccountNotificationsContent({ searchParams }: Props) {
   const token = (await cookies()).get(SESSION_COOKIE)?.value; if (!token) redirect('/login');
   const current = await resolveCurrentSession(token); if (current.status === 401) redirect('/login?error=expired'); if (current.status === 403) redirect('/change-password');
-  if (!current.ok) return <main className="platform-page"><Feedback tone="error">Account notification status is temporarily unavailable.</Feedback></main>;
+  if (!current.ok) return <main className="platform-page themed-workspace standalone-page"><Feedback tone="error">Account notification status is temporarily unavailable.</Feedback></main>;
   const session = currentSessionSchema.parse(await current.json()); const search = await searchParams;
   const params = accountNotificationQuerySchema.safeParse({ filter: search.filter ?? 'ALL', pageSize: 20, ...(search.cursor ? { cursor: search.cursor } : {}) });
   const response = params.success ? await fetch(apiUrl(`/auth/notifications?filter=${params.data.filter}&pageSize=${params.data.pageSize}${params.data.cursor ? `&cursor=${encodeURIComponent(params.data.cursor)}` : ''}`),
     { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' }).catch(() => null) : null;
   if (response?.status === 401) redirect('/login?error=expired');
   const page = response?.ok ? accountNotificationPageSchema.safeParse(await response.json().catch(() => null)) : null;
-  return <main className="platform-page">
+  return <main className="platform-page themed-workspace standalone-page">
     <header className="platform-page-heading"><div><span className="platform-eyebrow">ACCOUNT NOTIFICATIONS</span><h1>Notifications</h1><p>Application updates and account security events for {session.displayName ?? 'your account'}.</p></div><Link className="ui-button ui-button-secondary" href="/security">Open Security</Link></header>
     <nav className="notification-scope-tabs" aria-label="Notification scope"><a href="/account/notifications" aria-current="page">Account</a>{session.gyms.map(gym => <a key={gym.id} href={`/gyms/${encodeURIComponent(gym.slug)}/notifications`}>{gym.name}</a>)}</nav>
     {search.error === 'read' ? <Feedback tone="error">The read state could not be confirmed. Refresh the notification list before retrying.</Feedback> : null}

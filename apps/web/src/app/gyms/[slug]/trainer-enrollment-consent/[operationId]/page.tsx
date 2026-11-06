@@ -8,5 +8,5 @@ export default async function TrainerEnrollmentConsentPage({ params }: { params:
   const { slug, operationId } = await params;
   if (!/^[A-Za-z0-9_:-]{1,128}$/.test(slug) || !/^[A-Za-z0-9_:-]{1,128}$/.test(operationId)) notFound();
   if (!(await cookies()).get(SESSION_COOKIE)?.value) redirect(`/login?returnTo=${encodeURIComponent(`/gyms/${slug}/trainer-enrollment-consent/${operationId}`)}`);
-  return <main className="auth-shell"><Card className="member-registration-card"><CardHeader eyebrow="ACCOUNT CONSENT" title="Review trainer enrollment"/><p>Confirm whether this gym may link your existing GymOS account as a trainer. Your current password verifies your identity and is not shared with the gym.</p><TrainerEnrollmentConsentForm slug={slug} operationId={operationId}/></Card></main>;
+  return <main className="auth-shell themed-workspace"><Card className="member-registration-card"><CardHeader eyebrow="ACCOUNT CONSENT" title="Review trainer enrollment"/><p>Confirm whether this gym may link your existing GymOS account as a trainer. Your current password verifies your identity and is not shared with the gym.</p><TrainerEnrollmentConsentForm slug={slug} operationId={operationId}/></Card></main>;
 }

@@ -7,9 +7,8 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { currentSupportCookie } from '@/lib/support-context';
 import { apiUrl, SESSION_COOKIE } from '@/lib/gymos';
+import type { ProfileActionState } from '@/lib/profile-action-state';
 
-export type ProfileActionState = { status: 'idle' | 'success' | 'error'; message?: string; version?: number; fieldErrors?: Record<string, string> };
-const IDLE: ProfileActionState = { status: 'idle' };
 function value(form: FormData, key: string) { const result = form.get(key); return typeof result === 'string' ? result : ''; }
 function errors(error: { flatten(): { fieldErrors: Record<string, string[] | undefined> } }) {
   return Object.fromEntries(Object.entries(error.flatten().fieldErrors).flatMap(([name, messages]) => messages?.length ? [[name, messages[0]!]] : []));
@@ -97,5 +96,3 @@ export async function correctMemberProfile(slug: string, memberId: string, _prev
   }
   return result;
 }
-
-export const initialProfileActionState = IDLE;

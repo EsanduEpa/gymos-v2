@@ -9,6 +9,7 @@ import "./workspace.css";
 import "./owner.css";
 import "./trainer.css";
 import "./member.css";
+import "./common-foundation.css";
 
 export const metadata: Metadata = {
   title: "GymOS V2",

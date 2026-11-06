@@ -7,7 +7,9 @@ import { usePathname } from 'next/navigation';
 export function SessionLifecycle() {
   const pathname = usePathname();
   useEffect(() => {
-    const privatePage = !['/login', '/test-ui'].includes(pathname);
+    const publicPath = pathname === '/login' || pathname === '/test-ui' || pathname === '/apply' || pathname.startsWith('/apply/')
+      || pathname === '/recover' || pathname === '/help';
+    const privatePage = !publicPath;
     const channel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('gymos-session') : null;
     let disposed = false;
     let exiting = false;
@@ -94,7 +96,7 @@ export function SessionLifecycle() {
       if (event.data === 'logout' && privatePage) leave('/login');
       if (event.data === 'support-changed' && privatePage && document.querySelector('[data-support-session]')) leave('/admin');
     });
-    if (privatePage) document.documentElement.style.visibility = '';
+    document.documentElement.style.visibility = '';
     void check(true);
     const interval = setInterval(check, 30_000);
     document.addEventListener('submit', submit, true);

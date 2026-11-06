@@ -31,7 +31,7 @@ export default async function RequestTrainerSessionPage({ params }: { params: Pr
   const brand = resolveGymBrandColors(theme.primaryColor);
   const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
   return <DashboardChrome identityId={session.identityId} key={`${session.identityId}:${gym.id}:${gym.role}`} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'} style={style}>
-    <div className="gym-banner"><div><span className="eyebrow">SESSION REQUEST</span><h1>Request a trainer</h1><p>Choose a time in this gym’s local time zone. Your credit stays available until the trainer accepts.</p></div></div>
+    <div className="gym-banner"><div><span className="eyebrow">SESSION REQUEST</span><h1>Request a trainer</h1><p>Choose a time in this gym’s local time zone. Your credit stays available until the trainer accepts.</p></div><a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/member/trainers/${encodeURIComponent(trainerId)}`}>View trainer profile</a></div>
     <Card><CardHeader eyebrow="MEMBER REQUEST" title={options?.success ? options.data.trainerName : 'Session request'}/>
       {!options?.success ? <Feedback tone="error">Session request options could not be loaded. No request was sent.</Feedback> : <>
         <p>{trainerLevel(options.data.level)} · {options.data.specialisations.join(' · ') || 'Specialisations not listed'}</p>

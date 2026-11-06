@@ -10,7 +10,7 @@ async function ChangePasswordContent({ searchParams }: { searchParams: Promise<{
   const firstChange = (await searchParams).mode !== 'normal';
   if (!(await cookies()).get(SESSION_COOKIE)?.value) redirect('/login');
   return (
-    <main className="auth-shell">
+    <main className="auth-shell themed-workspace">
       <aside className="auth-illustration">
         <Link href="/" className="brand-lockup"><span className="brand-mark">G</span> GymOS</Link>
         <div className="auth-illustration-copy">

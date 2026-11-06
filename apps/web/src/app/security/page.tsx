@@ -21,16 +21,16 @@ async function SecurityContent({ searchParams }: { searchParams: Promise<{ revok
       fetch(apiUrl('/auth/session'), { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' }),
       fetch(apiUrl('/auth/security-events'), { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' }),
     ]);
-  } catch { return <main className="platform-page"><h1>Security</h1><Feedback tone="error">Session information is unavailable. Try again shortly.</Feedback></main>; }
+  } catch { return <main className="platform-page themed-workspace standalone-page"><h1>Security</h1><Feedback tone="error">Session information is unavailable. Try again shortly.</Feedback></main>; }
   if (sessionsResponse.status === 401 || sessionResponse.status === 401) redirect('/login?error=expired');
   if (sessionsResponse.status === 403 || sessionResponse.status === 403) redirect('/change-password');
   const sessions = sessionsResponse.ok ? sessionListSchema.safeParse(await sessionsResponse.json().catch(() => null)) : null;
   const session = sessionResponse.ok ? currentSessionSchema.safeParse(await sessionResponse.json().catch(() => null)) : null;
-  if (!sessions?.success || !session?.success) return <main className="platform-page"><h1>Security</h1><Feedback tone="error">Session information could not be confirmed.</Feedback></main>;
+  if (!sessions?.success || !session?.success) return <main className="platform-page themed-workspace standalone-page"><h1>Security</h1><Feedback tone="error">Session information could not be confirmed.</Feedback></main>;
   const securityEvents = eventsResponse.ok ? identitySecurityEventListSchema.safeParse(await eventsResponse.json().catch(() => null)) : null;
   const { revoked, error } = await searchParams;
   const current = session.data;
-  return <main className="platform-page security-page"><header className="platform-page-heading"><div><span className="platform-eyebrow">ACCOUNT SECURITY</span><h1>Security</h1><p>Review devices that can access your GymOS account.</p></div><Link href="/" className="ui-button ui-button-secondary">Back to workspace</Link></header>
+  return <main className="platform-page security-page themed-workspace standalone-page"><header className="platform-page-heading"><div><span className="platform-eyebrow">ACCOUNT SECURITY</span><h1>Security</h1><p>Review devices that can access your GymOS account.</p></div><Link href="/" className="ui-button ui-button-secondary">Back to workspace</Link></header>
     {revoked && <Feedback tone="success">The selected device was signed out.</Feedback>}
     {error === 'unavailable' && <Feedback tone="error">Session changes could not be confirmed. Refresh the list before retrying.</Feedback>}
     {error === 'invalid' && <Feedback tone="error">That session could not be selected.</Feedback>}

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 export default function HelpPage() {
-  return <main className="platform-page">
+  return <main className="platform-page themed-workspace standalone-page">
     <header className="platform-page-heading"><div><span className="platform-eyebrow">HELP</span><h1>Account and gym help</h1><p>Choose a safe next step for your account or gym access.</p></div></header>
     <section className="ui-card"><h2>Contact your gym</h2><p>For membership, profile, application, or gym contact corrections, use contact details the gym has already given you. GymOS does not send a message when you open this page and does not provide a member directory here.</p></section>
     <section className="ui-card"><h2>Application and access status</h2><p><Link href="/applications">Check your application status</Link>. Pending means the owner has not decided. Rejected or withdrawn applications are closed; contact the gym to ask about next steps before applying again. An approval offer still needs your consent and completed enrollment before gym access becomes active.</p><p>If access is revoked, expired, or unavailable, signing in does not restore gym membership. Contact the gym owner to confirm your membership status. A suspended account may still use account security and help pages, but cannot use gym features until access is restored through the authorized gym process.</p></section>

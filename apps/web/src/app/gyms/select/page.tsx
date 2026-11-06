@@ -26,7 +26,7 @@ async function GymSelectionContent() {
     if (gym) redirect(`/gyms/${encodeURIComponent(gym.slug)}/${gymRoleLandingPath(gym.role)}`);
   }
 
-  return <main className="auth-shell"><section className="form-card auth-card" aria-labelledby="gym-selection-heading">
+  return <main className="auth-shell themed-workspace"><section className="form-card auth-card" aria-labelledby="gym-selection-heading">
     <div className="eyebrow dark">YOUR WORKSPACES</div>
     <h1 id="gym-selection-heading">Choose a gym</h1>
     <p className="muted">Select the gym workspace you want to open.</p>

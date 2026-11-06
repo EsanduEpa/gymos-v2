@@ -10,7 +10,7 @@ export default async function MemberEnrollmentConsentPage({ params }: { params: 
   if (!(await cookies()).get(SESSION_COOKIE)?.value) {
     redirect(`/login?returnTo=${encodeURIComponent(`/gyms/${slug}/enrollment-consent/${operationId}`)}`);
   }
-  return <main className="auth-shell">
+  return <main className="auth-shell themed-workspace">
     <Card className="member-registration-card">
       <CardHeader eyebrow="ACCOUNT CONSENT" title="Review gym enrollment" />
       <p>Confirm that you want this gym to link your existing GymOS account as a member. Your password is used only to verify your identity. The gym owner will not receive it.</p>

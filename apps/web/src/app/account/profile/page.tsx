@@ -23,6 +23,8 @@ async function AccountProfileContent() {
   const profile = response.ok ? accountProfileSchema.safeParse(await response.json().catch(() => null)) : null;
   return <DashboardChrome identityId={session.identityId} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'}>
     <main className="platform-page"><header className="platform-page-heading"><div><span className="platform-eyebrow">ACCOUNT</span><h1>Profile</h1><p>Your global GymOS account identity.</p></div></header>
+      {session.gyms.length ? <Card><h2>Your gym profiles</h2><p>Select a gym to see your official member, trainer, or owner details.</p>
+        <div className="application-status-actions">{session.gyms.map(gym => <a className="ui-button ui-button-secondary" key={`${gym.slug}:${gym.role}`} href={`/gyms/${encodeURIComponent(gym.slug)}/profile`}>{gym.name} · {gym.role.toLowerCase()}</a>)}</div></Card> : null}
       {profile?.success ? <AccountProfileForm key={`identity:${profile.data.version}`} profile={profile.data} requestKey={randomUUID()}/> : <Card><Feedback tone="error">Your account profile is unavailable. No changes were made.</Feedback></Card>}
     </main>
   </DashboardChrome>;

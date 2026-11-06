@@ -20,7 +20,7 @@ async function LoginContent({
 }) {
   const { error, application, applyGym, returnTo } = await searchParams;
   return (
-    <main className="auth-shell">
+    <main className="auth-shell themed-workspace">
       <div className="auth-illustration">
         <Link href="/" className="brand-lockup"><span className="brand-mark">G</span> GymOS</Link>
         <div className="auth-illustration-copy">

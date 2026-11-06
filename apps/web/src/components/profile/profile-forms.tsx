@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { AccountProfile, SelfMemberProfile, SelfTrainerProfile, MemberDetail } from '@gymos/contracts';
 import { Button, Card, CardHeader, Feedback, Field } from '@/components/ui';
-import { correctMemberProfile, initialProfileActionState, updateAccountProfile, updateGymSelfProfile } from '@/app/profile-actions';
+import { correctMemberProfile, updateAccountProfile, updateGymSelfProfile } from '@/app/profile-actions';
+import { initialProfileActionState } from '@/lib/profile-action-state';
 
 export function AccountProfileForm({ profile, requestKey }: { profile: AccountProfile; requestKey: string }) {
   const [state, action, pending] = useActionState(updateAccountProfile, initialProfileActionState);

@@ -1,6 +1,6 @@
 import { Body, ConflictException, Controller, ForbiddenException, Get, Headers, HttpCode, NotFoundException, Param, Post, Put, Query, Req, UnprocessableEntityException, UseGuards } from '@nestjs/common';
 import type { Prisma, PrismaClient } from './generated/tenant/client.js';
-import { idempotencyKeySchema, trainerListQuerySchema, trainerListSchema, memberTrainerDirectorySchema, memberTrainerDirectoryQuerySchema, trainerProfileSchema, trainerShiftInputSchema, trainerShiftResultSchema, trainerStatusInputSchema } from '@gymos/contracts';
+import { idempotencyKeySchema, trainerListQuerySchema, trainerListSchema, memberTrainerDirectorySchema, memberTrainerDirectoryQuerySchema, memberTrainerProfileSchema, trainerProfileSchema, trainerShiftInputSchema, trainerShiftResultSchema, trainerStatusInputSchema } from '@gymos/contracts';
 import { appendTenantAudit } from './operations/transaction-audit.js';
 import { requestDigest } from './operations/primitives.js';
 import { DatabaseService } from './database.service.js';
@@ -124,6 +124,23 @@ export class TrainersController {
       ]);
       return memberTrainerDirectorySchema.parse({ items: rows.map(row => ({ ...row, rating: null })), page, pageSize,
         totalCount, totalPages: Math.ceil(totalCount / pageSize), asOf: new Date().toISOString() });
+    });
+  }
+
+  @Get('me/trainers/:trainerId/profile')
+  async memberTrainerProfile(@Req() request: GymRequest, @Param('trainerId') trainerId: string) {
+    const access = request.gymAccess;
+    if (!access || access.role !== 'MEMBER' || access.actor?.kind !== 'MEMBER') throw new ForbiddenException('Member access is required');
+    return this.tenantGate.withVerifiedTenant(access, async tenant => {
+      const binding = (await this.publishedTrainerBindings(tenant, access.gymId, true)).find(item => item.id === trainerId);
+      if (!binding) throw new NotFoundException('Trainer not found');
+      const trainer = await tenant.trainer.findFirst({ where: { id: trainerId, identityId: binding.identityId,
+        enrollmentOperationId: binding.operationId, registrationState: 'COMPLETE', status: 'ACTIVE' },
+        select: { id: true, fullName: true, level: true, specialisations: true, bio: true, yearsExperience: true,
+          shiftStart: true, shiftEnd: true } });
+      if (!trainer) throw new NotFoundException('Trainer not found');
+      const completedSessions = await tenant.pTSession.count({ where: { trainerId, state: 'COMPLETED' } });
+      return memberTrainerProfileSchema.parse({ trainer: { ...trainer, rating: null }, completedSessions, asOf: new Date().toISOString() });
     });
   }
 

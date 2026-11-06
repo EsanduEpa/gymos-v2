@@ -194,7 +194,8 @@ export class MemberApplicationsService {
             await appendMasterVersionAudit(tx, { actorIdentityId: access.identityId, gymId: access.gymId, eventCode: 'MEMBER_APPLICATION_APPROVED',
               resourceType: 'MEMBER_APPLICATION', resourceId: updated.id, committedVersion: updated.version,
               transition: { from: 'PROCESSING', to: 'APPROVED', version: updated.version } });
-            return updated;
+            return { id: updated.id, state: updated.state, version: updated.version,
+              enrollmentOperationId: updated.enrollmentOperationId ?? undefined };
           });
         }
       }
@@ -283,7 +284,8 @@ export class MemberApplicationsService {
         await appendMasterVersionAudit(tx, { actorIdentityId: access.identityId, gymId: access.gymId, eventCode: 'MEMBER_APPLICATION_APPROVED',
           resourceType: 'MEMBER_APPLICATION', resourceId: current.id, committedVersion: current.version,
           transition: { from: 'PROCESSING', to: 'APPROVED', version: current.version } });
-        return current;
+        return { id: current.id, state: current.state, version: current.version,
+          enrollmentOperationId: current.enrollmentOperationId ?? undefined };
       });
     });
   }

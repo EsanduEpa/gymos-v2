@@ -122,13 +122,15 @@ async function seedGym(state, master, users, index, today) {
         const start = new Date(`${sessionDay.toISOString().slice(0, 10)}T${String(8 + Math.floor((n % 4) * 1.5)).padStart(2, '0')}:${n % 2 ? '30' : '00'}:00+05:30`);
         const end = new Date(start.getTime() + 3600000);
         const confirmed = stateName !== 'PENDING_CONFIRMATION';
-        const bookedAt = day(start, -2);
+        const bookedAt = stateName === 'PENDING_CONFIRMATION' ? new Date() : day(start, -2);
+        const requestExpiresAt = stateName === 'PENDING_CONFIRMATION'
+          ? new Date(Math.min(bookedAt.getTime() + 12 * 3600_000, start.getTime() - 3600_000)) : null;
         const session = await tenant.pTSession.create({ data: { memberId: member.id, trainerId: trainer.id, state: stateName,
           type: n % 3 === 0 ? 'VIRTUAL' : 'IN_PERSON', scheduledStartAt: start, scheduledEndAt: end, gymTimezone: 'Asia/Colombo',
           fee: '2500', currency: 'LKR', configurationVersion: config.version,
           ...(confirmed ? { confirmedAt: bookedAt, confirmationRate: '0.4', confirmationLevel: 'LEVEL_1', confirmationShiftStart: '06:00', confirmationShiftEnd: '22:00' } : {}),
-          startedAt: stateName === 'COMPLETED' ? start : null, endedAt: future ? null : end,
-          notes: future ? 'Synthetic upcoming PT session' : 'Synthetic historical PT session', createdByIdentityId: users.owner.id, createdAt: bookedAt } });
+          startedAt: stateName === 'COMPLETED' ? start : null, endedAt: future ? null : end, requestExpiresAt,
+          notes: future ? 'Synthetic upcoming PT session' : 'Synthetic historical PT session', createdByIdentityId: confirmed ? users.owner.id : identity.id, createdAt: bookedAt } });
         const booking = await receipt(tenant, users.owner.id, future && !confirmed ? 'REQUEST_PT_SESSION' : 'BOOK_PT_SESSION', session.id, bookedAt);
         if (stateName === 'PENDING_CONFIRMATION') {
           await tenant.sessionStateEvent.create({ data: { sessionId: session.id, fromState: null, toState: 'PENDING_CONFIRMATION',
@@ -136,7 +138,7 @@ async function seedGym(state, master, users, index, today) {
           continue;
         }
         const hold = await tenant.sessionCreditHold.create({ data: { sessionId: session.id, packId: pack.id,
-          state: future ? 'HELD' : consumed ? 'CONSUMED' : 'RELEASED', creditOrdinal: future ? (consumed ? 2 : 1) : 1,
+          state: future ? 'HELD' : consumed ? 'CONSUMED' : 'RELEASED', creditOrdinal: future ? 2 : 1,
           creditValueMinorUnits: 250000n, heldAt: bookedAt, resolvedAt: future ? null : end } });
         await tenant.packCreditMovement.create({ data: { packId: pack.id, holdId: hold.id, kind: 'HOLD', availableDelta: -1, heldDelta: 1,
           consumedDelta: 0, expiredDelta: 0, creditOrdinal: hold.creditOrdinal, sourceKey: `hold:${hold.id}`, receiptId: booking.id,

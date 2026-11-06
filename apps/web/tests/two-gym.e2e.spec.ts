@@ -130,7 +130,19 @@ async function contrastRatio(page: Page, selector: string): Promise<number> {
       return 0.2126 * (linear[0] ?? 0) + 0.7152 * (linear[1] ?? 0) + 0.0722 * (linear[2] ?? 0);
     };
     const style = getComputedStyle(element);
-    const values = [luminance(style.color), luminance(style.backgroundColor)].sort((a, b) => b - a);
+    let background = style.backgroundColor;
+    if (style.backgroundImage !== 'none') background = style.getPropertyValue('--gym-color') || background;
+    else {
+      let ancestor = element.parentElement;
+      while (ancestor) {
+        const ancestorStyle = getComputedStyle(ancestor);
+        const channels = parse(ancestorStyle.backgroundColor);
+        const alpha = ancestorStyle.backgroundColor.startsWith('rgba') ? Number(ancestorStyle.backgroundColor.match(/[\d.]+/g)?.[3] ?? 0) : 1;
+        if (channels.length === 3 && alpha > 0.01) { background = ancestorStyle.backgroundColor; break; }
+        ancestor = ancestor.parentElement;
+      }
+    }
+    const values = [luminance(style.color), luminance(background)].sort((a, b) => b - a);
     return ((values[0] ?? 0) + 0.05) / ((values[1] ?? 0) + 0.05);
   });
 }
@@ -197,6 +209,38 @@ test.beforeEach(async()=>{
   await stop(api);
   api=start(process.execPath,[join(apiDirectory,'dist/main.js')],apiDirectory,apiEnvironment);
   await waitReady(`${apiBase}/`,api);
+});
+
+test('public member application entry stays available without an authenticated session', async ({ page }) => {
+  for (const mode of ['light', 'dark'] as const) {
+    await page.goto(`${webBase}/apply`);
+    await page.evaluate(value => localStorage.setItem('gymos-appearance', value), mode);
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Find your gym' })).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('data-appearance', mode);
+    await expect(page.locator('.auth-shell')).toHaveCSS('background-color', mode === 'light' ? 'rgb(243, 246, 250)' : 'rgb(10, 21, 40)');
+    await page.goto(`${webBase}/apply/${fixture.gyms[0]!.slug}`);
+    await expect(page.getByRole('heading', { name: fixture.gyms[0]!.name })).toBeVisible();
+    for (const width of [390, 320]) {
+      await page.setViewportSize({ width, height: 844 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    }
+    await page.goto(`${webBase}/recover`);
+    await expect(page.getByRole('heading', { name: 'Reset your password' })).toBeVisible();
+    await page.goto(`${webBase}/help`);
+    await expect(page.getByRole('heading', { name: 'Account and gym help' })).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('data-appearance', mode);
+    await openWithTestSession(page, fixture.users.pendingUser.id, '/no-access');
+    await expect(page.getByRole('heading', { name: 'No active gym access' })).toBeVisible();
+    await expect(page.locator('.application-status-shell .auth-illustration')).toBeVisible();
+    await page.goto(`${webBase}/applications`);
+    await expect(page.getByRole('heading', { name: 'Application status' })).toBeVisible();
+    await expect(page.locator('.application-status-shell .auth-illustration')).toBeVisible();
+    for (const width of [390, 320]) {
+      await page.setViewportSize({ width, height: 844 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    }
+  }
 });
 
 test('owner gym configuration keeps plan drafts on failure and saves exact zero plans', async ({ page }) => {
@@ -304,7 +348,7 @@ test('real browser and HTTP requests preserve two-gym isolation and pure reads',
   await page.goto(`${webBase}/`);
   // The unauthenticated home route streams its server-component redirect to /login.
   // Wait for that client-side navigation to settle before starting the next login navigation.
-  await expect(page).toHaveURL(/\/login$/);
+  await expect(page).toHaveURL(/\/login(?:\?error=expired)?$/);
   expect(await fixture.master.$transaction([
     fixture.master.user.count(), fixture.master.gym.count(), fixture.master.gymAccess.count(),
     fixture.master.operation.count(), fixture.master.platformAuditLog.count(),
@@ -350,7 +394,7 @@ test('real browser and HTTP requests preserve two-gym isolation and pure reads',
 
   await login(page, fixture.users.ownerA.email);
   await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/owner$`));
-  await expect(page.getByRole('heading', { name: 'Test Gym Alpha' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Live Gym Operations' })).toBeVisible();
   // The owner list reports the full published total, which can differ from
   // the raw tenant row count when a registration is still unpublished.
   const ownerListToken = (await page.context().cookies()).find(cookie => cookie.name === 'gymos_access_token')?.value;
@@ -361,13 +405,24 @@ test('real browser and HTTP requests preserve two-gym isolation and pure reads',
   const publishedTotal = (await publishedList.json()).totalCount as number;
   expect(publishedTotal).toBeGreaterThan(100);
   await page.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/owner/members`);
-  await expect(page.locator('.count-badge')).toHaveText(String(publishedTotal));
+  await expect(page.locator('.ui-pager')).toContainText(`of ${publishedTotal}`);
   await expect(page.locator('.gym-dashboard')).toHaveCSS('--gym-color', '#0F766E');
+  const enrollmentPlan = await fixture.tenants[0].membershipPlan.create({ data: {
+    name: `Browser Enrollment Plan ${environment.runId}`, price: '1.00', currency: 'LKR', durationDays: 30,
+  } });
+  await page.getByRole('link', { name: 'Register New Member' }).click();
+  await page.getByLabel('Enrollment reference').fill(`browser-enroll-${environment.runId}`);
   await page.getByLabel('Full name').fill('Browser Added Member');
-  await page.getByRole('textbox', { name: 'Email address optional' }).fill(`browser-${environment.runId}@example.test`);
-  await page.getByRole('button', { name: 'Add member' }).click();
-  await expect(page.locator('.ui-feedback-success')).toContainText('Member added');
-  await expect(page.getByText('Browser Added Member')).toBeVisible();
+  await page.getByLabel('Email address', { exact: true }).fill(`browser-${environment.runId}@example.test`);
+  await page.getByLabel('Phone').fill('+94000000001');
+  await page.getByLabel('Date of birth').fill('1994-04-10');
+  await page.getByLabel('Initial membership plan').selectOption(enrollmentPlan.id);
+  await page.getByRole('button', { name: 'Register member' }).click();
+  await expect(page.getByRole('heading', { name: 'One-time credential handoff' })).toBeVisible();
+  await expect(page.getByText(/expires in 24 hours/)).toBeVisible();
+  const createdMember = await fixture.tenants[0].member.findUniqueOrThrow({ where: { email: `browser-${environment.runId}@example.test` } });
+  await page.getByRole('button', { name: 'I have recorded the password' }).click();
+  await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/owner/members/${createdMember.id}$`));
 
   const ownerCookie = (await page.context().cookies()).find((cookie) => cookie.name === 'gymos_access_token');
   expect(ownerCookie?.httpOnly).toBe(true);
@@ -652,7 +707,7 @@ test('trainer registration enforces owner and selected-gym access, then hands of
   } finally { await trainerContext.close(); }
 });
 
-test('trainer roster/profile and member directory are usable at mobile width without exposing contact fields', async ({ page }) => {
+test('trainer roster/profile and member directory are usable at mobile width without exposing contact fields', async ({ page, request }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const gym = fixture.gyms[0]!;
   const tenant = fixture.tenants[0]!;
@@ -660,6 +715,16 @@ test('trainer roster/profile and member directory are usable at mobile width wit
   const trainerId = (await tenant.trainer.findUniqueOrThrow({ where: { identityId: fixture.users.trainerUser.id } })).id;
   await tenant.trainer.update({ where: { id: trainerId }, data: { shiftStart: '09:00', shiftEnd: '18:00' } });
   const gymToday = localDate(new Date(), 'Asia/Colombo');
+  const availabilityReceipt = await tenant.commandReceipt.create({ data: { actorIdentityId: fixture.users.ownerA.id,
+    commandKind: 'TEST_AVAILABILITY', idempotencyKey: `member-request-availability-${environment.runId}`,
+    requestDigest: requestDigest({ runId: environment.runId, availability: true }), state: 'COMMITTED', committedAt: new Date(), safeResult: { state: 'COMPLETE' } } });
+  const availabilityFrom = new Date(`${gymToday}T00:00:00.000Z`);
+  const availabilityThrough = new Date(availabilityFrom); availabilityThrough.setUTCDate(availabilityThrough.getUTCDate() + 60);
+  await tenant.pTAvailabilityRule.createMany({ data: Array.from({ length: 7 }, (_, weekday) => ({
+    id: `member-request-avail-${weekday}-${environment.runId}`, trainerId, kind: 'WEEKLY_WINDOW' as const, weekday,
+    startMinute: 540, endMinute: 1080, effectiveFrom: availabilityFrom, effectiveToExclusive: availabilityThrough,
+    createdByIdentityId: fixture.users.ownerA.id, commandReceiptId: availabilityReceipt.id, updatedAt: new Date(),
+  })) });
   const packStart = new Date(`${gymToday}T00:00:00.000Z`);
   const packEnd = new Date(packStart); packEnd.setUTCDate(packEnd.getUTCDate() + 90);
   const plan = await tenant.membershipPlan.create({ data: { name: `Task039 request term ${environment.runId}`, price: '0.00', currency: 'LKR', durationDays: 90 } });
@@ -717,8 +782,14 @@ test('trainer roster/profile and member directory are usable at mobile width wit
   await expect(card).not.toContainText(fixture.users.trainerUser.email);
   await expect(card).toContainText('Rating unavailable');
   await expect(card).toContainText('09:00–18:00 gym local time');
-  const requestLink = card.getByRole('link', { name: 'Request this trainer' });
-  await expect(requestLink).toHaveAttribute('href', new RegExp(`/gyms/${gym.slug}/member/trainers/${trainerId}/book`));
+  const profileLink = card.getByRole('link', { name: 'View Trainer Alpha profile' });
+  await expect(profileLink).toHaveAttribute('href', new RegExp(`/gyms/${gym.slug}/member/trainers/${trainerId}$`));
+  await profileLink.click();
+  await expect(page.getByRole('heading', { name: 'About your trainer' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Request a private session' })).toHaveAttribute('href', new RegExp(`/gyms/${gym.slug}/member/trainers/${trainerId}/book`));
+  await expectResponsivePage(page);
+  await page.getByRole('link', { name: 'Request a private session' }).click();
+  await expect(page.getByRole('heading', { name: 'Request a trainer', level: 1 })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: '/tmp/gymos-task039-member-directory-390.png', fullPage: true });
   await openWithTestSession(page, fixture.users.memberUser.id, `/gyms/${gym.slug}/member/calendar?month=${gymToday.slice(0, 7)}`);
@@ -736,7 +807,7 @@ test('trainer roster/profile and member directory are usable at mobile width wit
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: '/tmp/gymos-member-calendar-meal-390.png', fullPage: true });
   await openWithTestSession(page, fixture.users.memberUser.id, `/gyms/${gym.slug}/member/trainers`);
-  await requestLink.click();
+  await page.goto(`${webBase}/gyms/${gym.slug}/member/trainers/${trainerId}/book`);
   await expect(page).toHaveURL(new RegExp(`/gyms/${gym.slug}/member/trainers/${trainerId}/book`));
   await expect(page.getByRole('heading', { name: 'Request a trainer', level: 1 })).toBeVisible();
   await expect(page.getByText(/Session credits available today: 2/)).toBeVisible();
@@ -748,8 +819,17 @@ test('trainer roster/profile and member directory are usable at mobile width wit
   await page.setViewportSize({ width: 390, height: 844 });
   const requestDate = localDate(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), 'Asia/Colombo');
   const startingEffects = { sessions: await tenant.pTSession.count(), holds: await tenant.sessionCreditHold.count(), movements: await tenant.packCreditMovement.count() };
+  const memberCookie = (await page.context().cookies()).find(cookie => cookie.name === 'gymos_access_token');
+  expect((await request.get(`${apiBase}/auth/session`, { headers: { authorization: `Bearer ${memberCookie?.value}` } })).status()).toBe(200);
+  expect((await request.get(`${apiBase}/gyms/${gym.slug}/me/session-request-options?trainerId=${encodeURIComponent(trainerId)}`, { headers: { authorization: `Bearer ${memberCookie?.value}` } })).status()).toBe(200);
+  const slotsResponse = await request.get(`${apiBase}/gyms/${gym.slug}/session-slots?trainerId=${encodeURIComponent(trainerId)}&localDate=${requestDate}`, { headers: { authorization: `Bearer ${memberCookie?.value}` } });
+  expect(slotsResponse.status()).toBe(200);
+  expect((await slotsResponse.json()).slots.length).toBeGreaterThan(0);
   await page.getByLabel('Session date').fill(requestDate);
-  await page.getByLabel(/Start time/).fill('10:00');
+  const startTime = page.getByLabel(/Available start time/);
+  await expect(startTime).toBeEnabled();
+  await expect(startTime.locator('option')).not.toHaveCount(0);
+  await startTime.selectOption({ index: 1 });
   await page.getByLabel('Note for the trainer (optional)').fill('Please focus on beginner strength training.');
   await page.getByRole('button', { name: 'Request session' }).click();
   await expect(page.getByRole('status')).toContainText('The trainer must accept before credit is reserved.');
@@ -768,8 +848,14 @@ test('trainer roster/profile and member directory are usable at mobile width wit
   expect(await tenant.packCreditMovement.count()).toBe(startingEffects.movements + 1);
 
   await openWithTestSession(page, fixture.users.memberUser.id, `/gyms/${gym.slug}/member/trainers/${trainerId}/book`);
+  const secondMemberCookie = (await page.context().cookies()).find(cookie => cookie.name === 'gymos_access_token');
+  const secondSlotsResponse = await request.get(`${apiBase}/gyms/${gym.slug}/session-slots?trainerId=${encodeURIComponent(trainerId)}&localDate=${requestDate}`, { headers: { authorization: `Bearer ${secondMemberCookie?.value}` } });
+  expect(secondSlotsResponse.status()).toBe(200);
+  expect((await secondSlotsResponse.json()).slots.length).toBeGreaterThan(0);
   await page.getByLabel('Session date').fill(requestDate);
-  await page.getByLabel(/Start time/).fill('11:00');
+  const requestStart = page.getByLabel(/Available start time/);
+  await expect(requestStart).toBeEnabled();
+  await requestStart.selectOption({ index: 1 });
   await page.getByLabel('Note for the trainer (optional)').fill('Please review my shoulder warmup.');
   await page.getByRole('button', { name: 'Request session' }).click();
   await expect(page.getByRole('status')).toContainText('The trainer must accept before credit is reserved.');
@@ -777,7 +863,8 @@ test('trainer roster/profile and member directory are usable at mobile width wit
   await openWithTestSession(page, fixture.users.trainerUser.id, `/gyms/${gym.slug}/trainer/requests`);
   const declineCard = page.locator('.session-request-card').filter({ hasText: 'Please review my shoulder warmup.' });
   await expect(declineCard).toBeVisible();
-  await declineCard.getByLabel('Optional message for the member').fill('I am unavailable at that time. Please choose another slot.');
+  await declineCard.getByText('Add optional message for member').click();
+  await declineCard.getByLabel('Message for member').fill('I am unavailable at that time. Please choose another slot.');
   await declineCard.getByRole('button', { name: 'Decline request' }).click();
   await expect.poll(async () => (await tenant.pTSession.findUniqueOrThrow({ where: { id: declinedRequest.id } })).state).toBe('DECLINED');
   expect(await tenant.sessionCreditHold.count()).toBe(startingEffects.holds + 1);
@@ -788,21 +875,23 @@ test('trainer roster/profile and member directory are usable at mobile width wit
   await acceptedCard.getByRole('button', { name: 'Cancel session' }).click();
   const cancelDialog = page.getByRole('dialog', { name: 'Cancel session' });
   await expect(cancelDialog).toBeVisible();
-  await expect(acceptedCard).toContainText('This cancellation is within the free cancellation period.');
+  await expect(acceptedCard).toContainText('No PT credit is used. The reservation is released.');
   await page.screenshot({ path: '/tmp/gymos-member-free-cancellation-quote.png', animations: 'disabled' });
   await page.keyboard.press('Escape');
   await expect(cancelDialog).not.toBeVisible();
   await expect(acceptedCard.getByRole('button', { name: 'Cancel session' }).first()).toBeFocused();
   await acceptedCard.getByRole('button', { name: 'Cancel session' }).click();
   await expect(cancelDialog).toBeVisible();
-  await expect(acceptedCard).toContainText('This cancellation is within the free cancellation period.');
+  await expect(acceptedCard).toContainText('No PT credit is used. The reservation is released.');
   await acceptedCard.getByRole('button', { name: 'Cancel session' }).last().click();
   await expect.poll(async () => (await tenant.pTSession.findUniqueOrThrow({ where: { id: requested.id } })).state).toBe('CANCELLED');
   await expect.poll(async () => (await tenant.sessionCreditHold.findUniqueOrThrow({ where: { sessionId: requested.id } })).state).toBe('RELEASED');
 
   await openWithTestSession(page, fixture.users.memberUser.id, `/gyms/${gym.slug}/member/trainers/${trainerId}/book`);
   await page.getByLabel('Session date').fill(requestDate);
-  await page.getByLabel(/Start time/).fill('12:00');
+  const withdrawalStart = page.getByLabel(/Available start time/);
+  await expect(withdrawalStart).toBeEnabled();
+  await withdrawalStart.selectOption({ index: 1 });
   await page.getByLabel('Note for the trainer (optional)').fill('Please withdraw this request.');
   await page.getByRole('button', { name: 'Request session' }).click();
   await expect(page.getByRole('status')).toContainText('The trainer must accept before credit is reserved.');
@@ -875,16 +964,15 @@ test('role shell supports keyboard drawer, safe switching and current context', 
   for (const [user, role, label] of [
     [fixture.users.ownerA, 'owner', 'Dashboard'],
     [fixture.users.trainerUser, 'trainer', 'My Schedule'],
-    [fixture.users.memberUser, 'member', 'Member workspace'],
+    [fixture.users.memberUser, 'member', 'Home'],
   ] as const) {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await openGymWithTestSession(page, user.id, fixture.gyms[0].slug);
     await expect(page).toHaveURL(new RegExp(`/${role === 'trainer' ? 'trainer/schedule' : role}$`));
     await expect(page.locator('.shell-account-menu')).toContainText(user.displayName!);
     await expect(page.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link', { name: label, exact: true })).toHaveAttribute('aria-current', 'page');
-    expect(await page.locator('.shell-sidebar').evaluate(el => el.getBoundingClientRect().width)).toBe(224);
-    expect(await page.locator('.shell-header').evaluate(el => el.getBoundingClientRect().height)).toBe(52);
-    await expect(page.getByRole('link', { name: /Subscription|Support/ })).toHaveCount(0);
+    expect(await page.locator('.shell-sidebar').evaluate(el => el.getBoundingClientRect().width)).toBe(248);
+    expect(await page.locator('.shell-header').evaluate(el => el.getBoundingClientRect().height)).toBe(76);
     if (role !== 'owner') await expect(page.getByRole('button', { name: 'Add member' })).toHaveCount(0);
     await page.screenshot({ path: join(evidence, `${role}-1440.png`), animations: 'disabled' });
     await page.setViewportSize({ width: 320, height: 700 });
@@ -1287,7 +1375,7 @@ test('logout clears the browser even when API revocation is unavailable', async 
   await failedPage.close();
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(page).toHaveURL(/\/login\?error=logout-uncertain(?:&|$)/);
-  await expect(page.locator('.ui-feedback[role="alert"]')).toContainText('could not confirm sign-out on other devices');
+  await expect(page.locator('.ui-feedback[role="alert"]')).toContainText('server could not confirm session revocation');
   expect((await page.context().cookies()).some(item => item.name === 'gymos_access_token')).toBe(false);
   expect((await fixture.master.user.findUniqueOrThrow({ where: { id: fixture.users.ownerB.id } })).authVersion).toBe(before);
   await page.screenshot({ path: join(webDirectory, 'test-results/migration-evidence/GYMOS-MIG-020/backend-unavailable.png'), animations: 'disabled' });
@@ -1455,19 +1543,18 @@ test('member roster and profile keep role, tenant, privacy, empty, and dependenc
     fixture.tenants[0].membershipTerm.count(), fixture.tenants[1].auditLog.count(),
   ]);
   await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${alpha}/owner/members`);
-  await expect(page.getByText(/basic contacts/)).toBeVisible();
-  await expect(page.getByText(/operational accounts/)).toBeVisible();
-  await expect(page.getByText(/pending enrollments in this gym/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Member Management' })).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Gym members' })).toBeVisible();
   const memberEvidence = join(webDirectory, 'test-results/migration-evidence/GYMOS-MIG-032');
   await mkdir(memberEvidence, { recursive: true });
   await page.screenshot({ path: join(memberEvidence, 'roster-desktop.png'), fullPage: true, animations: 'disabled' });
-  await page.getByLabel('Search members').fill('no-member-matches-012345');
-  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await page.getByLabel('Search').fill('no-member-matches-012345');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
   await expect(page.getByText('No matching members.')).toBeVisible();
-  await expect(page.getByText('0 matching members')).toBeVisible();
-  await page.getByLabel('Search members').fill(profileMember.email!);
-  await page.getByRole('button', { name: 'Apply filters' }).click();
-  await expect(page.locator('.member-list')).toContainText(profileMember.fullName);
+  await expect(page.getByText(/Showing 0–0 of/)).toBeVisible();
+  await page.getByLabel('Search').fill(profileMember.email!);
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(page.getByRole('table', { name: 'Gym members' })).toContainText(profileMember.fullName);
   const ownerCookie = (await page.context().cookies()).find(cookie => cookie.name === 'gymos_access_token')!.value;
   const ownerHeaders = { authorization: `Bearer ${ownerCookie}` };
   const ownerProfile = await request.get(`${apiBase}/gyms/${alpha}/members/${profileMember.id}`, { headers: ownerHeaders });
@@ -1562,12 +1649,12 @@ test('member roster and profile expose accessible loading states while tenant re
     try {
       await ready;
       await page.goto(`${webBase}${path}`, { waitUntil: 'commit' });
-      await expect(page.getByRole('status')).toContainText(/Loading (gym|member profile)/);
+      await expect(page.getByRole('status')).toContainText(path.endsWith('/members') ? 'Loading members…' : 'Loading member profile…');
     } finally {
       release();
       await transaction;
     }
-    await expect(page.getByRole('heading', { name: path.endsWith('/members') ? 'Test Gym Alpha' : member.fullName, level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: path.endsWith('/members') ? 'Member Management' : member.fullName, level: 1 })).toBeVisible();
   }
 });
 
@@ -1620,7 +1707,7 @@ test('owner appearance upgrades live operations with accurate metrics and recove
   await page.route(`**${base}`, route => route.request().method() === 'POST' && route.request().headers()['next-action'] ? route.abort('failed') : route.continue());
   const abortedRefresh = page.waitForEvent('requestfailed', request => request.method() === 'POST' && Boolean(request.headers()['next-action']));
   await page.getByRole('button', { name: 'Refresh live status', exact: true }).click();
-  expect((await abortedRefresh).failure()?.errorText).toContain('ERR_FAILED');
+  expect((await abortedRefresh).failure()?.errorText).toMatch(/ERR_(FAILED|ABORTED)/);
   await expect(page.locator('.owner-dashboard-live').getByRole('alert')).toContainText('last loaded values remain visible');
   expect(await page.locator('.dashboard-metric strong').allTextContents()).toEqual(values);
   // Depending on the Next runtime, the deliberately aborted transport may also

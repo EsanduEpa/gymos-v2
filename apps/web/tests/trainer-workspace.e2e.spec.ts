@@ -127,6 +127,7 @@ test.afterAll('stop session-read services and remove owned fixtures', async () =
 
 async function seedCoachingCredits() {
   const tenant = fixture.tenants[0];
+  await tenant.gymConfiguration.update({ where: { id: 'current' }, data: { masterGymId: fixture.gyms[0].id, currency: 'LKR', timezone: 'Asia/Colombo' } });
   memberId = (await tenant.member.findUniqueOrThrow({ where: { identityId: fixture.users.memberUser.id } })).id;
   trainerId = (await tenant.trainer.findUniqueOrThrow({ where: { identityId: fixture.users.trainerUser.id } })).id;
   const today = localDate(new Date(), 'Asia/Colombo');
@@ -151,7 +152,7 @@ async function seedCoachingCredits() {
     const tomorrow = new Date(`${today}T00:00:00Z`); tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
     const date = tomorrow.toISOString().slice(0,10);
     const time = new Date(`${date}T${i ? '19' : '17'}:00:00+05:30`);
-    await tenant.pTSession.create({ data: { memberId, trainerId, state: 'PENDING_CONFIRMATION', type: 'IN_PERSON', fee: '50', currency: 'LKR', configurationVersion: 0, scheduledStartAt: time, scheduledEndAt: new Date(time.getTime() + 30 * 60000), requestExpiresAt: new Date(Date.now() + 12 * 3600000), gymTimezone: 'Asia/Colombo', createdByIdentityId: fixture.users.memberUser.id, notes: `Trainer UI request ${i}` } });
+    await tenant.pTSession.create({ data: { memberId, trainerId, state: 'PENDING_CONFIRMATION', type: 'IN_PERSON', fee: '50', currency: 'LKR', configurationVersion: 0, scheduledStartAt: time, scheduledEndAt: new Date(time.getTime() + 60 * 60000), requestExpiresAt: new Date(Date.now() + 12 * 3600000), gymTimezone: 'Asia/Colombo', createdByIdentityId: fixture.users.memberUser.id, notes: `Trainer UI request ${i}` } });
   }
 }
 
@@ -320,10 +321,13 @@ test('trainer accepts declines completes with confirmation and saves member-visi
   await openAs(page, fixture.users.trainerUser.id, `${base}/requests`);
   const accept = page.locator('.session-request-card').filter({ hasText: 'Trainer UI request 0' });
   await accept.getByRole('button', { name: 'Accept and reserve one credit' }).click();
-  await expect(page.getByText('Trainer UI request 0', { exact: false })).toHaveCount(0);
+  await expect(accept).toContainText('Request accepted and one credit is now held.');
   const decline = page.locator('.session-request-card').filter({ hasText: 'Trainer UI request 1' });
-  await decline.getByLabel('Optional message for the member').fill('Please choose another time.');
+  await decline.locator('summary').filter({ hasText: 'Add optional message for member' }).click();
+  await decline.getByLabel('Message for member').fill('Please choose another time.');
   await decline.getByRole('button', { name: 'Decline request', exact: true }).click();
+  await expect(decline).toContainText('Request declined.');
+  await page.reload();
   await expect(page.getByRole('heading', { name: 'No pending requests' })).toBeVisible();
   const tenant = fixture.tenants[0];
   expect((await tenant.pTSession.findFirstOrThrow({ where: { notes: 'Trainer UI request 0' } })).state).toBe('SCHEDULED');

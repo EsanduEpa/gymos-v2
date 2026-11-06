@@ -68,10 +68,10 @@ export class MemberEnrollmentService {
     }
     const email = normalizeIdentityEmail(input.email);
     const applicationOffer = applicationId ? await this.database.master.memberApplication.findUnique({ where: { id: applicationId },
-      select: { gymId: true, identityId: true, state: true, membershipPlanId: true, membershipPlanName: true, membershipPrice: true,
+      select: { gymId: true, identityId: true, state: true, consentedAt: true, membershipPlanId: true, membershipPlanName: true, membershipPrice: true,
         membershipCurrency: true, membershipDurationDays: true, membershipPlanVersion: true } }) : null;
     if (applicationId && (!applicationOffer || applicationOffer.gymId !== access.gymId || applicationOffer.state !== 'PROCESSING'
-      || applicationOffer.membershipPlanId !== input.membershipPlanId || !applicationOffer.membershipPlanName || !applicationOffer.membershipPrice
+      || !applicationOffer.consentedAt || applicationOffer.membershipPlanId !== input.membershipPlanId || !applicationOffer.membershipPlanName || !applicationOffer.membershipPrice
       || !applicationOffer.membershipCurrency || !applicationOffer.membershipDurationDays || applicationOffer.membershipPlanVersion === null)) {
       throw new ConflictException('Applicant membership offer is unavailable');
     }
@@ -108,14 +108,16 @@ export class MemberEnrollmentService {
             if (pending) throw new ConflictException('An enrollment for this identity is already awaiting consent or recovery');
             if (applicationId) {
               const application = await tx.memberApplication.findFirst({ where: { id: applicationId, gymId: access.gymId,
-                identityId: existing.id, state: 'PROCESSING' }, select: { id: true } });
-              if (!application) throw new ConflictException('Applicant consent is unavailable');
+                identityId: existing.id, state: 'PROCESSING' }, select: { id: true, consentedAt: true } });
+              if (!application?.consentedAt) throw new ConflictException('Applicant request is unavailable');
+              await tx.gymAccess.create({ data: { userId: existing.id, gymId: access.gymId, role: 'MEMBER', actorKind: 'MEMBER',
+                linkStatus: 'PENDING', enrollmentOperationId: operation.id } });
               await tx.memberApplication.update({ where: { id: application.id }, data: { enrollmentOperationId: operation.id,
                 version: { increment: 1 } } });
               await tx.operation.update({ where: { id: operation.id }, data: { subjectIdentityId: existing.id, version: { increment: 1 } } });
               await appendMasterAudit(tx, { actorIdentityId: access.identityId, operationId: operation.id, gymId: access.gymId,
                 stepCode: 'APPLICATION_ENROLLMENT_OFFERED', eventCode: 'MEMBER_APPLICATION_ENROLLMENT_OFFERED', resourceType: 'MEMBER_APPLICATION',
-                resourceId: application.id, transition: { to: 'APPLICANT_CONSENT_REQUIRED' } });
+                resourceId: application.id, transition: { to: 'PENDING_ENROLLMENT' } });
               return;
             }
             await tx.operation.update({ where: { id: operation.id }, data: { subjectIdentityId: existing.id, version: { increment: 1 } } });
@@ -168,7 +170,10 @@ export class MemberEnrollmentService {
       } }, select: { consumedAt: true },
     });
     if (consentProof && !consentProof.consumedAt) throw new ServiceUnavailableException('Enrollment consent is being recovered');
-    const reusedIdentity = Boolean(consentProof?.consumedAt);
+    // A self-submitted application already records the applicant's join request.
+    // Keep the credential they created; Owner-created identities still use the
+    // separate consent/temporary-password flow below.
+    const reusedIdentity = Boolean(consentProof?.consumedAt || applicationId);
     if (operation.state === 'COMPLETE') {
       if (!operation.tenantActorId || !operation.tenantMembershipId) throw new OperationIntegrityError('Completed enrollment is missing its tenant references');
       const term = await this.tenantGate.withVerifiedTenant(access, tenant => tenant.membershipTerm.findUnique({ where: { id: operation.tenantMembershipId! },

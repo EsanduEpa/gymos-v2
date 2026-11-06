@@ -9,7 +9,7 @@ import { withGymAccessFence } from '../identity/gym-access-fence.js';
 import { requestDigest } from '../operations/primitives.js';
 import { appendTenantAudit } from '../operations/transaction-audit.js';
 import { TenantSchemaGateService } from '../tenancy/tenant-schema-gate.service.js';
-import { allowedStartMinutes, type AvailabilityRule } from './availability-policy.js';
+import { allowedStartMinutes, resolvedStartSlots, type AvailabilityRule } from './availability-policy.js';
 
 type Access = TenantGateContext & { identityId: string; role: string; slug: string; accessVersion: number; actor: { kind: 'TRAINER' | 'MEMBER'; id: string } | null };
 const utcDate = (value: string | Date) => new Date(typeof value === 'string' ? `${value}T00:00:00.000Z` : `${value.toISOString().slice(0, 10)}T00:00:00.000Z`);
@@ -126,12 +126,7 @@ export class SessionAvailabilityService {
         const now = nowRows[0]!.now; const startBound = new Date(now.getTime() + 2 * 3600000); const endBound = new Date(now.getTime() + 14 * 86400000);
         const weekday = weekdayNumber(input.localDate); const timeZone = config.timezone;
         const allowed = allowedStartMinutes(input.localDate, rules as AvailabilityRule[], weekday);
-        const candidates = allowed.map(minute => {
-          const hour = Math.floor(minute / 60); const mins = minute % 60; const localTime = `${String(hour).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
-          const matches: { start: Date; offset: string }[] = []; const naive = new Date(`${input.localDate}T${localTime}:00Z`).getTime();
-          for (let offset = -840; offset <= 840; offset++) { const start = new Date(naive - offset * 60000); const actual = localParts(start, timeZone); if (`${actual.year}-${actual.month}-${actual.day}T${actual.hour}:${actual.minute}` === `${input.localDate}T${localTime}`) matches.push({ start, offset: `${offset < 0 ? '-' : '+'}${String(Math.floor(Math.abs(offset) / 60)).padStart(2, '0')}:${String(Math.abs(offset) % 60).padStart(2, '0')}` }); }
-          return matches.map(match => ({ ...match, end: new Date(match.start.getTime() + 3600000), localTime }));
-        }).flat().filter(slot => slot.start >= startBound && slot.start <= endBound);
+        const candidates = resolvedStartSlots(input.localDate, allowed, timeZone).filter(slot => slot.start >= startBound && slot.start <= endBound);
         const dayStartMinute = new Date(`${input.localDate}T00:00:00Z`).getTime();
         const dayZeroOffset = candidates.find(candidate => candidate.localTime === '12:00')?.offset ?? candidates[0]?.offset;
         const dayOffsetMinutes = dayZeroOffset ? (dayZeroOffset[0] === '-' ? -1 : 1) * (Number(dayZeroOffset.slice(1, 3)) * 60 + Number(dayZeroOffset.slice(4, 6))) : 0;

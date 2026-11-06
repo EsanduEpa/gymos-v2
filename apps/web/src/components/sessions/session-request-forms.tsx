@@ -37,8 +37,16 @@ export function SessionRequestDecisionForm({ slug, sessionId, expectedVersion, a
   slug: string; sessionId: string; expectedVersion: number; action: 'ACCEPT' | 'DECLINE'; requestKey: string;
 }) {
   const bound = decideSessionRequest.bind(null, slug, sessionId, requestKey, action, expectedVersion);
-  const [state, formAction, pending] = useActionState<SessionCommandState, FormData>(bound, {});
-  return <form action={formAction} className="ui-form-stack session-request-decision">
+  const [state, setState] = useState<SessionCommandState>({});
+  const [pending, startDecision] = useTransition();
+  return <form className="ui-form-stack session-request-decision" onSubmit={event => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    startDecision(async () => {
+      const result = await bound(state, formData);
+      setState(result);
+    });
+  }}>
     <input type="hidden" name="idempotencyKey" value={state.currentKey ?? state.nextKey ?? requestKey}/>
     {action === 'DECLINE' ? <details className="session-request-message"><summary>Add optional message for member</summary><label className="ui-field"><span className="ui-field-label">Message for member</span><textarea name="reason" maxLength={500} rows={2}/></label></details> : null}
     {state.error ? <p role="alert" className="ui-feedback ui-feedback-error">{state.error}</p> : null}

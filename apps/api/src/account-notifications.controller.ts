@@ -73,13 +73,11 @@ export class AccountNotificationsController {
       const clock = cursor ? null : (await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`)[0]!.now;
       const asOf = cursor ? new Date(cursor.asOf) : clock!;
       const source = sourceRows(identity.userId, asOf);
-      const [rows, unread] = await Promise.all([
-        tx.$queryRaw<AccountRow[]>(Prisma.sql`WITH source AS (${source}) SELECT * FROM source
+      const rows = await tx.$queryRaw<AccountRow[]>(Prisma.sql`WITH source AS (${source}) SELECT * FROM source
           WHERE (${parsed.data.filter} = 'ALL' OR read_at IS NULL)
             AND (${cursor ? true : false} = false OR (created_at, kind, id) < (${cursor?.createdAt ?? null}::timestamptz, ${cursor?.kind ?? null}::text, ${cursor?.id ?? null}::text))
-          ORDER BY created_at DESC, kind DESC, id DESC LIMIT ${parsed.data.pageSize + 1}`),
-        unreadCount(tx, identity.userId),
-      ]);
+          ORDER BY created_at DESC, kind DESC, id DESC LIMIT ${parsed.data.pageSize + 1}`);
+      const unread = await unreadCount(tx, identity.userId);
       const hasMore = rows.length > parsed.data.pageSize;
       const page = rows.slice(0, parsed.data.pageSize).map(row => ({ id: `${row.kind}:${row.id}`, sourceId: row.id, kind: row.kind, eventCode: row.event_code,
         title: row.title, message: row.message, target: row.target_kind === 'ACCOUNT_SECURITY' ? { kind: 'ACCOUNT_SECURITY' as const }
