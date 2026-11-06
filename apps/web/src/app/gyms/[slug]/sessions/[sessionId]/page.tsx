@@ -53,7 +53,7 @@ export default async function SessionDetailPage({ params, searchParams }: {
           <div><dt>Credit reservation</dt><dd>{state(data.reservation)}</dd></div>
           <div><dt>Settlement</dt><dd>{data.settlement ? `${state(data.settlement)} · ${data.creditConsumed ? '1 credit used' : 'No credit used'}` : 'Not settled'}</dd></div>
           <div><dt>{booking.state === 'PENDING_CONFIRMATION' ? 'If accepted, free cancellation through' : 'Free cancellation through'}</dt><dd>{data.cancellationDeadline ? time(data.cancellationDeadline) : 'Policy information unavailable'}</dd></div>
-          {booking.requestExpiresAt ? <div><dt>Request response deadline</dt><dd>{time(booking.requestExpiresAt)}</dd></div> : null}
+          {booking.requestExpiresAt ? <div><dt>{booking.state === 'PENDING_CONFIRMATION' ? 'Request response deadline' : 'Original request deadline'}</dt><dd>{time(booking.requestExpiresAt)}</dd></div> : null}
           {booking.startedAt ? <div><dt>Started</dt><dd>{time(booking.startedAt)}</dd></div> : null}
           {booking.endedAt ? <div><dt>Ended</dt><dd>{time(booking.endedAt)}</dd></div> : null}
         </dl>

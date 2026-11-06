@@ -47,3 +47,16 @@ For a fresh installation, build the clients, packages and API, then run `pnpm ma
 6. Cancel a future session and inspect the cancellation quote and resulting credit balance.
 7. Create a session for today, then start and complete it using the app's timing rules. Check earnings and trainer pay.
 8. Switch gyms and confirm that member records and changes stay in their own gym.
+
+
+## Disposable PT walkthrough in Chrome
+
+For PT checks independent of the persistent manual sandbox, prepare/build the current clients, API and web, then run from the root:
+
+```sh
+GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/api exec vitest run --config vitest.config.pt-visible.ts --disableConsoleIntercept
+```
+
+This opt-in holding fixture creates its own owned two-gym databases, synthetic logins, membership and eight-credit pack, plus a separately prepared active appointment eligible for ordinary completion. It prints the loopback URL, temporary logins and a unique stop-file path. Open the printed URL in Chrome. Never save/share those credentials or commit captured logs. The fixture does not use `.env` or the persistent manual sandbox. New bookings still obey notice/availability rules; the active appointment is a separate historical delivery fixture. Notes follow the existing completed-only rule.
+
+To stop normally, create **only the exact stop file printed by this run** in another terminal (`touch /tmp/<printed-name>`); the fixture stops its servers and verifies owned database/container cleanup. Its one-hour timeout is for interactive review, not a relaxed business/test timeout. A passing fixture confirms setup/teardown; document the actual browser observations separately. No full automated journey or real pilot follows from that pass.

@@ -93,3 +93,13 @@ Extend the PT-03 verified-tenant runner. Tenant-local durable reminder work is u
 ## Current handoff — PT-06/PT-07 local implementation (6 November 2026)
 
 The milestone sections above supersede their older “next PT-06” directions. Earlier entries below are historical observations; the Docker-owned tests now run successfully with local socket access. PT-02's availability integration is passing after the receipt-order fix; its broad UI/concurrency matrix remains open. No user changes were reverted: the entry working-tree changes in the PT05 exception fixture, PROGRESS.md and EVIDENCE.md were retained and extended. Nothing was deployed or merged; no shared/production database was touched. Continue from the first unfinished PT-07 task, not by rebuilding PT-01–PT-06.
+
+## Current follow-up handoff — Chrome and committed-tree cleanup
+
+Reviewed user commit `353ba7a`, preserving its changes. Removed 24 redundant 390/768 evidence images from the versioned tree (moved into ignored local test output); kept 24 mobile/desktop images, all source/tests/migrations/contracts and the runbook. No secrets or generated build/database artifacts were tracked. Earlier references to 48 preserved captures describe the pre-cleanup archive; 48 were actually tested, 24 remain versioned.
+
+Actual Google Chrome desktop testing now covers trainer availability/break publication, member slot selection/request with no hold, trainer acceptance, confirmed member balance/bell, separate eligible completion and completed-session notes visible to member, and live owner scheduled-work health. Fixed and Chrome-rechecked multiword availability reason persistence; also clarified end-date and historical request-deadline labels. Typecheck/lint/production web build passed. Fresh fixture cleanup passed; no normal/shared data changed. See EVIDENCE.md for exact scope and limits.
+
+First unfinished local task is now browser expired-auth/unknown-save recovery and eligible start verification, followed by the remaining detailed concurrency/support/accessibility/regression matrix. The newly requested future appointment was deliberately not started early. Deployment monitoring and a several-operating-day pilot/owner sign-off remain separately authorized release gates. No milestone is newly declared fully Verified.
+
+Owner live-visibility follow-up: source/Chrome confirmed all-dates ACTIVE total, but dashboard rows are a 10-row today-only preview and the session ledger is date-filtered/paginated. A dedicated all-dates ACTIVE list is not currently implemented; do not claim the default owner screen shows every ongoing session together. See EVIDENCE.md for the actual one-session Chrome check and its limits.

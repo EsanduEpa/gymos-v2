@@ -43,7 +43,7 @@ export async function saveAvailability(slug: string, trainerId: string, expected
       return { localDate, windows: intervalRows(range) };
     });
     const blocks = String(form.get('blocks') ?? '').split('\n').map(line => line.trim()).filter(Boolean).map(line => {
-      const [localDate, range, ...reason] = line.split(/\s+/, 3); if (!localDate || !range || !/^\d{4}-\d{2}-\d{2}$/.test(localDate)) throw new Error('Unavailable periods use YYYY-MM-DD HH:MM-HH:MM optional-reason');
+      const [localDate, range, ...reason] = line.split(/\s+/); if (!localDate || !range || !/^\d{4}-\d{2}-\d{2}$/.test(localDate)) throw new Error('Unavailable periods use YYYY-MM-DD HH:MM-HH:MM optional-reason');
       return { localDate, ...intervalRows(range)[0]!, ...(reason.length ? { reason: reason.join(' ') } : {}) };
     });
     const closures = String(form.get('closures') ?? '').split(/[\s,]+/).filter(Boolean);
