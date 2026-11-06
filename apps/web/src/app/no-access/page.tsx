@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { Suspense } from 'react';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Button, LoadingState } from '@/components/ui';
 import { signOut } from '../actions';
@@ -24,7 +25,8 @@ async function NoAccessContent() {
   return <main className="auth-shell"><section className="form-card auth-card">
     <div className="eyebrow dark">YOUR WORKSPACE</div>
     <h1>No active gym access</h1>
-    <p className="muted">Ask your gym administrator to grant access, then sign in again.</p>
+    <p className="muted">Ask your gym administrator to grant access, or review a member application linked to this account.</p>
+    <p><Link href="/applications">View application status</Link> · <Link href="/apply">Apply to join a gym</Link></p>
     <form action={signOut} data-session-exit><Button variant="secondary" type="submit">Sign out</Button></form>
   </section></main>;
 }

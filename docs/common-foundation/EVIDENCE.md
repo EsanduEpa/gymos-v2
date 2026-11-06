@@ -1,0 +1,117 @@
+# Common foundation evidence
+
+## CF-00 baseline evidence (2026-11-06)
+
+Repository state: `git status --short` was empty at inspection. Branch: `new-up`. No PT changes were present as uncommitted changes; the latest PT progress, evidence and runbook were read and retained without modification.
+
+Documentation inspected: full `docs/COMMON-FOUNDATION-IMPLEMENTATION-GUIDE.md`; `docs/migration/NOTES.md`; full current `docs/pt-implementation/PROGRESS.md`, `EVIDENCE.md` and `RUNBOOK.md`; `docs/ui-ux-transformation/00-MASTER-UI-UX-PLAN.md`, Owner and Member workspace docs; `apps/web/AGENTS.md`. The web guide requires consulting the installed Next.js documentation before code changes.
+
+Baseline routes include public `/`, `/login`, `/gyms/select`, `/no-access`, `/change-password`, gym role route `/gyms/[slug]`, owner member directory/create/detail, member workspace, and existing member/trainer enrollment-consent routes. There is no public application or applicant status route. `AuthController` authenticates normalized email/password and returns only active gym accesses; access tokens last 15 minutes. The gym access guard and tenant actor/operation/receipt bindings gate operational routes.
+
+Enrollment baseline: `MemberEnrollmentService` already implements Master Operation checkpoints, owner authorization, tenant CommandReceipt, tenant member and membership-term writes, reciprocal actor binding, access activation and recovery. Existing-identity enrollment requires a subject-owned password/consent proof. New owner-created accounts receive a separate temporary credential and first-login change flow. Owner approval must not bypass or repurpose these protections.
+
+Data ownership baseline: Master `User`, `Gym`, `GymAccess`, `Operation`, `EnrollmentProof`, credentials and registry are authoritative for identity/access/operation evidence. Tenant `Member`, `MembershipTerm`, PT and operational notifications are tenant-owned. Notification routing currently has a typed PT/session target and needs explicit extension for application targets. Master and tenant manifests/migrations are versioned; applied migrations are immutable.
+
+Harness commands inspected from root/API/web manifests: workspace preparation/check/typecheck/lint/unit/build, owned database integrations (`test:database:owned`, `test:pt:owned`, domain configs), and Playwright (`pnpm --dir apps/web test:e2e`). Harnesses and fixtures must be inspected before running; owned Postgres/browser suites depend on Docker access. No automated test has yet been run for CF-00, and CF-00 makes no verification claim.
+
+## Confirmed choices vs proposed defaults
+
+Confirmed by guide: online MEMBER applications require owner approval; account creation grants no gym membership/access; recovery is staff-assisted without external messaging provider; personal devices may remain signed in and shared staff devices use shorter sessions; preserve architecture/theme; extend in-app notifications including PT events.
+
+Proposed defaults (not confirmed product choices): personal sessions 7-day inactivity/30-day absolute, shared sessions 30-minute inactivity/8-hour absolute, shared mode selected by default, 15-minute access token retained, rotating renewal credentials; staff recovery credential 15-minute one-use bounded attempt; minimal contact/application fields; no mailbox verification claim. CF-01 does not implement session/recovery changes.
+
+## Application lifecycle and policy baseline
+
+Application states: `PENDING` after authenticated submission; `PROCESSING` while owner approval is reconciling; `APPROVED` only after required enrollment effects and access are reconciled; `REJECTED` after owner rejection; `WITHDRAWN` after applicant withdrawal before approval; `RECOVERY_REQUIRED` for a safely resumable interrupted operation. Terminal rejected/withdrawn records remain retained under a documented retention policy (duration not yet established); resubmission creates a new application only when no pending/processing/approved application or gym role exists. Exact duplicate pending submit returns the same generic success/status and does not create another row. Normalized email is case-insensitive/trimmed per `normalizeIdentityEmail`; public responses must not disclose whether an identity exists.
+
+Existing identity: sign-in and explicit applicant consent are required before the application can be attached to that identity. Owner action cannot create consent. A self-created account keeps the submitted password hash; owner approval never writes credential fields or issues a temporary password. Another gym role or elevated global role is rejected without revealing identity details.
+
+Pending applicant permissions: own application/status/outcome and ordinary account session/sign-out/help routes only. Deny all gym operational/member/PT/finance/configuration APIs until ACTIVE reciprocal enrollment has reconciled. Unauthenticated applicant can see public gym name and submit; cannot query application outcome by email or application ID.
+
+## Field and action ownership
+
+| Fact/action | Authority | Who may change/read |
+| --- | --- | --- |
+| Login email/password, global display label, account security | Master identity | Subject; staff recovery only under later documented CF-03 procedure. Gym owner cannot edit global credentials/identity. |
+| Gym role/access and reciprocal tenant actor binding | Master `GymAccess` plus enrollment operation; checked against tenant | Authorized owner workflow; active subject receives own role after reconciled approval. |
+| Application identity, state, decision, subject consent, private owner note, applicant-safe reason | Master | Subject reads own status/withdraws before processing; current gym owner reviews/decides; private notes owner-only. |
+| Operational full name/contact/DOB/emergency data, membership terms, PT/credits | Tenant | Existing Member/Owner workflows; application collects only minimal name/contact and no health/emergency data. |
+| PT notifications/reminders | Tenant | Existing tenant role/relationship policy and notification authorization. |
+| Application outcome notification | Master identity scope | Only its subject; owner pending notice only within authorized gym context. |
+| Platform support observations | Existing audited support scope | Read-only, time-limited; cannot mutate or decide applications. |
+
+## CF-01 status
+
+Implementation and exact automated results are recorded below. Manual browser walkthroughs and manual acceptance tests are deferred per user instruction. No deployment, merge, pilot, shared/production DB mutation, or external communication is authorized or performed.
+
+## CF-01 implementation status (2026-11-06)
+
+Source review found no public application/status route or application queue. The existing `MemberEnrollmentService` is a durable, recoverable owner registration command that requires an active membership plan, creates the Master operation, commits a tenant member and membership term under a tenant command receipt, and then activates the reciprocal Master `GymAccess`. It also contains the existing-identity `EnrollmentProof` gate and one-time temporary credential behavior for owner-created new identities. Existing notification storage is tenant-scoped; current typed target kinds are PT-only. Public applicant outcome therefore needs an identity-scoped Master fact/notification and typed application route, independent of tenant availability.
+
+The initial CF-00 handoff noted the missing application-bound enrollment flow; that baseline is superseded by the implementation below. CF-01 added additive Master application/notice storage, typed contracts/routes, public and authenticated application flows, status/consent screen, owner queue/decision screen, audit events, and identity-scoped application notices. The exact membership offer is snapshotted in Master and bound to the existing `REGISTER_MEMBER` operation. Applicant password consent uses the existing enrollment-consent endpoint; owner approval is not consent. `GymAccess` activates only through the existing enrollment reconciliation after tenant member/term and command receipt completion.
+
+The CF-owned application integration suite covers normalized duplicate public submissions, real `GymAccessGuard` denial while pending, credential preservation, authenticated existing-identity application and auth-version fencing, withdrawal and reapplication after rejection/withdrawal, same-action and competing approve/reject races, private-note isolation, recipient-scoped notices, and outage/retry state. The tenant integration suite also covers the application-bound operation handoff: wrong password is rejected, correct applicant password records consent, tenant/member/term/access reconciliation completes, and no temporary password or password mutation occurs. Existing owner-created onboarding and enrollment-consent cases remain covered in the same regression suite. The owned application suite uses a mocked enrollment service for its outage/retry assertions; the real operation/consent path is exercised separately in the tenant integration suite.
+
+## Automated checks run for CF-01 (2026-11-06)
+
+- `pnpm --dir packages/contracts test` — passed, 62 tests.
+- `pnpm --dir packages/contracts build` — passed.
+- `pnpm exec prisma validate --schema packages/database-master/prisma/schema.prisma` — passed.
+- `pnpm --dir apps/api exec vitest run --config vitest.config.tenancy.ts` — passed, 2 files / 2 tests (Master and tenant manifest checks).
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/api exec vitest run --config vitest.config.member-applications.ts --disableConsoleIntercept` — passed, 1 file / 4 tests; disposable run cleaned 4 databases and its container.
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/api exec vitest run --config vitest.config.tenancy-integration.ts test/tenancy/tenant-schema.integration.test.ts --disableConsoleIntercept` — passed, 1 file / 32 tests, including owner-created enrollment and the new application-bound consent/reconciliation test; disposable run cleaned 8 databases and its container.
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/api exec vitest run --config vitest.config.identity.ts --disableConsoleIntercept` — passed, 1 file / 13 tests; disposable run cleaned 4 databases and its container.
+- `pnpm --dir apps/api exec tsc --noEmit --incremental false --pretty false` — passed.
+- `pnpm --dir apps/web exec tsc --noEmit --incremental false --pretty false` — passed.
+- `pnpm --dir apps/api lint` — passed with three existing unused-variable/import warnings in `analytics.service.ts`, `availability.service.ts`, and `availability.controller.ts`.
+- `pnpm --dir apps/web lint` — passed.
+- `pnpm --dir apps/web build` — passed; new `/apply`, `/apply/[slug]`, `/gyms/[slug]/apply`, `/applications` and owner applications routes were included.
+- `pnpm check:workspace` — passed; 5 packages, workspace graph valid.
+- `pnpm test:unit` — passed: contracts 62, API client 14, theme token 5, API source 61, pool tests 25.
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm test:pt:owned` — passed, 13 files / 55 tests; PT command, recovery, reminders, availability, session reads/notifications, and upgrade rehearsal all completed with disposable fixture cleanup.
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm test:recovery:owned` — passed, 1 file / 1 recovery drill; 8 disposable databases cleaned.
+- `git diff --check` — passed. The final explicit documentation whitespace scan also passed.
+
+The first sandboxed Docker-backed attempt failed because the Docker socket was unavailable; the same owned suites were then rerun with the permitted disposable-container execution and passed. One sandboxed `pnpm test:unit` attempt hit `listen EPERM` in an API controller unit test; rerunning with local listener permission passed. Two intermediate production builds exposed Next.js cache-component/Suspense requirements in new routes; route boundaries were corrected and the final build passed. An intermediate parallel web `tsc` invocation raced the Next build while `.next/types` was being regenerated; the isolated final web typecheck passed afterward. A focused 1-test run of the new application-bound consent test passed before rerunning the entire 32-test tenant suite.
+
+Manual browser walkthroughs and manual acceptance tests remain deferred by instruction. Automated browser routes are not yet covered by a new CF-specific Playwright spec. No deployment, merge, pilot, external message, or shared/production database change occurred.
+
+## Remaining risks and unverified behavior
+
+- The public application submission response is deliberately generic for normalized email collisions; an applicant who already has an account must sign in and use the authenticated application route. The UI directs applicants to sign in, and no account-existence signal is returned.
+- The full browser flow, visual/mobile acceptance, exact owner/applicant notification behavior in a running web/API stack, tenant outage recovery in a real deployment topology, and accessibility review are not manually accepted. Automated browser coverage is deferred.
+- `RECOVERY_REQUIRED` is modeled for future repair states but this CF-01 implementation leaves recoverable enrollment failures in `PROCESSING` and retries the stable operation; permanent unexpected state repair is not covered by a new operator workflow.
+- Retention duration for rejected/withdrawn application records remains a product policy decision.
+
+## CF-00 documentation baseline checks (historical, before CF-01 implementation)
+
+- `pnpm --dir packages/contracts test` — passed, 59 tests at the CF-00 baseline; superseded by the 62-test CF-01 run above.
+- `pnpm --dir apps/api exec vitest run src/identity/email.spec.ts src/identity/gym-access-fence.spec.ts` — passed, 11 tests. These cover current identity email normalization and access-fence helpers, not the absent application journey.
+- `pnpm exec prisma validate --schema packages/database-master/prisma/schema.prisma` — passed at the CF-00 baseline; superseded by the CF-01 schema validation above.
+- `rg -n '[[:blank:]]+$' docs/common-foundation` — no trailing-whitespace matches.
+- `git diff --check` — passed for tracked diffs. The new documentation is untracked, so the explicit whitespace scan above covers those files.
+
+These historical checks documented the CF-00 baseline only and are not CF-01 verification results.
+
+## CF-02 automated checks (2026-11-06)
+
+Implementation review: added Master `IdentitySession` migration with immutable identity/history protections and manifest version `master-2026-11-06.3`; hashed refresh credentials; session-bound access tokens; 15-minute access-token renewal; proposed personal/shared idle and absolute limits; explicit current/all logout; owner-independent self-scoped session list/revoke APIs; HttpOnly browser transport; foreground and document-navigation renewal; and Security device management UI. Current/all session effects remain in Master and existing authVersion logout semantics continue. Legacy sid-less access tokens retain bounded compatibility until their existing 15-minute expiration. `sessions.ts` keeps its primitive schemas local to avoid a runtime ESM barrel cycle.
+
+- `pnpm --dir packages/contracts build && pnpm --dir packages/contracts test` — passed; 62 contract tests.
+- `pnpm exec prisma validate --schema packages/database-master/prisma/schema.prisma` — passed.
+- `shasum -a 256 packages/database-master/prisma/migrations/20261106070000_identity_sessions/migration.sql` — `d35aa4917bce8a6c1d5a490b4395ac555f0f0c0995e2d0015a42505c6a92fe60`, matches the Master template manifest.
+- `pnpm --dir apps/api exec vitest run --config vitest.config.tenancy.ts` — passed, 2 files / 2 tests (migration checksum and Master/tenant manifests).
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm test:pt:owned` — passed after the runtime DI fix, 13 files / 55 tests; disposable fixtures cleaned up. This covers PT command/recovery, reads, notifications, scheduled reminders, and tenant upgrade rehearsal.
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/api exec vitest run --config vitest.config.identity.ts --disableConsoleIntercept` — passed, 1 file / 14 tests. Uses disposable databases; cleanup reported 4 dropped databases and removed container. Covers concurrent refresh, replay revocation, personal/shared classification, session listing, passive vs foreground activity expiry, current/all logout and identity authVersion behavior.
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm test:cf:owned` — passed, 1 file / 4 tests; disposable cleanup reported 4 databases dropped and container removed. Retains pending access, credential preservation, consent, duplicate/decision race and notice authorization coverage.
+- `GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/api exec vitest run --config vitest.config.tenancy-integration.ts test/tenancy/tenant-schema.integration.test.ts --disableConsoleIntercept` — passed, 1 file / 32 tests; disposable cleanup reported 8 databases dropped. Covers existing owner-created enrollment and CF-01 application-bound enrollment consent/reconciliation.
+- `pnpm test:unit` — passed: 62 contract tests, 14 API client tests, 5 theme tests, 18 API source files / 63 tests, and 3 pool files / 25 tests.
+- `pnpm --dir apps/api exec tsc --noEmit --incremental false --pretty false && pnpm --dir apps/web exec tsc --noEmit --incremental false --pretty false` — passed.
+- `pnpm --dir apps/web build` — passed; includes `/security`, `/api/session/renew`, and CF-01 routes.
+- `pnpm --dir apps/api lint && pnpm --dir apps/web lint` — passed. API lint reports three pre-existing unused-variable/import warnings in analytics and session availability; web lint is clean.
+- `pnpm check:workspace` — passed; 5-package workspace graph valid.
+- `git diff --check` — passed. `rg -n '[[:blank:]]+$' docs/common-foundation` — no matches (rg exit 1 means no trailing whitespace).
+
+Corrected attempts: initial identity integration exposed one stale error-message assertion and a stale replay token; both were corrected, then the full identity suite passed. The first unit run hit sandbox `listen EPERM`; rerun with local listener permission passed. Initial PT owned regression surfaced Nest dependency injection metadata because `AuthSessionService` imported `DatabaseService` type-only; switched to runtime import and reran below. The manifest test initially expected `.2`; updated to `.3` to match the additive migration. Initial unit run before the local test permission also exposed the ESM primitive import cycle in contracts; fixed by making `sessions.ts` independent of the root barrel. These failed attempts are not counted as passes.
+
+Manual browser/device selection, refresh and expiry walkthroughs, cross-device logout acceptance, visual/mobile/accessibility review, and live tenant-outage UX checks remain explicitly deferred. No manual tests were conducted and no deployment, merge, pilot, external message or shared/production database mutation occurred.

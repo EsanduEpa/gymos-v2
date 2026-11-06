@@ -57,16 +57,23 @@ import { AnalyticsService } from './analytics/analytics.service.js';
 import { SessionAvailabilityController } from './sessions/availability.controller.js';
 import { SessionAvailabilityService } from './sessions/availability.service.js';
 import { SessionExpiryRunner } from './sessions/session-expiry-runner.js';
+import { MemberApplicationsController } from './member-applications.controller.js';
+import { MemberApplicationsService } from './member-applications.service.js';
+import { AuthSessionService } from './identity/auth-session.service.js';
+import { AuthSessionGuard } from './identity/auth-session.guard.js';
 
 @Module({
   imports: [
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
   ],
-  controllers: [SessionExceptionsController, AppController, AdminController, AuthController, CredentialsController, CredentialReissueController, GymsController, TrainersController, PacksController, NotificationsController, ConfigurationController, ProvisioningOwnerController, SupportSessionController, GymLifecycleController, SessionBookingController, SessionReadsController, SessionRequestsController, MemberSessionOverviewController, CoachingController, MemberLifecycleController, SessionLifecycleController, FinanceController, DashboardController, AnalyticsController, SessionAvailabilityController],
+  controllers: [SessionExceptionsController, AppController, AdminController, AuthController, CredentialsController, CredentialReissueController, GymsController, MemberApplicationsController, TrainersController, PacksController, NotificationsController, ConfigurationController, ProvisioningOwnerController, SupportSessionController, GymLifecycleController, SessionBookingController, SessionReadsController, SessionRequestsController, MemberSessionOverviewController, CoachingController, MemberLifecycleController, SessionLifecycleController, FinanceController, DashboardController, AnalyticsController, SessionAvailabilityController],
   providers: [SessionExceptionsService,
     AppService,
     DatabaseService,
     MemberEnrollmentService,
+    MemberApplicationsService,
+    AuthSessionService,
+    AuthSessionGuard,
     TrainerEnrollmentService,
     CredentialService,
     GymAccessGuard,
@@ -95,6 +102,7 @@ import { SessionExpiryRunner } from './sessions/session-expiry-runner.js';
     SessionAvailabilityService,
     SessionExpiryRunner,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: AuthSessionGuard },
     { provide: APP_GUARD, useClass: SupportScopeGuard },
   ],
 })

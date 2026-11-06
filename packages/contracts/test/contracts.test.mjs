@@ -21,7 +21,8 @@ const gym = { id: 'gym-1', name: 'Synthetic Gym', slug: 'test-a', status: 'ACTIV
 const theme = { primaryColor: '#123456', logoUrl: 'https://example.test/logo.svg' };
 const member = { id: 'member-1', fullName: 'Synthetic Member', email: null, status: 'ACTIVE' };
 const fixtures = {
-  E01: { accessToken: 'fixture-only-token', tokenType: 'Bearer', expiresIn: 900,
+  E01: { accessToken: 'fixture-only-token', tokenType: 'Bearer', expiresIn: 900, sessionId: 'session-1', refreshToken: 'A'.repeat(43),
+    refreshExpiresAt: asOf, absoluteExpiresAt: asOf, deviceClass: 'SHARED', deviceLabel: 'Chrome on Linux',
     globalRole: 'USER', mustChangePassword: false, gyms: [{ id: gym.id, name: gym.name, slug: gym.slug, role: 'OWNER' }] },
   E02: [gym], E03: gym, E04: { slug: gym.slug, name: gym.name, theme },
   E05: { slug: gym.slug, theme: { ...theme, version: 1 } }, E06: { gymId: gym.id, slug: gym.slug, role: 'OWNER' },
@@ -173,12 +174,14 @@ test('credential contracts enforce password policy and one-time reissue envelope
 
 test('shell session projection excludes credential and connection material', async () => {
   const { currentSessionSchema, logoutResultSchema } = await import('../dist/legacy.js');
-  const session = { identityId: 'identity-1', displayName: 'Synthetic owner', globalRole: 'USER', mustChangePassword: false, gyms: fixtures.E01.gyms };
+  const session = { identityId: 'identity-1', displayName: 'Synthetic owner', globalRole: 'USER', mustChangePassword: false,
+    sessionId: 'session-1', refreshExpiresAt: asOf, absoluteExpiresAt: asOf, deviceClass: 'SHARED', deviceLabel: 'Chrome on Linux',
+    lastActivityAt: asOf, gyms: fixtures.E01.gyms };
   assert.deepEqual(currentSessionSchema.parse(session), session);
   assert.deepEqual(logoutResultSchema.parse({ revoked: true }), { revoked: true });
   assert.equal(logoutResultSchema.safeParse({ revoked: false }).success, false);
   assert.equal(logoutResultSchema.safeParse({ revoked: true, accessToken: 'fixture-only' }).success, false);
-  for (const field of ['accessToken', 'passwordHash', 'databaseName', 'authVersion']) {
+  for (const field of ['accessToken', 'refreshToken', 'passwordHash', 'databaseName', 'authVersion']) {
     assert.equal(currentSessionSchema.safeParse({ ...session, [field]: 'fixture-only' }).success, false);
   }
 });

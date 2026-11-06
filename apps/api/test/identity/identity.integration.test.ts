@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readFile } from 'node:fs/promises';
@@ -229,7 +229,8 @@ it('retains login response compatibility and safe owner access while pending/unv
   await master.gymAccess.create({ data: { userId: user.id, gymId: gym.id, role: 'OWNER', linkStatus: 'ACTIVE' } });
   const database = { master } as DatabaseService;
   const result = await new AuthController(database).login({ email: ' LOGIN@Example.TEST ', password });
-  expect(Object.keys(result).sort()).toEqual(['accessToken', 'tokenType', 'expiresIn', 'globalRole', 'mustChangePassword', 'gyms'].sort());
+  expect(Object.keys(result).sort()).toEqual(['accessToken', 'tokenType', 'expiresIn', 'sessionId', 'refreshToken', 'refreshExpiresAt',
+    'absoluteExpiresAt', 'deviceClass', 'deviceLabel', 'globalRole', 'mustChangePassword', 'gyms'].sort());
   expect(result.expiresIn).toBe(900);
   expect(result.mustChangePassword).toBe(false);
   expect(result.gyms).toHaveLength(1);
@@ -446,8 +447,8 @@ it('logout atomically revokes every current identity session including restricte
   const results = await Promise.allSettled([controller.logout(auth(first.accessToken)), controller.logout(auth(second.accessToken))]);
   expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
   expect((await master.user.findUniqueOrThrow({ where: { id: user.id } })).authVersion).toBe(user.authVersion + 1);
-  await expect(controller.session(auth(first.accessToken))).rejects.toThrow('Invalid or expired session');
-  await expect(controller.session(auth(second.accessToken))).rejects.toThrow('Invalid or expired session');
+  await expect(controller.session(auth(first.accessToken))).rejects.toThrow('Session revoked or expired');
+  await expect(controller.session(auth(second.accessToken))).rejects.toThrow('Session revoked or expired');
   const fresh = await controller.login({ email: user.email, password });
   await expect(controller.logout(auth(first.accessToken))).rejects.toThrow('Invalid or expired session');
   await expect(controller.session(auth(fresh.accessToken))).resolves.toMatchObject({ identityId: user.id, displayName: null });
@@ -456,6 +457,47 @@ it('logout atomically revokes every current identity session including restricte
   await expect(controller.logout(auth(restricted.accessToken))).resolves.toEqual({ revoked: true });
   expect((await master.user.findUniqueOrThrow({ where: { id: user.id } })).authVersion).toBe(user.authVersion + 2);
   expect(await master.$transaction([master.user.count(), master.gymAccess.count(), master.operation.count()])).toEqual(before);
+});
+
+it('rotates a device refresh token once across concurrent tabs, detects replay, and isolates current-device logout', async () => {
+  const user = await fixtureIdentity('device-sessions@example.test');
+  const controller = new AuthController({ master } as DatabaseService);
+  const auth = (token: string) => ({ headers: { authorization: `Bearer ${token}` } });
+  const personal = await controller.login({ email: user.email, password, deviceClass: 'PERSONAL' });
+  const shared = await controller.login({ email: user.email, password });
+  expect(personal.deviceClass).toBe('PERSONAL');
+  expect(personal.deviceLabel).toBe('Web browser');
+  expect(shared.deviceClass).toBe('SHARED');
+  const rows = await controller.sessionsList(auth(personal.accessToken));
+  expect(rows.items).toHaveLength(2);
+  expect(rows.items.filter((row: { current: boolean }) => row.current)).toHaveLength(1);
+  const sessionBeforeRenewal = await master.identitySession.findUniqueOrThrow({ where: { id: personal.sessionId } });
+  const concurrent = await Promise.all([
+    controller.refresh({ refreshToken: personal.refreshToken }),
+    controller.refresh({ refreshToken: personal.refreshToken }),
+  ]);
+  expect(concurrent[0].refreshToken).toBe(concurrent[1].refreshToken);
+  expect(concurrent[0].refreshToken).not.toBe(personal.refreshToken);
+  const passiveRenewal = await master.identitySession.findUniqueOrThrow({ where: { id: personal.sessionId } });
+  expect(passiveRenewal.lastActivityAt).toEqual(sessionBeforeRenewal.lastActivityAt);
+  expect(passiveRenewal.idleExpiresAt).toEqual(sessionBeforeRenewal.idleExpiresAt);
+  const activityRenewal = await controller.refresh({ refreshToken: concurrent[0].refreshToken, activity: true });
+  const activeRenewal = await master.identitySession.findUniqueOrThrow({ where: { id: personal.sessionId } });
+  expect(activeRenewal.lastActivityAt.getTime()).toBeGreaterThan(sessionBeforeRenewal.lastActivityAt.getTime());
+  expect(activeRenewal.idleExpiresAt.getTime()).toBeGreaterThanOrEqual(passiveRenewal.idleExpiresAt.getTime());
+  await expect(controller.session(auth(personal.accessToken))).resolves.toMatchObject({ identityId: user.id });
+  await expect(controller.session(auth(activityRenewal.accessToken))).resolves.toMatchObject({ identityId: user.id, deviceClass: 'PERSONAL' });
+
+  const oldHash = createHash('sha256').update(concurrent[0].refreshToken).digest('hex');
+  await master.identitySession.updateMany({ where: { identityId: user.id, previousRefreshTokenHash: oldHash },
+    data: { previousRefreshValidUntil: new Date(0) } });
+  await expect(controller.refresh({ refreshToken: concurrent[0].refreshToken })).rejects.toThrow('replay detected');
+  await expect(controller.session(auth(activityRenewal.accessToken))).rejects.toThrow('Session revoked or expired');
+  await expect(controller.session(auth(shared.accessToken))).resolves.toMatchObject({ identityId: user.id });
+
+  await expect(controller.logout(auth(shared.accessToken), { scope: 'CURRENT' })).resolves.toEqual({ revoked: true });
+  await expect(controller.session(auth(shared.accessToken))).rejects.toThrow('Session revoked or expired');
+  await expect(controller.session(auth(activityRenewal.accessToken))).rejects.toThrow('Session revoked or expired');
 });
 
 it('serializes the owner acknowledgement and credential-reissue race to one delivery outcome', async () => {

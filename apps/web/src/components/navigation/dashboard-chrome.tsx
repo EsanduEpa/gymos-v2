@@ -11,7 +11,7 @@ import { Button, LoadingState } from '@/components/ui';
 import { NotificationsBell } from './notifications-bell';
 import { ThemeToggle } from './theme-toggle';
 import { sidebarIsCollapsed, subscribeAppearance, togglePlatformSidebar } from '@/lib/appearance';
-import { Building2, LayoutDashboard, Plus, ShieldCheck, PanelLeftClose, PanelLeftOpen, LogOut, Menu, X, Dumbbell, UsersRound, CalendarDays, Wallet, ChartNoAxesCombined, Settings2, ScrollText, CreditCard, ArrowLeftRight, ClipboardList, Utensils, House } from 'lucide-react';
+import { Building2, LayoutDashboard, Plus, ShieldCheck, PanelLeftClose, PanelLeftOpen, LogOut, Menu, X, Dumbbell, UsersRound, CalendarDays, Wallet, ChartNoAxesCombined, Settings2, ScrollText, CreditCard, ArrowLeftRight, ClipboardList, Utensils, House, ClipboardCheck } from 'lucide-react';
 
 // Only implemented destinations belong here. Support uses its explicit read-only
 // context; notification/subscription navigation waits for its owning slices.
@@ -33,7 +33,7 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
   const themed = platform || owner || trainer || member;
   const drawerOpener = useRef<HTMLElement | null>(null);
   const ownerSections = [
-    { label: 'WORKSPACE', items: [{ label: 'Dashboard', path: '', icon: LayoutDashboard }, { label: 'Members', path: '/members', icon: UsersRound }, { label: 'Trainers', path: '/trainers', icon: Dumbbell }, { label: 'Sessions', path: '/sessions', icon: CalendarDays }] },
+    { label: 'WORKSPACE', items: [{ label: 'Dashboard', path: '', icon: LayoutDashboard }, { label: 'Members', path: '/members', icon: UsersRound }, { label: 'Applications', path: '/applications', icon: ClipboardCheck }, { label: 'Trainers', path: '/trainers', icon: Dumbbell }, { label: 'Sessions', path: '/sessions', icon: CalendarDays }] },
     { label: 'BUSINESS', items: [{ label: 'Financials', path: '/financials', icon: Wallet }, { label: 'Analytics', path: '/analytics', icon: ChartNoAxesCombined }] },
     { label: 'MANAGEMENT', items: [{ label: 'Gym Configuration', path: '/gym-config', icon: Settings2 }, { label: 'Audit Log', path: '/audit', icon: ScrollText }, { label: 'Subscription', path: '/subscription', icon: CreditCard }] },
   ];
@@ -69,7 +69,9 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
         {sections.map(section => <div className="workspace-nav-group" key={section.label}><span className="platform-nav-label">{section.label}</span>{section.items.map(({ label: itemLabel, path, icon: Icon }) => <a key={path} href={`${destination}${path}`} title={itemLabel} aria-label={itemLabel} aria-current={(path ? (pathname.startsWith(`${destination}${path}`) || bookingDetail && path === (trainer ? '/schedule' : '/sessions') || trainer && path === '/clients' && pathname.includes('/plans/')) : pathname === home || pathname === `/gyms/${gym.slug}`) ? 'page' : undefined} onClick={close}><Icon size={19}/><span>{itemLabel}</span></a>)}</div>)}
         {gyms.length > 1 ? <a href="/gyms/select" title="Switch gym" aria-label="Switch gym" onClick={() => { close(); setSwitching(true); }}><ArrowLeftRight size={19}/><span>Switch gym</span></a> : null}
       </nav>
-      <div className="shell-sidebar-footer"><div className="platform-sidebar-identity"><span className="shell-avatar" aria-hidden="true">{displayName.slice(0, 1).toUpperCase()}</span><div><strong>{displayName}</strong><small>{owner ? 'Gym owner' : trainer ? 'Personal trainer' : 'Member'}</small></div></div><form action={signOut} data-session-exit><Button type="submit" variant="secondary" aria-label="Sign out"><LogOut size={16}/><span>Sign out</span></Button></form></div>
+      <div className="shell-sidebar-footer"><div className="platform-sidebar-identity"><span className="shell-avatar" aria-hidden="true">{displayName.slice(0, 1).toUpperCase()}</span><div><strong>{displayName}</strong><small>{owner ? 'Gym owner' : trainer ? 'Personal trainer' : 'Member'}</small></div></div>
+        <a className="ui-button ui-button-secondary" href="/security" aria-label="Security settings"><ShieldCheck size={16}/><span>Security</span></a>
+        <form action={signOut} data-session-exit><Button type="submit" variant="secondary" aria-label="Sign out"><LogOut size={16}/><span>Sign out</span></Button></form></div>
     </>;
     if (platform) return <>
       <a className="platform-brand" href="/admin" aria-label="GymOS platform home"><span className="platform-brand-mark"><Dumbbell size={23}/></span><span className="platform-brand-copy"><strong>GymOS</strong><small>PLATFORM CONSOLE</small></span></a>
@@ -85,6 +87,7 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
       </nav>
       <div className="platform-sidebar-note"><ShieldCheck size={20}/><strong>Built around trust</strong><p>Every gym has its own secure workspace. Support access is always read-only.</p></div>
       <div className="shell-sidebar-footer"><div className="platform-sidebar-identity"><span className="shell-avatar" aria-hidden="true">{displayName.slice(0, 1).toUpperCase()}</span><div><strong>{displayName}</strong><small>{support ? 'Read-only support' : 'Super administrator'}</small></div></div>
+        <a className="ui-button ui-button-secondary" href="/security" aria-label="Security settings"><ShieldCheck size={16}/><span>Security</span></a>
         <form action={signOut} data-session-exit><Button type="submit" variant="secondary" aria-label="Sign out"><LogOut size={16}/><span>Sign out</span></Button></form>
       </div>
     </>;

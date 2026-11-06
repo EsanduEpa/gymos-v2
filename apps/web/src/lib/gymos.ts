@@ -1,4 +1,5 @@
 export const SESSION_COOKIE = 'gymos_access_token';
+export const SESSION_REFRESH_COOKIE = 'gymos_refresh_token';
 
 export function apiUrl(path: string): string {
   const base = process.env.GYMOS_API_URL ?? 'http://127.0.0.1:3001';

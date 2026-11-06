@@ -16,3 +16,9 @@ export function sessionCookieOptions(token: string, expiresIn: number) {
   const expires = new Date(Math.min(tokenExpiry(token) - 2000, Date.now() + Math.min(expiresIn, 900) * 1000));
   return { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/', expires };
 }
+
+export function refreshCookieOptions(expiresAt: string) {
+  const parsed = Date.parse(expiresAt);
+  const expires = new Date(Number.isFinite(parsed) ? parsed : 0);
+  return { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/', expires };
+}

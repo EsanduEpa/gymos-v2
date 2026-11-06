@@ -1,7 +1,7 @@
 import { contentDigest } from '../operations/primitives.js';
 // Immutable reviewed chain; schema deployment is an explicit owned runner command.
 export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
-  version: 'master-2026-11-03.1',
+  version: 'master-2026-11-06.3',
   migrations: [
     {
       name: '20261021100256_init_master',
@@ -60,6 +60,14 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       name: '20261103040000_member_lifecycle_intent',
       checksum: '304c97681a03e5bff34226bafeda0d0385aed6d22e40ed412cc64437f1a7eebc',
     },
+    {
+      name: '20261106060000_member_applications',
+      checksum: '3926ee8596018da0f8047a1ca9fda0333f6fcf5ca2c370bca24d0744069b445d',
+    },
+    {
+      name: '20261106070000_identity_sessions',
+      checksum: 'd35aa4917bce8a6c1d5a490b4395ac555f0f0c0995e2d0015a42505c6a92fe60',
+    },
   ],
   postconditions: {
     tables: [
@@ -67,11 +75,14 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       'EnrollmentProof',
       'Gym',
       'GymAccess',
+      'IdentitySession',
       'GymLifecycleIntent',
       'GymRegistrySummary',
       'MasterSchemaDeployment',
       'MasterSchemaState',
       'MemberLifecycleIntent',
+      'MemberApplication',
+      'MemberApplicationNotice',
       'Operation',
       'PlatformAuditLog',
       'ProvisioningIntent',
@@ -99,6 +110,9 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       'SchemaRollout_guard',
       'SupportEvent_append_only',
       'SupportSession_immutable',
+      'IdentitySession_immutable_history',
+      'MemberApplication_immutable_subject',
+      'MemberApplicationNotice_immutable',
     ],
     requiredColumns: {
       Theme: ['id', 'gymId', 'primaryColor', 'logoUrl', 'version'],
@@ -155,6 +169,9 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
         'targetStatus',
         'reason',
       ],
+      MemberApplication: ['id', 'gymId', 'identityId', 'fullName', 'phone', 'consentedAt', 'state', 'version', 'enrollmentOperationId', 'membershipPlanId', 'dateOfBirth', 'membershipPlanName', 'membershipPrice', 'membershipCurrency', 'membershipDurationDays', 'membershipPlanVersion'],
+      MemberApplicationNotice: ['id', 'applicationId', 'gymId', 'recipientId', 'event', 'createdAt', 'readAt'],
+      IdentitySession: ['id', 'identityId', 'authVersion', 'deviceClass', 'deviceLabel', 'refreshTokenHash', 'version', 'createdAt', 'lastActivityAt', 'idleExpiresAt', 'absoluteExpiresAt', 'revokedAt'],
     },
   },
 } as const);

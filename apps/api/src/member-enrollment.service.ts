@@ -44,7 +44,7 @@ export class MemberEnrollmentService {
     }
   }
 
-  async enroll(access: NonNullable<GymRequest['gymAccess']>, input: MemberRegistrationInput) {
+  async enroll(access: NonNullable<GymRequest['gymAccess']>, input: MemberRegistrationInput, applicationId?: string) {
     if (access.role !== 'OWNER') throw new ForbiddenException('Only gym owners can register members');
     // Replays do not execute Operation.claim's prepare callback, so authorize
     // every attempt before reading tenant data or resuming an external effect.
@@ -67,6 +67,14 @@ export class MemberEnrollmentService {
       });
     }
     const email = normalizeIdentityEmail(input.email);
+    const applicationOffer = applicationId ? await this.database.master.memberApplication.findUnique({ where: { id: applicationId },
+      select: { gymId: true, identityId: true, state: true, membershipPlanId: true, membershipPlanName: true, membershipPrice: true,
+        membershipCurrency: true, membershipDurationDays: true, membershipPlanVersion: true } }) : null;
+    if (applicationId && (!applicationOffer || applicationOffer.gymId !== access.gymId || applicationOffer.state !== 'PROCESSING'
+      || applicationOffer.membershipPlanId !== input.membershipPlanId || !applicationOffer.membershipPlanName || !applicationOffer.membershipPrice
+      || !applicationOffer.membershipCurrency || !applicationOffer.membershipDurationDays || applicationOffer.membershipPlanVersion === null)) {
+      throw new ConflictException('Applicant membership offer is unavailable');
+    }
     const fingerprintKey = process.env.JWT_SECRET;
     if (!fingerprintKey || fingerprintKey.length < 32) throw new ServiceUnavailableException('Member enrollment is unavailable');
     const protectedFingerprint = protectedIntentFingerprint(JSON.stringify(input.healthNotes === undefined ? ['absent']
@@ -79,7 +87,7 @@ export class MemberEnrollmentService {
       claim = await service.claim({ actorIdentityId: access.identityId, kind: 'REGISTER_MEMBER', gymId: access.gymId,
         idempotencyKey: input.idempotencyKey,
         intent: { fullName: input.fullName, email, phone: input.phone, dateOfBirth: input.dateOfBirth,
-          emergencyContact: input.emergencyContact ?? null, membershipPlanId: input.membershipPlanId },
+          emergencyContact: input.emergencyContact ?? null, membershipPlanId: input.membershipPlanId, ...(applicationId ? { applicationId } : {}) },
         protectedFingerprint,
         prepare: async (tx, operation) => {
           await tx.$queryRaw`SELECT "id" FROM "Gym" WHERE "id" = ${access.gymId} FOR SHARE`;
@@ -98,6 +106,18 @@ export class MemberEnrollmentService {
             if (!identity || identity.globalRole !== 'USER') throw new ConflictException('This identity cannot join this gym');
             if (gymAccess) throw new ConflictException('This identity already has a role in this gym');
             if (pending) throw new ConflictException('An enrollment for this identity is already awaiting consent or recovery');
+            if (applicationId) {
+              const application = await tx.memberApplication.findFirst({ where: { id: applicationId, gymId: access.gymId,
+                identityId: existing.id, state: 'PROCESSING' }, select: { id: true } });
+              if (!application) throw new ConflictException('Applicant consent is unavailable');
+              await tx.memberApplication.update({ where: { id: application.id }, data: { enrollmentOperationId: operation.id,
+                version: { increment: 1 } } });
+              await tx.operation.update({ where: { id: operation.id }, data: { subjectIdentityId: existing.id, version: { increment: 1 } } });
+              await appendMasterAudit(tx, { actorIdentityId: access.identityId, operationId: operation.id, gymId: access.gymId,
+                stepCode: 'APPLICATION_ENROLLMENT_OFFERED', eventCode: 'MEMBER_APPLICATION_ENROLLMENT_OFFERED', resourceType: 'MEMBER_APPLICATION',
+                resourceId: application.id, transition: { to: 'APPLICANT_CONSENT_REQUIRED' } });
+              return;
+            }
             await tx.operation.update({ where: { id: operation.id }, data: { subjectIdentityId: existing.id, version: { increment: 1 } } });
             await appendMasterAudit(tx, { actorIdentityId: access.identityId, operationId: operation.id, gymId: access.gymId,
               stepCode: 'CONSENT_REQUIRED', eventCode: 'MEMBER_ENROLLMENT_CONSENT_REQUIRED', resourceType: 'IDENTITY', resourceId: existing.id,
@@ -211,6 +231,11 @@ export class MemberEnrollmentService {
           await tx.$queryRaw`SELECT "id" FROM "MembershipPlan" WHERE "id" = ${input.membershipPlanId} FOR SHARE`;
           const plan = await tx.membershipPlan.findUnique({ where: { id: input.membershipPlanId } });
           if (!plan || plan.status !== 'ACTIVE' || plan.currency !== configuration.currency) throw new UnprocessableEntityException('Choose an active membership plan for this gym currency');
+          if (applicationId && applicationOffer && (plan.version !== applicationOffer.membershipPlanVersion
+            || plan.name !== applicationOffer.membershipPlanName || plan.price.toString() !== applicationOffer.membershipPrice
+            || plan.currency !== applicationOffer.membershipCurrency || plan.durationDays !== applicationOffer.membershipDurationDays)) {
+            throw new ConflictException('The membership offer changed; ask the gym owner to review it');
+          }
           const [clock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
           const today = gymLocalDate(configuration.timezone!, clock!.now);
           if (input.dateOfBirth > today) throw new UnprocessableEntityException('Date of birth cannot be in the future');
@@ -303,11 +328,20 @@ export class MemberEnrollmentService {
       || operation.gymId !== gym.id || operation.subjectIdentityId !== input.identityId) {
       throw new NotFoundException('Enrollment consent is unavailable');
     }
+    const application = await this.database.master.memberApplication.findUnique({ where: { enrollmentOperationId: operation.id },
+      select: { id: true, identityId: true, state: true } });
+    if (application && (application.identityId !== input.identityId || application.state !== 'PROCESSING')) {
+      throw new NotFoundException('Enrollment consent is unavailable');
+    }
     const result = await new IdentityFoundationService(this.database.master).consentEnrollment({
       gymId: gym.id, role: 'MEMBER', enrollmentOperationId: operation.id,
       authenticatedIdentityId: input.identityId, authenticatedAuthVersion: input.authVersion,
       currentPassword: input.currentPassword, decision: input.decision,
     });
+    if (application && result.status === 'CONSENT_DECLINED') {
+      await this.database.master.memberApplication.updateMany({ where: { id: application.id, state: 'PROCESSING' },
+        data: { state: 'WITHDRAWN', version: { increment: 1 } } });
+    }
     return { operationId: operation.id, ...result };
   }
 }

@@ -587,6 +587,45 @@ it('commits a full owner enrollment once and requires authenticated explicit con
   expect(await master.gymAccess.findUnique({ where: { userId_gymId: { userId: declineIdentity.id, gymId: gymIds[0] } } })).toBeNull();
 });
 
+it('binds an application offer to applicant-authenticated enrollment consent without changing credentials', async () => {
+  await master.gymAccess.createMany({ data: [{ userId: actorId, gymId: gymIds[0], role: 'OWNER', linkStatus: 'ACTIVE' }], skipDuplicates: true });
+  await tenants[0].gymConfiguration.update({ where: { id: 'current' }, data: { timezone: 'Asia/Colombo', currency: 'LKR' } });
+  const plan = await tenants[0].membershipPlan.create({ data: { name: 'Application Plan', price: '999.00', currency: 'LKR', durationDays: 30 } });
+  const ownerAccess = await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: actorId, gymId: gymIds[0] } } });
+  const access = { ...(await context(0)), slug: `schema-0-${run.runId}`, role: 'OWNER', identityId: actorId,
+    identityVersion: 0, accessVersion: ownerAccess.version, actor: null } as const;
+  const currentPassword = `application-consent-${run.runId}`;
+  const passwordHash = await argon2.hash(currentPassword, { type: argon2.argon2id });
+  const applicant = await master.user.create({ data: { email: `application-${run.runId}@example.test`, passwordHash } });
+  const application = await master.memberApplication.create({ data: { gymId: gymIds[0], identityId: applicant.id,
+    fullName: 'Application Applicant', phone: '+94115556666', consentedAt: new Date(), state: 'PROCESSING',
+    membershipPlanId: plan.id, dateOfBirth: '1995-06-15', membershipPlanName: plan.name, membershipPrice: plan.price.toString(),
+    membershipCurrency: plan.currency, membershipDurationDays: plan.durationDays, membershipPlanVersion: plan.version } });
+  const credential = { issueTemporaryCredential: async () => { throw new Error('Applicant enrollment must not issue a temporary password'); } } as unknown as CredentialService;
+  const service = new MemberEnrollmentService({ master } as DatabaseService, gateFor(), credential);
+  const input = { fullName: application.fullName, email: applicant.email, phone: application.phone, dateOfBirth: application.dateOfBirth!,
+    membershipPlanId: plan.id, idempotencyKey: `member-application:${application.id}` };
+  const pending = await service.enroll(access as never, input, application.id);
+  expect(pending).toMatchObject({ status: 'PENDING', consentRequired: true });
+  expect(await master.gymAccess.findUnique({ where: { userId_gymId: { userId: applicant.id, gymId: gymIds[0] } } })).toBeNull();
+  expect(await tenants[0].member.count({ where: { email: applicant.email } })).toBe(0);
+  const token = await new SignJWT({ authVersion: applicant.authVersion }).setProtectedHeader({ alg: 'HS256' })
+    .setSubject(applicant.id).setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('5m')
+    .sign(new TextEncoder().encode(guardJwtSecret));
+  const controller = new GymsController({ master } as DatabaseService, gateFor(), service);
+  await expect(controller.memberEnrollmentConsent({ headers: { authorization: `Bearer ${token}` } } as never,
+    access.slug, pending.operationId, { decision: 'ACCEPT', currentPassword: 'incorrect-password' })).rejects.toThrow('Identity verification failed');
+  const consent = await controller.memberEnrollmentConsent({ headers: { authorization: `Bearer ${token}` } } as never,
+    access.slug, pending.operationId, { decision: 'ACCEPT', currentPassword });
+  expect(consent.status).toBe('CONSENT_RECORDED');
+  const completed = await service.enroll(access as never, input, application.id);
+  expect(completed).toMatchObject({ status: 'COMPLETE' });
+  expect(await master.user.findUniqueOrThrow({ where: { id: applicant.id } })).toMatchObject({ passwordHash });
+  expect(await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: applicant.id, gymId: gymIds[0] } } }))
+    .toMatchObject({ role: 'MEMBER', linkStatus: 'ACTIVE' });
+  expect(await tenants[0].member.count({ where: { email: applicant.email } })).toBe(1);
+});
+
 it('rejects invalid future dates, foreign plans and strict DTO fields before any enrollment effect', async () => {
   const ownerAccess = await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: actorId, gymId: gymIds[0] } } });
   const access = { ...(await context(0)), slug: `schema-0-${run.runId}`, role: 'OWNER', identityId: actorId,

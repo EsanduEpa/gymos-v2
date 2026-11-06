@@ -38,49 +38,147 @@ enum ActorKind {
   TRAINER
 }
 
+enum SessionDeviceClass {
+  PERSONAL
+  SHARED
+}
+
 model User {
-  originalPlatformAudits PlatformAuditLog[]   @relation("PlatformAuditOriginalActor")
-  initiatedOperations    Operation[]          @relation("OperationActor")
-  subjectOperations      Operation[]          @relation("OperationSubject")
-  platformAudits         PlatformAuditLog[]   @relation("PlatformAuditActor")
-  credentialDeliveries   CredentialDelivery[] @relation("CredentialSubject")
-  issuedCredentials      CredentialDelivery[] @relation("CredentialIssuer")
-  id                     String               @id @default(cuid())
-  email                  String               @unique
-  passwordHash           String
-  globalRole             GlobalRole           @default(USER)
-  displayName            String?
-  mustChangePassword     Boolean              @default(false)
-  authVersion            Int                  @default(0)
-  version                Int                  @default(0)
-  passwordChangedAt      DateTime?            @db.Timestamptz(3)
-  credentialExpiresAt    DateTime?            @db.Timestamptz(3)
-  gymAccesses            GymAccess[]
-  enrollmentProofs       EnrollmentProof[]
-  createdAt              DateTime             @default(now())
-  updatedAt              DateTime             @updatedAt
+  originalPlatformAudits   PlatformAuditLog[]        @relation("PlatformAuditOriginalActor")
+  initiatedOperations      Operation[]               @relation("OperationActor")
+  subjectOperations        Operation[]               @relation("OperationSubject")
+  platformAudits           PlatformAuditLog[]        @relation("PlatformAuditActor")
+  credentialDeliveries     CredentialDelivery[]      @relation("CredentialSubject")
+  issuedCredentials        CredentialDelivery[]      @relation("CredentialIssuer")
+  id                       String                    @id @default(cuid())
+  email                    String                    @unique
+  passwordHash             String
+  globalRole               GlobalRole                @default(USER)
+  displayName              String?
+  mustChangePassword       Boolean                   @default(false)
+  authVersion              Int                       @default(0)
+  version                  Int                       @default(0)
+  passwordChangedAt        DateTime?                 @db.Timestamptz(3)
+  credentialExpiresAt      DateTime?                 @db.Timestamptz(3)
+  gymAccesses              GymAccess[]
+  enrollmentProofs         EnrollmentProof[]
+  memberApplications       MemberApplication[]
+  memberApplicationNotices MemberApplicationNotice[] @relation("MemberApplicationNoticeRecipient")
+  identitySessions         IdentitySession[]
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+}
+
+model IdentitySession {
+  id                        String             @id @default(cuid())
+  identityId                String
+  identity                  User               @relation(fields: [identityId], references: [id], onDelete: Restrict)
+  authVersion               Int
+  deviceClass               SessionDeviceClass
+  deviceLabel               String
+  refreshTokenHash          String             @unique
+  previousRefreshTokenHash  String?            @unique
+  previousRefreshValidUntil DateTime?          @db.Timestamptz(3)
+  version                   Int                @default(0)
+  createdAt                 DateTime           @default(now()) @db.Timestamptz(3)
+  lastActivityAt            DateTime           @default(now()) @db.Timestamptz(3)
+  idleExpiresAt             DateTime           @db.Timestamptz(3)
+  absoluteExpiresAt         DateTime           @db.Timestamptz(3)
+  revokedAt                 DateTime?          @db.Timestamptz(3)
+  revocationReason          String?
+
+  @@index([identityId, revokedAt, lastActivityAt])
+  @@index([idleExpiresAt])
+  @@index([absoluteExpiresAt])
 }
 
 model Gym {
   platformAudits               PlatformAuditLog[]
-  operations                   Operation[]          @relation("OperationGym")
-  expectedTenantOperationId    String?              @unique
-  expectedTenantOperation      Operation?           @relation("GymExpectedTenantOperation", fields: [expectedTenantOperationId], references: [id], onDelete: Restrict)
-  id                           String               @id @default(cuid())
-  slug                         String               @unique
+  operations                   Operation[]               @relation("OperationGym")
+  expectedTenantOperationId    String?                   @unique
+  expectedTenantOperation      Operation?                @relation("GymExpectedTenantOperation", fields: [expectedTenantOperationId], references: [id], onDelete: Restrict)
+  id                           String                    @id @default(cuid())
+  slug                         String                    @unique
   name                         String
-  databaseName                 String               @unique
-  status                       GymStatus            @default(PROVISIONING)
-  version                      Int                  @default(0)
-  publicProfileVersion         Int                  @default(0)
+  databaseName                 String                    @unique
+  status                       GymStatus                 @default(PROVISIONING)
+  version                      Int                       @default(0)
+  publicProfileVersion         Int                       @default(0)
   expectedTenantSchemaVersion  String?
   expectedTenantManifestDigest String?
   gymAccesses                  GymAccess[]
   theme                        Theme?
   enrollmentProofs             EnrollmentProof[]
   credentialDeliveries         CredentialDelivery[]
-  createdAt                    DateTime             @default(now())
-  updatedAt                    DateTime             @updatedAt
+  memberApplications           MemberApplication[]
+  memberApplicationNotices     MemberApplicationNotice[]
+  createdAt                    DateTime                  @default(now())
+  updatedAt                    DateTime                  @updatedAt
+}
+
+enum MemberApplicationState {
+  PENDING
+  PROCESSING
+  APPROVED
+  REJECTED
+  WITHDRAWN
+  RECOVERY_REQUIRED
+}
+
+model MemberApplication {
+  notices                MemberApplicationNotice[]
+  id                     String                    @id @default(cuid())
+  gymId                  String
+  gym                    Gym                       @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  identityId             String
+  identity               User                      @relation(fields: [identityId], references: [id], onDelete: Restrict)
+  fullName               String
+  phone                  String
+  consentedAt            DateTime                  @db.Timestamptz(3)
+  state                  MemberApplicationState    @default(PENDING)
+  version                Int                       @default(0)
+  decidedByIdentityId    String?
+  applicantReason        String?
+  privateNote            String?
+  enrollmentOperationId  String?                   @unique
+  membershipPlanId       String?
+  dateOfBirth            String?
+  membershipPlanName     String?
+  membershipPrice        String?
+  membershipCurrency     String?
+  membershipDurationDays Int?
+  membershipPlanVersion  Int?
+  createdAt              DateTime                  @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime                  @updatedAt @db.Timestamptz(3)
+
+  @@index([gymId, state, createdAt, id])
+  @@index([identityId, createdAt])
+}
+
+enum MemberApplicationNoticeEvent {
+  APPLICANT_SUBMITTED
+  APPLICANT_APPROVED
+  APPLICANT_REJECTED
+  APPLICANT_WITHDREW
+  OWNER_NEW_APPLICATION
+  OWNER_APPLICATION_WITHDREW
+}
+
+model MemberApplicationNotice {
+  id            String                       @id @default(cuid())
+  applicationId String
+  application   MemberApplication            @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  gymId         String
+  gym           Gym                          @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  recipientId   String
+  recipient     User                         @relation("MemberApplicationNoticeRecipient", fields: [recipientId], references: [id], onDelete: Restrict)
+  event         MemberApplicationNoticeEvent
+  createdAt     DateTime                     @default(now()) @db.Timestamptz(3)
+  readAt        DateTime?                    @db.Timestamptz(3)
+
+  @@unique([applicationId, recipientId, event])
+  @@index([recipientId, readAt, createdAt])
+  @@index([gymId, recipientId, createdAt])
 }
 
 model GymAccess {
@@ -161,51 +259,51 @@ enum OperationState {
 }
 
 model Operation {
-  provisioningIntent ProvisioningIntent?
-  lifecycleIntent GymLifecycleIntent?
-  trainerLifecycleIntent TrainerLifecycleIntent?
-  memberLifecycleIntent MemberLifecycleIntent?
-  schemaRolloutTarget SchemaRolloutTarget?
-  id                            String              @id @default(cuid())
+  provisioningIntent            ProvisioningIntent?
+  lifecycleIntent               GymLifecycleIntent?
+  trainerLifecycleIntent        TrainerLifecycleIntent?
+  memberLifecycleIntent         MemberLifecycleIntent?
+  schemaRolloutTarget           SchemaRolloutTarget?
+  id                            String                  @id @default(cuid())
   kind                          OperationKind
   actorIdentityId               String
-  actor                         User                @relation("OperationActor", fields: [actorIdentityId], references: [id], onDelete: Restrict)
+  actor                         User                    @relation("OperationActor", fields: [actorIdentityId], references: [id], onDelete: Restrict)
   scopeKey                      String
   idempotencyKey                String
   requestDigest                 String
   requestedSlug                 String?
   supportContextId              String? // Local SupportSession FK added by024; not cross-DB.
   gymId                         String?
-  gym                           Gym?                @relation("OperationGym", fields: [gymId], references: [id], onDelete: Restrict)
-  expectedForGym                Gym?                @relation("GymExpectedTenantOperation")
+  gym                           Gym?                    @relation("OperationGym", fields: [gymId], references: [id], onDelete: Restrict)
+  expectedForGym                Gym?                    @relation("GymExpectedTenantOperation")
   subjectIdentityId             String?
-  subject                       User?               @relation("OperationSubject", fields: [subjectIdentityId], references: [id], onDelete: Restrict)
+  subject                       User?                   @relation("OperationSubject", fields: [subjectIdentityId], references: [id], onDelete: Restrict)
   ownerThemeId                  String?
-  ownerTheme                    Theme?              @relation(fields: [ownerThemeId], references: [id], onDelete: Restrict)
-  databaseName                  String?             @unique
+  ownerTheme                    Theme?                  @relation(fields: [ownerThemeId], references: [id], onDelete: Restrict)
+  databaseName                  String?                 @unique
   intendedTenantTemplateVersion String?
   intendedTenantManifestDigest  String?
   appliedTenantTemplateVersion  String?
   appliedTenantManifestDigest   String?
-  tenantSchemaVerifiedAt        DateTime?           @db.Timestamptz(3)
+  tenantSchemaVerifiedAt        DateTime?               @db.Timestamptz(3)
   tenantActorId                 String?
   tenantCommandReceiptId        String?
   tenantMembershipId            String?
   // tenantRegistrationRevenueId deliberately omitted: approved MVP creates no
   // registration cash/upfront full earned record; stale map field withdrawn.
-  completedSteps                Json                @default("{}")
-  state                         OperationState      @default(PENDING)
-  step                          String              @default("PENDING")
-  version                       Int                 @default(0)
-  attemptCount                  Int                 @default(0)
+  completedSteps                Json                    @default("{}")
+  state                         OperationState          @default(PENDING)
+  step                          String                  @default("PENDING")
+  version                       Int                     @default(0)
+  attemptCount                  Int                     @default(0)
   leaseToken                    String?
-  leaseExpiresAt                DateTime?           @db.Timestamptz(3)
-  leaseRequiresReconciliation   Boolean             @default(false)
+  leaseExpiresAt                DateTime?               @db.Timestamptz(3)
+  leaseRequiresReconciliation   Boolean                 @default(false)
   safeResult                    Json?
   errorCode                     String?
-  createdAt                     DateTime            @default(now()) @db.Timestamptz(3)
-  updatedAt                     DateTime            @updatedAt @db.Timestamptz(3)
-  lastAttemptAt                 DateTime?           @db.Timestamptz(3)
+  createdAt                     DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt                     DateTime                @updatedAt @db.Timestamptz(3)
+  lastAttemptAt                 DateTime?               @db.Timestamptz(3)
   audits                        PlatformAuditLog[]
   credentialDelivery            CredentialDelivery?
 
@@ -262,79 +360,82 @@ model CredentialDelivery {
 
 // Private durable intent. Never serialize this model in status/registry DTOs.
 model ProvisioningIntent {
-  operationId String @id
-  operation Operation @relation(fields: [operationId], references: [id], onDelete: Restrict)
-  name String
-  ownerEmail String
+  operationId            String    @id
+  operation              Operation @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  name                   String
+  ownerEmail             String
   plannedOwnerIdentityId String
-  reuseIdentity Boolean
-  actorAuthVersion Int
-  currency String
-  timezone String
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  reuseIdentity          Boolean
+  actorAuthVersion       Int
+  currency               String
+  timezone               String
+  createdAt              DateTime  @default(now()) @db.Timestamptz(3)
 }
 
 model GymRegistrySummary {
-  gymId String @id
-  memberCount Int?
-  trainerCount Int?
-  observedAt DateTime? @db.Timestamptz(3)
+  gymId         String    @id
+  memberCount   Int?
+  trainerCount  Int?
+  observedAt    DateTime? @db.Timestamptz(3)
   schemaVersion String?
-  health String @default("UNAVAILABLE")
-  version Int @default(0)
+  health        String    @default("UNAVAILABLE")
+  version       Int       @default(0)
 }
 
 model SupportSession {
-  id String @id @default(cuid())
-  tokenHash String @unique
-  actorIdentityId String
-  authVersion Int
-  gymId String
-  scope String
-  reasonCode String
-  explanation String
-  issuedAt DateTime @default(now()) @db.Timestamptz(3)
-  expiresAt DateTime @db.Timestamptz(3)
-  revokedAt DateTime? @db.Timestamptz(3)
+  id               String         @id @default(cuid())
+  tokenHash        String         @unique
+  actorIdentityId  String
+  authVersion      Int
+  gymId            String
+  scope            String
+  reasonCode       String
+  explanation      String
+  issuedAt         DateTime       @default(now()) @db.Timestamptz(3)
+  expiresAt        DateTime       @db.Timestamptz(3)
+  revokedAt        DateTime?      @db.Timestamptz(3)
   revocationReason String?
-  version Int @default(0)
-  events SupportEvent[]
+  version          Int            @default(0)
+  events           SupportEvent[]
+
   @@index([actorIdentityId, revokedAt])
   @@index([expiresAt])
 }
+
 model SupportEvent {
-  id String @id @default(cuid())
-  eventKey String @unique
-  supportSessionId String
-  session SupportSession @relation(fields:[supportSessionId], references:[id], onDelete:Restrict)
+  id                      String         @id @default(cuid())
+  eventKey                String         @unique
+  supportSessionId        String
+  session                 SupportSession @relation(fields: [supportSessionId], references: [id], onDelete: Restrict)
   originalActorIdentityId String
-  gymId String
-  scope String
-  route String
-  outcome String
-  reasonReference String
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  gymId                   String
+  scope                   String
+  route                   String
+  outcome                 String
+  reasonReference         String
+  createdAt               DateTime       @default(now()) @db.Timestamptz(3)
+
   @@index([gymId, createdAt])
 }
 
 model GymLifecycleIntent {
-  operationId String @id
-  operation Operation @relation(fields:[operationId], references:[id], onDelete:Restrict)
+  operationId        String    @id
+  operation          Operation @relation(fields: [operationId], references: [id], onDelete: Restrict)
   expectedGymVersion Int
-  target String
-  reason String
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  target             String
+  reason             String
+  createdAt          DateTime  @default(now()) @db.Timestamptz(3)
 }
 
 model TrainerLifecycleIntent {
-  operationId          String    @id
-  operation            Operation @relation(fields: [operationId], references: [id], onDelete: Restrict)
-  trainerId            String
-  expectedAccessVersion Int
+  operationId            String    @id
+  operation              Operation @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  trainerId              String
+  expectedAccessVersion  Int
   expectedTrainerVersion Int
-  targetStatus         String
-  reason               String
-  createdAt            DateTime  @default(now()) @db.Timestamptz(3)
+  targetStatus           String
+  reason                 String
+  createdAt              DateTime  @default(now()) @db.Timestamptz(3)
 
   @@index([trainerId, createdAt])
 }
@@ -353,70 +454,79 @@ model MemberLifecycleIntent {
 }
 
 model SchemaRollout {
- id String @id @default(cuid())
- actorIdentityId String
- idempotencyKey String
- requestDigest String
- targetVersion String
- targetDigest String
- orderedGymIds Json
- batchSize Int
- state String @default("CANARY_PENDING")
- version Int @default(0)
- targets SchemaRolloutTarget[]
- createdAt DateTime @default(now()) @db.Timestamptz(3)
- @@unique([actorIdentityId,idempotencyKey])
+  id              String                @id @default(cuid())
+  actorIdentityId String
+  idempotencyKey  String
+  requestDigest   String
+  targetVersion   String
+  targetDigest    String
+  orderedGymIds   Json
+  batchSize       Int
+  state           String                @default("CANARY_PENDING")
+  version         Int                   @default(0)
+  targets         SchemaRolloutTarget[]
+  createdAt       DateTime              @default(now()) @db.Timestamptz(3)
+
+  @@unique([actorIdentityId, idempotencyKey])
 }
+
 model SchemaRolloutTarget {
- operationId String @id
- operation Operation @relation(fields:[operationId],references:[id],onDelete:Restrict)
- rolloutId String
- rollout SchemaRollout @relation(fields:[rolloutId],references:[id],onDelete:Restrict)
- ordinal Int
- databaseName String
- ownershipOperationId String
- sourceOperationId String
- sourceVersion String
- sourceDigest String
- expectedGymVersion Int
- reviews SchemaRepairReview[]
- @@unique([rolloutId,ordinal])
+  operationId          String               @id
+  operation            Operation            @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  rolloutId            String
+  rollout              SchemaRollout        @relation(fields: [rolloutId], references: [id], onDelete: Restrict)
+  ordinal              Int
+  databaseName         String
+  ownershipOperationId String
+  sourceOperationId    String
+  sourceVersion        String
+  sourceDigest         String
+  expectedGymVersion   Int
+  reviews              SchemaRepairReview[]
+
+  @@unique([rolloutId, ordinal])
 }
+
 model SchemaRepairReview {
- id String @id @default(cuid())
- operationId String
- target SchemaRolloutTarget @relation(fields:[operationId],references:[operationId],onDelete:Restrict)
- actorIdentityId String
- approvedAttempt Int
- reason String
- observedVersion String
- observedDigest String
- schemaEvidenceDigest String
- createdAt DateTime @default(now()) @db.Timestamptz(3)
- @@unique([operationId,approvedAttempt])
+  id                   String              @id @default(cuid())
+  operationId          String
+  target               SchemaRolloutTarget @relation(fields: [operationId], references: [operationId], onDelete: Restrict)
+  actorIdentityId      String
+  approvedAttempt      Int
+  reason               String
+  observedVersion      String
+  observedDigest       String
+  schemaEvidenceDigest String
+  createdAt            DateTime            @default(now()) @db.Timestamptz(3)
+
+  @@unique([operationId, approvedAttempt])
 }
+
 model SchemaRolloutApproval {
- id String @id @default(cuid())
- rolloutId String
- expectedVersion Int
- actorIdentityId String
- reason String
- canaryEvidenceDigest String
- createdAt DateTime @default(now()) @db.Timestamptz(3)
- @@unique([rolloutId,expectedVersion])
+  id                   String   @id @default(cuid())
+  rolloutId            String
+  expectedVersion      Int
+  actorIdentityId      String
+  reason               String
+  canaryEvidenceDigest String
+  createdAt            DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([rolloutId, expectedVersion])
 }
+
 model MasterSchemaState {
- id String @id
- templateVersion String
- manifestDigest String
- schemaEvidenceDigest String
- verifiedAt DateTime @db.Timestamptz(3)
- version Int @default(0)
+  id                   String   @id
+  templateVersion      String
+  manifestDigest       String
+  schemaEvidenceDigest String
+  verifiedAt           DateTime @db.Timestamptz(3)
+  version              Int      @default(0)
 }
+
 model MasterSchemaDeployment {
- id String @id @default(cuid())
- manifestDigest String @unique
- templateVersion String
- schemaEvidenceDigest String
- createdAt DateTime @default(now()) @db.Timestamptz(3)
+  id                   String   @id @default(cuid())
+  manifestDigest       String   @unique
+  templateVersion      String
+  schemaEvidenceDigest String
+  createdAt            DateTime @default(now()) @db.Timestamptz(3)
 }

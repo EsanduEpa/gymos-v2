@@ -1,7 +1,7 @@
 import { UnauthorizedException } from '@nestjs/common';
 import { jwtVerify } from 'jose';
 
-export type AccessTokenIdentity = { userId: string; authVersion: number };
+export type AccessTokenIdentity = { userId: string; authVersion: number; sessionId?: string };
 
 export async function identityFromAuthorization(
   authorization: string | undefined,
@@ -28,7 +28,11 @@ export async function identityFromAuthorization(
       || payload.authVersion < 0) {
       throw new Error('Invalid identity claims');
     }
-    return { userId: payload.sub, authVersion: payload.authVersion };
+    if (payload.sid !== undefined && (typeof payload.sid !== 'string' || !payload.sid || payload.sid.length > 128)) {
+      throw new Error('Invalid session claim');
+    }
+    return { userId: payload.sub, authVersion: payload.authVersion,
+      ...(typeof payload.sid === 'string' ? { sessionId: payload.sid } : {}) };
   } catch {
     throw new UnauthorizedException('Invalid or expired token');
   }
