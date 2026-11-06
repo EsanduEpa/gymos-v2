@@ -205,5 +205,8 @@ it('serializes conflicting late cancellation and no-show commands to one termina
   expect(await ctx.tenant.revenueRecord.count({ where: { sessionId: ready.session.id, category: { in: ['LATE_CANCEL', 'MISSED_LATE'] } } })).toBe(1);
   expect(await ctx.tenant.packCreditMovement.count({ where: { packId: ready.pack.id, kind: 'CONSUME' } })).toBe(1);
   expect(await ctx.tenant.auditLog.count({ where: { resourceId: ready.session.id, eventCode: { in: ['PT_SESSION_CANCELLED', 'PT_SESSION_MISSED'] } } })).toBe(1);
-  expect(await ctx.tenant.notification.count({ where: { resourceId: ready.session.id, eventCode: { in: ['SESSION_CANCELLED', 'SESSION_MISSED'] } } })).toBe(1);
+  const notices = await ctx.tenant.notification.findMany({ where: { resourceId: ready.session.id, eventCode: { in: ['SESSION_CANCELLED', 'SESSION_MISSED'] } } });
+  expect(notices).toHaveLength(2);
+  expect(new Set(notices.map(notice => notice.recipientIdentityId))).toEqual(new Set([ctx.memberAccess.identityId, ctx.trainerAccess.identityId]));
+  expect(new Set(notices.map(notice => notice.eventCode)).size).toBe(1);
 });

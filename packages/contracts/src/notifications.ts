@@ -80,3 +80,10 @@ export function notificationHref(slug: string, item: Pick<z.infer<typeof notific
 export type Notification = z.infer<typeof notificationSchema>;
 export type NotificationList = z.infer<typeof notificationListSchema>;
 export type AuditPage = z.infer<typeof auditPageSchema>;
+
+export const ptScheduledWorkHealthSchema = z.strictObject({
+  enabled: z.boolean(), lastAttemptAt: isoInstantSchema.nullable(), lastSuccessAt: isoInstantSchema.nullable(),
+  totalFailures: z.number().int().nonnegative(), lastError: z.string().max(160).nullable(),
+  expiredRequestsDue: z.number().int().nonnegative(), expiryLagSeconds: z.number().int().nonnegative(),
+  overdue: z.number().int().nonnegative(), retrying: z.number().int().nonnegative(), lagSeconds: z.number().int().nonnegative(), asOf: isoInstantSchema,
+});

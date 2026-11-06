@@ -41,7 +41,7 @@ export const sessionReadPageSchema = z.strictObject({
   totalCount: z.number().int().nonnegative(), totalPages: z.number().int().nonnegative(), asOf: isoInstantSchema,
   timeZone: z.string().min(1).max(100), rangeStart: isoInstantSchema.nullable(), rangeEndExclusive: isoInstantSchema.nullable(),
   filterTotal: z.number().int().nonnegative(),
-  summary: z.strictObject({ monthBookings: z.number().int().nonnegative().nullable(), lifetimePackCredits: z.strictObject({ available: z.number().int().nonnegative(), held: z.number().int().nonnegative(), consumed: z.number().int().nonnegative(), expired: z.number().int().nonnegative() }).nullable() }),
+  summary: z.strictObject({ nextCreditExpiry: localDateSchema.nullable().default(null), monthBookings: z.number().int().nonnegative().nullable(), lifetimePackCredits: z.strictObject({ available: z.number().int().nonnegative(), held: z.number().int().nonnegative(), consumed: z.number().int().nonnegative(), expired: z.number().int().nonnegative() }).nullable() }),
 });
 export const recentSessionListSchema = z.strictObject({
   items: z.array(sessionReadItemSchema).max(10), limit: z.literal(10), totalCount: z.number().int().nonnegative(), hasMore: z.boolean(), asOf: isoInstantSchema, timeZone: z.string().min(1).max(100),

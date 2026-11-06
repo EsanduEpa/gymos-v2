@@ -296,6 +296,7 @@ model PTSession {
   revenueRecords        RevenueRecord[]
   payRecord             PayRecord?
   payCorrections         TrainerPayCorrection[]
+  reminders              PTSessionReminder[]
   adjustments            PTSessionAdjustment[]  @relation("AdjustedSession")
   replacementAdjustment  PTSessionAdjustment?   @relation("ReplacementSession")
 
@@ -525,6 +526,8 @@ model Notification {
   id                  String          @id @default(cuid())
   recipientIdentityId String
   sourceEventKey      String
+  supersededAt        DateTime?       @db.Timestamptz(3)
+  reminder            PTSessionReminder?
   eventCode           String
   title               String
   message             String
@@ -752,4 +755,33 @@ model CategoryBudget {
 
   @@unique([category, month])
   @@index([month, category])
+}
+
+model PTSessionReminder {
+  id String @id
+  sessionId String
+  session PTSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  scheduledStartAt DateTime @db.Timestamptz(3)
+  scheduledEndAt DateTime @db.Timestamptz(3)
+  kind String
+  recipientIdentityId String
+  recipientRole String
+  dueAt DateTime @db.Timestamptz(3)
+  status String @default("PENDING")
+  attempts Int @default(0)
+  nextAttemptAt DateTime @db.Timestamptz(3)
+  finishedAt DateTime? @db.Timestamptz(3)
+  notificationId String? @unique
+  notification Notification? @relation(fields: [notificationId], references: [id], onDelete: Restrict)
+  lastError String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([sessionId, scheduledStartAt, scheduledEndAt, kind, recipientIdentityId], map: "PTSessionReminder_revision_key")
+  @@index([status, nextAttemptAt, dueAt, id], map: "PTSessionReminder_due_idx")
+}
+model PTScheduledWorkStatus {
+  id String @id
+  lastAttemptAt DateTime @db.Timestamptz(3)
+  lastSuccessAt DateTime? @db.Timestamptz(3)
+  totalFailures Int @default(0)
+  lastError String?
 }

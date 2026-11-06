@@ -97,7 +97,7 @@ export class SessionAvailabilityService {
           return !allowedStartMinutes(localDate, policyRules, weekdayNumber(localDate)).includes(minute);
         });
         if (invalidated.length) throw new ConflictException({ message: 'Availability changes require resolving existing live sessions first', affectedSessionIds: invalidated.map(session => session.id) });
-          const receipt = await tx.commandReceipt.create({ data: { actorIdentityId: access.identityId, commandKind: 'UPDATE_PT_AVAILABILITY', idempotencyKey: input.idempotencyKey, requestDigest: digest, resourceType: 'TRAINER', resourceId: trainerId, state: 'COMMITTED', committedAt: now[0]!.now, safeResult: { version: input.expectedVersion + 1, availabilitySnapshot: input } } });
+          const receipt = await tx.commandReceipt.create({ data: { actorIdentityId: access.identityId, commandKind: 'UPDATE_PT_AVAILABILITY', idempotencyKey: input.idempotencyKey, requestDigest: digest, resourceType: 'TRAINER', resourceId: trainerId, state: 'RUNNING' } });
           await tx.pTAvailabilityRule.deleteMany({ where: { trainerId } });
           if (access.role === 'OWNER' && input.closureRange) await tx.pTAvailabilityRule.deleteMany({ where: { kind: 'GYM_CLOSURE', localDate: { gte: utcDate(input.closureRange.from), lte: utcDate(input.closureRange.through) } } });
           await tx.pTAvailabilityRule.createMany({ data: rules.map(rule => ({ id: randomUUID(), ...rule, trainerId, localDate: rule.localDate ? utcDate(rule.localDate) : null, effectiveFrom: rule.effectiveFrom ? utcDate(rule.effectiveFrom) : null, effectiveToExclusive: rule.effectiveToExclusive ? utcDate(rule.effectiveToExclusive) : null, createdByIdentityId: access.identityId, commandReceiptId: receipt.id, updatedAt: now[0]!.now })) });
@@ -107,7 +107,7 @@ export class SessionAvailabilityService {
         const result = availabilitySchema.parse({ trainerId, version: input.expectedVersion + 1, timeZone: config!.timezone!, asOf: now[0]!.now.toISOString(),
           weekly: values.filter(v => v.kind === 'WEEKLY_WINDOW').map(v => ({ weekday: v.weekday!, effectiveFrom: v.effectiveFrom!.toISOString().slice(0, 10), effectiveToExclusive: v.effectiveToExclusive!.toISOString().slice(0, 10), startMinute: v.startMinute!, endMinute: v.endMinute! })),
           dated: values.filter(v => v.kind === 'DATED_WINDOW').map(v => ({ localDate: v.localDate!.toISOString().slice(0, 10), startMinute: v.startMinute!, endMinute: v.endMinute! })), blocks: values.filter(v => v.kind === 'BLOCK').map(v => ({ localDate: v.localDate!.toISOString().slice(0, 10), startMinute: v.startMinute!, endMinute: v.endMinute!, reason: v.reason })), closures: values.filter(v => v.kind === 'GYM_CLOSURE').map(v => v.localDate!.toISOString().slice(0, 10)) });
-        await tx.commandReceipt.update({ where: { actorIdentityId_commandKind_idempotencyKey: { actorIdentityId: access.identityId, commandKind: 'UPDATE_PT_AVAILABILITY', idempotencyKey: input.idempotencyKey } }, data: { safeResult: result } });
+        await tx.commandReceipt.update({ where: { actorIdentityId_commandKind_idempotencyKey: { actorIdentityId: access.identityId, commandKind: 'UPDATE_PT_AVAILABILITY', idempotencyKey: input.idempotencyKey } }, data: { state: 'COMMITTED', committedAt: now[0]!.now, safeResult: result } });
         return result;
       }));
     });

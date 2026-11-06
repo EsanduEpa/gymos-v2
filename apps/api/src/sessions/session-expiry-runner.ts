@@ -4,6 +4,7 @@ import { TenantDatabaseService } from '../tenant-database.service.js';
 import { TENANT_TEMPLATE_MANIFEST, tenantManifestDigest } from '../tenancy/tenant-template-manifest.js';
 import { verifyInstalledTenant } from '../tenancy/tenant-schema-verifier.js';
 import { canonicalJson } from '../operations/primitives.js';
+import { sweepSessionReminders } from './session-reminders.js';
 import { expirePendingSession } from './expire-pending-session.js';
 
 const intervalMs = 30_000;
@@ -26,10 +27,10 @@ export class SessionExpiryRunner implements OnModuleInit, OnApplicationShutdown 
 
   onModuleInit() {
     if (process.env.NODE_ENV === 'test' || process.env.PT_EXPIRY_RUNNER_ENABLED === 'false') {
-      this.logger.log('PT expiry runner disabled');
+      this.logger.log('PT scheduled-work runner disabled');
       return;
     }
-    this.logger.log(`PT expiry runner enabled; interval=${intervalMs}ms batch=${batchSize} perTenantLimit=${maxPerTenantPerTick}`);
+    this.logger.log(`PT scheduled-work runner enabled; interval=${intervalMs}ms batch=${batchSize} perTenantLimit=${maxPerTenantPerTick}`);
     this.timer = setInterval(() => void this.tick(), intervalMs);
     this.timer.unref();
     void this.tick();
@@ -91,19 +92,22 @@ export class SessionExpiryRunner implements OnModuleInit, OnApplicationShutdown 
                 }
                 if (candidates.length < batchSize) break;
               }
+              const reminders = await sweepSessionReminders(tenant, this.database.master, gym.id);
+              failures += reminders.failed; this.totalFailures += reminders.failed;
+              this.logger.log(`PT reminders: gym=${gym.id} sent=${reminders.sent} failed=${reminders.failed}`);
               return { skipped: false, expired: tenantExpired };
             });
-          });
+          }, { timeout: 120_000, maxWait: 5_000 });
           gyms++; expired += counts.expired; if (counts.skipped) skipped++;
         } catch (error) {
           failures++; this.totalFailures++;
-          this.logger.error(`PT expiry sweep failed for a verified tenant batch (${gym.id}): ${error instanceof Error ? error.message : 'unknown error'}`);
+          this.logger.error(`PT scheduled-work sweep failed for a verified tenant batch (${gym.id}): ${error instanceof Error ? error.message : 'unknown error'}`);
         }
       }
       if (registry.length < 1000) this.gymCursor = null;
       const result = { gyms, expired, skipped, failures, startedAt, completedAt: new Date().toISOString() };
       this.lastResult = result;
-      this.logger.log(`PT expiry sweep completed: gyms=${gyms} expired=${expired} skipped=${skipped} failures=${failures}`);
+      this.logger.log(`PT scheduled-work sweep completed: gyms=${gyms} expired=${expired} skipped=${skipped} failures=${failures}`);
       return result;
     } catch (error) {
       failures++; this.totalFailures++;

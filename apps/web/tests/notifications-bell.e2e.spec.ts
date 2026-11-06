@@ -107,7 +107,7 @@ test('selected-gym bell keeps unread state on failure and marks notifications ex
   await bell.click();
   const popover = page.getByRole('region', { name: 'Notifications' });
   await expect(popover.getByText('Session confirmed')).toBeVisible();
-  await expect(popover.getByRole('link', { name: /Session confirmed/ })).toHaveAttribute('href', new RegExp(`/gyms/${fixture.gyms[0]!.slug}/member/sessions`));
+  await expect(popover.getByRole('link', { name: /Session confirmed/ })).toHaveAttribute('href', new RegExp(`/gyms/${fixture.gyms[0]!.slug}/sessions/session-${environment.runId}`));
   await expect(popover.getByRole('button', { name: 'Mark read' })).toHaveCount(2);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await mkdir(evidenceDirectory, { recursive: true });

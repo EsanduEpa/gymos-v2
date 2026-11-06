@@ -236,7 +236,7 @@ export const TENANT_TEMPLATE_V7: TenantTemplateManifest = Object.freeze({
     constraints: [...TENANT_TEMPLATE_V6.postconditions.constraints.filter(name => name !== 'PTSession_state_shape_check'), 'PTSession_state_shape_v2_check'],
   },
 });
-export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
+export const TENANT_TEMPLATE_V8: TenantTemplateManifest = Object.freeze({
   ...TENANT_TEMPLATE_V7,
   version: 'tenant-2026-11-06.4',
   migrations: [...TENANT_TEMPLATE_V7.migrations, { name: '20261106040000_pt_owner_exceptions', checksum: 'd23789d50058968bca527e95ca21563e81f2eb4f177cd4aba219410f0c34ed0d' }],
@@ -254,7 +254,24 @@ export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
     },
   },
 });
-export const TENANT_MANIFESTS: readonly TenantTemplateManifest[] = [TENANT_TEMPLATE_V1, TENANT_TEMPLATE_V2, TENANT_TEMPLATE_V3, TENANT_TEMPLATE_V4, TENANT_TEMPLATE_V5, TENANT_TEMPLATE_V6, TENANT_TEMPLATE_V7, TENANT_TEMPLATE_MANIFEST];
+export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
+  ...TENANT_TEMPLATE_V8,
+  version: 'tenant-2026-11-06.5',
+  migrations: [...TENANT_TEMPLATE_V8.migrations, { name: '20261106050000_pt_reminders', checksum: '3ef3a8cdd086da49e25592ca4d783e8897b441da7d66dc1d5bb080b0d1903bab' }],
+  postconditions: {
+    ...TENANT_TEMPLATE_V8.postconditions,
+    tables: [...TENANT_TEMPLATE_V8.postconditions.tables, 'PTSessionReminder', 'PTScheduledWorkStatus'],
+    indexes: [...TENANT_TEMPLATE_V8.postconditions.indexes, 'PTSessionReminder_pkey', 'PTSessionReminder_notificationId_key', 'PTSessionReminder_revision_key', 'PTSessionReminder_due_idx', 'PTScheduledWorkStatus_pkey'],
+    constraints: [...TENANT_TEMPLATE_V8.postconditions.constraints, 'PTSessionReminder_pkey', 'PTSessionReminder_sessionId_fkey', 'PTSessionReminder_notificationId_fkey', 'PTSessionReminder_notificationId_key', 'PTSessionReminder_shape_check', 'PTScheduledWorkStatus_pkey', 'PTScheduledWorkStatus_id_check'],
+    triggers: [...TENANT_TEMPLATE_V8.postconditions.triggers, 'PTSession_reminder_sync'],
+    columns: { ...TENANT_TEMPLATE_V8.postconditions.columns,
+      Notification: [...TENANT_TEMPLATE_V8.postconditions.columns.Notification, 'supersededAt'],
+      PTSessionReminder: ['id', 'sessionId', 'scheduledStartAt', 'scheduledEndAt', 'kind', 'recipientIdentityId', 'recipientRole', 'dueAt', 'status', 'attempts', 'nextAttemptAt', 'finishedAt', 'notificationId', 'lastError', 'createdAt'],
+      PTScheduledWorkStatus: ['id', 'lastAttemptAt', 'lastSuccessAt', 'totalFailures', 'lastError'],
+    },
+  },
+});
+export const TENANT_MANIFESTS: readonly TenantTemplateManifest[] = [TENANT_TEMPLATE_V1, TENANT_TEMPLATE_V2, TENANT_TEMPLATE_V3, TENANT_TEMPLATE_V4, TENANT_TEMPLATE_V5, TENANT_TEMPLATE_V6, TENANT_TEMPLATE_V7, TENANT_TEMPLATE_V8, TENANT_TEMPLATE_MANIFEST];
 export function reviewedTenantManifest(version: string | null, digest: string | null) {
   return TENANT_MANIFESTS.find(manifest => manifest.version === version && tenantManifestDigest(manifest) === digest);
 }

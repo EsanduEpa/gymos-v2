@@ -32,8 +32,10 @@ export function NotificationsBell({ slug, identityId, role }: { slug: string; id
     const stop = () => { if (timer !== undefined) { window.clearInterval(timer); timer = undefined; } };
     const visibility = () => { if (document.visibilityState === 'visible') start(); else stop(); };
     start();
+    const focus = () => { if (document.visibilityState === 'visible') void refresh(); };
+    window.addEventListener('focus', focus);
     document.addEventListener('visibilitychange', visibility);
-    return () => { stop(); document.removeEventListener('visibilitychange', visibility); sequence.current += 1; };
+    return () => { stop(); window.removeEventListener('focus', focus); document.removeEventListener('visibilitychange', visibility); sequence.current += 1; };
   }, [refresh]);
 
   async function markOne(id: string) {
@@ -68,11 +70,11 @@ export function NotificationsBell({ slug, identityId, role }: { slug: string; id
       {list?.unreadCount ? <span className="notification-unread-count">{list.unreadCount > 99 ? '99+' : list.unreadCount}</span> : null}
     </button>
     {open ? <section id="notification-popover" className="notification-popover" aria-label="Notifications">
-      <div className="notification-popover-heading"><div><strong>Notifications</strong><small>{list?.unreadCount ?? 0} unread</small></div>
+      <div className="notification-popover-heading"><div><strong>Notifications</strong><small>{list ? `${list.unreadCount} unread` : 'Unread count unavailable'}</small></div>
         <button type="button" className="notification-close" aria-label="Close notifications" onClick={() => setOpen(false)}>×</button></div>
       {error ? <p className="notification-error" role="status">{list ? 'Showing the last saved notification state. ' : ''}{error}</p> : null}
       {loading && !list ? <p className="notification-empty" role="status">Loading notifications…</p> : null}
-      {!loading && !list?.items.length ? <p className="notification-empty">No notifications yet.</p> : null}
+      {!loading && list && !list.items.length ? <p className="notification-empty">No notifications yet.</p> : null}
       {list?.items.length ? <ul className="notification-list">
         {list.items.map(item => <li key={item.id} className={item.readAt ? 'notification-item' : 'notification-item is-unread'}>
           <a href={notificationHref(slug, item)} onClick={() => setOpen(false)}>
@@ -83,7 +85,7 @@ export function NotificationsBell({ slug, identityId, role }: { slug: string; id
             onClick={() => void markOne(item.id)}>{pending === item.id ? 'Marking…' : 'Mark read'}</button> : null}
         </li>)}
       </ul> : null}
-      <div className="notification-popover-footer"><button type="button" disabled={!list?.unreadCount || pending !== null} onClick={() => void markAll()}>
+      <p className="notification-empty">PT reminders appear in the app when you open or use it.</p><div className="notification-popover-footer"><button type="button" disabled={!list?.unreadCount || pending !== null} onClick={() => void markAll()}>
         {pending === 'all' ? 'Marking all…' : 'Mark all read'}
       </button><button type="button" disabled={loading} onClick={() => void refresh()}>Refresh</button></div>
     </section> : null}

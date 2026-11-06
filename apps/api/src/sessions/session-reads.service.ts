@@ -115,7 +115,7 @@ export class SessionReadsService {
         return sessionReadPageSchema.parse({ items: rows.map(row => item(row, access.role, now, policies.find(policy => policy.configurationVersion === row.configurationVersion)?.minimumSessionDurationMinutes ?? null)), page: query.page, pageSize: query.pageSize,
           totalCount, totalPages: Math.ceil(totalCount / query.pageSize), filterTotal: totalCount, asOf: now.toISOString(), timeZone,
           rangeStart: rangeStart?.toISOString() ?? null, rangeEndExclusive: rangeEndExclusive?.toISOString() ?? null,
-          summary: { monthBookings, lifetimePackCredits } });
+          summary: { monthBookings, lifetimePackCredits, nextCreditExpiry: access.role === 'MEMBER' ? await this.memberNextCreditExpiry(tx, access.actor!.id, timeZone, now) : null } });
       });
     });
   }
@@ -239,6 +239,12 @@ export class SessionReadsService {
     const sqlEnd = range.month ? endDate : nextDate(endDate);
     const [bounds] = await tenant.$queryRaw<{ start: Date; end: Date }[]>`SELECT (${startDate}::date::timestamp AT TIME ZONE ${timeZone}) AS start, (${sqlEnd}::date::timestamp AT TIME ZONE ${timeZone}) AS end`;
     return [bounds!.start, bounds!.end];
+  }
+
+  private async memberNextCreditExpiry(tx: Prisma.TransactionClient, memberId: string, timeZone: string, now: Date) {
+    const [clock] = await tx.$queryRaw<{ today: string }[]>`SELECT to_char(${now}::timestamptz AT TIME ZONE ${timeZone}, 'YYYY-MM-DD') AS today`;
+    const units = await creditUnits(tx, memberId);
+    return units.find(unit => unit.available === 1 && unit.effectiveEndDateExclusive.toISOString().slice(0, 10) > clock!.today)?.effectiveEndDateExclusive.toISOString().slice(0, 10) ?? null;
   }
 
   private async memberPackBalance(tx: Prisma.TransactionClient, memberId: string, timeZone: string, now: Date) {

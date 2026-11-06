@@ -319,6 +319,10 @@ export class SessionLifecycleService {
             if (!recipientIdentityId) throw new ConflictException('Session notification recipient is unavailable');
             const notice = await appendTenantNotification(tx, { masterGymId: access.gymId, receiptId: receipt.id, eventCode: 'SESSION_CANCELLED', resourceId: sessionId,
               recipientIdentityId, eventOrdinal: ended.version, ...(memberCancels ? { linkKind: 'TRAINER_SCHEDULE' as const } : {}) });
+            const otherRecipient = memberCancels ? session.member.identityId : session.trainer.identityId;
+            if (!otherRecipient) throw new ConflictException('Session notification recipient is unavailable');
+            await appendTenantNotification(tx, { masterGymId: access.gymId, receiptId: receipt.id, eventCode: 'SESSION_CANCELLED', resourceId: sessionId,
+              recipientIdentityId: otherRecipient, eventOrdinal: ended.version, linkKind: memberCancels ? 'MEMBER_SESSIONS' : 'TRAINER_SCHEDULE' });
             return { result: { resourceIds: [sessionId, settlement.id, notice.id], version: ended.version, notificationState: 'AVAILABLE' }, resourceType: 'PT_SESSION', resourceId: sessionId,
               audits: [{ actorIdentityId: access.identityId, eventCode, resourceType: 'PT_SESSION', resourceId: sessionId,
                 transition: { from: session.state, to: 'CANCELLED', version: ended.version } }] };
@@ -383,6 +387,8 @@ export class SessionLifecycleService {
               sourceKey: `pt-session:${access.gymId}:${sessionId}:missed-late` } });
             const notice = await appendTenantNotification(tx, { masterGymId: access.gymId, receiptId: receipt.id, eventCode: 'SESSION_MISSED', resourceId: sessionId,
               recipientIdentityId: session.member.identityId!, eventOrdinal: updated.version });
+            await appendTenantNotification(tx, { masterGymId: access.gymId, receiptId: receipt.id, eventCode: 'SESSION_MISSED', resourceId: sessionId,
+              recipientIdentityId: session.trainer.identityId!, eventOrdinal: updated.version, linkKind: 'TRAINER_SCHEDULE' });
             return { result: { resourceIds: [sessionId, settlement.id, revenue.id, notice.id], version: updated.version, notificationState: 'AVAILABLE' }, resourceType: 'PT_SESSION', resourceId: sessionId,
               audits: [{ actorIdentityId: access.identityId, eventCode, resourceType: 'PT_SESSION', resourceId: sessionId,
                 transition: { from: 'SCHEDULED', to: 'MISSED', version: updated.version } }] };
@@ -657,6 +663,8 @@ export class SessionLifecycleService {
             }
             const notice = await appendTenantNotification(tx, { masterGymId: access.gymId, receiptId: receipt.id, eventCode: 'SESSION_COMPLETED', resourceId: session.id,
               recipientIdentityId: session.member.identityId!, eventOrdinal: updated.version });
+            await appendTenantNotification(tx, { masterGymId: access.gymId, receiptId: receipt.id, eventCode: 'SESSION_COMPLETED', resourceId: session.id,
+              recipientIdentityId: session.trainer.identityId!, eventOrdinal: updated.version, linkKind: 'TRAINER_SCHEDULE' });
             return { result: { resourceIds: [session.id, settlement.id, revenue.id, payId, period.id, notice.id],
                 version: updated.version, notificationState: 'AVAILABLE' }, resourceType: 'PT_SESSION', resourceId: session.id,
               audits: [{ actorIdentityId: access.identityId, eventCode, resourceType: 'PT_SESSION', resourceId: session.id,

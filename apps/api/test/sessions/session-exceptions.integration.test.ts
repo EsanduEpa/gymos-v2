@@ -1,3 +1,4 @@
+import { rehearsePtRestore } from '../support/pt-restore-rehearsal.js';
 import { FinanceService } from '../../src/finance/finance.service.js';
 import { createHmac, randomUUID } from 'node:crypto';
 import { SessionExceptionsService } from '../../src/sessions/session-exceptions.service.js';
@@ -274,7 +275,9 @@ it('restores an expired named unit and compensates a recorded expiry earning wit
 
 
 it('records an exact zero-value delivered correction as a real pay fact without minting value under replay',async()=>{
-  const ctx=await prepare(11,1,0n);
+  const ctx=await prepare(13,1,0n);
+  expect(ctx.booking.creditReservation.packId).toBe(ctx.pack.id);
+  expect(ctx.booking.creditReservation.creditValue).toBe('0.00');
   const start=new Date(Date.now()-6*3600000);const end=new Date(start.getTime()+3600000);
   await ctx.tenant.pTSession.update({where:{id:ctx.booking.session.id},data:{scheduledStartAt:start,scheduledEndAt:end}});
   const saved=await confirm(ctx,{...await source(ctx),kind:'CORRECTION',target:'COMPLETED',actualStartedAt:start.toISOString(),actualEndedAt:end.toISOString()});
@@ -284,3 +287,13 @@ it('records an exact zero-value delivered correction as a real pay fact without 
   expect(facts).toHaveLength(1);expect(facts[0]!.amount.toString()).toBe('0');
   expect((await creditUnits(ctx.tenant,ctx.member.id)).find(row=>row.packId===ctx.pack.id)).toMatchObject({available:0,held:0,consumed:1,expired:0,valueMinorUnits:0n});
 });
+
+it('restores a synthetic PT backup and reconciles every table/view without activating the target', async () => {
+  const evidence = await rehearsePtRestore(run, fixture.tenantDatabases[0]!);
+  expect(evidence.counts.PTSessionAdjustment).toBeGreaterThan(0);
+  expect(evidence.counts.PTCreditRemedy).toBeGreaterThan(0);
+  expect(evidence.counts.TrainerPayCorrection).toBeGreaterThan(0);
+  expect(evidence.counts.PackCreditMovement).toBeGreaterThan(0);
+  expect(evidence.counts.PTSessionReminder).toBeGreaterThan(0);
+  console.info('[pt-restore-rehearsal]', JSON.stringify(evidence));
+}, 120_000);

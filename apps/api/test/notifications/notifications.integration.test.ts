@@ -167,3 +167,13 @@ async function createReceiptForNotification(tenant: typeof fixture.tenants[numbe
   return tenant.commandReceipt.create({ data: { id: `notification_receipt_${runId}`, actorIdentityId: actorId, commandKind: 'TEST_NOTIFICATION',
     idempotencyKey: randomUUID(), requestDigest: requestDigest({ runId }), state: 'COMMITTED', committedAt: new Date(), safeResult: {} } });
 }
+
+it('exposes scheduled-work health only to the selected gym owner', async () => {
+  const path = `/gyms/${fixture.gyms[0]!.slug}/sessions/scheduled-work-health`;
+  const response = await call(path, await bearer(fixture.users.ownerA.id));
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({ enabled: false, lastSuccessAt: null, overdue: 0, retrying: 0 });
+  expect((await call(path, await bearer(fixture.users.memberUser.id))).status).toBe(403);
+  expect((await call(path, await bearer(fixture.users.trainerUser.id))).status).toBe(403);
+  expect((await call(path, await bearer(fixture.users.ownerB.id))).status).toBe(403);
+});

@@ -2,8 +2,8 @@ import { Activity, ArrowUpRight, CalendarDays, Check, Dumbbell, Ticket, Utensils
 import type { MemberMealPlanPage, MemberWorkoutPlanPage, SessionReadPage } from '@gymos/contracts';
 import { EmptyState, Feedback } from '@/components/ui';
 
-type Props = { slug: string; name: string; gymName: string; snapshot: SessionReadPage | null; workouts: MemberWorkoutPlanPage | null; meals: MemberMealPlanPage | null; upcoming: SessionReadPage | null; completed: SessionReadPage | null };
-export function MemberHome({ slug, name, gymName, snapshot, workouts, meals, upcoming, completed }: Props) {
+type Props = { slug: string; name: string; gymName: string; snapshot: SessionReadPage | null; workouts: MemberWorkoutPlanPage | null; meals: MemberMealPlanPage | null; upcoming: SessionReadPage | null; completed: SessionReadPage | null; pending: SessionReadPage | null };
+export function MemberHome({ slug, name, gymName, snapshot, workouts, meals, upcoming, completed, pending }: Props) {
   const base = `/gyms/${encodeURIComponent(slug)}/member`;
   const workout = workouts?.items[0];
   const meal = meals?.items[0];
@@ -16,6 +16,13 @@ export function MemberHome({ slug, name, gymName, snapshot, workouts, meals, upc
   ];
   return <div className="member-home">
     <header className="member-welcome"><div><span className="platform-eyebrow">YOUR TRAINING AT {gymName}</span><h1>Welcome back, {name.split(' ')[0]}.</h1><p>Your plans, your next session, and a little more focus for the day.</p></div><a href={`${base}/calendar`} className="ui-button ui-button-secondary"><CalendarDays size={17}/> My calendar</a></header>
+    <section className="member-next-sessions member-pt-priority" aria-labelledby="member-pt-priority-heading">
+      <div className="member-section-heading"><h2 id="member-pt-priority-heading">Your next PT session</h2><a className="ui-button ui-button-primary" href={`${base}/trainers`}>Request PT</a></div>
+      {!upcoming ? <Feedback tone="info">Upcoming sessions are unavailable. <a href={`${base}/sessions`}>Open PT sessions to retry</a>.</Feedback> : future[0] ? <p><a className="platform-text-link" href={`/gyms/${encodeURIComponent(slug)}/sessions/${encodeURIComponent(future[0].id)}`}>{future[0].trainerName} · {new Intl.DateTimeFormat('en-GB', { timeZone: future[0].gymTimeZone, dateStyle: 'medium', timeStyle: 'short' }).format(new Date(future[0].scheduledStartAt))}</a> · Confirmed · {future[0].gymTimeZone}</p> : <p>No upcoming confirmed PT session.</p>}
+      {!pending ? <Feedback tone="info">Pending requests could not be loaded. <a href={`${base}/sessions?state=PENDING_CONFIRMATION`}>Check requests</a>.</Feedback> : pending.items.length ? <ul>{pending.items.map(item => <li key={item.id}><a className="platform-text-link" href={`/gyms/${encodeURIComponent(slug)}/sessions/${encodeURIComponent(item.id)}`}>Awaiting {item.trainerName}’s decision</a>{item.requestExpiresAt ? <> · Decision due {new Intl.DateTimeFormat('en-GB', { timeZone: item.gymTimeZone, dateStyle: 'medium', timeStyle: 'short' }).format(new Date(item.requestExpiresAt))} ({item.gymTimeZone})</> : null} · No credit held</li>)}</ul> : <p>No pending PT requests.</p>}
+      <p>{credits ? `${credits.available} unheld · ${credits.held} reserved PT credits.` : 'PT credit balances are unavailable.'} {snapshot?.summary.nextCreditExpiry ? `Next unheld credit expires at the start of ${snapshot.summary.nextCreditExpiry} (${snapshot.timeZone}).` : credits ? 'No upcoming unheld credit expiry.' : ''}</p>
+      <p className="member-supporting">Reminders appear here in the app when you open or use it. Membership and credit dates are checked for each booking.</p>
+    </section>
     <section className="member-metrics" aria-label="Your training summary">{metrics.map(({ label, value, hint, icon: Icon }) => <article className="member-metric" key={label}><div><span>{label}</span><Icon size={19}/></div><strong>{value}</strong><p>{hint}</p></article>)}</section>
     <div className="member-home-main">
       <section className="member-workout-feature" aria-labelledby="latest-workout-heading"><div className="member-feature-top"><span className="member-feature-icon"><Dumbbell size={28}/></span><span className="member-tag">Assigned by your trainer</span></div><span className="platform-eyebrow">YOUR LATEST WORKOUT</span><h2 id="latest-workout-heading">{workout?.name ?? (workouts ? 'Your next plan starts here' : 'Workout plans unavailable')}</h2><p>{workout?.description || (workout ? 'Your trainer’s exercise plan, ready to review at your own pace.' : workouts ? 'Your trainer’s assigned workout will appear here when it is ready.' : 'We couldn’t load your assigned plans. Try opening Workouts again.')}</p>

@@ -148,7 +148,9 @@ it('completes the held credit using the booking policy snapshot, replays safely,
   expect(await ctx.tenant.payRecord.count({ where: { sessionId: ready.session.id } })).toBe(1);
   expect(await ctx.tenant.sessionCreditHold.count({ where: { sessionId: ready.session.id, state: 'CONSUMED' } })).toBe(1);
   expect(await ctx.tenant.packCreditMovement.count({ where: { packId: ready.pack.id, kind: 'CONSUME', creditOrdinal: 1 } })).toBe(1);
-  expect(await ctx.tenant.notification.count({ where: { resourceId: ready.session.id, eventCode: 'SESSION_COMPLETED' } })).toBe(1);
+  const completedNotices = await ctx.tenant.notification.findMany({ where: { resourceId: ready.session.id, eventCode: 'SESSION_COMPLETED' } });
+  expect(completedNotices).toHaveLength(2);
+  expect(new Set(completedNotices.map(notice => notice.recipientIdentityId))).toEqual(new Set([fixture.users.memberUser.id, fixture.users.trainerUser.id]));
   const payRow = await ctx.tenant.payRecord.findUniqueOrThrow({ where: { sessionId: ready.session.id } });
   expect(payRow.confirmationRate.toFixed(6)).toBe('0.400000');
   expect(payRow.confirmationLevel).toBe('LEVEL_1');

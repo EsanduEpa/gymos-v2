@@ -36,7 +36,9 @@ export function SessionLifecycle() {
         // Only a rendered authorized shell needs live gym invalidation. Leave
         // server not-found/error responses in place; redirecting them races the
         // uniform foreign/unknown-gym denial and changes its visible behavior.
-        if (!supportId && expectedIdentity && parts[1] === 'gyms' && parts[2] !== 'select' && !session.gyms.some(gym => gym.slug === parts[2] && (!parts[3] || gym.role.toLowerCase() === parts[3]))) return leave('/');
+        const sharedBookingPath = parts.length === 5 && parts[3] === 'sessions' && /^[A-Za-z0-9_:-]{1,128}$/.test(parts[4] ?? '');
+        if (!supportId && expectedIdentity && parts[1] === 'gyms' && parts[2] !== 'select' && !session.gyms.some(gym => gym.slug === parts[2]
+          && (!parts[3] || gym.role.toLowerCase() === parts[3] || sharedBookingPath && ['OWNER', 'TRAINER', 'MEMBER'].includes(gym.role)))) return leave('/');
         clearTimeout(expiryTimer);
         const expiresAt = Math.min(session.expiresAt, supportId ? session.support?.expiresAt ?? 0 : session.expiresAt);
         expiryTimer = setTimeout(() => leave(supportId ? '/admin' : '/login?error=expired'), Math.max(0, expiresAt - Date.now()));
