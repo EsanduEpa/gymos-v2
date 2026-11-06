@@ -48,6 +48,7 @@ async function LoginContent({
           </form>
           <p className="form-note"><Link href="/recover">Forgot your password? Get staff help</Link></p>
           <p className="form-note"><Link href="/apply">Apply to join a gym</Link> · <Link href="/applications">Check application status</Link></p>
+          <p className="form-note"><Link href="/help">Help and privacy information</Link></p>
         </div>
       </div>
     </main>

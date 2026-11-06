@@ -43,6 +43,12 @@ export const platformAnalyticsSummarySchema = z.strictObject({ totalGyms: z.numb
 export const platformAnalyticsRefreshInputSchema = z.strictObject({ cursor: z.string().min(1).max(128).optional() });
 export const platformAnalyticsRefreshResultSchema = z.strictObject({ processed: z.number().int().nonnegative().max(25), unavailable: z.number().int().nonnegative().max(25),
   nextCursor: z.string().nullable(), asOf: z.iso.datetime() });
+export const operationalVisibilitySchema = z.strictObject({
+  pendingApplications: z.number().int().nonnegative(), recoveryRequiredApplications: z.number().int().nonnegative(),
+  stuckEnrollmentOperations: z.number().int().nonnegative(), exhaustedRecoveryCredentials: z.number().int().nonnegative(),
+  profileOperations: z.literal('NOT_CENTRALLY_RECORDED'), renewalRevocationErrors: z.literal('NOT_RECORDED'),
+  inboxProjectionBacklog: z.literal('NOT_APPLICABLE_TRANSACTIONAL'), asOf: z.iso.datetime(),
+});
 export const supportEntrySchema = z.strictObject({ gymId: z.string().min(1).max(128), scope: z.literal('GYM_SUMMARY_READ'), reasonCode: z.string().regex(/^[A-Z][A-Z0-9_]{1,49}$/), explanation: z.string().trim().min(10).max(500) });
 export const supportEntryResultSchema = z.strictObject({ id: z.string(), context: z.string().regex(/^[A-Za-z0-9_-]{43}$/), slug: z.string(), expiresAt: z.iso.datetime() });
 export const supportSummarySchema = z.strictObject({

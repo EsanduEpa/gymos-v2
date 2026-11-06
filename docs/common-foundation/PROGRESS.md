@@ -50,12 +50,22 @@ Automated coverage: current-password rejection, canonical target normalization, 
 
 Remaining risks and deferred acceptance: an email address entered in a request is not proof of mailbox control, and staff follow-up only records an existing process; a real login identity update remains unavailable until a separately authorized proof and reconciliation process exists. Manual browser, visual/mobile, keyboard/focus/accessibility, real staff follow-up, and live outage acceptance remain deferred. CF-05 is not marked Verified.
 
-Next task: implement **CF-07 common help, error, privacy and account-lifecycle consistency**, carrying forward the CF-06 automated browser route issue for resolution as part of the owned browser evidence work in CF-08.
+Next task: resolve the CF-06 automated browser route issue and complete owned browser evidence in CF-08.
+
+## CF-07 — Ready for review (automated checks passed; manual acceptance pending)
+
+Bounded scope: account/gym help routes and state guidance; privacy and lifecycle owner procedures; SuperAdmin aggregate visibility for supported Master signals; standardized next-step copy on application submission uncertainty. No legal retention period, account merge/delete flow, member-directory contact lookup, external messaging, or unsupported telemetry was invented.
+
+Implementation: `/help` now explains pending/rejected/withdrawn/revoked/suspended status, account versus gym membership, privacy and account correction next steps, identity verification, and the limits of the current email-correction request. Sign-in, recovery, authenticated application, and application status link to Help. The SuperAdmin `/admin` page reads `GET /admin/operations/visibility`, which reports only aggregate Master counts for pending/recovery-required applications, stale/retryable enrollment operations, and active exhausted recovery credentials. Profile operation failures and session renewal/revocation failures are explicitly marked not centrally recorded; inbox projection backlog is marked inapplicable because current notices commit with source records. The procedure is recorded in [the CF-07 owner privacy runbook](CF-07-OWNER-PRIVACY-RUNBOOK.md).
+
+Data and retention decisions: collect only fields required for application, membership, security and support. No legal retention duration was confirmed. Retain records as required for present access control, support, reconciliation and audit; do not automate deletion/anonymization until an explicit reviewed schedule exists. No identity merge or hard delete is authorized by this milestone.
+
+Automated checks for CF-07 pass: contract safety, operational-summary service unit test, workspace typechecks, unit suite (including the pre-existing localhost controller test after permitted rerun), lint, API build, web build, workspace graph, and whitespace/diff checks. The earlier CF-06 Playwright notification journey remains a failing automated browser check and is carried forward; CF-07 is Ready for review for its own automated coverage, but the common-foundation release is not fully verified. Manual mobile, keyboard/focus, theme, zoom, long-name, and real owner workflow acceptance is deferred.
 
 ## Remaining milestones
 
-- CF-07: common help/error/privacy/lifecycle behavior and operational visibility.
-- CF-08: owned integration/browser, upgrade, recovery and release evidence; no milestone is Verified by compilation alone.
+- CF-07: implemented; review manual help, keyboard/focus, mobile, theme and privacy workflows.
+- CF-08: resolve the existing automated notification-browser redirect, run owned browser/upgrade/recovery evidence, and complete release review; no milestone is Verified by compilation alone.
 
 ## Risks and dependencies
 

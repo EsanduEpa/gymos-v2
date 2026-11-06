@@ -26,6 +26,13 @@ test('registry counts distinguish unavailable from zero and support summaries re
  assert.deepEqual(supportSummarySchema.parse(summary),summary);
  for(const key of ['healthNotes','passwordHash','databaseName','members','audit'])assert.equal(supportSummarySchema.safeParse({...summary,tenant:{...summary.tenant,[key]:'excluded'}}).success,false);
 });
+test('operational visibility keeps unrecorded signals explicit and rejects private or inferred fields',async()=>{
+ const {operationalVisibilitySchema}=await import('../dist/platform.js');
+ const summary={pendingApplications:3,recoveryRequiredApplications:1,stuckEnrollmentOperations:2,exhaustedRecoveryCredentials:0,
+  profileOperations:'NOT_CENTRALLY_RECORDED',renewalRevocationErrors:'NOT_RECORDED',inboxProjectionBacklog:'NOT_APPLICABLE_TRANSACTIONAL',asOf:'2026-11-06T00:00:00.000Z'};
+ assert.deepEqual(operationalVisibilitySchema.parse(summary),summary);
+ for(const extra of [{identityEmail:'private@example.test'},{memberNames:['Synthetic Person']},{renewalRevocationErrors:0},{profileOperations:0}]) assert.equal(operationalVisibilitySchema.safeParse({...summary,...extra}).success,false);
+});
 test('controlled rollout input pins the reviewed manifest and bounded unique gym selection without caller database targets',async()=>{
  const {schemaRolloutInputSchema}=await import('../dist/platform.js');
  const input={idempotencyKey:'rollout-fixture-key',targetVersion:'tenant-fixture',targetDigest:'a'.repeat(64),gymIds:['gym-a','gym-b'],batchSize:1};

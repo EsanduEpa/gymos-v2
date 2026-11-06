@@ -13,7 +13,7 @@ function RecoveryContent() {
     <div className="auth-form-wrap"><Card className="auth-card"><div className="eyebrow dark">STAFF-ASSISTED RECOVERY</div><h1>Reset your password</h1>
       <p className="muted">Contact your gym owner directly using the contact details provided by your gym. After checking your identity in person or through a known contact, the owner can give you a one-use recovery link. It expires after 15 minutes.</p>
       <p className="muted">If you already received a recovery link, continue below. Your link is kept in this page’s URL fragment and is never sent as a referrer.</p>
-      <RecoveryForm/><p className="form-note"><Link href="/login">Back to sign in</Link></p></Card></div></main>;
+      <RecoveryForm/><p className="form-note"><Link href="/help">Help and privacy information</Link> · <Link href="/login">Back to sign in</Link></p></Card></div></main>;
 }
 
 export default function RecoveryPage() {

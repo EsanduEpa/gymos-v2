@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { registryPageSchema } from '@gymos/contracts/platform';
+import { registryPageSchema, operationalVisibilitySchema } from '@gymos/contracts/platform';
 import { platformAnalyticsRefreshResultSchema, platformAnalyticsSummarySchema } from '@gymos/contracts/platform';
 import type { Gym, Operation, Prisma } from '../generated/master/client.js';
 import { DatabaseService } from '../database.service.js';
@@ -29,6 +29,21 @@ export async function readApprovedTenantSummary(tenants: TenantDatabaseService, 
 @Injectable()
 export class PlatformRegistryService {
  constructor(private readonly database:DatabaseService,private readonly tenants:TenantDatabaseService){}
+ async operationalVisibility(){
+  return this.database.master.$transaction(async tx=>{
+   await tx.$executeRaw`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`;
+   const [clock]=await tx.$queryRaw<{now:Date}[]>`SELECT clock_timestamp() AS now`;
+   const now=clock!.now;
+   const [pendingApplications,recoveryRequiredApplications,stuckEnrollmentOperations,exhaustedRecoveryRows]=await Promise.all([
+    tx.memberApplication.count({where:{state:'PENDING'}}),
+    tx.memberApplication.count({where:{state:'RECOVERY_REQUIRED'}}),
+    tx.operation.count({where:{kind:'REGISTER_MEMBER',OR:[{state:{in:['FAILED_RETRYABLE','REPAIR_REQUIRED']}},{leaseExpiresAt:{lt:now},state:{notIn:['COMPLETE','FAILED_FINAL']}}]}}),
+    tx.$queryRaw<{count:bigint}[]>`SELECT count(*)::bigint AS count FROM "RecoveryCredential" WHERE "attempts" >= "maxAttempts" AND "redeemedAt" IS NULL AND "revokedAt" IS NULL AND "expiresAt" > ${now}`,
+   ]);
+   return operationalVisibilitySchema.parse({pendingApplications,recoveryRequiredApplications,stuckEnrollmentOperations,exhaustedRecoveryCredentials:Number(exhaustedRecoveryRows[0]?.count??0n),
+    profileOperations:'NOT_CENTRALLY_RECORDED',renewalRevocationErrors:'NOT_RECORDED',inboxProjectionBacklog:'NOT_APPLICABLE_TRANSACTIONAL',asOf:now.toISOString()});
+  });
+ }
  async page(actorIdentityId:string,cursor?:string){
   if(cursor && !(await this.database.master.gym.findUnique({where:{id:cursor},select:{id:true}})))throw new NotFoundException('Registry page unavailable');
   const [gyms,total]=await Promise.all([
