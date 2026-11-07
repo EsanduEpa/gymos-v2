@@ -54,8 +54,5 @@ export async function decideSessionRequest(slug: string, sessionId: string, init
   const result = sessionDecisionResultSchema.safeParse(await response.json().catch(() => null));
   if (!response.ok || !result.success) return { error: response.status === 422 ? 'Eligibility changed. Refresh the request before trying again.' : 'The decision outcome is unknown. Retry with this same key.',
     currentKey: key, outcomeUnknown: response.status >= 500 || response.ok };
-  revalidatePath(`/gyms/${encodeURIComponent(slug)}/trainer/requests`);
-  revalidatePath(`/gyms/${encodeURIComponent(slug)}/trainer/schedule`);
-  revalidatePath(`/gyms/${encodeURIComponent(slug)}/member/sessions`);
   return { success: result.data.session.state === 'SCHEDULED' ? 'Request accepted and one credit is now held.' : 'Request declined.', nextKey: randomUUID() };
 }

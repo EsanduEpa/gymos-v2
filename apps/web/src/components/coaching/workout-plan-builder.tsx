@@ -2,16 +2,19 @@
 
 import { useActionState, useState } from 'react';
 import { saveWorkoutPlan, type WorkoutPlanActionState } from '@/app/workout-plan-actions';
+import type { WorkoutPlanView } from '@gymos/contracts';
 import styles from './workout-plan-builder.module.css';
 
 type Row = { id: string; name: string; sets: string; reps: string; weightKg: string; durationMinutes: string; notes: string };
 const newRow = (name = '', sets = '', reps = '', weightKg = ''): Row => ({ id: globalThis.crypto.randomUUID(), name, sets, reps, weightKg, durationMinutes: '', notes: '' });
 const initialState: WorkoutPlanActionState = {};
 
-export function WorkoutPlanBuilder({ slug, memberId, memberName, initialKey }: { slug: string; memberId: string; memberName: string; initialKey: string }) {
-  const [rows, setRows] = useState<Row[]>([newRow()]);
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
+export function WorkoutPlanBuilder({ slug, memberId, memberName, initialKey, initialPlan }: { slug: string; memberId: string; memberName: string; initialKey: string; initialPlan?: WorkoutPlanView }) {
+  const [rows, setRows] = useState<Row[]>(() => initialPlan?.exercises.map(exercise => ({ id: globalThis.crypto.randomUUID(), name: exercise.name,
+    sets: String(exercise.sets), reps: exercise.reps === null ? '' : String(exercise.reps), weightKg: exercise.weightKg ?? '',
+    durationMinutes: exercise.durationMinutes === null ? '' : String(exercise.durationMinutes), notes: exercise.notes ?? '' })) ?? [newRow()]);
+  const [name, setName] = useState(initialPlan?.name ?? '');
+  const [description, setDescription] = useState(initialPlan?.description ?? '');
   const action = saveWorkoutPlan.bind(null, slug, initialKey);
   const [state, formAction, pending] = useActionState(action, initialState);
   const currentKey = state.currentKey ?? state.nextKey ?? initialKey;
@@ -20,12 +23,13 @@ export function WorkoutPlanBuilder({ slug, memberId, memberName, initialKey }: {
   }
   return <form action={formAction} className={styles.form}>
     <input type="hidden" name="memberId" value={memberId}/>
+    {initialPlan ? <><input type="hidden" name="planId" value={initialPlan.id}/><input type="hidden" name="expectedRevision" value={initialPlan.revision}/></> : null}
     <input type="hidden" name="exerciseCount" value={rows.length}/>
     <input type="hidden" name="idempotencyKey" value={currentKey}/>
     <div className={styles.fields}>
       <label>Plan title<input name="name" value={name} onChange={event => setName(event.currentTarget.value)} required maxLength={120} placeholder="Workout plan title"/></label>
       <label>Description (optional)<textarea name="description" value={description} onChange={event => setDescription(event.currentTarget.value)} rows={2} maxLength={4000}/></label>
-      <p className={styles.assigned}>Client: <strong>{memberName}</strong>. Saving explicitly assigns this plan to this client.</p>
+      <p className={styles.assigned}>Client: <strong>{memberName}</strong>. {initialPlan ? 'Saving updates this assigned plan.' : 'Saving explicitly assigns this plan to this client.'}</p>
     </div>
     <div className={styles.rowHeader}><div><h2>Exercises</h2><p>1–100 exercises. Weight is in kilograms; zero is preserved.</p></div>
       <button type="button" className="ui-button ui-button-secondary" disabled={pending || rows.length >= 100} onClick={() => setRows(current => [...current, newRow()])}>Add exercise</button></div>
@@ -43,6 +47,6 @@ export function WorkoutPlanBuilder({ slug, memberId, memberName, initialKey }: {
     </fieldset>)}</div>
     {state.error ? <p className={styles.error} role="alert">{state.error}</p> : null}
     {state.success ? <div className={styles.success} role="status"><p>{state.success}</p>{state.planId ? <a href={`/gyms/${encodeURIComponent(slug)}/trainer/clients/${encodeURIComponent(memberId)}`}>View client profile</a> : null}</div> : null}
-    <button className="ui-button ui-button-primary" type="submit" disabled={pending}>{pending ? 'Saving…' : state.outcomeUnknown ? 'Retry save with same key' : 'Save and assign workout plan'}</button>
+    <button className="ui-button ui-button-primary" type="submit" disabled={pending}>{pending ? 'Saving…' : state.outcomeUnknown ? 'Retry save with same key' : initialPlan ? 'Save workout plan changes' : 'Save and assign workout plan'}</button>
   </form>;
 }

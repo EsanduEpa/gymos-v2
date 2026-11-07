@@ -196,9 +196,10 @@ test('profile contracts keep global identity, self-service fields, and owner cor
   assert.equal(updateSelfTrainerProfileSchema.safeParse(trainer).success, true);
   assert.equal(updateSelfTrainerProfileSchema.safeParse({ ...trainer, specialisations: ['Strength', 'strength'] }).success, false);
   assert.equal(updateSelfTrainerProfileSchema.safeParse({ ...trainer, level: 'LEVEL_2' }).success, false);
-  const correction = { fullName: 'Synthetic Corrected Name', dateOfBirth: null, phone: null, emergencyContact: null, expectedVersion: 2,
+  const correction = { fullName: 'Synthetic Corrected Name', dateOfBirth: null, phone: null, emergencyContact: null, healthNotes: null, expectedVersion: 2,
     reason: 'MEMBER_REQUEST', idempotencyKey: 'owner-profile-0123456' };
   assert.equal(ownerMemberProfileCorrectionSchema.safeParse(correction).success, true);
+  assert.equal(ownerMemberProfileCorrectionSchema.safeParse(Object.fromEntries(Object.entries(correction).filter(([key]) => key !== 'healthNotes'))).success, true);
   assert.equal(ownerMemberProfileCorrectionSchema.safeParse({ ...correction, status: 'SUSPENDED' }).success, false);
 });
 

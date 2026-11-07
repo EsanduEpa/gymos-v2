@@ -55,6 +55,7 @@ const profileSessionSchema = z.strictObject({
 
 export const workoutPlanViewSchema = z.strictObject({
   id: idSchema,
+  revision: z.string().regex(/^d1:[a-f0-9]{64}$/),
   name: z.string().min(1).max(120),
   description: z.string().max(4000).nullable(),
   createdAt: instantSchema,
@@ -77,6 +78,7 @@ const mealTotalsSchema = z.strictObject({
 });
 export const mealPlanViewSchema = z.strictObject({
   id: idSchema,
+  revision: z.string().regex(/^d1:[a-f0-9]{64}$/),
   name: z.string().min(1).max(120),
   createdAt: instantSchema,
   entries: z.array(z.strictObject({
@@ -104,6 +106,7 @@ export const mealPlanCreateSchema = z.strictObject({
   name: z.string().trim().min(1).max(120),
   entries: z.array(mealPlanEntryCreateSchema).min(1).max(100),
 });
+export const mealPlanUpdateSchema = mealPlanCreateSchema.extend({ expectedRevision: z.string().regex(/^d1:[a-f0-9]{64}$/) });
 export const memberMealPlanPageSchema = z.strictObject({
   items: z.array(mealPlanViewSchema).max(100),
   page: z.number().int().min(1), pageSize: z.number().int().min(1).max(100),
@@ -131,6 +134,7 @@ export const workoutPlanCreateSchema = z.strictObject({
   description: z.string().nullable().optional().refine(value => value === undefined || value === null || Array.from(value).length <= 4000),
   exercises: z.array(workoutExerciseCreateSchema).min(1).max(100),
 });
+export const workoutPlanUpdateSchema = workoutPlanCreateSchema.extend({ expectedRevision: z.string().regex(/^d1:[a-f0-9]{64}$/) });
 
 export const memberWorkoutPlansQuerySchema = z.strictObject({ page: pageNumberSchema.default(1), pageSize: pageSizeSchema.default(25) });
 export const memberWorkoutPlanPageSchema = z.strictObject({
@@ -164,8 +168,11 @@ export type TrainerClientQuery = z.infer<typeof trainerClientQuerySchema>;
 export type TrainerClientPage = z.infer<typeof trainerClientPageSchema>;
 export type TrainerClientProfile = z.infer<typeof trainerClientProfileSchema>;
 export type WorkoutPlanCreate = z.infer<typeof workoutPlanCreateSchema>;
+export type WorkoutPlanUpdate = z.infer<typeof workoutPlanUpdateSchema>;
+export type WorkoutPlanView = z.infer<typeof workoutPlanViewSchema>;
 export type MemberWorkoutPlansQuery = z.infer<typeof memberWorkoutPlansQuerySchema>;
 export type MemberWorkoutPlanPage = z.infer<typeof memberWorkoutPlanPageSchema>;
 export type MealPlanCreate = z.infer<typeof mealPlanCreateSchema>;
+export type MealPlanUpdate = z.infer<typeof mealPlanUpdateSchema>;
 export type MealPlanView = z.infer<typeof mealPlanViewSchema>;
 export type MemberMealPlanPage = z.infer<typeof memberMealPlanPageSchema>;

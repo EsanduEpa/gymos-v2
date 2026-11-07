@@ -85,7 +85,7 @@ export function NotificationsBell({ slug, identityId, role }: { slug: string; id
             onClick={() => void markOne(item.id)}>{pending === item.id ? 'Marking…' : 'Mark read'}</button> : null}
         </li>)}
       </ul> : null}
-      <p className="notification-empty">PT reminders appear in the app when you open or use it.</p><div className="notification-popover-footer"><a href={`/gyms/${encodeURIComponent(slug)}/notifications`}>View all gym notifications</a><button type="button" disabled={!list?.unreadCount || pending !== null} onClick={() => void markAll()}>
+      <p className="notification-empty">Notifications refresh while GymOS is open and this tab is visible.</p><div className="notification-popover-footer"><a href={`/gyms/${encodeURIComponent(slug)}/notifications`}>View all gym notifications</a><button type="button" disabled={!list?.unreadCount || pending !== null} onClick={() => void markAll()}>
         {pending === 'all' ? 'Marking all…' : 'Mark all read'}
       </button><button type="button" disabled={loading} onClick={() => void refresh()}>Refresh</button></div>
     </section> : null}

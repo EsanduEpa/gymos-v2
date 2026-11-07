@@ -3,6 +3,8 @@
   "private": true,
   "scripts": {
     "manual:setup": "node apps/api/scripts/manual-test.mjs setup",
+    "manual:rebind": "node apps/api/scripts/manual-test.mjs rebind",
+    "manual:sync": "node apps/api/scripts/manual-test.mjs sync",
     "manual:check": "node apps/api/scripts/manual-test.mjs check",
     "manual:start": "node apps/api/scripts/manual-test.mjs start",
     "dev:web": "pnpm --dir apps/web dev",

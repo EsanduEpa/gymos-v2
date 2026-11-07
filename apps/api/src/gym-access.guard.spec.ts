@@ -31,7 +31,7 @@ describe('GymAccessGuard availability boundary', () => {
     const previousSecret = process.env.JWT_SECRET;
     process.env.JWT_SECRET = 'task005-test-secret-at-least-32-bytes-long';
     try {
-      const token = await new SignJWT({ authVersion: 0 })
+      const token = await new SignJWT({ authVersion: 0, sid: 'test-session', gaid: 'test-account' })
         .setProtectedHeader({ alg: 'HS256' })
         .setSubject('task005-user')
         .setIssuer('gymos-v2')
@@ -40,8 +40,10 @@ describe('GymAccessGuard availability boundary', () => {
         .sign(new TextEncoder().encode(process.env.JWT_SECRET));
       const request = { headers: { authorization: `Bearer ${token}` }, params: { slug: 'task005-gym' } };
       const guard = new GymAccessGuard({ master: {
-        user: { findUnique: async () => ({ authVersion: 0, mustChangePassword: false, credentialExpiresAt: null }) },
+        user: { findUnique: async () => ({ authVersion: 0, globalRole: 'USER', mustChangePassword: false, credentialExpiresAt: null }) },
         $queryRaw: async () => [{ now: new Date() }],
+        identitySession: { findUnique: async () => ({ identityId: 'task005-user', gymAccountId: 'test-account', authVersion: 0, revokedAt: null }) },
+        gymAccount: { findUnique: async () => ({ userId: 'task005-user', gymId: 'task005-gym-id', status: 'ACTIVE', authVersion: 0, mustChangePassword: false, credentialExpiresAt: null }) },
         gymAccess: { findFirst: async () => {
           throw new Error('postgresql://sensitive:details@remote.example.invalid/gym');
         } },

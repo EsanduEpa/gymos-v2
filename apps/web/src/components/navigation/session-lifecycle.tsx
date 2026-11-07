@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation';
 export function SessionLifecycle() {
   const pathname = usePathname();
   useEffect(() => {
-    const publicPath = pathname === '/login' || pathname === '/test-ui' || pathname === '/apply' || pathname.startsWith('/apply/')
+    const publicPath = pathname === '/login' || pathname === '/gym-account/setup' || pathname === '/test-ui' || pathname === '/apply' || pathname.startsWith('/apply/')
       || pathname === '/recover' || pathname === '/help';
     const privatePage = !publicPath;
     const channel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('gymos-session') : null;

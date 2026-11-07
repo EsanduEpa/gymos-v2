@@ -49,6 +49,7 @@ export const ownerMemberProfileCorrectionSchema = z.strictObject({
   dateOfBirth: z.iso.date().nullable(),
   phone: nullableText(40),
   emergencyContact: nullableText(240),
+  healthNotes: nullableText(4000).optional(),
   expectedVersion: versionSchema,
   reason: memberCorrectionReasonSchema,
   idempotencyKey,

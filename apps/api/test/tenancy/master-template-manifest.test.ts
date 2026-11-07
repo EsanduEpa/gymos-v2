@@ -15,7 +15,7 @@ describe('Master template manifest', () => {
       actual.push({ name: migration.name, checksum: createHash('sha256').update(source).digest('hex') });
     }
     expect(actual).toEqual(MASTER_TEMPLATE_MANIFEST.migrations);
-    expect(MASTER_TEMPLATE_MANIFEST.version).toBe('master-2026-11-06.8');
+    expect(MASTER_TEMPLATE_MANIFEST.version).toBe('master-2026-11-06.11');
     expect(MASTER_TEMPLATE_MANIFEST.postconditions.tables).toContain('MemberApplication');
     expect(MASTER_TEMPLATE_MANIFEST.postconditions.tables).toContain('MemberApplicationNotice');
     expect(MASTER_TEMPLATE_MANIFEST.postconditions.tables).toContain('IdentitySession');

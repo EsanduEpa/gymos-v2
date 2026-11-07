@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { idempotencyKeySchema, mealPlanCreateResultSchema, mealPlanCreateSchema } from '@gymos/contracts';
+import { idempotencyKeySchema, mealPlanCreateResultSchema, mealPlanCreateSchema, mealPlanUpdateSchema } from '@gymos/contracts';
 import { apiUrl, SESSION_COOKIE } from '@/lib/gymos';
 
 export type MealPlanActionState = { error?: string; success?: string; nextKey?: string; currentKey?: string; outcomeUnknown?: boolean; planId?: string };
@@ -15,6 +15,9 @@ export async function saveMealPlan(slug: string, initialKey: string, _state: Mea
   const idempotencyKey = String(formData.get('idempotencyKey') ?? initialKey);
   if (!idempotencyKeySchema.safeParse(idempotencyKey).success) return { error: 'Refresh the form before saving.', nextKey: randomUUID() };
   const count = Number(formData.get('entryCount'));
+  const planId = String(formData.get('planId') ?? '');
+  const expectedRevision = String(formData.get('expectedRevision') ?? '');
+  if (planId && !/^[A-Za-z0-9_:-]{1,128}$/.test(planId)) return { error: 'Refresh the plan before editing.', nextKey: randomUUID() };
   if (!Number.isSafeInteger(count) || count < 1 || count > 100) return { error: 'Add between one and 100 meal rows.' };
   const entries = Array.from({ length: count }, (_, index) => {
     const field = (name: string) => formData.get(`entry-${index}-${name}`);
@@ -24,24 +27,25 @@ export async function saveMealPlan(slug: string, initialKey: string, _state: Mea
     return { dayOfWeek: Number(field('dayOfWeek')), mealType: text(field('mealType')), foodItem: text(field('foodItem')),
       calories: integer(field('calories')), proteinGrams: decimal(field('proteinGrams')), carbsGrams: decimal(field('carbsGrams')), fatsGrams: decimal(field('fatsGrams')) };
   });
-  const parsed = mealPlanCreateSchema.safeParse({ name: formData.get('name'), entries });
+  const raw = { name: formData.get('name'), entries };
+  const parsed = planId ? mealPlanUpdateSchema.safeParse({ ...raw, expectedRevision }) : mealPlanCreateSchema.safeParse(raw);
   if (!parsed.success) return { error: 'Check the title, day, meal type and nonnegative nutrition fields.', nextKey: randomUUID() };
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) redirect('/login');
   let response: Response;
   try {
-    response = await fetch(apiUrl(`/gyms/${encodeURIComponent(slug)}/me/clients/${encodeURIComponent(memberId)}/meal-plans`), {
-      method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', 'idempotency-key': idempotencyKey },
+    response = await fetch(apiUrl(`/gyms/${encodeURIComponent(slug)}/me/clients/${encodeURIComponent(memberId)}/meal-plans${planId ? `/${encodeURIComponent(planId)}` : ''}`), {
+      method: planId ? 'PATCH' : 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', 'idempotency-key': idempotencyKey },
       body: JSON.stringify(parsed.data), cache: 'no-store',
     });
   } catch { return { error: 'The save outcome is unknown. Retry with this same key to resolve it.', currentKey: idempotencyKey, outcomeUnknown: true }; }
   if (response.status === 401) redirect('/login?error=expired');
   if (response.status === 403 || response.status === 404) return { error: 'This client is no longer available to your trainer account.', nextKey: randomUUID() };
-  if (response.status === 409) return { error: 'The client relationship or idempotency key changed. Reload the client profile before saving.', nextKey: randomUUID() };
+  if (response.status === 409) return { error: planId ? 'This plan changed since you opened it. Reload it before saving.' : 'The client relationship or idempotency key changed. Reload the client profile before saving.', nextKey: randomUUID() };
   const result = mealPlanCreateResultSchema.safeParse(await response.json().catch(() => null));
   if (!response.ok || !result.success) return { error: response.status === 422 ? 'The meal plan did not pass server validation.' : 'The save outcome is unknown. Retry with this same key to resolve it.',
     currentKey: idempotencyKey, outcomeUnknown: response.status >= 500 || response.ok };
   revalidatePath(`/gyms/${encodeURIComponent(slug)}/trainer/clients/${encodeURIComponent(memberId)}`);
   revalidatePath(`/gyms/${encodeURIComponent(slug)}/member/meal-plans`);
-  return { success: result.data.replayed ? 'This meal plan was already saved.' : 'Meal plan assigned to this client.', planId: result.data.plan.id, nextKey: randomUUID() };
+  return { success: result.data.replayed ? 'This meal plan change was already saved.' : planId ? 'Meal plan changes saved.' : 'Meal plan assigned to this client.', planId: result.data.plan.id, nextKey: randomUUID() };
 }

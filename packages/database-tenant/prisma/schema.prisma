@@ -521,6 +521,8 @@ enum NotificationLinkKind {
   MEMBER_SESSIONS
   TRAINER_REQUESTS
   MEMBER_PROFILE
+  MEMBER_WORKOUT_PLANS
+  MEMBER_MEAL_PLANS
 }
 
 model Notification {

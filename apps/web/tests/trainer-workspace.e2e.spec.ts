@@ -94,14 +94,22 @@ async function seedSessions() {
 
 }
 async function openAs(page: Page, userId: string, path: string) {
-  await installBrowserSession({ page, master: fixture.master, identityId: userId, jwtSecret, origin: webBase });
+  const slug = path.match(/^\/gyms\/([^/]+)/)?.[1];
+  const gym = fixture.gyms.find(item => item.slug === slug);
+  await installBrowserSession({ page, master: fixture.master, identityId: userId, ...(gym ? { gymId: gym.id } : {}), jwtSecret, origin: webBase });
   await page.goto(`${webBase}${path}`);
 }
 
-test.beforeEach(async ({ page }) => { page.setDefaultTimeout(15000); });
-
-test.beforeAll('start isolated session-read fixtures and local services', async () => {
+async function startApi() {
+  const apiPort = new URL(apiBase).port;
+  api = launch(process.execPath, [join(apiDirectory, 'dist/main.js')], apiDirectory, { PATH: process.env.PATH, HOME: process.env.HOME,
+    NODE_ENV: 'production', TZ: 'UTC', PORT: apiPort, MASTER_DATABASE_URL: environment.masterUrl,
+    TENANT_DATABASE_URL: environment.masterUrl, PROVISION_DATABASE_URL: environment.masterUrl, JWT_SECRET: jwtSecret });
+  await waitReady(`${apiBase}/`, api);
+}
+test.beforeEach('start isolated trainer fixture and local services', async ({ page }) => {
   test.setTimeout(180_000);
+  page.setDefaultTimeout(15000);
   if (process.env.GYMOS_TEST_ALLOW_DOCKER !== '1') throw new Error('Explicit GYMOS_TEST_ALLOW_DOCKER=1 is required');
   environment = await createDisposableEnvironment();
   fixture = await seedTwoGymFixture(environment);
@@ -111,18 +119,20 @@ test.beforeAll('start isolated session-read fixtures and local services', async 
   await seedCoachingCredits();
   const [apiPort, webPort] = await Promise.all([reservePort(), reservePort()]);
   apiBase = `http://127.0.0.1:${apiPort}`; webBase = `http://127.0.0.1:${webPort}`; jwtSecret = randomBytes(32).toString('hex');
-  api = launch(process.execPath, [join(apiDirectory, 'dist/main.js')], apiDirectory, { PATH: process.env.PATH, HOME: process.env.HOME,
-    NODE_ENV: 'production', TZ: 'UTC', PORT: String(apiPort), MASTER_DATABASE_URL: environment.masterUrl,
-    TENANT_DATABASE_URL: environment.masterUrl, PROVISION_DATABASE_URL: environment.masterUrl, JWT_SECRET: jwtSecret });
-  await waitReady(`${apiBase}/`, api);
+  await startApi();
   web = launch(process.execPath, [join(webDirectory, 'node_modules/next/dist/bin/next'), 'start', '-H', '127.0.0.1', '-p', String(webPort)], webDirectory,
     { PATH: process.env.PATH, HOME: process.env.HOME, NODE_ENV: 'production', TZ: 'UTC', GYMOS_API_URL: apiBase, GYMOS_WEB_ORIGIN: webBase });
   await waitReady(`${webBase}/login`, web);
 });
 
-test.afterAll('stop session-read services and remove owned fixtures', async () => {
+test.afterEach('stop trainer services and remove owned fixture', async ({}, testInfo) => {
+  if (testInfo.status !== testInfo.expectedStatus) {
+    console.error('Trainer web server diagnostics:', web?.errorText());
+    console.error('Trainer API server diagnostics:', api?.errorText());
+  }
   await stop(web); await stop(api); await fixture?.close();
   if (environment) console.info('[trainer-ui-browser-cleanup]', JSON.stringify(await environment.cleanup()));
+  web = undefined; api = undefined;
 });
 
 async function seedCoachingCredits() {
@@ -256,6 +266,13 @@ test('trainer calendar shows every monthly session and links to the day schedule
 
 test('trainer coaching keeps drafts assigns real plans and preserves client-only access', async ({ page, request }) => {
   const base = `/gyms/${fixture.gyms[0].slug}/trainer`;
+  const tenant = fixture.tenants[0];
+  const older = new Date(Date.now() - 40 * 24 * 60 * 60_000);
+  const oldest = new Date(Date.now() - 70 * 24 * 60 * 60_000);
+  await tenant.workoutPlan.create({ data: { memberId, trainerId, name: 'Older browser workout', createdAt: older, exercises: { create: [{ sortOrder: 0, name: 'Mobility', sets: 2 }] } } });
+  await tenant.workoutPlan.create({ data: { memberId, trainerId, name: 'Oldest browser workout', createdAt: oldest, exercises: { create: [{ sortOrder: 0, name: 'Stretch', sets: 1 }] } } });
+  await tenant.mealPlan.create({ data: { memberId, trainerId, name: 'Older browser meal', createdAt: older, entries: { create: [{ sortOrder: 0, dayOfWeek: 1, mealType: 'Breakfast', foodItem: 'Fruit' }] } } });
+  await tenant.mealPlan.create({ data: { memberId, trainerId, name: 'Oldest browser meal', createdAt: oldest, entries: { create: [{ sortOrder: 0, dayOfWeek: 1, mealType: 'Snack', foodItem: 'Yogurt' }] } } });
   await openAs(page, fixture.users.trainerUser.id, `${base}/clients`);
   const trainerToken = (await page.context().cookies()).find(cookie => cookie.name === 'gymos_access_token')!.value;
   const rosterResponse = await request.get(`${apiBase}/gyms/${fixture.gyms[0].slug}/me/clients?q=Member%20Alpha`, { headers: { authorization: `Bearer ${trainerToken}` } });
@@ -291,7 +308,6 @@ test('trainer coaching keeps drafts assigns real plans and preserves client-only
   await page.getByLabel('Weight kg (optional)').fill('0');
   await page.getByRole('button', { name: 'Save and assign workout plan' }).click();
   await expect(page.locator('form').getByRole('status')).toContainText('Workout plan assigned');
-  const tenant = fixture.tenants[0];
   expect(await tenant.workoutPlan.count({ where: { name: 'Trainer UI Strength', memberId } })).toBe(1);
   expect((await tenant.workoutExercise.findFirstOrThrow({ where: { plan: { name: 'Trainer UI Strength' } } })).weightKg?.toString()).toBe('0');
   await page.goto(`${webBase}${base}/plans/meal/new?memberId=${memberId}`);
@@ -308,11 +324,46 @@ test('trainer coaching keeps drafts assigns real plans and preserves client-only
   await page.goto(`${webBase}${base}/clients/${memberId}`);
   await expect(page.locator('#workouts')).toContainText('Trainer UI Strength');
   await expect(page.locator('#meals')).toContainText('Trainer UI Nutrition');
+  await page.getByRole('link', { name: 'Edit workout plan' }).first().click();
+  await page.getByLabel('Plan title').fill('Trainer UI Strength Revised');
+  await page.getByLabel('Exercise name').fill('Goblet squat revised');
+  await page.getByRole('button', { name: 'Save workout plan changes' }).click();
+  await expect(page.locator('form').getByRole('status')).toContainText('Workout plan changes saved.');
+  expect(await tenant.workoutPlan.count({ where: { name: 'Trainer UI Strength', memberId } })).toBe(0);
+  expect(await tenant.workoutPlan.count({ where: { name: 'Trainer UI Strength Revised', memberId } })).toBe(1);
+  expect((await tenant.workoutExercise.findFirstOrThrow({ where: { plan: { name: 'Trainer UI Strength Revised' } } })).name).toBe('Goblet squat revised');
+  await page.goto(`${webBase}${base}/clients/${memberId}`);
+  await page.getByRole('link', { name: 'View all workout plans' }).click();
+  await expect(page.getByRole('heading', { name: 'Workout plans' })).toBeVisible();
+  await expect(page.getByText('Older browser workout')).toBeVisible();
+  await page.getByRole('link', { name: 'Edit workout plan' }).nth(1).click();
+  await page.getByLabel('Plan title').fill('Older browser workout revised');
+  await page.getByRole('button', { name: 'Save workout plan changes' }).click();
+  await expect(page.locator('form').getByRole('status')).toContainText('Workout plan changes saved.');
+  expect(await tenant.workoutPlan.count({ where: { name: 'Older browser workout revised', memberId } })).toBe(1);
+  await page.goto(`${webBase}${base}/clients/${memberId}`);
+  await page.getByRole('link', { name: 'Edit meal plan' }).first().click();
+  await page.getByLabel('Plan title').fill('Trainer UI Nutrition Revised');
+  await page.getByLabel('Food item').first().fill('Oats and berries');
+  await page.getByRole('button', { name: 'Save meal plan changes' }).click();
+  await expect(page.locator('form').getByRole('status')).toContainText('Meal plan changes saved.');
+  expect(await tenant.mealPlan.count({ where: { name: 'Trainer UI Nutrition', memberId } })).toBe(0);
+  expect(await tenant.mealPlan.count({ where: { name: 'Trainer UI Nutrition Revised', memberId } })).toBe(1);
+  expect((await tenant.mealPlanEntry.findFirstOrThrow({ where: { plan: { name: 'Trainer UI Nutrition Revised' } } })).foodItem).toBe('Oats and berries');
+  await page.goto(`${webBase}${base}/clients/${memberId}`);
+  await page.getByRole('link', { name: 'View all meal plans' }).click();
+  await expect(page.getByRole('heading', { name: 'Meal plans' })).toBeVisible();
+  await expect(page.getByText('Older browser meal')).toBeVisible();
+  await page.getByRole('link', { name: 'Edit meal plan' }).nth(1).click();
+  await page.getByLabel('Plan title').fill('Older browser meal revised');
+  await page.getByRole('button', { name: 'Save meal plan changes' }).click();
+  await expect(page.locator('form').getByRole('status')).toContainText('Meal plan changes saved.');
+  expect(await tenant.mealPlan.count({ where: { name: 'Older browser meal revised', memberId } })).toBe(1);
   const token = (await page.context().cookies()).find(cookie => cookie.name === 'gymos_access_token')!.value;
   const unrelated = await tenant.member.findFirstOrThrow({ where: { identityId: null } });
   expect((await request.get(`${apiBase}/gyms/${fixture.gyms[0].slug}/me/clients/${unrelated.id}`, { headers: { authorization: `Bearer ${token}` } })).status()).toBe(404);
   await openAs(page, fixture.users.memberUser.id, `/gyms/${fixture.gyms[0].slug}/member/workout-plans`);
-  await expect(page.getByRole('article')).toContainText('Trainer UI Strength');
+  await expect(page.getByRole('article').filter({ hasText: 'Trainer UI Strength Revised' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Save and assign/ })).toHaveCount(0);
 });
 

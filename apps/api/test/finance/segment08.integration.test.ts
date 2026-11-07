@@ -16,8 +16,16 @@ let app: INestApplication;
 let base: string;
 const secret = randomBytes(32).toString('hex');
 const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
-async function bearer(identityId: string) { return new SignJWT({ authVersion: 0 }).setProtectedHeader({ alg: 'HS256' }).setSubject(identityId)
-  .setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('15m').sign(new TextEncoder().encode(secret)); }
+async function bearer(identityId: string, gymId = fixture.gyms[0]!.id) {
+  const account = await fixture.master.gymAccount.upsert({ where: { userId_gymId: { userId: identityId, gymId } },
+    create: { userId: identityId, gymId, username: `finance-${identityId}-${gymId}`, passwordHash: 'fixture-not-a-login-hash', status: 'ACTIVE' },
+    update: { status: 'ACTIVE', mustChangePassword: false, credentialExpiresAt: null } });
+  const now = Date.now(); const refreshTokenHash = createHash('sha256').update(randomBytes(32)).digest('hex');
+  const session = await fixture.master.identitySession.create({ data: { identityId, gymAccountId: account.id, authVersion: account.authVersion,
+    deviceClass: 'SHARED', deviceLabel: 'Finance integration test', refreshTokenHash, idleExpiresAt: new Date(now + 600_000), absoluteExpiresAt: new Date(now + 900_000) } });
+  return new SignJWT({ authVersion: account.authVersion, sid: session.id, gaid: account.id }).setProtectedHeader({ alg: 'HS256' }).setSubject(identityId)
+    .setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('15m').sign(new TextEncoder().encode(secret));
+}
 async function call(path: string, accessToken: string, body?: unknown, method?: string) { return fetch(`${base}${path}`, { method: method ?? (body === undefined ? 'GET' : 'POST'),
   headers: { authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }); }
 
@@ -36,7 +44,7 @@ afterAll(async () => {
 
 it('isolates and replays expense/budget commands, reconciles P&L, and closes payroll without a payout', async () => {
   const tenant = fixture.tenants[0]!; const slug = fixture.gyms[0]!.slug;
-  const owner = await bearer(fixture.users.ownerA.id); const otherOwner = await bearer(fixture.users.ownerB.id);
+  const owner = await bearer(fixture.users.ownerA.id); const otherOwner = await bearer(fixture.users.ownerB.id, fixture.gyms[1]!.id);
   const trainer = await bearer(fixture.users.trainerUser.id); const member = await bearer(fixture.users.memberUser.id);
   const memberRow = await tenant.member.findFirstOrThrow(); const trainerRow = await tenant.trainer.findFirstOrThrow({ where: { identityId: fixture.users.trainerUser.id } });
   const config = await tenant.gymConfiguration.findUniqueOrThrow({ where: { id: 'current' } });
@@ -181,7 +189,7 @@ it('exports complete bounded row sets over 100, protects formulas, exports only 
     await tenant.revenueRecord.create({ data: { sessionId, category: 'COMPLETED_SESSION', amount, currency: 'LKR', sourceKey: `session:${sessionId}:completed` } });
   }
   const dashboard = await call(`/gyms/${slug}/dashboard`, owner); expect(dashboard.status).toBe(200); const data = await dashboard.json();
-  expect(data.timeZone).toBe('Asia/Colombo'); expect(data.earningChart).toHaveLength(8); expect(data.metrics.membersInGym.definition).toContain('not a people count');
+  expect(data.timeZone).toBe('Asia/Colombo'); expect(data.earningChart).toHaveLength(8); expect(data.metrics.activeSessionsToday.definition).toContain('scheduled start falls');
   expect(data.rangeStart).toBe(midnightUtc.toISOString()); expect(data.metrics.todayOperationalEarning.value).toBe('9.0000');
   expect(data.earningChart[0]).toMatchObject({ startHour: 6, endHour: 8, amount: '3.0000' });
   expect(data.earningChart[1]).toMatchObject({ startHour: 8, endHour: 10, amount: '4.0000' });
@@ -198,7 +206,7 @@ it('exports complete bounded row sets over 100, protects formulas, exports only 
   expect(edgedGrowth[0].count - insights.memberGrowth.points[0].count).toBe(1);
   expect(edgedGrowth[5].count - insights.memberGrowth.points[5].count).toBe(1);
   expect(edgedGrowth.slice(1, 5).map((point: { count: number }, index: number) => point.count - insights.memberGrowth.points[index + 1].count)).toEqual([0, 0, 0, 0]);
-  const emptyGymAnalytics = await (await call(`/gyms/${fixture.gyms[1]!.slug}/analytics?window=30d`, await bearer(fixture.users.ownerB.id))).json();
+  const emptyGymAnalytics = await (await call(`/gyms/${fixture.gyms[1]!.slug}/analytics?window=30d`, await bearer(fixture.users.ownerB.id, fixture.gyms[1]!.id))).json();
   expect(emptyGymAnalytics.utilization.points).toEqual([]);
   expect(emptyGymAnalytics.peakHours.points.every((point: { sessionCount: number; averagePerDay: number }) => point.sessionCount === 0 && point.averagePerDay === 0)).toBe(true);
   expect(emptyGymAnalytics.memberGrowth.points).toHaveLength(6);
@@ -232,8 +240,8 @@ it('exports complete bounded row sets over 100, protects formulas, exports only 
   expect(supportAudit.items.find((row: { id: string }) => row.id === supportRowId)).toMatchObject({ actorIdentityId: fixture.users.admin.id,
     originalActorIdentityId: fixture.users.ownerA.id, transition: { from: 'SCHEDULED', to: 'ACTIVE', version: 1 } });
   expect(JSON.stringify(supportAudit)).not.toContain('must be redacted');
-  expect((await call(`/gyms/${slug}/audit?page=1&pageSize=20&actionType=PT_SESSION_STARTED`, await bearer(fixture.users.ownerB.id))).status).toBe(403);
-  const otherGymAudit = await (await call(`/gyms/${fixture.gyms[1]!.slug}/audit?page=1&pageSize=20&actionType=PT_SESSION_STARTED`, await bearer(fixture.users.ownerB.id))).json();
+  expect((await call(`/gyms/${slug}/audit?page=1&pageSize=20&actionType=PT_SESSION_STARTED`, await bearer(fixture.users.ownerB.id, fixture.gyms[1]!.id))).status).toBe(403);
+  const otherGymAudit = await (await call(`/gyms/${fixture.gyms[1]!.slug}/audit?page=1&pageSize=20&actionType=PT_SESSION_STARTED`, await bearer(fixture.users.ownerB.id, fixture.gyms[1]!.id))).json();
   expect(otherGymAudit.items).toEqual([]);
 });
 

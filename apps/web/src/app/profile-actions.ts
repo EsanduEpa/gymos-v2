@@ -84,11 +84,12 @@ export async function correctMemberProfile(slug: string, memberId: string, _prev
   const rawDate = value(formData, 'dateOfBirth');
   const body = { fullName: value(formData, 'fullName').trim(), dateOfBirth: rawDate || null,
     phone: value(formData, 'phone').trim() || null, emergencyContact: value(formData, 'emergencyContact').trim() || null,
+    healthNotes: value(formData, 'healthNotes').trim() || null,
     expectedVersion, reason: value(formData, 'reason') };
   const parsed = ownerMemberProfileCorrectionSchema.safeParse({ ...body, idempotencyKey });
   if (!parsed.success) return { status: 'error', message: 'Correct the highlighted fields and save again.', fieldErrors: errors(parsed.error) };
   const validatedBody = { fullName: parsed.data.fullName, dateOfBirth: parsed.data.dateOfBirth, phone: parsed.data.phone,
-    emergencyContact: parsed.data.emergencyContact, expectedVersion: parsed.data.expectedVersion, reason: parsed.data.reason };
+    emergencyContact: parsed.data.emergencyContact, healthNotes: parsed.data.healthNotes, expectedVersion: parsed.data.expectedVersion, reason: parsed.data.reason };
   const result = await save(`/gyms/${encodeURIComponent(slug)}/members/${encodeURIComponent(memberId)}/profile`, validatedBody, parsed.data.idempotencyKey);
   if (result.status === 'success') {
     revalidatePath(`/gyms/${encodeURIComponent(slug)}`, 'layout');

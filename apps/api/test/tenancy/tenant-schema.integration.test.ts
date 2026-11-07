@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import argon2 from 'argon2';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { ConflictException, ForbiddenException, ServiceUnavailableException, UnprocessableEntityException, type ExecutionContext } from '@nestjs/common';
@@ -338,7 +338,25 @@ it('publishes only active actors with matching completed Master operation, tenan
 
   const guard = new GymAccessGuard({ master } as DatabaseService, gateFor());
   async function requestFor(identityId: string, slug = gym.slug) {
-    const token = await new SignJWT({ authVersion: 0 }).setProtectedHeader({ alg: 'HS256' })
+    const user = await master.user.findUniqueOrThrow({ where: { id: identityId }, select: { authVersion: true, globalRole: true } });
+    if (user.globalRole === 'SUPER_ADMIN') {
+      const token = await new SignJWT({ authVersion: user.authVersion }).setProtectedHeader({ alg: 'HS256' })
+        .setSubject(identityId).setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('5m')
+        .sign(new TextEncoder().encode(guardJwtSecret));
+      const request = { headers: { authorization: `Bearer ${token}` }, params: { slug } } as unknown as GymRequest;
+      const execution = { switchToHttp: () => ({ getRequest: () => request }) } as ExecutionContext;
+      await guard.canActivate(execution);
+      return request;
+    }
+    const gymAccount = await master.gymAccount.upsert({ where: { userId_gymId: { userId: identityId, gymId: gym.id } },
+      create: { userId: identityId, gymId: gym.id, username: `guard-${randomUUID()}@example.test`, passwordHash: 'fixture-not-a-login-hash', status: 'ACTIVE' },
+      update: { status: 'ACTIVE', mustChangePassword: false, credentialExpiresAt: null } });
+    const now = Date.now();
+    const refreshTokenHash = createHash('sha256').update(randomUUID()).digest('hex');
+    const session = await master.identitySession.create({ data: { identityId, gymAccountId: gymAccount.id, authVersion: gymAccount.authVersion,
+      deviceClass: 'PERSONAL', deviceLabel: 'Integration fixture', refreshTokenHash,
+      idleExpiresAt: new Date(now + 600_000), absoluteExpiresAt: new Date(now + 900_000) } });
+    const token = await new SignJWT({ authVersion: gymAccount.authVersion, sid: session.id, gaid: gymAccount.id }).setProtectedHeader({ alg: 'HS256' })
       .setSubject(identityId).setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('5m')
       .sign(new TextEncoder().encode(guardJwtSecret));
     const request = { headers: { authorization: `Bearer ${token}` }, params: { slug } } as unknown as GymRequest;
@@ -409,7 +427,7 @@ it('publishes only active actors with matching completed Master operation, tenan
   const superAdmin = await master.user.create({ data: {
     email: `guard-platform-admin-${run.runId}@example.test`, passwordHash: 'fixture-not-a-login-hash', globalRole: 'SUPER_ADMIN',
   } });
-  await expect(requestFor(superAdmin.id)).rejects.toThrow('Gym access denied');
+  await expect(requestFor(superAdmin.id)).rejects.toThrow('Platform accounts cannot enter gym workspaces');
 });
 
 it('preserves member list/create behavior and maps duplicate email to a safe conflict', async () => {
@@ -588,7 +606,7 @@ it('commits a full owner enrollment once and requires authenticated explicit con
   expect(await master.gymAccess.findUnique({ where: { userId_gymId: { userId: declineIdentity.id, gymId: gymIds[0] } } })).toBeNull();
 });
 
-it('binds an application offer to applicant-authenticated enrollment consent without changing credentials', async () => {
+it('publishes an already-consented applicant offer without changing credentials', async () => {
   await master.gymAccess.createMany({ data: [{ userId: actorId, gymId: gymIds[0], role: 'OWNER', linkStatus: 'ACTIVE' }], skipDuplicates: true });
   await tenants[0].gymConfiguration.update({ where: { id: 'current' }, data: { timezone: 'Asia/Colombo', currency: 'LKR' } });
   const plan = await tenants[0].membershipPlan.create({ data: { name: 'Application Plan', price: '999.00', currency: 'LKR', durationDays: 30 } });
@@ -606,24 +624,12 @@ it('binds an application offer to applicant-authenticated enrollment consent wit
   const service = new MemberEnrollmentService({ master } as DatabaseService, gateFor(), credential);
   const input = { fullName: application.fullName, email: applicant.email, phone: application.phone, dateOfBirth: application.dateOfBirth!,
     membershipPlanId: plan.id, idempotencyKey: `member-application:${application.id}` };
-  const pending = await service.enroll(access as never, input, application.id);
-  expect(pending).toMatchObject({ status: 'PENDING', consentRequired: true });
-  expect(await master.gymAccess.findUnique({ where: { userId_gymId: { userId: applicant.id, gymId: gymIds[0] } } })).toBeNull();
-  expect(await tenants[0].member.count({ where: { email: applicant.email } })).toBe(0);
-  const token = await new SignJWT({ authVersion: applicant.authVersion }).setProtectedHeader({ alg: 'HS256' })
-    .setSubject(applicant.id).setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('5m')
-    .sign(new TextEncoder().encode(guardJwtSecret));
-  const controller = new GymsController({ master } as DatabaseService, gateFor(), service);
-  await expect(controller.memberEnrollmentConsent({ headers: { authorization: `Bearer ${token}` } } as never,
-    access.slug, pending.operationId, { decision: 'ACCEPT', currentPassword: 'incorrect-password' })).rejects.toThrow('Identity verification failed');
-  const consent = await controller.memberEnrollmentConsent({ headers: { authorization: `Bearer ${token}` } } as never,
-    access.slug, pending.operationId, { decision: 'ACCEPT', currentPassword });
-  expect(consent.status).toBe('CONSENT_RECORDED');
   const completed = await service.enroll(access as never, input, application.id);
-  expect(completed).toMatchObject({ status: 'COMPLETE' });
+  expect(completed).toMatchObject({ status: 'COMPLETE', memberId: expect.any(String) });
+  if (completed.status !== 'COMPLETE') throw new Error('Expected already-consented application enrollment to complete');
   expect(await master.user.findUniqueOrThrow({ where: { id: applicant.id } })).toMatchObject({ passwordHash });
   expect(await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: applicant.id, gymId: gymIds[0] } } }))
-    .toMatchObject({ role: 'MEMBER', linkStatus: 'ACTIVE' });
+    .toMatchObject({ role: 'MEMBER', linkStatus: 'ACTIVE', actorKind: 'MEMBER', tenantActorId: completed.memberId });
   expect(await tenants[0].member.count({ where: { email: applicant.email } })).toBe(1);
 });
 
@@ -1160,19 +1166,23 @@ it('keeps global and gym profiles separate, fences self edits, versions and repl
   const owner = { ...context0, slug: `schema-0-${run.runId}`, role: 'OWNER', identityId: actorId,
     identityVersion: 0, accessVersion: ownerLink.version, actor: null } as const;
   const correctionBody = { fullName: 'Synthetic Corrected Official Name', dateOfBirth: '1992-03-04', phone: '+94770002233',
-    emergencyContact: 'Synthetic Correction Contact', expectedVersion: self.version + 2, reason: 'MEMBER_REQUEST' };
+    emergencyContact: 'Synthetic Correction Contact', healthNotes: 'Synthetic updated health note',
+    expectedVersion: self.version + 2, reason: 'MEMBER_REQUEST' };
   const correction = await profileController.correctMember({ gymAccess: owner } as GymRequest, member.id, 'profile-owner-correct-0001', correctionBody);
   expect(correction).toMatchObject({ version: self.version + 3, replayed: false });
   expect(await profileController.correctMember({ gymAccess: owner } as GymRequest, member.id, 'profile-owner-correct-0001', correctionBody))
     .toMatchObject({ version: self.version + 3, replayed: true });
   const changedMember = await tenant.member.findUniqueOrThrow({ where: { id: member.id } });
-  expect(changedMember).toMatchObject({ fullName: correctionBody.fullName, phone: correctionBody.phone, emergencyContact: correctionBody.emergencyContact });
+  expect(changedMember).toMatchObject({ fullName: correctionBody.fullName, phone: correctionBody.phone,
+    emergencyContact: correctionBody.emergencyContact, healthNotes: correctionBody.healthNotes });
   expect(changedMember.dateOfBirth?.toISOString().slice(0, 10)).toBe(correctionBody.dateOfBirth);
   const ownerAudit = await tenant.auditLog.findFirstOrThrow({ where: { eventCode: 'OWNER_MEMBER_PROFILE_CORRECTED', resourceId: member.id } });
   expect(ownerAudit.transition).toEqual({ from: String(self.version + 2), to: String(self.version + 3), version: self.version + 3, reasonCode: 'MEMBER_REQUEST' });
+  expect(JSON.stringify(ownerAudit.transition)).not.toContain(correctionBody.healthNotes);
   const profileNotice = await tenant.notification.findFirstOrThrow({ where: { recipientIdentityId: member.identityId!, eventCode: 'MEMBER_PROFILE_CORRECTED' } });
   expect(profileNotice).toMatchObject({ title: 'Membership profile updated', message: 'A gym owner updated your membership profile. Review your profile details.', linkKind: 'MEMBER_PROFILE', resourceId: member.id });
   expect(profileNotice.message).not.toMatch(/Synthetic|1992|9477|MEMBER_REQUEST/);
+  expect(profileNotice.message).not.toContain(correctionBody.healthNotes);
   await expect(profileController.correctMember({ gymAccess: owner } as GymRequest, member.id, 'profile-owner-correct-0002',
     { ...correctionBody, expectedVersion: self.version + 3, status: 'SUSPENDED' })).rejects.toBeInstanceOf(UnprocessableEntityException);
   expect((await tenant.member.findUniqueOrThrow({ where: { id: member.id } })).status).toBe(member.status);

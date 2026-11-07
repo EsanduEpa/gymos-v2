@@ -19,6 +19,8 @@ test('mark-all through instant is validated and hrefs are built from typed local
   assert.equal(notificationTargetHref({ kind: 'OWNER_APPLICATION_QUEUE', gymSlug: 'gym-alpha', applicationId: 'app_1' }), '/gyms/gym-alpha/owner/applications#app_1');
   assert.equal(notificationTargetHref({ kind: 'ACCOUNT_SECURITY' }), '/security');
   assert.equal(notificationHref('gym-alpha', { linkKind: 'MEMBER_PROFILE', resourceId: 'member_1' }), '/gyms/gym-alpha/profile');
+  assert.equal(notificationHref('gym-alpha', { linkKind: 'MEMBER_WORKOUT_PLANS', resourceId: 'plan_1' }), '/gyms/gym-alpha/member/workout-plans');
+  assert.equal(notificationHref('gym-alpha', { linkKind: 'MEMBER_MEAL_PLANS', resourceId: 'plan_2' }), '/gyms/gym-alpha/member/meal-plans');
   assert.equal(notificationHistoryQuerySchema.safeParse({ pageSize: 51 }).success, false);
   assert.equal(accountNotificationQuerySchema.safeParse({ cursor: 'arbitrary destination' }).success, false);
 });

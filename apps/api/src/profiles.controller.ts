@@ -1,4 +1,5 @@
-import { Body, ConflictException, Controller, ForbiddenException, Get, Headers, NotFoundException, Param, Patch, Req, UnprocessableEntityException, UseGuards } from '@nestjs/common';
+import { Body, ConflictException, Controller, ForbiddenException, Get, Headers, NotFoundException, Param, Patch, Req, ServiceUnavailableException, UnprocessableEntityException, UseGuards } from '@nestjs/common';
+import { createHmac } from 'node:crypto';
 import type { Request } from 'express';
 import type { PrismaClient } from './generated/tenant/client.js';
 import { accountProfileSchema, idempotencyKeySchema, ownerMemberProfileCorrectionSchema, profileCommandResultSchema,
@@ -7,7 +8,7 @@ import { accountProfileSchema, idempotencyKeySchema, ownerMemberProfileCorrectio
 import { DatabaseService } from './database.service.js';
 import { identityFromAuthorization } from './auth-token.js';
 import { appendMasterVersionAudit, appendTenantAudit } from './operations/transaction-audit.js';
-import { requestDigest } from './operations/primitives.js';
+import { protectedIntentFingerprint, requestDigest } from './operations/primitives.js';
 import { GymAccessGuard, type GymRequest } from './gym-access.guard.js';
 import { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js';
 import { withGymAccessFence } from './identity/gym-access-fence.js';
@@ -215,8 +216,14 @@ export class GymProfileController {
     return this.tenantGate.withVerifiedTenant(access, async tenant => {
       const binding = await this.publishedMember(tenant, access.gymId, memberId);
       return withGymAccessFence(this.database.master, [{ identityId: access.identityId, gymId: access.gymId, role: 'OWNER' }], async () => {
+        const fingerprintKey = process.env.JWT_SECRET;
+        if (!fingerprintKey || fingerprintKey.length < 32) throw new ServiceUnavailableException('Member profile updates are unavailable');
+        const protectedHealthNotes = protectedIntentFingerprint(JSON.stringify(parsed.data.healthNotes === undefined ? ['absent']
+          : parsed.data.healthNotes === null ? ['null'] : ['value', parsed.data.healthNotes]),
+        `member-profile-note:${access.gymId}:${access.identityId}:${memberId}:${parsed.data.idempotencyKey}`,
+        createHmac('sha256', fingerprintKey).update('gymos-member-profile-note-fingerprint-v1').digest());
         const digest = requestDigest({ fullName: parsed.data.fullName, dateOfBirth: parsed.data.dateOfBirth, phone: parsed.data.phone,
-          emergencyContact: parsed.data.emergencyContact, expectedVersion: parsed.data.expectedVersion, reason: parsed.data.reason });
+          emergencyContact: parsed.data.emergencyContact, expectedVersion: parsed.data.expectedVersion, reason: parsed.data.reason }, protectedHealthNotes);
         return tenant.$transaction(async tx => {
           const prior = await tx.commandReceipt.findUnique({ where: { actorIdentityId_commandKind_idempotencyKey: {
             actorIdentityId: access.identityId, commandKind: 'CORRECT_MEMBER_PROFILE', idempotencyKey: parsed.data.idempotencyKey,
@@ -230,7 +237,8 @@ export class GymProfileController {
             enrollmentOperationId: binding.enrollmentOperationId, version: member.version }, data: {
               fullName: parsed.data.fullName,
               dateOfBirth: parsed.data.dateOfBirth ? new Date(`${parsed.data.dateOfBirth}T00:00:00.000Z`) : null,
-              phone: parsed.data.phone, emergencyContact: parsed.data.emergencyContact, version: { increment: 1 },
+              phone: parsed.data.phone, emergencyContact: parsed.data.emergencyContact, healthNotes: parsed.data.healthNotes,
+              version: { increment: 1 },
             } });
           if (updated.count !== 1) throw new ConflictException('Member profile changed; reload before correcting it');
           const version = member.version + 1;

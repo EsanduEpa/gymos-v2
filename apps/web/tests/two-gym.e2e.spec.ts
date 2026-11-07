@@ -88,8 +88,10 @@ async function waitForSessionLifecycle(page: Page): Promise<void> {
 }
 
 async function openWithTestSession(page: Page, userId: string, path: string, expiresIn = 900): Promise<string> {
+  const slug = path.match(/^\/gyms\/([^/?#]+)/)?.[1];
+  const gymId = fixture.gyms.find(gym => gym.slug === slug)?.id;
   const installed = await installBrowserSession({ page, master: fixture.master, identityId: userId, jwtSecret: testJwtSecret, origin: webBase,
-    accessLifetimeSeconds: expiresIn, ...(expiresIn < 0 ? { expired: true } : {}) });
+    ...(gymId ? { gymId } : {}), accessLifetimeSeconds: expiresIn, ...(expiresIn < 0 ? { expired: true } : {}) });
   await page.goto(`${webBase}${path}`);
   return installed.accessToken;
 }
@@ -1668,9 +1670,9 @@ test('owner appearance upgrades live operations with accurate metrics and recove
   const response = await request.get(`${apiBase}/gyms/${fixture.gyms[0].slug}/dashboard`, { headers: { authorization: `Bearer ${token}` } });
   expect(response.ok()).toBe(true);
   const snapshot = await response.json();
-  await expect(page.locator('.dashboard-metric').nth(0).locator('strong')).toHaveText(String(snapshot.metrics.membersInGym.value));
+  await expect(page.locator('.dashboard-metric').nth(0).locator('strong')).toHaveText(String(snapshot.metrics.activeSessionsToday.value));
   await expect(page.locator('.dashboard-metric').nth(1).locator('strong')).toHaveText(String(snapshot.metrics.activeSessions.value));
-  await expect(page.locator('.dashboard-metric').nth(3).locator('strong')).toHaveText(String(snapshot.metrics.trainersOnFloor.value));
+  await expect(page.locator('.dashboard-metric').nth(3).locator('strong')).toHaveText(String(snapshot.metrics.trainersWithSessionsToday.value));
   await expect(page.locator('.owner-request-summary')).toContainText(`${snapshot.metrics.pendingRequests.value} pending PT`);
   await expect(page.locator('main')).not.toContainText('Members in Gym');
   const evidence = join(webDirectory, 'test-results/ui-transformation/gym-owner');

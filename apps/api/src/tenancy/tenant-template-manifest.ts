@@ -271,13 +271,18 @@ export const TENANT_TEMPLATE_V9: TenantTemplateManifest = Object.freeze({
     },
   },
 });
-export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
+export const TENANT_TEMPLATE_V10: TenantTemplateManifest = Object.freeze({
   ...TENANT_TEMPLATE_V9,
   version: 'tenant-2026-11-06.6',
   migrations: [...TENANT_TEMPLATE_V9.migrations, { name: '20261106120000_member_profile_notifications', checksum: 'afc031dfbdc3068a060e9757c97b105ba5fd4d7741427012024d4c2ef51ad144' }],
   postconditions: TENANT_TEMPLATE_V9.postconditions,
 });
-export const TENANT_MANIFESTS: readonly TenantTemplateManifest[] = [TENANT_TEMPLATE_V1, TENANT_TEMPLATE_V2, TENANT_TEMPLATE_V3, TENANT_TEMPLATE_V4, TENANT_TEMPLATE_V5, TENANT_TEMPLATE_V6, TENANT_TEMPLATE_V7, TENANT_TEMPLATE_V8, TENANT_TEMPLATE_V9, TENANT_TEMPLATE_MANIFEST];
+export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
+  ...TENANT_TEMPLATE_V10,
+  version: 'tenant-2026-11-07.1',
+  migrations: [...TENANT_TEMPLATE_V10.migrations, { name: '20261107010000_plan_notifications', checksum: '1da5d1f127f63dca18386277998e3f59e5a52181228ce99ef566aed802b2b3bc' }],
+});
+export const TENANT_MANIFESTS: readonly TenantTemplateManifest[] = [TENANT_TEMPLATE_V1, TENANT_TEMPLATE_V2, TENANT_TEMPLATE_V3, TENANT_TEMPLATE_V4, TENANT_TEMPLATE_V5, TENANT_TEMPLATE_V6, TENANT_TEMPLATE_V7, TENANT_TEMPLATE_V8, TENANT_TEMPLATE_V9, TENANT_TEMPLATE_V10, TENANT_TEMPLATE_MANIFEST];
 export function reviewedTenantManifest(version: string | null, digest: string | null) {
   return TENANT_MANIFESTS.find(manifest => manifest.version === version && tenantManifestDigest(manifest) === digest);
 }

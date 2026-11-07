@@ -18,7 +18,7 @@ Updated: 6 November 2026. This is the separate backlog for work after the local,
 5. Confirm production policies for account recovery durations, retention, identity assurance, email ownership/change, privacy, and notification delivery. The existing CF progress document distinguishes implemented defaults from confirmed choices.
 6. Complete PT and CF release gates, upgrade/rollback rehearsal, production security review, and deployment/pilot planning separately. Do not use synthetic fixtures as proof for real data migration.
 
-The earlier persistent manual fixture remains preserved in ignored `.env.manual-test.previous.json`; it should be cleaned only after verifying its ownership and that no one needs it. The new `.env.manual-test.json` is the demo fixture.
+The earlier persistent manual fixture was removed from Docker on 2026-11-07 after its databases and private state file were backed up under ignored `.local-backups/gymos-db-cleanup-20261107/`. The active `.env.manual-test.json` remains the testing fixture on port 3002.
 
 ## Membership update after the demo walkthrough
 

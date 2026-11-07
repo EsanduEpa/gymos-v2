@@ -6,6 +6,7 @@ export async function installBrowserSession(input: {
   page: Page;
   master: PrismaClient;
   identityId: string;
+  gymId?: string;
   jwtSecret: string;
   origin: string;
   accessLifetimeSeconds?: number;
@@ -13,11 +14,15 @@ export async function installBrowserSession(input: {
   expired?: boolean;
 }) {
   const user = await input.master.user.findUniqueOrThrow({ where: { id: input.identityId }, select: { authVersion: true } });
+  const gymAccount = input.gymId ? await input.master.gymAccount.upsert({ where: { userId_gymId: { userId: input.identityId, gymId: input.gymId } },
+    create: { userId: input.identityId, gymId: input.gymId, username: `browser-${input.identityId}-${input.gymId}`, passwordHash: 'fixture-not-a-login-hash', status: 'ACTIVE' },
+    update: { status: 'ACTIVE', mustChangePassword: false, credentialExpiresAt: null } }) : null;
+  const authVersion = gymAccount?.authVersion ?? user.authVersion;
   const now = new Date();
   const idleLifetimeMs = input.idleLifetimeMs ?? 30 * 60_000;
   const refreshToken = randomBytes(32).toString('base64url');
   const session = await input.master.identitySession.create({ data: {
-    identityId: input.identityId, authVersion: user.authVersion, deviceClass: 'SHARED', deviceLabel: 'Synthetic browser test',
+    identityId: input.identityId, ...(gymAccount ? { gymAccountId: gymAccount.id } : {}), authVersion, deviceClass: 'SHARED', deviceLabel: 'Synthetic browser test',
     refreshTokenHash: createHash('sha256').update(refreshToken).digest('hex'),
     idleExpiresAt: new Date(now.getTime() + idleLifetimeMs),
     absoluteExpiresAt: new Date(now.getTime() + 8 * 60 * 60_000),
@@ -25,7 +30,7 @@ export async function installBrowserSession(input: {
   }, select: { id: true } });
   const issuedAt = Math.floor(now.getTime() / 1000);
   const header = Buffer.from(JSON.stringify({ alg: 'HS256' })).toString('base64url');
-  const payload = Buffer.from(JSON.stringify({ sub: input.identityId, authVersion: user.authVersion, sid: session.id,
+  const payload = Buffer.from(JSON.stringify({ sub: input.identityId, authVersion, ...(gymAccount ? { gaid: gymAccount.id } : {}), sid: session.id,
     iss: 'gymos-v2', aud: 'gymos-api', iat: issuedAt, exp: issuedAt + (input.accessLifetimeSeconds ?? 900) })).toString('base64url');
   const signature = createHmac('sha256', input.jwtSecret).update(`${header}.${payload}`).digest('base64url');
   await input.page.goto('about:blank');

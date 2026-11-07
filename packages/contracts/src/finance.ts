@@ -62,9 +62,9 @@ export const financeExportInputSchema = z.strictObject({ kind: z.enum(['revenue'
 export const ownerDashboardSchema = z.strictObject({ gymSlug: slug, date: localDate, timeZone: z.string().min(1).max(100),
   rangeStart: instant, rangeEndExclusive: instant, asOf: instant, currency,
   metrics: z.strictObject({
-    membersInGym: z.strictObject({ value: z.number().int().nonnegative(), definition: z.string(), numerator: z.number().int().nonnegative(), denominator: z.null(), sourceCount: z.number().int().nonnegative() }),
+    activeSessionsToday: z.strictObject({ value: z.number().int().nonnegative(), definition: z.string(), numerator: z.number().int().nonnegative(), denominator: z.null(), sourceCount: z.number().int().nonnegative() }),
     activeSessions: z.strictObject({ value: z.number().int().nonnegative(), definition: z.string(), numerator: z.number().int().nonnegative(), denominator: z.null(), sourceCount: z.number().int().nonnegative() }),
-    trainersOnFloor: z.strictObject({ value: z.number().int().nonnegative(), definition: z.string(), numerator: z.number().int().nonnegative(), denominator: z.null(), sourceCount: z.number().int().nonnegative() }),
+    trainersWithSessionsToday: z.strictObject({ value: z.number().int().nonnegative(), definition: z.string(), numerator: z.number().int().nonnegative(), denominator: z.null(), sourceCount: z.number().int().nonnegative() }),
     todayOperationalEarning: z.strictObject({ value: decimal, definition: z.string(), numerator: decimal, denominator: z.null(), sourceCount: z.number().int().nonnegative(), currency }),
     pendingRequests: z.strictObject({ value: z.number().int().nonnegative(), definition: z.string(), numerator: z.number().int().nonnegative(), denominator: z.null(), sourceCount: z.number().int().nonnegative() }),
   }),
@@ -73,7 +73,7 @@ export const ownerDashboardSchema = z.strictObject({ gymSlug: slug, date: localD
     scheduledEndAt: instant, memberName: z.string().min(1).max(120), trainerName: z.string().min(1).max(120), currency, fee: decimal })).max(10),
   activeSessionItems: z.array(z.strictObject({ id, startedAt: instant, scheduledStartAt: instant,
     memberName: z.string().min(1).max(120), trainerName: z.string().min(1).max(120) })),
-  trainerCards: z.array(z.strictObject({ id, name: z.string().min(1).max(120), scheduledToday: z.number().int().nonnegative(), activeToday: z.number().int().nonnegative() })).max(50),
+  trainerCards: z.array(z.strictObject({ id, name: z.string().min(1).max(120), scheduledToday: z.number().int().nonnegative(), activeNow: z.number().int().nonnegative() })).max(50),
 });
 export type OwnerDashboard = z.infer<typeof ownerDashboardSchema>;
 export const budgetResultSchema = z.strictObject({ id: id.nullable(), category: expenseCategorySchema, month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
