@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { deploymentConfiguration } from './config.mjs';
-const base = { GYMOS_WEB_ORIGIN: 'https://demo.vercel.app', GYMOS_API_URL: 'https://api.onrender.com', JWT_SECRET: 'synthetic-test-secret-with-at-least-32-characters', GYMOS_DEPLOY_DATABASE_HOST: 'db.projectref.supabase.co',
+const base = { GYMOS_WEB_ORIGIN: 'https://demo.vercel.app', GYMOS_API_URL: 'https://api.onrender.com', JWT_SECRET: 'synthetic'.repeat(8), GYMOS_DEPLOY_DATABASE_HOST: 'db.projectref.supabase.co',
  MASTER_DATABASE_URL: 'postgresql://postgres:synthetic@db.projectref.supabase.co:5432/gymos_master?sslmode=verify-full',
  TENANT_DATABASE_URL: 'postgresql://postgres:synthetic@db.projectref.supabase.co:5432/postgres?sslmode=verify-full',
  PROVISION_DATABASE_URL: 'postgresql://postgres:synthetic@db.projectref.supabase.co:5432/postgres?sslmode=verify-full' };
