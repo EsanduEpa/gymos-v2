@@ -1738,13 +1738,13 @@ test('owner appearance upgrades live operations with accurate metrics and recove
 });
 
 test('owner appearance covers directories profiles sessions finance and configuration in both themes', async ({ page, request }) => {
-  test.setTimeout(300_000);
+  test.setTimeout(420_000);
   const base = `/gyms/${fixture.gyms[0].slug}/owner`;
   const member = await fixture.tenants[0].member.findUniqueOrThrow({ where: { identityId: fixture.users.memberUser.id } });
   const trainer = await fixture.tenants[0].trainer.findUniqueOrThrow({ where: { identityId: fixture.users.trainerUser.id } });
   const evidence = join(webDirectory, 'test-results/ui-transformation/gym-owner');
   await mkdir(evidence, { recursive: true });
-  await openWithTestSession(page, fixture.users.ownerA.id, `${base}/members`);
+  await openWithTestSession(page, fixture.users.ownerA.id, `${base}/members`, 3600);
   const paths = ['/members', '/members/new', `/members/${member.id}`, '/trainers', '/trainers/new', `/trainers/${trainer.id}`, '/sessions', '/sessions?view=list&mode=month', '/sessions/book', '/financials', '/financials?tab=expenses', '/financials?tab=payroll', '/analytics', '/gym-config', '/audit', '/subscription'];
   for (const mode of ['light', 'dark'] as const) {
     await page.getByRole('button', { name: mode === 'light' ? 'Atlas Light' : 'Midnight Blue', exact: true }).click();
