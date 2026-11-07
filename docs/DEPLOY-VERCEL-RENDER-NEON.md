@@ -4,7 +4,19 @@ Follow these steps in order. This guide prepares a new synthetic demo; it does n
 
 ## Accounts and costs
 
-Create/sign in to GitHub, Neon (https://console.neon.tech), Render (https://dashboard.render.com), and Vercel (https://vercel.com). GitHub sign-in is convenient for all three hosts. Neon Free can be used within its quotas; the continuous workers may keep its compute active, so monitor usage. The checked-in Render Blueprint uses a paid persistent Starter service. Use a Vercel plan permitted for commercial client work; Hobby is restricted to personal, non-commercial use. Review the provider checkout before creating paid resources. No custom domain is necessary for the demo.
+Create/sign in to GitHub, Neon (https://console.neon.tech), Render (https://dashboard.render.com), and Vercel (https://vercel.com). GitHub sign-in is convenient for all three hosts. Neon Free can be used within its quotas; the continuous workers may keep its compute active, so monitor usage. The checked-in Render Blueprint selects Free. Choose free plans in each dashboard and review the final resource summary. Vercel Hobby is restricted to personal, non-commercial use; a commercial client demo may require a paid plan even with synthetic data. No custom domain is necessary for the demo.
+
+## Free demo operating limits
+
+Render Free sleeps after 15 minutes without inbound traffic and usually needs about a minute to wake. Provisioning, session expiry and reminders run only while the API is awake. Both workers remain enabled and sweep on startup; overdue work may require multiple batches. Do not promise timely reminders while asleep. No separate paid worker, Redis service or Render database is required.
+
+Before each demonstration, open the Render API root URL directly and wait for the application's response. You can also run `GYMOS_API_URL=https://your-api.onrender.com pnpm deploy:demo:wake` from the repository root. This sends one bounded request; it does not schedule keep-alive traffic. Then sign in through Vercel and check Owner Sessions for recent successful scheduled work. A root response only confirms the process is listening. Avoid making the first login request wait for a sleeping API through Vercel.
+
+The workers query Neon frequently while Render is awake, preventing database idle sleep during that period. Monitor Neon compute/storage quotas and Render usage in their dashboards. Stop the demo service when finished if appropriate. Free services have limited capacity; keep the demo small and verify actual memory/latency in the hosted rehearsal.
+
+After deployment, leave the API idle for at least 15 minutes, wake it directly, then repeat login and a booking read. Confirm workers resume, gym data persists, and recent scheduled-work health succeeds. This sleep/restart rehearsal is part of acceptance.
+
+Provider details: [Render Free](https://render.com/docs/free), [Neon plans](https://neon.com/docs/introduction/plans), [Vercel Hobby](https://vercel.com/docs/plans/hobby). Limits and eligibility can change.
 
 ## 1. Create the Neon database project
 
@@ -76,11 +88,11 @@ The configured remote is `https://github.com/EsanduEpa/gymos-v2.git`. The local 
 
 For a beginner, GitHub Desktop is convenient: add the existing repository, review Changed Files, select the intended application/deployment changes, enter a commit summary, commit, then Push origin. Do not select private env files, local backup archives or generated output. Confirm the chosen branch on GitHub contains root `render.yaml` and `apps/web/vercel.json`. Remember this branch name; select it on both hosts. Do not silently deploy an older `main` branch if your changes are on another branch.
 
-## 5. Create the persistent Render API
+## 5. Create the free Render API
 
 1. Open Render, New → Blueprint, connect GitHub, and authorize access to this repository.
 2. Select `EsanduEpa/gymos-v2` and the pushed branch. Blueprint file: `render.yaml` at repository root.
-3. Review the `gymos-api` service and the paid Starter plan. Use a region near Neon if offered. Keep the repository root as the service root.
+3. Review the `gymos-api` service and confirm the Free instance plan. Use a region near Neon if offered. Keep the repository root as the service root.
 4. Enter the required environment values:
 
 | Render variable | Value |
@@ -92,7 +104,7 @@ For a beginner, GitHub Desktop is convenient: add the existing repository, revie
 | GYMOS_WEB_ORIGIN | `https://example.invalid` for the initial boot only |
 
 5. Blueprint supplies NODE_VERSION, NODE_ENV, both worker flags and generates JWT_SECRET. In Environment, replace the generated JWT_SECRET with the private stable value from `.env.deploy.neon`, then save/redeploy. Never put JWT_SECRET on Vercel.
-6. Apply/create the Blueprint after reviewing billing. If Render asks for build/start settings, they are `corepack enable && pnpm install --frozen-lockfile && pnpm build:deploy:api` and `pnpm start:deploy:api`.
+6. Apply/create the Blueprint after confirming no paid resources are selected. If Render asks for build/start settings, they are `corepack enable && pnpm install --frozen-lockfile && pnpm build:deploy:api` and `pnpm start:deploy:api`.
 7. Watch Events/Logs until deployment succeeds. Copy the actual public `https://...onrender.com` address. Open it: the root response confirms the API process is listening, not complete database/worker readiness.
 8. Confirm logs include provisioning runner enabled and PT scheduled-work runner enabled. Zero gyms is expected before creating the first gym.
 
@@ -150,7 +162,7 @@ Edit/test locally, commit and push. For this manually controlled setup, deploy t
 - Login unavailable: check Render status/logs and Vercel GYMOS_API_URL. Root API health alone does not prove Master tables exist.
 - No admin / invalid password: confirm initialization used this Neon project and the intended administrator email; cloud accounts are separate from local synthetic accounts.
 - Gym remains PENDING: verify PROVISIONING_RUNNER_ENABLED=true and inspect durable status/logs for role/database/ownership failures or existing-owner consent.
-- Reminders disabled/stale: verify persistent Render service, worker flag and Neon availability/quota.
+- Reminders disabled/stale: wake the Render service, verify the worker flag and Neon availability/quota; allow successful sweeps before evaluating overdue work.
 - Build cannot resolve workspace modules: Root Directory apps/web on Vercel, repository root on Render, correct build commands, root lockfile and outside-root files included.
 - Cold-start/database timeouts: Neon Free can sleep and has usage caps; rehearse wake-up latency against current pool budgets and monitor actual usage.
 

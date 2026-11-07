@@ -35,7 +35,7 @@ Node is pinned to major 24 and pnpm to 9.15.0. The hosting services must install
 
 Connect this repository in Render, choose **New Blueprint**, and select root `render.yaml`.
 
-The blueprint selects a persistent Starter service because provisioning, request expiry and reminders must run while no browser is connected. It disables automatic redeploys so schema rollout and frontend rollout can be coordinated. This is a paid service configuration; choosing Render Free introduces sleep and cannot meet the background-worker requirement.
+The blueprint selects Free for a synthetic demo and disables automatic redeploys so schema rollout and frontend rollout can be coordinated. Free sleeps when idle: provisioning, request expiry and reminders pause until wake-up. For continuous background work, explicitly upgrade the service to a paid persistent instance. See the [free demo operating limits](DEPLOY-VERCEL-RENDER-NEON.md#free-demo-operating-limits).
 
 Keep Root Directory empty (repository root). The configured commands are:
 

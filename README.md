@@ -69,4 +69,4 @@ This is the first complete working slice, not a production rollout. Sessions nee
 
 See [Vercel + Render + Supabase setup](docs/DEPLOY-VERCEL-RENDER-SUPABASE.md) for repository settings, private environment variables, direct-database requirements, explicit migrations and hosted acceptance gates.
 
-For Neon instead of Supabase, use the [beginner Vercel + Render + Neon guide](docs/DEPLOY-VERCEL-RENDER-NEON.md).
+For the free synthetic demo, follow the [Vercel + Render Free + Neon guide](docs/DEPLOY-VERCEL-RENDER-NEON.md). The Render Blueprint selects Free; scheduled work pauses during idle sleep. Wake the API before demonstrating. Vercel Hobby eligibility depends on personal, non-commercial use.

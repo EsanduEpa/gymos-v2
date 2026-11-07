@@ -26,6 +26,7 @@
     "build:deploy:web": "pnpm prepare:checks && pnpm --dir apps/api build && pnpm --dir apps/web build",
     "build:deploy:api": "pnpm prepare:checks && pnpm --dir apps/api build",
     "start:deploy:api": "node infrastructure/deployment/start-api.mjs",
+    "deploy:demo:wake": "node infrastructure/deployment/wake-demo.mjs",
     "deploy:database:check": "node infrastructure/deployment/database.mjs check",
     "deploy:database:migrate": "node infrastructure/deployment/database.mjs migrate-master"
   },
