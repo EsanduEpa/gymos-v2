@@ -394,7 +394,8 @@ test('real browser and HTTP requests preserve two-gym isolation and pure reads',
   await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/owner$`));
   await page.context().clearCookies();
 
-  await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${fixture.gyms[0].slug}/owner`);
+  // Verify cookie security on an actual login, rather than a synthetic session cookie.
+  await login(page, fixture.users.ownerA.email);
   await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/owner$`));
   await expect(page.getByRole('heading', { name: 'Live Gym Operations' })).toBeVisible();
   // The owner list reports the full published total, which can differ from
@@ -529,6 +530,7 @@ test('full member enrollment hands off a one-time credential and enforces first-
   await expect(page.getByRole('navigation', { name: 'Membership history pages' })).toContainText('26 membership terms');
   await page.getByRole('link', { name: 'Next membership page' }).click();
   await expect(page).toHaveURL(/membershipPage=2/);
+  await expect(page.getByRole('tab', { name: 'Membership & Packs' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByText('Page 2 of 2')).toBeVisible();
   await expect(page.getByText('Browser historical term 1', { exact: true })).toBeVisible();
   expect(identity.mustChangePassword).toBe(true);
@@ -1032,11 +1034,23 @@ test('web sessions enforce cookie, origin, expiry, revocation and logout boundar
   const token = cookie!.value;
   expect((await page.content()).includes(token)).toBe(false);
   expect(await page.evaluate(() => ({ local: localStorage.length, session: sessionStorage.length, cookie: document.cookie.includes('gymos_access_token') }))).toEqual({ local: 0, session: 0, cookie: false });
+  let unnecessaryRenewals = 0;
+  const observeRenewal = (response: import('@playwright/test').Response) => {
+    if (new URL(response.url()).pathname === '/api/session/renew') unnecessaryRenewals++;
+  };
+  page.on('response', observeRenewal);
   const privateResponse = await page.goto(`${webBase}/gyms/${fixture.gyms[1].slug}/owner`);
   expect(privateResponse?.headers()['cache-control']).toContain('no-store');
   const sessionResponse = await page.request.get(`${webBase}/api/session`);
   expect(sessionResponse.headers()['cache-control']).toContain('no-store');
   expect((await sessionResponse.text()).includes(token)).toBe(false);
+  await waitForSessionLifecycle(page);
+  await page.getByRole('button', { name: 'Midnight Blue', exact: true }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-appearance', 'dark');
+  await waitForSessionLifecycle(page);
+  expect(unnecessaryRenewals).toBe(0);
+  page.off('response', observeRenewal);
+
   const before = (await fixture.master.user.findUniqueOrThrow({ where: { id: fixture.users.ownerB.id } })).authVersion;
   const rejectedOrigins: Record<string, string>[] = [{ origin: 'https://foreign.example' }, {}, { origin: 'null' }, { origin: webBase, 'sec-fetch-site': 'cross-site' }, { origin: webBase.replace('http:', 'https:') }];
   for (const headers of rejectedOrigins) {
@@ -1752,12 +1766,21 @@ test('owner appearance upgrades live operations with accurate metrics and recove
 
 test('owner appearance covers directories profiles sessions finance and configuration in both themes', async ({ page, request }) => {
   test.setTimeout(480_000);
+  page.setDefaultTimeout(10_000);
   const base = `/gyms/${fixture.gyms[0].slug}/owner`;
   const member = await fixture.tenants[0].member.findUniqueOrThrow({ where: { identityId: fixture.users.memberUser.id } });
   const trainer = await fixture.tenants[0].trainer.findUniqueOrThrow({ where: { identityId: fixture.users.trainerUser.id } });
   const evidence = join(webDirectory, 'test-results/ui-transformation/gym-owner');
   await mkdir(evidence, { recursive: true });
   await openWithTestSession(page, fixture.users.ownerA.id, `${base}/members`, 900);
+  // Keep payroll layout covered even when this walkthrough runs on its own.
+  await fixture.tenants[0].trainerPayPeriod.upsert({
+    where: { cadence_localStartDate: { cadence: 'MONTHLY', localStartDate: new Date('2020-01-01T00:00:00Z') } },
+    create: { cadence: 'MONTHLY', localStartDate: new Date('2020-01-01T00:00:00Z'),
+      localEndDateExclusive: new Date('2020-02-01T00:00:00Z'), timezone: 'Asia/Colombo',
+      utcStartAt: new Date('2019-12-31T18:30:00Z'), utcEndAt: new Date('2020-01-31T18:30:00Z') },
+    update: {},
+  });
   const paths = ['/members', '/members/new', `/members/${member.id}`, '/trainers', '/trainers/new', `/trainers/${trainer.id}`, '/sessions', '/sessions?view=list&mode=month', '/sessions/book', '/financials', '/financials?tab=expenses', '/financials?tab=payroll', '/analytics', '/gym-config', '/audit', '/subscription'];
   for (const mode of ['light', 'dark'] as const) {
     await page.getByRole('button', { name: mode === 'light' ? 'Atlas Light' : 'Midnight Blue', exact: true }).click();
@@ -1774,7 +1797,9 @@ test('owner appearance covers directories profiles sessions finance and configur
       }
     }
     await page.goto(`${webBase}${base}/gym-config`);
+    await waitForSessionLifecycle(page);
     for (const name of ['Gym Profile', 'Membership Plans', 'PT Session Rates', 'Trainer Pay Rates', 'Cancellation Policy']) {
+      await expect(page.getByRole('tablist', { name: 'Gym configuration' })).toBeVisible();
       await page.getByRole('tab', { name, exact: true }).click();
       await expect(page.getByRole('tabpanel')).toBeVisible();
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth).catch(() => false),

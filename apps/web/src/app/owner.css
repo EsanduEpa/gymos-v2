@@ -171,3 +171,7 @@
 .owner-workspace .owner-member-filters { display: grid; margin-top: 0; }
 @media (max-width: 560px) { .owner-workspace .member-directory-filters { flex-direction: column; align-items: stretch; }.owner-workspace .member-directory-filters > label { flex: none; } }
 @media (max-width: 560px) { .owner-workspace .ui-tabs { flex-wrap: wrap; gap: 2px 14px; overflow-x: visible; } }
+
+/* Payroll details must wrap inside their grid track when periods are populated. */
+.owner-workspace .finance-payroll-row > div, .owner-workspace .finance-payroll-row > form { min-width: 0; overflow-wrap: anywhere; }
+.owner-workspace .finance-payroll-row > form .ui-button { white-space: normal; }

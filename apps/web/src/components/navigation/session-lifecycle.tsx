@@ -17,11 +17,12 @@ export function SessionLifecycle() {
     let identity: string | undefined;
     let expiryTimer: ReturnType<typeof setTimeout> | undefined;
     let idleTimer: ReturnType<typeof setTimeout> | undefined;
-    let lastRenewalAt = 0;
+    let lastRenewalAt = Date.now();
+    let renewal: Promise<boolean> | undefined;
     const hide = () => { document.documentElement.style.visibility = 'hidden'; };
     const leave = (url: string) => { if (navigating || exiting) return; navigating = true; hide(); window.location.replace(url); };
     const controller = new AbortController();
-    const renew = async (activity: boolean) => {
+    const performRenewal = async (activity: boolean) => {
       if (!privatePage || disposed || exiting || navigating || document.visibilityState !== 'visible') return false;
       try {
         const response = await fetch('/api/session/renew', { method: 'POST', headers: { 'content-type': 'application/json' },
@@ -31,6 +32,11 @@ export function SessionLifecycle() {
         lastRenewalAt = Date.now();
         return true;
       } catch { return false; }
+    };
+    // Focus, activity and expiry may arrive together; share one cookie rotation.
+    const renew = (activity: boolean) => {
+      if (!renewal) renewal = performRenewal(activity).finally(() => { renewal = undefined; });
+      return renewal;
     };
     const check = async (foreground = false) => {
       if (!privatePage || disposed || exiting || navigating) return;
@@ -91,7 +97,7 @@ export function SessionLifecycle() {
       }
     };
     const restored = (event: PageTransitionEvent) => { if (event.persisted && privatePage) { hide(); window.location.reload(); } };
-    const visibility = () => { if (document.visibilityState === 'visible') { void renew(true).then(ok => { if (ok) void check(false); else void check(true); }); } };
+    const visibility = () => { if (document.visibilityState === 'visible') void check(true); };
     channel?.addEventListener('message', event => {
       if (event.data === 'logout' && privatePage) leave('/login');
       if (event.data === 'support-changed' && privatePage && document.querySelector('[data-support-session]')) leave('/admin');

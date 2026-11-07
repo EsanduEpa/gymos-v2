@@ -1,8 +1,8 @@
+import { identityToken } from '../support/identity-token.js';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { SignJWT } from 'jose';
 import { PrismaClient } from '../../src/generated/master/client.js';
 import { AppModule } from '../../src/app.module.js';
 import { DatabaseService } from '../../src/database.service.js';
@@ -13,7 +13,7 @@ let run: Awaited<ReturnType<typeof createDisposablePostgresRun>>;
 let master: PrismaClient; let app: INestApplication; let base: string; let admin: string; let other: string;
 const secret = randomBytes(32).toString('hex');
 async function token(userId: string, authVersion = 0) {
-  return new SignJWT({authVersion}).setProtectedHeader({alg:'HS256'}).setSubject(userId).setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('15m').sign(new TextEncoder().encode(secret));
+  return identityToken(master, secret, userId, authVersion);
 }
 async function call(path: string, bearer: string, body?: unknown, key = randomUUID()) {
   return fetch(`${base}${path}`, { method: body === undefined ? 'GET' : 'POST', headers: { authorization: `Bearer ${bearer}`, 'content-type':'application/json', 'idempotency-key':key }, ...(body === undefined ? {} : {body:JSON.stringify(body)}) });
