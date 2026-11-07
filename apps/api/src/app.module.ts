@@ -1,3 +1,4 @@
+import { ProvisioningRunner } from './platform/provisioning-runner.js';
 import { SessionExceptionsController } from './sessions/session-exceptions.controller.js';
 import { SessionExceptionsService } from './sessions/session-exceptions.service.js';
 import { Module } from '@nestjs/common';
@@ -82,6 +83,7 @@ import { AuthSessionGuard } from './identity/auth-session.guard.js';
     GymAccessGuard,
     GymProvisioningService,
     ProvisioningReservationService,
+    ProvisioningRunner,
     ProvisioningOwnerService,
     SupportSessionService,
     PlatformRegistryService,

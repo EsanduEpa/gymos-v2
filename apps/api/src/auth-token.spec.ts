@@ -13,7 +13,7 @@ describe('versioned access token verification', () => {
   });
 
   async function token(payload: Record<string, unknown>, expiration: string | number = '5m') {
-    return new SignJWT(payload)
+    return new SignJWT({ sid: "session-016", ...payload })
       .setProtectedHeader({ alg: 'HS256' })
       .setSubject('identity-016')
       .setIssuer('gymos-v2')
@@ -26,7 +26,7 @@ describe('versioned access token verification', () => {
   it('returns the identity and security version from a valid token', async () => {
     const signed = await token({ authVersion: 7 });
     await expect(identityFromAuthorization(`Bearer ${signed}`)).resolves.toEqual({
-      userId: 'identity-016', authVersion: 7,
+      userId: 'identity-016', authVersion: 7, sessionId: 'session-016',
     });
   });
 
@@ -44,5 +44,28 @@ describe('versioned access token verification', () => {
     await expect(identityFromAuthorization(`Bearer ${expired}`)).rejects.toThrow('Invalid or expired token');
     await expect(identityFromAuthorization(`Bearer ${tampered}`)).rejects.toThrow('Invalid or expired token');
     await expect(identityFromAuthorization(`Bearer ${unversioned}`)).rejects.toThrow('Invalid or expired token');
+  });
+});
+
+import { afterEach, describe, expect, it } from 'vitest';
+const previous = process.env.JWT_SECRET;
+afterEach(() => { if (previous === undefined) delete process.env.JWT_SECRET; else process.env.JWT_SECRET = previous; });
+async function token(claims: Record<string, unknown>) {
+  process.env.JWT_SECRET = 'synthetic-unit-test-signing-secret-20261107';
+  return 'Bearer ' + await new SignJWT({ authVersion: 0, ...claims }).setProtectedHeader({ alg: 'HS256' }).setSubject('synthetic').setIssuer('gymos-v2').setAudience('gymos-api').sign(new TextEncoder().encode(process.env.JWT_SECRET));
+}
+describe('access token session and lifetime requirements', () => {
+  it('rejects legacy tokens without a durable session', async () => {
+    const now = Math.floor(Date.now()/1000);
+    await expect(identityFromAuthorization(await token({ iat: now, exp: now + 900 }))).rejects.toThrow();
+  });
+  it('rejects absent or overlong expiry', async () => {
+    const now = Math.floor(Date.now()/1000);
+    await expect(identityFromAuthorization(await token({ sid: 'session', iat: now }))).rejects.toThrow();
+    await expect(identityFromAuthorization(await token({ sid: 'session', iat: now, exp: now + 901 }))).rejects.toThrow();
+  });
+  it('accepts current session-bound tokens', async () => {
+    const now = Math.floor(Date.now()/1000);
+    await expect(identityFromAuthorization(await token({ sid: 'session', iat: now, exp: now + 900 }))).resolves.toMatchObject({ sessionId: 'session', userId: 'synthetic' });
   });
 });

@@ -9,9 +9,9 @@ describe('GymAccessGuard availability boundary', () => {
     const previousSecret = process.env.JWT_SECRET;
     process.env.JWT_SECRET = 'task005-test-secret-at-least-32-bytes-long';
     try {
-      const token = await new SignJWT({ authVersion: 0 })
+      const token = await new SignJWT({ authVersion: 0, sid: 'test-session' })
         .setProtectedHeader({ alg: 'HS256' }).setSubject('platform-admin')
-        .setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('5m')
+        .setIssuer('gymos-v2').setAudience('gymos-api').setIssuedAt().setExpirationTime('5m')
         .sign(new TextEncoder().encode(process.env.JWT_SECRET));
       const findFirst = vi.fn();
       const guard = new GymAccessGuard({ master: {
@@ -36,7 +36,7 @@ describe('GymAccessGuard availability boundary', () => {
         .setSubject('task005-user')
         .setIssuer('gymos-v2')
         .setAudience('gymos-api')
-        .setExpirationTime('5m')
+        .setIssuedAt().setExpirationTime('5m')
         .sign(new TextEncoder().encode(process.env.JWT_SECRET));
       const request = { headers: { authorization: `Bearer ${token}` }, params: { slug: 'task005-gym' } };
       const guard = new GymAccessGuard({ master: {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { sessionReadStateSchema } from './session-reads.js';
 
 const idSchema = z.string().min(1).max(128).regex(/^[A-Za-z0-9_:-]+$/);
 const instantSchema = z.iso.datetime({ offset: true });
@@ -21,7 +22,7 @@ export const trainerClientQuerySchema = z.strictObject({
 
 const latestClientSessionSchema = z.strictObject({
   id: idSchema,
-  state: z.enum(['SCHEDULED', 'ACTIVE', 'COMPLETED']),
+  state: sessionReadStateSchema,
   scheduledStartAt: instantSchema,
   scheduledEndAt: instantSchema,
 });
@@ -47,7 +48,7 @@ export const trainerClientPageSchema = z.strictObject({
 
 const profileSessionSchema = z.strictObject({
   id: idSchema,
-  state: z.enum(['SCHEDULED', 'ACTIVE', 'COMPLETED']),
+  state: sessionReadStateSchema,
   scheduledStartAt: instantSchema,
   scheduledEndAt: instantSchema,
   notes: z.string().max(4000).nullable(),

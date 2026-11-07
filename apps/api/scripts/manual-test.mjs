@@ -367,7 +367,7 @@ async function start() {
   const webPort = 3002;
   if (!await portFree(apiPort) || !await portFree(webPort)) throw new Error('Sandbox ports are occupied');
   const apiEnv = { ...cleanEnv, PORT: String(apiPort), MASTER_DATABASE_URL: state.masterUrl, TENANT_DATABASE_URL: state.masterUrl,
-    PROVISION_DATABASE_URL: state.provisionUrl, JWT_SECRET: state.jwtSecret };
+    PROVISION_DATABASE_URL: state.provisionUrl, PROVISIONING_RUNNER_ENABLED: 'true', JWT_SECRET: state.jwtSecret };
   const api = spawn(process.execPath, ['dist/main.js'], { cwd: `${root}apps/api`, env: apiEnv, stdio: 'inherit' });
   const web = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '-H', '127.0.0.1', '-p', String(webPort)], {
     cwd: `${root}apps/web`, env: { ...cleanEnv, NODE_ENV: 'production', GYMOS_API_URL: `http://127.0.0.1:${apiPort}`, GYMOS_WEB_ORIGIN: `http://localhost:${webPort}`, GYMOS_COOKIE_SUFFIX: '_test' }, stdio: 'inherit' });

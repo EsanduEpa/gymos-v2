@@ -12,9 +12,7 @@ export class AuthSessionGuard implements CanActivate {
     const authorization = request.headers.authorization;
     if (!authorization) return true;
     const identity = await identityFromAuthorization(authorization);
-    // Tokens issued before CF-02 have at most a 15-minute lifetime and lack a
-    // durable session claim. New tokens always carry sid and are checked here.
-    if (identity.sessionId) await this.sessions.assertActive(identity.userId, identity.authVersion, identity.sessionId);
+    await this.sessions.assertActive(identity.userId, identity.authVersion, identity.sessionId!);
     return true;
   }
 }

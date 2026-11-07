@@ -15,7 +15,7 @@ describe('AuthSessionGuard', () => {
     const claims: Record<string, unknown> = { authVersion: 3 };
     if (sessionId) claims.sid = sessionId;
     return new SignJWT(claims).setProtectedHeader({ alg: 'HS256' }).setSubject('identity-1')
-      .setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('5m')
+      .setIssuer('gymos-v2').setAudience('gymos-api').setIssuedAt().setExpirationTime('5m')
       .sign(new TextEncoder().encode(process.env.JWT_SECRET));
   }
 
@@ -23,12 +23,12 @@ describe('AuthSessionGuard', () => {
     return { switchToHttp: () => ({ getRequest: () => ({ headers: { authorization } }) }) } as ExecutionContext;
   }
 
-  it('checks session-bound bearer tokens globally and preserves bounded legacy-token compatibility', async () => {
+  it('checks session-bound bearer tokens globally and rejects legacy tokens', async () => {
     const assertActive = vi.fn().mockResolvedValue(undefined);
     const guard = new AuthSessionGuard({ assertActive } as unknown as AuthSessionService);
     await expect(guard.canActivate(execution(`Bearer ${await token('session-1')}`))).resolves.toBe(true);
     expect(assertActive).toHaveBeenCalledWith('identity-1', 3, 'session-1');
-    await expect(guard.canActivate(execution(`Bearer ${await token()}`))).resolves.toBe(true);
+    await expect(guard.canActivate(execution(`Bearer ${await token()}`))).rejects.toThrow('Invalid or expired token');
     expect(assertActive).toHaveBeenCalledTimes(1);
   });
 

@@ -1093,6 +1093,14 @@ test('web sessions enforce cookie, origin, expiry, revocation and logout boundar
   await expect(page.locator('.shell-account-menu')).toContainText('Owner Beta');
   await expect(page.locator('main')).not.toContainText('Alpha Person');
   await page.screenshot({ path: join(evidence, 'fresh-identity.png'), animations: 'disabled' });
+  const refreshOnlyAccess = (await page.context().cookies()).find(item => item.name === 'gymos_access_token')!.value;
+  const refreshOnlySessionId = JSON.parse(Buffer.from(refreshOnlyAccess.split('.')[1]!, 'base64url').toString()).sid as string;
+  await page.context().clearCookies({ name: 'gymos_access_token' });
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  expect(await fixture.master.identitySession.findUniqueOrThrow({ where: { id: refreshOnlySessionId }, select: { revocationReason: true } }))
+    .toMatchObject({ revocationReason: 'CURRENT_DEVICE_LOGOUT' });
+
 });
 
 test('platform appearance persists across reloads and supports responsive keyboard workflows', async ({ page }) => {
@@ -1398,6 +1406,11 @@ test('browser recovers an unpublished tenant commit after Master activation fail
   await fixture.master.$executeRawUnsafe(`CREATE TRIGGER fail_member_activation_browser BEFORE INSERT ON "PlatformAuditLog"
     FOR EACH ROW EXECUTE FUNCTION fail_member_activation_browser()`);
   try {
+    await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${slug}/owner/members/new`);
+    // A scoped account's revocation version may diverge from User.authVersion.
+    // Reauthenticate after revocation and retain the global identity fence.
+    await fixture.master.gymAccount.update({ where: { userId_gymId: { userId: fixture.users.ownerA.id, gymId: fixture.gyms[0].id } },
+      data: { authVersion: { increment: 1 } } });
     await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${slug}/owner/members/new`);
     const key = await fillMemberEnrollment(page, { name: 'Activation Recovery Member', email, planId: plan.id });
     await page.getByRole('button', { name: 'Register member' }).click();
@@ -1744,7 +1757,7 @@ test('owner appearance covers directories profiles sessions finance and configur
   const trainer = await fixture.tenants[0].trainer.findUniqueOrThrow({ where: { identityId: fixture.users.trainerUser.id } });
   const evidence = join(webDirectory, 'test-results/ui-transformation/gym-owner');
   await mkdir(evidence, { recursive: true });
-  await openWithTestSession(page, fixture.users.ownerA.id, `${base}/members`, 3600);
+  await openWithTestSession(page, fixture.users.ownerA.id, `${base}/members`, 900);
   const paths = ['/members', '/members/new', `/members/${member.id}`, '/trainers', '/trainers/new', `/trainers/${trainer.id}`, '/sessions', '/sessions?view=list&mode=month', '/sessions/book', '/financials', '/financials?tab=expenses', '/financials?tab=payroll', '/analytics', '/gym-config', '/audit', '/subscription'];
   for (const mode of ['light', 'dark'] as const) {
     await page.getByRole('button', { name: mode === 'light' ? 'Atlas Light' : 'Midnight Blue', exact: true }).click();

@@ -45,6 +45,10 @@ Open `http://localhost:3000/login`. Sign in as Super Admin, create a gym and its
 
 The web app uses `http://127.0.0.1:3001` for its server-side API calls by default. Set `GYMOS_API_URL` for a different API address. The access token stays in an HttpOnly cookie and expires after 15 minutes.
 
+## Automatic gym setup
+
+Set `PROVISIONING_RUNNER_ENABLED=true` on the persistent API process to complete gym reservations automatically. The isolated manual-testing launcher enables this setting for its own synthetic databases. Leave it disabled while performing controlled schema maintenance. See [provisioning runtime](docs/PROVISIONING-RUNTIME.md) for discovery, retries, shutdown and required database privileges.
+
 ## Verify the first milestone
 
 Build both applications, then run the repeatable end-to-end check:
@@ -60,3 +64,9 @@ The check starts its own API and web servers, creates two temporary gyms through
 ## Current scope
 
 This is the first complete working slice, not a production rollout. Sessions need renewal, and gym provisioning currently runs migrations synchronously from the API. Before onboarding real gyms, add connection limits, background provisioning, recovery for failed provisioning, backups, deployment controls, and deeper automated security coverage.
+
+## Hosted demo deployment
+
+See [Vercel + Render + Supabase setup](docs/DEPLOY-VERCEL-RENDER-SUPABASE.md) for repository settings, private environment variables, direct-database requirements, explicit migrations and hosted acceptance gates.
+
+For Neon instead of Supabase, use the [beginner Vercel + Render + Neon guide](docs/DEPLOY-VERCEL-RENDER-NEON.md).

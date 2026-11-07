@@ -1,3 +1,4 @@
+import { ProvisioningRunner } from '../../src/platform/provisioning-runner.js';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -100,4 +101,15 @@ it('provisions with a dedicated CREATEDB/CREATEROLE login without superuser priv
   const reserved=await reserve('least-privilege');
   expect((await new ProvisioningWorker(database,restricted,tenants).runOnce(reserved.operationId)).state).toBe('COMPLETE');await recordOwned(reserved.operationId);
  }finally{await restricted.onApplicationShutdown();vi.stubEnv('PROVISION_DATABASE_URL',run.masterUrl);}
+});
+
+it('discovers a pending reservation and finishes it through the supervised runner', async () => {
+ const reserved = await reserve('runner-discovery');
+ const runner = new ProvisioningRunner(database, physical, tenants);
+ try {
+  await runner.tick();
+  const completed = await reservations.status(actor, reserved.operationId);
+  expect(completed.state).toBe('COMPLETE');
+  await recordOwned(reserved.operationId);
+ } finally { await runner.onModuleDestroy(); }
 });

@@ -1,3 +1,4 @@
+import { TenantSchemaVerifier } from '../../src/tenancy/tenant-schema-verifier.js';
 import { SessionExpiryRunner } from '../../src/sessions/session-expiry-runner.js';
 import type { DatabaseService } from '../../src/database.service.js';
 import type { TenantDatabaseService } from '../../src/tenant-database.service.js';
@@ -106,6 +107,15 @@ it('the shared runner scans verified tenant bindings and emits due work with no 
     if (index < 0) throw new Error('Unowned target');
     return work(fixture.tenants[index]!);
   } } as TenantDatabaseService;
+  const gym = await fixture.master.gym.findUniqueOrThrow({ where: { id: fixture.gyms[0].id } });
+  const rollout = await fixture.master.operation.create({ data: {
+    kind: 'ROLLOUT_TENANT_SCHEMA', actorIdentityId: fixture.users.ownerA.id, gymId: gym.id,
+    scopeKey: `runner-rollout:${gym.id}`, idempotencyKey: randomUUID(), requestDigest: 'd1:' + '0'.repeat(64),
+    state: 'COMPLETE', step: 'SCHEMA_COMPLETE', safeResult: { syntheticFixture: true }, intendedTenantTemplateVersion: gym.expectedTenantSchemaVersion,
+    intendedTenantManifestDigest: gym.expectedTenantManifestDigest,
+  } });
+  await new TenantSchemaVerifier(tenant).verifyAndAttest({ masterGymId: gym.id, operationId: rollout.id });
+  await fixture.master.gym.update({ where: { id: gym.id }, data: { expectedTenantOperationId: rollout.id } });
   const runner = new SessionExpiryRunner({ master: fixture.master } as DatabaseService, tenants);
   const result = await runner.tick();
   expect(result).toMatchObject({ gyms: 2, failures: 0 });

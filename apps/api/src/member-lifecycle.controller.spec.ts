@@ -44,7 +44,7 @@ describe('MemberLifecycleController gym scoping', () => {
     const secret = 'task033-member-lifecycle-test-secret-at-least-32-bytes';
     process.env.JWT_SECRET = secret;
     const tokenFor = (identityId: string) => new SignJWT({ authVersion: 0, sid: `${identityId}-session`, gaid: `${identityId}-account` }).setProtectedHeader({ alg: 'HS256' }).setSubject(identityId)
-      .setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('5m').sign(new TextEncoder().encode(secret));
+      .setIssuer('gymos-v2').setAudience('gymos-api').setIssuedAt().setExpirationTime('5m').sign(new TextEncoder().encode(secret));
     const ownerToken = await tokenFor('owner-b');
     const memberToken = await tokenFor('member-b');
     const guard = new GymAccessGuard(database as unknown as DatabaseService, tenantGate as unknown as TenantSchemaGateService);

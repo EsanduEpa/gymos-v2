@@ -22,7 +22,12 @@
     "test:recovery:owned": "pnpm --dir apps/api exec vitest run --config vitest.config.recovery.ts --disableConsoleIntercept",
     "generate:clients": "prisma generate --schema packages/database-master/prisma/schema.prisma && prisma generate --schema packages/database-tenant/prisma/schema.prisma",
     "prepare:checks": "pnpm generate:clients && pnpm --filter \"./packages/**\" --recursive --if-present build",
-    "test:cf:owned": "pnpm --dir apps/api exec vitest run --config vitest.config.member-applications.ts --disableConsoleIntercept"
+    "test:cf:owned": "pnpm --dir apps/api exec vitest run --config vitest.config.member-applications.ts --disableConsoleIntercept",
+    "build:deploy:web": "pnpm prepare:checks && pnpm --dir apps/api build && pnpm --dir apps/web build",
+    "build:deploy:api": "pnpm prepare:checks && pnpm --dir apps/api build",
+    "start:deploy:api": "node infrastructure/deployment/start-api.mjs",
+    "deploy:database:check": "node infrastructure/deployment/database.mjs check",
+    "deploy:database:migrate": "node infrastructure/deployment/database.mjs migrate-master"
   },
   "packageManager": "pnpm@9.15.0+sha512.76e2379760a4328ec4415815bcd6628dee727af3779aaa4c914e3944156c4299921a89f976381ee107d41f12cfa4b66681ca9c718f0668fa0831ed4c6d8ba56c",
   "pnpm": {
@@ -36,5 +41,8 @@
   "devDependencies": {
     "dotenv": "^18.0.8",
     "prisma": "^7.10.1"
+  },
+  "engines": {
+    "node": "24.x"
   }
 }
