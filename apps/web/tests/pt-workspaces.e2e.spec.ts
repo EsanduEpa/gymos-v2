@@ -143,7 +143,7 @@ test('PT priority, detail routes and bell preserve both themes at mobile/tablet/
       await page.getByRole('button', { name: 'Notifications, 2 unread' }).click();
       const popover = page.getByRole('region', { name: 'Notifications' });
       await expect(popover.getByRole('link', { name: /Session confirmed/ })).toHaveAttribute('href', `/gyms/${slug}/sessions/pt-confirmed-${environment.runId}`);
-      await expect(popover).toContainText('when you open or use it');
+      await expect(popover).toContainText('Notifications refresh while GymOS is open and this tab is visible.');
       await popover.getByRole('button', { name: 'Close notifications' }).click();
     }
     if (role === 'OWNER') {

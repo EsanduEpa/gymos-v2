@@ -74,7 +74,7 @@ it('rolls back partial Master finalization, resumes tenant success, and hands of
   expect((await call(`/gyms/${body.slug}/access`,initialToken)).status).toBe(403);
   const changed=await call('/auth/change-password',initialToken,{currentPassword:issued.temporaryPassword,newPassword:password,confirmPassword:password});expect(changed.status).toBe(201);
   const account=await master.gymAccount.findUniqueOrThrow({where:{userId_gymId:{userId:subject.id,gymId:done.gymId!}}});
-  expect(await argon2.verify(account.passwordHash,password)).toBe(true);
+  expect(await argon2.verify(account.passwordHash!,password)).toBe(true);
   expect((await call(`/gyms/${body.slug}/access`,await scopedToken(subject.id,done.gymId!))).status).toBe(200);
   const safe=JSON.stringify(done.safeResult);expect(/password|credential|token|database|email/i.test(safe)).toBe(false);
   const tenant=await run.connect(done.databaseName!);try{
@@ -103,7 +103,7 @@ it('requires private verified consent for an existing identity across two gyms a
   const username=`${gym.gym.slug}.owner@example.test`;
   expect((await call('/auth/gym-account/setup','',{gymSlug:gym.gym.slug,legacyEmail:owner.email,legacyPassword:password,username,newPassword:`${password}-scoped`})).status).toBe(201);
   const account=await master.gymAccount.findUniqueOrThrow({where:{userId_gymId:{userId:owner.id,gymId:gym.gym.id}}});
-  expect(account.username).toBe(username);expect(await argon2.verify(account.passwordHash,`${password}-scoped`)).toBe(true);
+  expect(account.username).toBe(username);expect(await argon2.verify(account.passwordHash!,`${password}-scoped`)).toBe(true);
   expect((await call(`/gyms/${gym.gym.slug}/access`,await scopedToken(owner.id,gym.gym.id))).status).toBe(200);
  }
  const after=await master.user.findUniqueOrThrow({where:{id:owner.id}});

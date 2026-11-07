@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import { SignJWT } from 'jose';
@@ -17,8 +17,15 @@ let fixture: Awaited<ReturnType<typeof seedTwoGymFixture>>;
 let app: INestApplication;
 let base: string;
 const secret = randomBytes(32).toString('hex');
-async function bearer(identityId: string) {
-  return new SignJWT({ authVersion: 0 }).setProtectedHeader({ alg: 'HS256' }).setSubject(identityId)
+async function bearer(identityId: string, gymId = fixture.gyms[0]!.id) {
+  const account = await fixture.master.gymAccount.upsert({ where: { userId_gymId: { userId: identityId, gymId } },
+    create: { userId: identityId, gymId, username: `notifications-${identityId}-${gymId}`, passwordHash: 'fixture-not-a-login-hash', status: 'ACTIVE' },
+    update: { status: 'ACTIVE', mustChangePassword: false, credentialExpiresAt: null } });
+  const now = Date.now();
+  const session = await fixture.master.identitySession.create({ data: { identityId, gymAccountId: account.id, authVersion: account.authVersion,
+    deviceClass: 'SHARED', deviceLabel: 'Notification integration test', refreshTokenHash: createHash('sha256').update(randomBytes(32)).digest('hex'),
+    idleExpiresAt: new Date(now + 600_000), absoluteExpiresAt: new Date(now + 900_000) } });
+  return new SignJWT({ authVersion: account.authVersion, sid: session.id, gaid: account.id }).setProtectedHeader({ alg: 'HS256' }).setSubject(identityId)
     .setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('15m').sign(new TextEncoder().encode(secret));
 }
 async function call(path: string, accessToken: string, body?: unknown, method?: string) {
@@ -44,7 +51,7 @@ afterAll(async () => {
 }, 120_000);
 
 it('keeps selected-gym notification reads and marks within the authenticated recipient', async () => {
-  const ownerB = await bearer(fixture.users.ownerB.id);
+  const ownerB = await bearer(fixture.users.ownerB.id, fixture.gyms[1]!.id);
   const trainer = await bearer(fixture.users.trainerUser.id);
   const member = await bearer(fixture.users.memberUser.id);
   const gymA = fixture.gyms[0]!;
@@ -112,7 +119,9 @@ it('keeps selected-gym notification reads and marks within the authenticated rec
 it('keeps the account inbox identity-scoped and security history append-only', async () => {
   const pending = await bearer(fixture.users.pendingUser.id);
   const other = await bearer(fixture.users.memberUser.id);
-  const first = await fixture.master.identitySecurityEvent.create({ data: { id: `security_${run.runId}_1`, identityId: fixture.users.pendingUser.id, event: 'PASSWORD_CHANGED', createdAt: new Date(Date.now() - 1000) } });
+  const account = await fixture.master.gymAccount.findUniqueOrThrow({ where: { userId_gymId: { userId: fixture.users.pendingUser.id, gymId: fixture.gyms[0]!.id } } });
+  const first = await fixture.master.identitySecurityEvent.create({ data: { id: `security_${run.runId}_1`, identityId: fixture.users.pendingUser.id,
+    gymAccountId: account.id, event: 'PASSWORD_CHANGED', createdAt: new Date(Date.now() - 1000) } });
   const application = await fixture.master.memberApplication.create({ data: { id: `application_${run.runId}`, gymId: fixture.gyms[0]!.id,
     identityId: fixture.users.pendingUser.id, fullName: 'Pending synthetic applicant', phone: '+94770000000', consentedAt: new Date(Date.now() - 500) } });
   await fixture.master.memberApplicationNotice.create({ data: { id: `application_notice_${run.runId}`, applicationId: application.id,
@@ -136,7 +145,7 @@ it('keeps the account inbox identity-scoped and security history append-only', a
   expect(markAll.status).toBe(201);
   expect((await markAll.json()).changedCount).toBe(1);
   const later = await fixture.master.identitySecurityEvent.create({ data: { id: `security_${run.runId}_later`, identityId: fixture.users.pendingUser.id,
-    event: 'SESSIONS_REVOKED', createdAt: new Date(Date.parse(page.asOf) + 1000) } });
+    gymAccountId: account.id, event: 'SESSIONS_REVOKED', createdAt: new Date(Date.parse(page.asOf) + 1000) } });
   expect(later.id).toBeTruthy();
   expect((await (await call('/auth/notifications', pending)).json()).unreadCount).toBe(1);
   await expect(fixture.master.identitySecurityEvent.update({ where: { id: first.id }, data: { createdAt: new Date() } })).rejects.toThrow();
@@ -226,5 +235,5 @@ it('exposes scheduled-work health only to the selected gym owner', async () => {
   expect(await response.json()).toMatchObject({ enabled: false, lastSuccessAt: null, overdue: 0, retrying: 0 });
   expect((await call(path, await bearer(fixture.users.memberUser.id))).status).toBe(403);
   expect((await call(path, await bearer(fixture.users.trainerUser.id))).status).toBe(403);
-  expect((await call(path, await bearer(fixture.users.ownerB.id))).status).toBe(403);
+  expect((await call(path, await bearer(fixture.users.ownerB.id, fixture.gyms[1]!.id))).status).toBe(403);
 });

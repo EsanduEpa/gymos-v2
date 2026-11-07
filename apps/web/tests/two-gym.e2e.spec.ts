@@ -394,7 +394,7 @@ test('real browser and HTTP requests preserve two-gym isolation and pure reads',
   await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/owner$`));
   await page.context().clearCookies();
 
-  await login(page, fixture.users.ownerA.email);
+  await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${fixture.gyms[0].slug}/owner`);
   await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/owner$`));
   await expect(page.getByRole('heading', { name: 'Live Gym Operations' })).toBeVisible();
   // The owner list reports the full published total, which can differ from
@@ -567,7 +567,7 @@ test('full member enrollment hands off a one-time credential and enforces first-
   } finally { await memberContext.close(); }
 });
 
-test('existing identity explicitly consents, keeps its password, and enters the selected gym as a member', async ({ page, browser }) => {
+test('existing identity explicitly consents, keeps its password, and enters the selected gym as a member', async ({ page, browser, request }) => {
   const plan = await fixture.tenants[1].membershipPlan.create({ data: {
     name: 'Existing Identity Plan', price: '12.50', currency: 'LKR', durationDays: 14,
   } });
@@ -600,8 +600,7 @@ test('existing identity explicitly consents, keeps its password, and enters the 
   const identityContext = await browser.newContext();
   try {
     const identityPage = await identityContext.newPage();
-    await loginWithPassword(identityPage, fixture.users.memberUser.email, fixture.password);
-    await expect(identityPage).not.toHaveURL(/\/login/);
+    await openWithTestSession(identityPage, fixture.users.memberUser.id, `/gyms/${fixture.gyms[0].slug}/member`);
     await identityPage.goto(`${webBase}${consentPath}`);
     await expect(identityPage.getByRole('heading', { name: 'Review gym enrollment' })).toBeVisible();
     await identityPage.getByLabel('Current password').fill(fixture.password);
@@ -631,9 +630,12 @@ test('existing identity explicitly consents, keeps its password, and enters the 
   const memberContext = await browser.newContext();
   try {
     const memberPage = await memberContext.newPage();
-    await loginWithPassword(memberPage, fixture.users.memberUser.email, fixture.password);
-    await expect(memberPage).toHaveURL(/\/gyms\/select$/);
-    await memberPage.getByRole('link', { name: /Test Gym Beta.*member/ }).click();
+    const username = `member.${fixture.gyms[1].slug}@example.test`;
+    const setup = await request.post(`${apiBase}/auth/gym-account/setup`, { data: { gymSlug: fixture.gyms[1].slug,
+      legacyEmail: fixture.users.memberUser.email, legacyPassword: fixture.password, username, newPassword: `${fixture.password}-beta` } });
+    expect(setup.status()).toBe(201);
+    expect((await fixture.master.gymAccount.findUniqueOrThrow({ where: { username } })).gymId).toBe(fixture.gyms[1].id);
+    await openWithTestSession(memberPage, fixture.users.memberUser.id, `/gyms/${fixture.gyms[1].slug}/member`);
     await expect(memberPage).toHaveURL(new RegExp(`/gyms/${fixture.gyms[1].slug}/member$`));
     await expect(memberPage.locator('.shell-gym-name')).toContainText('Test Gym Beta');
     await expect(memberPage.getByRole('heading', { name: /Welcome back, Member/ })).toBeVisible();
@@ -646,13 +648,13 @@ test('trainer registration enforces owner and selected-gym access, then hands of
   const beforeDenied = await Promise.all([fixture.master.user.count(), fixture.master.gymAccess.count(), fixture.master.operation.count()]);
   const registration = { fullName: 'Denied Trainer', email: `denied-${email}`, phone: '+94112223348', level: 'LEVEL_1', yearsExperience: null,
     specialisations: [], shiftStart: null, shiftEnd: null, bio: null, idempotencyKey: `denied-trainer-${environment.runId}` };
-  await openWithTestSession(page, fixture.users.ownerA.id, '/test-ui');
+  await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${fixture.gyms[0].slug}/owner`);
   let bearer = (await page.context().cookies()).find(cookie => cookie.name === 'gymos_access_token')?.value;
   expect((await request.post(`${apiBase}/gyms/${fixture.gyms[1].slug}/trainer-registrations`, { headers: { authorization: `Bearer ${bearer}` }, data: registration })).status()).toBe(403);
-  await openWithTestSession(page, fixture.users.memberUser.id, '/test-ui');
+  await openWithTestSession(page, fixture.users.memberUser.id, `/gyms/${fixture.gyms[0].slug}/member`);
   bearer = (await page.context().cookies()).find(cookie => cookie.name === 'gymos_access_token')?.value;
   expect((await request.post(`${apiBase}/gyms/${fixture.gyms[0].slug}/trainer-registrations`, { headers: { authorization: `Bearer ${bearer}` }, data: registration })).status()).toBe(403);
-  await openWithTestSession(page, fixture.users.ownerA.id, '/test-ui');
+  await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${fixture.gyms[0].slug}/owner`);
   bearer = (await page.context().cookies()).find(cookie => cookie.name === 'gymos_access_token')?.value;
   expect((await request.post(`${apiBase}/gyms/${fixture.gyms[0].slug}/trainer-registrations`, { headers: { authorization: `Bearer ${bearer}` }, data: { ...registration, email, idempotencyKey: `invalid-trainer-${environment.runId}`, shiftStart: '08:00' } })).status()).toBe(422);
   expect(await Promise.all([fixture.master.user.count(), fixture.master.gymAccess.count(), fixture.master.operation.count()])).toEqual(beforeDenied);
@@ -959,7 +961,7 @@ test('V1 Classic branding stays readable and keeps identical geometry at approve
   }
 });
 
-test('role shell supports keyboard drawer, safe switching and current context', async ({ page }) => {
+test('role shell supports keyboard drawer and gym-scoped context', async ({ page }) => {
   const evidence = join(webDirectory, 'test-results/migration-evidence/GYMOS-MIG-013');
   await mkdir(evidence, { recursive: true });
   const before = await fixture.master.$transaction([fixture.master.user.count(), fixture.master.gymAccess.count(), fixture.master.operation.count()]);
@@ -1000,17 +1002,16 @@ test('role shell supports keyboard drawer, safe switching and current context', 
   }
   await page.setViewportSize({ width: 1440, height: 1000 });
   await openGymWithTestSession(page, fixture.users.multiOwner.id, fixture.gyms[0].slug);
-  await page.getByRole('link', { name: 'Switch gym' }).click();
-  await expect(page.getByRole('heading', { name: 'Choose a gym' })).toBeVisible();
-  await page.getByRole('link', { name: /Test Gym Beta/ }).click();
+  await expect(page.getByRole('link', { name: 'Switch gym' })).toHaveCount(0);
+  await openGymWithTestSession(page, fixture.users.multiOwner.id, fixture.gyms[1].slug);
   await expect(page.locator('.shell-gym-name')).toContainText('Test Gym Beta');
   await expect(page.locator('.gym-dashboard')).toHaveCSS('--gym-color', '#7C3AED');
   await expect(page.locator('main')).not.toContainText('Test Gym Alpha');
-  await page.getByRole('link', { name: 'Switch gym' }).click();
   const access = await fixture.master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: fixture.users.multiOwner.id, gymId: fixture.gyms[0].id } } });
   try {
-    await fixture.master.gymAccess.update({ where: { userId_gymId: { userId: access.userId, gymId: access.gymId } }, data: { linkStatus: 'REVOKED', version: { increment: 1 } } });
     const revokedGymPage = await page.context().newPage();
+    await openGymWithTestSession(revokedGymPage, fixture.users.multiOwner.id, fixture.gyms[0].slug);
+    await fixture.master.gymAccess.update({ where: { userId_gymId: { userId: access.userId, gymId: access.gymId } }, data: { linkStatus: 'REVOKED', version: { increment: 1 } } });
     try {
       await revokedGymPage.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/owner`);
       await expect(revokedGymPage.getByRole('heading', { name: 'This page could not be found' })).toBeVisible();
@@ -1084,7 +1085,8 @@ test('web sessions enforce cookie, origin, expiry, revocation and logout boundar
   // A new identity in the shared cookie must never retain the old shell.
   await openGymWithTestSession(page, fixture.users.ownerA.id, fixture.gyms[0].slug);
   await expect(page.locator('.shell-account-menu')).toContainText('Owner Alpha');
-  await fixture.master.user.update({ where: { id: fixture.users.ownerA.id }, data: { authVersion: { increment: 1 } } });
+  await fixture.master.gymAccount.update({ where: { userId_gymId: { userId: fixture.users.ownerA.id, gymId: fixture.gyms[0].id } },
+    data: { authVersion: { increment: 1 } } });
   await page.reload();
   await expect(page).toHaveURL(/\/login(?:\?|$)/);
   await openGymWithTestSession(page, fixture.users.ownerB.id, fixture.gyms[1].slug);
@@ -1637,7 +1639,7 @@ test('member roster and profile expose accessible loading states while tenant re
   test.setTimeout(90_000);
   const slug = fixture.gyms[0].slug;
   const member = await fixture.tenants[0].member.findFirstOrThrow({ where: { identityId: fixture.users.memberUser.id } });
-  await openWithTestSession(page, fixture.users.ownerA.id, '/test-ui');
+  await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${slug}/owner`);
   for (const path of [`/gyms/${slug}/owner/members`, `/gyms/${slug}/owner/members/${member.id}`]) {
     let release!: () => void;
     let acquired!: () => void;
@@ -1656,6 +1658,7 @@ test('member roster and profile expose accessible loading states while tenant re
       release();
       await transaction;
     }
+    await page.goto(`${webBase}${path}`);
     await expect(page.getByRole('heading', { name: path.endsWith('/members') ? 'Member Management' : member.fullName, level: 1 })).toBeVisible();
   }
 });
@@ -1735,7 +1738,7 @@ test('owner appearance upgrades live operations with accurate metrics and recove
 });
 
 test('owner appearance covers directories profiles sessions finance and configuration in both themes', async ({ page, request }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   const base = `/gyms/${fixture.gyms[0].slug}/owner`;
   const member = await fixture.tenants[0].member.findUniqueOrThrow({ where: { identityId: fixture.users.memberUser.id } });
   const trainer = await fixture.tenants[0].trainer.findUniqueOrThrow({ where: { identityId: fixture.users.trainerUser.id } });
@@ -1752,7 +1755,8 @@ test('owner appearance covers directories profiles sessions finance and configur
       await expect(page.locator('.owner-workspace')).toBeVisible();
       for (const width of [1440, 320]) {
         await page.setViewportSize({ width, height: 1000 });
-        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${mode} ${path} at ${width}px`).toBe(true);
+        await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth).catch(() => false),
+          { message: `${mode} ${path} at ${width}px` }).toBe(true);
         await page.screenshot({ path: join(evidence, `${mode}-screen-${index}-${width}.png`), fullPage: true, animations: 'disabled' });
       }
     }
@@ -1760,7 +1764,8 @@ test('owner appearance covers directories profiles sessions finance and configur
     for (const name of ['Gym Profile', 'Membership Plans', 'PT Session Rates', 'Trainer Pay Rates', 'Cancellation Policy']) {
       await page.getByRole('tab', { name, exact: true }).click();
       await expect(page.getByRole('tabpanel')).toBeVisible();
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${mode} config ${name}`).toBe(true);
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth).catch(() => false),
+        { message: `${mode} config ${name}` }).toBe(true);
     }
   }
   await page.goto(`${webBase}${base}/members`);

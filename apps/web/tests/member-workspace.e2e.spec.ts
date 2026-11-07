@@ -308,7 +308,8 @@ test('member requests keep drafts and withdraw without holding credits then conf
   await expect(page.getByRole('heading', { name: 'No active trainers found' })).toBeVisible();
   await page.getByLabel('Search by trainer name').fill('Trainer Alpha');
   await page.getByRole('button', { name: 'Search', exact: true }).click();
-  await page.getByRole('link', { name: 'Request this trainer', exact: true }).click();
+  await page.getByRole('link', { name: 'View Trainer Alpha profile', exact: true }).click();
+  await page.getByRole('link', { name: 'Request a private session', exact: true }).click();
   await page.setViewportSize({ width: 320, height: 844 });
   const requestDay = localDate(new Date(Date.now() + 4 * 86400000), 'Asia/Colombo');
   await page.getByLabel('Session date', { exact: true }).fill(requestDay);

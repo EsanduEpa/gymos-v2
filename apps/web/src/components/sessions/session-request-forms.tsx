@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState, useEffect, useState, useSyncExternalStore, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { createSessionRequest, decideSessionRequest, type SessionCommandState } from '@/app/session-request-actions';
 import { loadSessionSlots } from '@/app/availability-actions';
 
@@ -36,6 +37,7 @@ export function SessionRequestForm({ slug, trainerId, timeZone, requestKey, minD
 export function SessionRequestDecisionForm({ slug, sessionId, expectedVersion, action, requestKey }: {
   slug: string; sessionId: string; expectedVersion: number; action: 'ACCEPT' | 'DECLINE'; requestKey: string;
 }) {
+  const router = useRouter();
   const bound = decideSessionRequest.bind(null, slug, sessionId, requestKey, action, expectedVersion);
   const [state, setState] = useState<SessionCommandState>({});
   const [pending, startDecision] = useTransition();
@@ -45,6 +47,7 @@ export function SessionRequestDecisionForm({ slug, sessionId, expectedVersion, a
     startDecision(async () => {
       const result = await bound(state, formData);
       setState(result);
+      if (result.success) router.refresh();
     });
   }}>
     <input type="hidden" name="idempotencyKey" value={state.currentKey ?? state.nextKey ?? requestKey}/>
