@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: gymos-api
+    runtime: node
+    # Synthetic demo: sleeps when idle; workers resume when the service wakes.
+    plan: free
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build:deploy:api
+    startCommand: pnpm start:deploy:api
+    healthCheckPath: /
+    autoDeployTrigger: 'off'
+    envVars:
+      - key: NODE_VERSION
+        value: 24.22.0
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MASTER_DATABASE_URL
+        sync: false
+      - key: TENANT_DATABASE_URL
+        sync: false
+      - key: PROVISION_DATABASE_URL
+        sync: false
+      - key: GYMOS_DEPLOY_DATABASE_HOST
+        sync: false
+      - key: GYMOS_WEB_ORIGIN
+        sync: false
+      - key: PROVISIONING_RUNNER_ENABLED
+        value: 'true'
+      - key: PT_EXPIRY_RUNNER_ENABLED
+        value: 'true'

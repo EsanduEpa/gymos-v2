@@ -372,12 +372,14 @@ test('trainer accepts declines completes with confirmation and saves member-visi
   await openAs(page, fixture.users.trainerUser.id, `${base}/requests`);
   const accept = page.locator('.session-request-card').filter({ hasText: 'Trainer UI request 0' });
   await accept.getByRole('button', { name: 'Accept and reserve one credit' }).click();
-  await expect(accept).toContainText('Request accepted and one credit is now held.');
+  await expect.poll(async () => (await fixture.tenants[0].pTSession.findFirstOrThrow({ where: { notes: 'Trainer UI request 0' } })).state).toBe('SCHEDULED');
+  await expect(accept).toHaveCount(0);
   const decline = page.locator('.session-request-card').filter({ hasText: 'Trainer UI request 1' });
   await decline.locator('summary').filter({ hasText: 'Add optional message for member' }).click();
   await decline.getByLabel('Message for member').fill('Please choose another time.');
   await decline.getByRole('button', { name: 'Decline request', exact: true }).click();
-  await expect(decline).toContainText('Request declined.');
+  await expect.poll(async () => (await fixture.tenants[0].pTSession.findFirstOrThrow({ where: { notes: 'Trainer UI request 1' } })).state).toBe('DECLINED');
+  await expect(decline).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole('heading', { name: 'No pending requests' })).toBeVisible();
   const tenant = fixture.tenants[0];

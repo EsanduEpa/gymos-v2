@@ -24,7 +24,7 @@ async function bearer(identityId: string, gymId = fixture.gyms[0]!.id) {
   const session = await fixture.master.identitySession.create({ data: { identityId, gymAccountId: account.id, authVersion: account.authVersion,
     deviceClass: 'SHARED', deviceLabel: 'Finance integration test', refreshTokenHash, idleExpiresAt: new Date(now + 600_000), absoluteExpiresAt: new Date(now + 900_000) } });
   return new SignJWT({ authVersion: account.authVersion, sid: session.id, gaid: account.id }).setProtectedHeader({ alg: 'HS256' }).setSubject(identityId)
-    .setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('15m').sign(new TextEncoder().encode(secret));
+    .setIssuer('gymos-v2').setAudience('gymos-api').setIssuedAt().setExpirationTime('15m').sign(new TextEncoder().encode(secret));
 }
 async function call(path: string, accessToken: string, body?: unknown, method?: string) { return fetch(`${base}${path}`, { method: method ?? (body === undefined ? 'GET' : 'POST'),
   headers: { authorization: `Bearer ${accessToken}`, 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }); }

@@ -66,3 +66,12 @@ test('meal plan validates Monday-Sunday rows, exact macros, totals and strict me
     hasMore: false, asOf: '2026-09-01T00:00:00.000Z', timeZone: 'Asia/Colombo' }).success, true);
   assert.equal(memberWorkoutPlansQuerySchema.safeParse({ memberId: 'substitute' }).success, false);
 });
+
+test('trainer history preserves every session outcome without breaking the profile', () => {
+  for (const state of ['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE', 'COMPLETED', 'MISSED', 'CANCELLED', 'DECLINED', 'EXPIRED']) {
+    const history = { items: [{ id: 'history-1', state, scheduledStartAt: '2026-11-07T00:00:00.000Z',
+      scheduledEndAt: '2026-11-07T01:00:00.000Z', notes: null }], limit: 10, totalCount: 1, hasMore: false };
+    assert.equal(trainerClientProfileSchema.shape.recentSessions.safeParse(history).success, true, state);
+    assert.equal(trainerClientProfileSchema.shape.recentSessions.safeParse({ ...history, items: [{ ...history.items[0], state: 'UNKNOWN' }] }).success, false);
+  }
+});

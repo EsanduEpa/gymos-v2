@@ -1,3 +1,4 @@
+import { identityToken } from '../support/identity-token.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
@@ -18,14 +19,14 @@ let database:DatabaseService;let physical:GymProvisioningService;let tenants:Ten
 let reservations:ProvisioningReservationService;
 const secret=randomBytes(32).toString('hex');
 const password=randomBytes(24).toString('base64url');
-async function token(id:string,authVersion=0){return new SignJWT({authVersion}).setProtectedHeader({alg:'HS256'}).setSubject(id).setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('15m').sign(new TextEncoder().encode(secret));}
+async function token(id:string,authVersion=0){return identityToken(master, secret, id, authVersion);}
 async function scopedToken(identityId:string,gymId:string){
  const account=await master.gymAccount.findUniqueOrThrow({where:{userId_gymId:{userId:identityId,gymId}}});
  const now=Date.now();const session=await master.identitySession.create({data:{identityId,gymAccountId:account.id,authVersion:account.authVersion,
   deviceClass:'SHARED',deviceLabel:'Owner integration test',refreshTokenHash:createHash('sha256').update(randomBytes(32)).digest('hex'),
   idleExpiresAt:new Date(now+600_000),absoluteExpiresAt:new Date(now+900_000)}});
  return new SignJWT({authVersion:account.authVersion,sid:session.id,gaid:account.id}).setProtectedHeader({alg:'HS256'}).setSubject(identityId)
-  .setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('15m').sign(new TextEncoder().encode(secret));
+  .setIssuer('gymos-v2').setAudience('gymos-api').setIssuedAt().setExpirationTime('15m').sign(new TextEncoder().encode(secret));
 }
 const call=(path:string,bearer:string,body?:unknown,key=randomUUID())=>fetch(`${base}${path}`,{method:body===undefined?'GET':'POST',headers:{...(bearer?{authorization:`Bearer ${bearer}`}:{ }),'content-type':'application/json','idempotency-key':key},...(body===undefined?{}:{body:JSON.stringify(body)})});
 const input=(slug:string,email=`${slug}@example.test`)=>({name:'Synthetic activation gym',slug,ownerEmail:email,currency:'LKR' as const,timezone:'Asia/Colombo'});

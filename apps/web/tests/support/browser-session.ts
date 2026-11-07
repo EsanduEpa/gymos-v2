@@ -13,9 +13,9 @@ export async function installBrowserSession(input: {
   idleLifetimeMs?: number;
   expired?: boolean;
 }) {
-  const user = await input.master.user.findUniqueOrThrow({ where: { id: input.identityId }, select: { authVersion: true } });
+  const user = await input.master.user.findUniqueOrThrow({ where: { id: input.identityId }, select: { authVersion: true, passwordHash: true } });
   const gymAccount = input.gymId ? await input.master.gymAccount.upsert({ where: { userId_gymId: { userId: input.identityId, gymId: input.gymId } },
-    create: { userId: input.identityId, gymId: input.gymId, username: `browser-${input.identityId}-${input.gymId}`, passwordHash: 'fixture-not-a-login-hash', status: 'ACTIVE' },
+    create: { userId: input.identityId, gymId: input.gymId, username: `browser-${input.identityId}-${input.gymId}`, passwordHash: user.passwordHash, status: 'ACTIVE' },
     update: { status: 'ACTIVE', mustChangePassword: false, credentialExpiresAt: null } }) : null;
   const authVersion = gymAccount?.authVersion ?? user.authVersion;
   const now = new Date();

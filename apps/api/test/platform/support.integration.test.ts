@@ -1,8 +1,8 @@
+import { identityToken } from '../support/identity-token.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { SignJWT } from 'jose';
 import { PrismaClient } from '../../src/generated/master/client.js';
 import { AppModule } from '../../src/app.module.js';
 import { DatabaseService } from '../../src/database.service.js';
@@ -16,7 +16,7 @@ import { createDisposablePostgresRun } from '../support/disposable-postgres.js';
 let run:Awaited<ReturnType<typeof createDisposablePostgresRun>>;let master:PrismaClient;let app:INestApplication;let base:string;let actor:string;let bearer:string;let other:string;let tenants:TenantDatabaseService;let registry:PlatformRegistryService;
 let gymA:{id:string;slug:string};let gymB:{id:string;slug:string};let pending:{id:string;slug:string};
 const secret=randomBytes(32).toString('hex');
-const token=async(id:string,authVersion=0,sessionId?:string)=>new SignJWT({authVersion,...(sessionId?{sid:sessionId}:{})}).setProtectedHeader({alg:'HS256'}).setSubject(id).setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('15m').sign(new TextEncoder().encode(secret));
+const token = (id: string, authVersion = 0, sessionId?: string) => identityToken(master, secret, id, authVersion, sessionId);
 async function call(path:string,method='GET',body?:unknown,context?:string,identity=bearer){return fetch(`${base}${path}`,{method,headers:{authorization:`Bearer ${identity}`,'content-type':'application/json',...(context?{'x-gymos-support-context':context}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})});}
 const entry=(gymId:string)=>({gymId,scope:'GYM_SUMMARY_READ',reasonCode:'DIAGNOSE_ACCESS',explanation:'Synthetic support acceptance check'});
 const enter=async(gymId:string)=>{const response=await call('/admin/support-sessions','POST',entry(gymId));expect(response.status).toBe(201);return response.json();};

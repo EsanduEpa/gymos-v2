@@ -35,3 +35,6 @@ a2df3629832075a787ebe50a8e12b100c96d3690:apps/api/README.md:generic-api-key:5
 # Reviewed PR #14 false positives: evidence prose and a synthetic test password.
 4976c2533e8b5f1a5547986292d49623e34daae9:docs/common-foundation/EVIDENCE.md:generic-api-key:154
 a0de9b9d4cba56f92baca2e86d94eacee8356674:packages/contracts/test/member-applications.test.mjs:generic-api-key:10
+
+# PR #15: reviewed synthetic deployment-validator test value, never a live credential.
+bf48192f9e02c9139cfdf78e9694c32a24499520:infrastructure/deployment/config.test.mjs:generic-api-key:4

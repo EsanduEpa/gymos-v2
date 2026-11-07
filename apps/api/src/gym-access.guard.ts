@@ -198,7 +198,9 @@ export class GymAccessGuard implements CanActivate {
 
     request.gymAccess = {
       identityId: identity.userId,
-      identityVersion: identity.authVersion,
+      // Downstream identity fences compare User.authVersion. The scoped
+      // account version is independently validated against the session above.
+      identityVersion: user.authVersion,
       gymId: access.gymId,
       slug: access.gym.slug,
       role: access.role,

@@ -21,14 +21,18 @@ export async function identityFromAuthorization(
       issuer: 'gymos-v2',
       audience: 'gymos-api',
       algorithms: ['HS256'],
+      requiredClaims: ['sub', 'exp', 'iat', 'sid'],
+      maxTokenAge: '15m',
     });
+    if (!Number.isSafeInteger(payload.exp) || !Number.isSafeInteger(payload.iat)
+      || payload.exp! <= payload.iat! || payload.exp! - payload.iat! > 900) throw new Error('Invalid token lifetime');
     if (typeof payload.sub !== 'string'
       || typeof payload.authVersion !== 'number'
       || !Number.isSafeInteger(payload.authVersion)
       || payload.authVersion < 0) {
       throw new Error('Invalid identity claims');
     }
-    if (payload.sid !== undefined && (typeof payload.sid !== 'string' || !payload.sid || payload.sid.length > 128)) {
+    if (typeof payload.sid !== 'string' || !payload.sid || payload.sid.length > 128) {
       throw new Error('Invalid session claim');
     }
     if (payload.gaid !== undefined && (typeof payload.gaid !== 'string' || !payload.gaid || payload.gaid.length > 128 || typeof payload.sid !== 'string')) {

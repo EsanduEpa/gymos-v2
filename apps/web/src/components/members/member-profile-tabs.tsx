@@ -9,8 +9,8 @@ import { OwnerMemberCorrectionForm } from '@/components/profile/profile-forms';
 
 const items = [{ id: 'overview', label: 'Overview' }, { id: 'sessions', label: 'Attendance History' }, { id: 'history', label: 'Membership & Packs' }];
 
-export function MemberProfileTabs({ member, slug, requestKey }: { member: MemberDetail; slug: string; requestKey: string }) {
-  const [active, setActive] = useState(() => typeof window !== 'undefined' && window.location.hash === '#history' ? 'history' : 'overview');
+export function MemberProfileTabs({ member, slug, requestKey, initialTab = 'overview' }: { member: MemberDetail; slug: string; requestKey: string; initialTab?: 'overview' | 'history' }) {
+  const [active, setActive] = useState<string>(initialTab);
   return <section className="member-profile-tabs">
     <Card>
       <div className="ui-card-header"><div><span className="eyebrow dark">ACCOUNT</span><h2>{member.fullName}</h2></div><StatusBadge status={member.status}/></div>

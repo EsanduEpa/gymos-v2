@@ -1,6 +1,7 @@
 'use server';
 
 import { platformOperationSchema, provisioningInputSchema, idempotencyKeySchema } from '@gymos/contracts/platform';
+import { sessionRenewalSchema } from '@gymos/contracts';
 import { existingEndpointContracts, logoutResultSchema } from '@gymos/contracts/legacy';
 import { changePasswordInputSchema, changePasswordResultSchema } from '@gymos/contracts/credentials';
 import { recoveryCompleteInputSchema, recoveryCompleteResultSchema, recoveryIssueInputSchema, recoveryIssueResultSchema,
@@ -8,7 +9,7 @@ import { recoveryCompleteInputSchema, recoveryCompleteResultSchema, recoveryIssu
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { refreshCookieOptions, sessionCookieOptions } from '@/lib/session-transport';
+import { refreshCookieOptions, sessionCookieOptions, tokenExpiry } from '@/lib/session-transport';
 import { apiUrl, gymRoleLandingPath, SESSION_COOKIE, SESSION_REFRESH_COOKIE } from '@/lib/gymos';
 import { currentSupportCookie, SUPPORT_COOKIE } from '@/lib/support-context';
 
@@ -81,9 +82,19 @@ export async function login(formData: FormData) {
 
 async function endSession(scope: 'CURRENT' | 'ALL') {
   const jar = await cookies();
-  const token = jar.get(SESSION_COOKIE)?.value;
+  let token = jar.get(SESSION_COOKIE)?.value;
+  const refreshToken = jar.get(SESSION_REFRESH_COOKIE)?.value;
   let uncertain = false;
   try {
+    if ((!token || tokenExpiry(token) <= Date.now()) && refreshToken) {
+      const renewed = await fetch(apiUrl('/auth/refresh'), {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ refreshToken, activity: false }), cache: 'no-store', signal: AbortSignal.timeout(8000),
+      });
+      const parsed = sessionRenewalSchema.safeParse(await renewed.json().catch(() => null));
+      if (!renewed.ok || !parsed.success) throw new Error('Session renewal unavailable');
+      token = parsed.data.accessToken;
+    }
     if (token) {
       const response = await fetch(apiUrl('/auth/logout'), {
         method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },

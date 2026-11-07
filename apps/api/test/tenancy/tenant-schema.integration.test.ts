@@ -33,6 +33,19 @@ const digest = tenantManifestDigest();
 const guardJwtSecret = 'task018-test-secret-at-least-32-bytes-long';
 let previousJwtSecret: string | undefined;
 
+// Real durable sessions keep integration tokens aligned with production authentication.
+async function identityToken(identityId: string, authVersion: number) {
+  const now = Date.now();
+  const session = await master.identitySession.create({ data: {
+    identityId, authVersion, deviceClass: 'PERSONAL', deviceLabel: 'Integration fixture',
+    refreshTokenHash: createHash('sha256').update(randomUUID()).digest('hex'),
+    idleExpiresAt: new Date(now + 600_000), absoluteExpiresAt: new Date(now + 900_000),
+  } });
+  return new SignJWT({ authVersion, sid: session.id }).setProtectedHeader({ alg: 'HS256' })
+    .setSubject(identityId).setIssuer('gymos-v2').setAudience('gymos-api')
+    .setIssuedAt().setExpirationTime('5m').sign(new TextEncoder().encode(guardJwtSecret));
+}
+
 function tenantClient(url: string): TenantClient {
   return new TenantClient({ adapter: new PrismaPg({ connectionString: url, max: 2 }) });
 }
@@ -340,9 +353,7 @@ it('publishes only active actors with matching completed Master operation, tenan
   async function requestFor(identityId: string, slug = gym.slug) {
     const user = await master.user.findUniqueOrThrow({ where: { id: identityId }, select: { authVersion: true, globalRole: true } });
     if (user.globalRole === 'SUPER_ADMIN') {
-      const token = await new SignJWT({ authVersion: user.authVersion }).setProtectedHeader({ alg: 'HS256' })
-        .setSubject(identityId).setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('5m')
-        .sign(new TextEncoder().encode(guardJwtSecret));
+      const token = await identityToken(identityId, user.authVersion);
       const request = { headers: { authorization: `Bearer ${token}` }, params: { slug } } as unknown as GymRequest;
       const execution = { switchToHttp: () => ({ getRequest: () => request }) } as ExecutionContext;
       await guard.canActivate(execution);
@@ -357,7 +368,7 @@ it('publishes only active actors with matching completed Master operation, tenan
       deviceClass: 'PERSONAL', deviceLabel: 'Integration fixture', refreshTokenHash,
       idleExpiresAt: new Date(now + 600_000), absoluteExpiresAt: new Date(now + 900_000) } });
     const token = await new SignJWT({ authVersion: gymAccount.authVersion, sid: session.id, gaid: gymAccount.id }).setProtectedHeader({ alg: 'HS256' })
-      .setSubject(identityId).setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('5m')
+      .setSubject(identityId).setIssuer('gymos-v2').setAudience('gymos-api').setIssuedAt().setExpirationTime('5m')
       .sign(new TextEncoder().encode(guardJwtSecret));
     const request = { headers: { authorization: `Bearer ${token}` }, params: { slug } } as unknown as GymRequest;
     const execution = { switchToHttp: () => ({ getRequest: () => request }) } as ExecutionContext;
@@ -550,9 +561,7 @@ it('commits a full owner enrollment once and requires authenticated explicit con
   expect(await tenants[0].member.count({ where: { email: existingIdentity.email } })).toBe(0);
   expect(await master.gymAccess.findUnique({ where: { userId_gymId: { userId: existingIdentity.id, gymId: gymIds[0] } } })).toBeNull();
 
-  const memberToken = await new SignJWT({ authVersion: existingIdentity.authVersion }).setProtectedHeader({ alg: 'HS256' })
-    .setSubject(existingIdentity.id).setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('5m')
-    .sign(new TextEncoder().encode(guardJwtSecret));
+  const memberToken = await identityToken(existingIdentity.id, existingIdentity.authVersion);
   const consentRequest = { headers: { authorization: `Bearer ${memberToken}` } } as never;
   const controllerWithEnrollment = new GymsController({ master } as DatabaseService, gateFor(), service);
   await expect(controllerWithEnrollment.memberEnrollmentConsent(consentRequest, access.slug, pending.operationId,
@@ -592,9 +601,7 @@ it('commits a full owner enrollment once and requires authenticated explicit con
   const declinedInput = { ...reusedInput, email: declineIdentity.email, idempotencyKey: 'member-consent-enrollment-02' };
   const declinedPending = await service.enroll(access as never, declinedInput);
   if (declinedPending.status !== 'PENDING') throw new Error('Expected second consent to be pending');
-  const declineToken = await new SignJWT({ authVersion: declineIdentity.authVersion }).setProtectedHeader({ alg: 'HS256' })
-    .setSubject(declineIdentity.id).setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('5m')
-    .sign(new TextEncoder().encode(guardJwtSecret));
+  const declineToken = await identityToken(declineIdentity.id, declineIdentity.authVersion);
   const declined = await controllerWithEnrollment.memberEnrollmentConsent(
     { headers: { authorization: `Bearer ${declineToken}` } } as never, access.slug, declinedPending.operationId,
     { decision: 'DECLINE', currentPassword: existingPassword },
@@ -1123,8 +1130,7 @@ it('keeps global and gym profiles separate, fences self edits, versions and repl
   const tenant = tenants[0]!;
   const member = await tenant.member.findUniqueOrThrow({ where: { id: memberLink.tenantActorId! } });
   const user = await master.user.update({ where: { id: memberLink.userId }, data: { mustChangePassword: false, credentialExpiresAt: null } });
-  const jwt = await new SignJWT({ authVersion: user.authVersion, sid: `profile-${randomUUID()}` }).setProtectedHeader({ alg: 'HS256' })
-    .setSubject(user.id).setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('5m').sign(new TextEncoder().encode(guardJwtSecret));
+  const jwt = await identityToken(user.id, user.authVersion);
   const database = { master } as DatabaseService;
   const profileController = new GymProfileController(database, gateFor());
   const context0 = await context(0);

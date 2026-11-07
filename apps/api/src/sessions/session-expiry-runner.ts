@@ -58,12 +58,21 @@ export class SessionExpiryRunner implements OnModuleInit, OnApplicationShutdown 
         where: { status: 'ACTIVE', expectedTenantSchemaVersion: TENANT_TEMPLATE_MANIFEST.version,
           expectedTenantManifestDigest: manifestDigest, expectedTenantOperationId: { not: null }, ...(this.gymCursor ? { id: { gt: this.gymCursor } } : {}) },
         orderBy: { id: 'asc' }, take: 1000,
-        include: { expectedTenantOperation: { select: { state: true, databaseName: true } } },
+        include: { expectedTenantOperation: { select: { state: true, databaseName: true, kind: true, gymId: true } } },
       });
       for (const gym of registry) {
         this.gymCursor = gym.id;
         if (this.stopping) break;
-        if (gym.expectedTenantOperation?.state !== 'COMPLETE' || gym.expectedTenantOperation.databaseName !== gym.databaseName) { skipped++; continue; }
+        const operation = gym.expectedTenantOperation;
+        if (operation?.state !== 'COMPLETE') { skipped++; continue; }
+        if (operation.databaseName !== gym.databaseName) {
+          // Rollout operations reference an already owned physical database;
+          // databaseName is unique to its original provisioning operation.
+          const owner = operation.kind === 'ROLLOUT_TENANT_SCHEMA' && operation.gymId === gym.id
+            ? await this.database.master.operation.findFirst({ where: { kind: 'PROVISION_GYM', state: 'COMPLETE', gymId: gym.id, databaseName: gym.databaseName }, select: { id: true } })
+            : null;
+          if (!owner) { skipped++; continue; }
+        }
         try {
           const counts = await this.database.master.$transaction(async masterTx => {
             const [lock] = await masterTx.$queryRaw<{ locked: boolean }[]>`SELECT pg_try_advisory_xact_lock(hashtextextended(${`pt-expiry:${gym.id}`}, 0)) AS locked`;
