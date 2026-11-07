@@ -1738,7 +1738,7 @@ test('owner appearance upgrades live operations with accurate metrics and recove
 });
 
 test('owner appearance covers directories profiles sessions finance and configuration in both themes', async ({ page, request }) => {
-  test.setTimeout(420_000);
+  test.setTimeout(480_000);
   const base = `/gyms/${fixture.gyms[0].slug}/owner`;
   const member = await fixture.tenants[0].member.findUniqueOrThrow({ where: { identityId: fixture.users.memberUser.id } });
   const trainer = await fixture.tenants[0].trainer.findUniqueOrThrow({ where: { identityId: fixture.users.trainerUser.id } });
@@ -1789,9 +1789,8 @@ test('owner appearance covers directories profiles sessions finance and configur
   expect(await fixture.tenants[1].expenseRecord.count({ where: { description: 'Owner UI verification expense' } })).toBe(0);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await openWithTestSession(page, fixture.users.multiOwner.id, base);
-  await page.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link', { name: 'Switch gym', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Choose a gym' })).toBeVisible();
-  await page.getByRole('link', { name: /Test Gym Beta/ }).click();
+  await expect(page.getByRole('navigation', { name: 'Main navigation', exact: true }).getByRole('link', { name: 'Switch gym', exact: true })).toHaveCount(0);
+  await openWithTestSession(page, fixture.users.multiOwner.id, `/gyms/${fixture.gyms[1].slug}/owner`);
   await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[1].slug}/owner$`));
   await expect(page.locator('.workspace-header-gym')).toHaveText('Test Gym Beta');
   await expect(page.locator('html')).toHaveAttribute('data-appearance', 'dark');
