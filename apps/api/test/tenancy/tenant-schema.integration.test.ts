@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import argon2 from 'argon2';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { ConflictException, ForbiddenException, ServiceUnavailableException, UnprocessableEntityException, type ExecutionContext } from '@nestjs/common';
@@ -7,6 +7,7 @@ import { PrismaClient as MasterClient } from '../../src/generated/master/client.
 import { PrismaClient as TenantClient } from '../../src/generated/tenant/client.js';
 import type { DatabaseService } from '../../src/database.service.js';
 import { GymsController } from '../../src/gyms.controller.js';
+import { AccountProfileController, GymProfileController } from '../../src/profiles.controller.js';
 import { MemberEnrollmentService } from '../../src/member-enrollment.service.js';
 import { TrainerEnrollmentService } from '../../src/trainer-enrollment.service.js';
 import { isOperationalActor } from '../../src/identity/publication-policy.js';
@@ -337,7 +338,25 @@ it('publishes only active actors with matching completed Master operation, tenan
 
   const guard = new GymAccessGuard({ master } as DatabaseService, gateFor());
   async function requestFor(identityId: string, slug = gym.slug) {
-    const token = await new SignJWT({ authVersion: 0 }).setProtectedHeader({ alg: 'HS256' })
+    const user = await master.user.findUniqueOrThrow({ where: { id: identityId }, select: { authVersion: true, globalRole: true } });
+    if (user.globalRole === 'SUPER_ADMIN') {
+      const token = await new SignJWT({ authVersion: user.authVersion }).setProtectedHeader({ alg: 'HS256' })
+        .setSubject(identityId).setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('5m')
+        .sign(new TextEncoder().encode(guardJwtSecret));
+      const request = { headers: { authorization: `Bearer ${token}` }, params: { slug } } as unknown as GymRequest;
+      const execution = { switchToHttp: () => ({ getRequest: () => request }) } as ExecutionContext;
+      await guard.canActivate(execution);
+      return request;
+    }
+    const gymAccount = await master.gymAccount.upsert({ where: { userId_gymId: { userId: identityId, gymId: gym.id } },
+      create: { userId: identityId, gymId: gym.id, username: `guard-${randomUUID()}@example.test`, passwordHash: 'fixture-not-a-login-hash', status: 'ACTIVE' },
+      update: { status: 'ACTIVE', mustChangePassword: false, credentialExpiresAt: null } });
+    const now = Date.now();
+    const refreshTokenHash = createHash('sha256').update(randomUUID()).digest('hex');
+    const session = await master.identitySession.create({ data: { identityId, gymAccountId: gymAccount.id, authVersion: gymAccount.authVersion,
+      deviceClass: 'PERSONAL', deviceLabel: 'Integration fixture', refreshTokenHash,
+      idleExpiresAt: new Date(now + 600_000), absoluteExpiresAt: new Date(now + 900_000) } });
+    const token = await new SignJWT({ authVersion: gymAccount.authVersion, sid: session.id, gaid: gymAccount.id }).setProtectedHeader({ alg: 'HS256' })
       .setSubject(identityId).setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('5m')
       .sign(new TextEncoder().encode(guardJwtSecret));
     const request = { headers: { authorization: `Bearer ${token}` }, params: { slug } } as unknown as GymRequest;
@@ -408,7 +427,7 @@ it('publishes only active actors with matching completed Master operation, tenan
   const superAdmin = await master.user.create({ data: {
     email: `guard-platform-admin-${run.runId}@example.test`, passwordHash: 'fixture-not-a-login-hash', globalRole: 'SUPER_ADMIN',
   } });
-  await expect(requestFor(superAdmin.id)).rejects.toThrow('Gym access denied');
+  await expect(requestFor(superAdmin.id)).rejects.toThrow('Platform accounts cannot enter gym workspaces');
 });
 
 it('preserves member list/create behavior and maps duplicate email to a safe conflict', async () => {
@@ -585,6 +604,33 @@ it('commits a full owner enrollment once and requires authenticated explicit con
     .toMatchObject({ state: 'FAILED_FINAL', errorCode: 'CONSENT_DECLINED' });
   expect(await tenants[0].member.count({ where: { email: declineIdentity.email } })).toBe(0);
   expect(await master.gymAccess.findUnique({ where: { userId_gymId: { userId: declineIdentity.id, gymId: gymIds[0] } } })).toBeNull();
+});
+
+it('publishes an already-consented applicant offer without changing credentials', async () => {
+  await master.gymAccess.createMany({ data: [{ userId: actorId, gymId: gymIds[0], role: 'OWNER', linkStatus: 'ACTIVE' }], skipDuplicates: true });
+  await tenants[0].gymConfiguration.update({ where: { id: 'current' }, data: { timezone: 'Asia/Colombo', currency: 'LKR' } });
+  const plan = await tenants[0].membershipPlan.create({ data: { name: 'Application Plan', price: '999.00', currency: 'LKR', durationDays: 30 } });
+  const ownerAccess = await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: actorId, gymId: gymIds[0] } } });
+  const access = { ...(await context(0)), slug: `schema-0-${run.runId}`, role: 'OWNER', identityId: actorId,
+    identityVersion: 0, accessVersion: ownerAccess.version, actor: null } as const;
+  const currentPassword = `application-consent-${run.runId}`;
+  const passwordHash = await argon2.hash(currentPassword, { type: argon2.argon2id });
+  const applicant = await master.user.create({ data: { email: `application-${run.runId}@example.test`, passwordHash } });
+  const application = await master.memberApplication.create({ data: { gymId: gymIds[0], identityId: applicant.id,
+    fullName: 'Application Applicant', phone: '+94115556666', consentedAt: new Date(), state: 'PROCESSING',
+    membershipPlanId: plan.id, dateOfBirth: '1995-06-15', membershipPlanName: plan.name, membershipPrice: plan.price.toString(),
+    membershipCurrency: plan.currency, membershipDurationDays: plan.durationDays, membershipPlanVersion: plan.version } });
+  const credential = { issueTemporaryCredential: async () => { throw new Error('Applicant enrollment must not issue a temporary password'); } } as unknown as CredentialService;
+  const service = new MemberEnrollmentService({ master } as DatabaseService, gateFor(), credential);
+  const input = { fullName: application.fullName, email: applicant.email, phone: application.phone, dateOfBirth: application.dateOfBirth!,
+    membershipPlanId: plan.id, idempotencyKey: `member-application:${application.id}` };
+  const completed = await service.enroll(access as never, input, application.id);
+  expect(completed).toMatchObject({ status: 'COMPLETE', memberId: expect.any(String) });
+  if (completed.status !== 'COMPLETE') throw new Error('Expected already-consented application enrollment to complete');
+  expect(await master.user.findUniqueOrThrow({ where: { id: applicant.id } })).toMatchObject({ passwordHash });
+  expect(await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: applicant.id, gymId: gymIds[0] } } }))
+    .toMatchObject({ role: 'MEMBER', linkStatus: 'ACTIVE', actorKind: 'MEMBER', tenantActorId: completed.memberId });
+  expect(await tenants[0].member.count({ where: { email: applicant.email } })).toBe(1);
 });
 
 it('rejects invalid future dates, foreign plans and strict DTO fields before any enrollment effect', async () => {
@@ -1069,4 +1115,92 @@ it('projects only published members with filtered totals and denies foreign or n
     tenants[0].membershipTerm.count(), tenants[0].commandReceipt.count(), tenants[1].auditLog.count(),
   ]);
   expect(after).toEqual(before);
+});
+
+it('keeps global and gym profiles separate, fences self edits, versions and replays saves, and audits owner correction without field values', async () => {
+  const memberLink = await master.gymAccess.findFirstOrThrow({ where: { gymId: gymIds[0], role: 'MEMBER', actorKind: 'MEMBER',
+    linkStatus: 'ACTIVE', tenantActorId: { not: null }, enrollmentOperationId: { not: null } } });
+  const tenant = tenants[0]!;
+  const member = await tenant.member.findUniqueOrThrow({ where: { id: memberLink.tenantActorId! } });
+  const user = await master.user.update({ where: { id: memberLink.userId }, data: { mustChangePassword: false, credentialExpiresAt: null } });
+  const jwt = await new SignJWT({ authVersion: user.authVersion, sid: `profile-${randomUUID()}` }).setProtectedHeader({ alg: 'HS256' })
+    .setSubject(user.id).setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('5m').sign(new TextEncoder().encode(guardJwtSecret));
+  const database = { master } as DatabaseService;
+  const profileController = new GymProfileController(database, gateFor());
+  const context0 = await context(0);
+  const memberAccess = { ...context0, slug: `schema-0-${run.runId}`, role: 'MEMBER', identityId: user.id,
+    identityVersion: user.authVersion, accessVersion: memberLink.version,
+    actor: { kind: 'MEMBER', id: memberLink.tenantActorId!, registrationOperationId: memberLink.enrollmentOperationId! } } as const;
+  const memberRequest = { gymAccess: memberAccess } as GymRequest;
+  const beforeGlobalName = member.fullName;
+  const accountController = new AccountProfileController(database);
+  const authRequest = { headers: { authorization: `Bearer ${jwt}` } } as never;
+  const accountSave = { displayName: 'Synthetic Global Display', expectedVersion: user.version };
+  const accountResult = await accountController.update(authRequest, 'profile-account-save-0001', accountSave);
+  expect(accountResult).toMatchObject({ version: user.version + 1, replayed: false });
+  expect(await accountController.update(authRequest, 'profile-account-save-0001', accountSave)).toMatchObject({ version: user.version + 1, replayed: true });
+  expect((await master.user.findUniqueOrThrow({ where: { id: user.id } })).displayName).toBe('Synthetic Global Display');
+  expect((await tenant.member.findUniqueOrThrow({ where: { id: member.id } })).fullName).toBe(beforeGlobalName);
+
+  const self = await profileController.getMine(memberRequest) as { memberId: string; version: number; phone: string | null };
+  expect(self).toMatchObject({ memberId: member.id, version: member.version });
+  const selfBody = { phone: '+94770001122', emergencyContact: 'Synthetic Contact · 0710000000', expectedVersion: self.version };
+  const selfResult = await profileController.updateMine(memberRequest, 'profile-member-save-0001', selfBody);
+  expect(selfResult).toMatchObject({ version: self.version + 1, replayed: false });
+  expect(await profileController.updateMine(memberRequest, 'profile-member-save-0001', selfBody)).toMatchObject({ version: self.version + 1, replayed: true });
+  expect(await tenant.member.findUniqueOrThrow({ where: { id: member.id } })).toMatchObject({ phone: selfBody.phone, emergencyContact: selfBody.emergencyContact, fullName: beforeGlobalName });
+  await expect(profileController.updateMine(memberRequest, 'profile-member-save-0002', { ...selfBody, expectedVersion: self.version, healthNotes: 'forged' }))
+    .rejects.toBeInstanceOf(UnprocessableEntityException);
+  await expect(profileController.updateMine({ gymAccess: { ...memberAccess, identityId: actorId } } as GymRequest, 'profile-member-save-0003',
+    { ...selfBody, expectedVersion: self.version + 1 })).rejects.toBeInstanceOf(ForbiddenException);
+
+  const competing = await Promise.allSettled([
+    profileController.updateMine(memberRequest, 'profile-member-race-0001', { ...selfBody, phone: '+94771110001', expectedVersion: self.version + 1 }),
+    profileController.updateMine(memberRequest, 'profile-member-race-0002', { ...selfBody, phone: '+94772220002', expectedVersion: self.version + 1 }),
+  ]);
+  expect(competing.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+  expect(competing.filter(result => result.status === 'rejected')).toHaveLength(1);
+  expect((competing.find(result => result.status === 'rejected') as PromiseRejectedResult).reason).toBeInstanceOf(ConflictException);
+
+  const ownerLink = await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: actorId, gymId: gymIds[0] } } });
+  const owner = { ...context0, slug: `schema-0-${run.runId}`, role: 'OWNER', identityId: actorId,
+    identityVersion: 0, accessVersion: ownerLink.version, actor: null } as const;
+  const correctionBody = { fullName: 'Synthetic Corrected Official Name', dateOfBirth: '1992-03-04', phone: '+94770002233',
+    emergencyContact: 'Synthetic Correction Contact', healthNotes: 'Synthetic updated health note',
+    expectedVersion: self.version + 2, reason: 'MEMBER_REQUEST' };
+  const correction = await profileController.correctMember({ gymAccess: owner } as GymRequest, member.id, 'profile-owner-correct-0001', correctionBody);
+  expect(correction).toMatchObject({ version: self.version + 3, replayed: false });
+  expect(await profileController.correctMember({ gymAccess: owner } as GymRequest, member.id, 'profile-owner-correct-0001', correctionBody))
+    .toMatchObject({ version: self.version + 3, replayed: true });
+  const changedMember = await tenant.member.findUniqueOrThrow({ where: { id: member.id } });
+  expect(changedMember).toMatchObject({ fullName: correctionBody.fullName, phone: correctionBody.phone,
+    emergencyContact: correctionBody.emergencyContact, healthNotes: correctionBody.healthNotes });
+  expect(changedMember.dateOfBirth?.toISOString().slice(0, 10)).toBe(correctionBody.dateOfBirth);
+  const ownerAudit = await tenant.auditLog.findFirstOrThrow({ where: { eventCode: 'OWNER_MEMBER_PROFILE_CORRECTED', resourceId: member.id } });
+  expect(ownerAudit.transition).toEqual({ from: String(self.version + 2), to: String(self.version + 3), version: self.version + 3, reasonCode: 'MEMBER_REQUEST' });
+  expect(JSON.stringify(ownerAudit.transition)).not.toContain(correctionBody.healthNotes);
+  const profileNotice = await tenant.notification.findFirstOrThrow({ where: { recipientIdentityId: member.identityId!, eventCode: 'MEMBER_PROFILE_CORRECTED' } });
+  expect(profileNotice).toMatchObject({ title: 'Membership profile updated', message: 'A gym owner updated your membership profile. Review your profile details.', linkKind: 'MEMBER_PROFILE', resourceId: member.id });
+  expect(profileNotice.message).not.toMatch(/Synthetic|1992|9477|MEMBER_REQUEST/);
+  expect(profileNotice.message).not.toContain(correctionBody.healthNotes);
+  await expect(profileController.correctMember({ gymAccess: owner } as GymRequest, member.id, 'profile-owner-correct-0002',
+    { ...correctionBody, expectedVersion: self.version + 3, status: 'SUSPENDED' })).rejects.toBeInstanceOf(UnprocessableEntityException);
+  expect((await tenant.member.findUniqueOrThrow({ where: { id: member.id } })).status).toBe(member.status);
+
+  const trainerLink = await master.gymAccess.findFirstOrThrow({ where: { gymId: gymIds[0], role: 'TRAINER', actorKind: 'TRAINER',
+    linkStatus: 'ACTIVE', tenantActorId: { not: null }, enrollmentOperationId: { not: null } } });
+  const trainerUser = await master.user.update({ where: { id: trainerLink.userId }, data: { mustChangePassword: false, credentialExpiresAt: null } });
+  const trainerAccess = { ...context0, slug: `schema-0-${run.runId}`, role: 'TRAINER', identityId: trainerUser.id,
+    identityVersion: trainerUser.authVersion, accessVersion: trainerLink.version,
+    actor: { kind: 'TRAINER', id: trainerLink.tenantActorId!, registrationOperationId: trainerLink.enrollmentOperationId! } } as const;
+  const trainerRequest = { gymAccess: trainerAccess } as GymRequest;
+  const trainerProfile = await profileController.getMine(trainerRequest) as { trainerId: string; version: number };
+  const trainerSave = { phone: '+94773334444', biography: 'Synthetic updated trainer biography', specialisations: ['Strength', 'Mobility'],
+    yearsExperience: 9, expectedVersion: trainerProfile.version };
+  expect(await profileController.updateMine(trainerRequest, 'profile-trainer-save-0001', trainerSave)).toMatchObject({ version: trainerProfile.version + 1, replayed: false });
+  expect(await profileController.updateMine(trainerRequest, 'profile-trainer-save-0001', trainerSave)).toMatchObject({ version: trainerProfile.version + 1, replayed: true });
+  expect(await tenant.trainer.findUniqueOrThrow({ where: { id: trainerProfile.trainerId } })).toMatchObject({ phone: trainerSave.phone,
+    bio: trainerSave.biography, specialisations: trainerSave.specialisations, yearsExperience: trainerSave.yearsExperience });
+  await expect(profileController.updateMine(trainerRequest, 'profile-trainer-save-0002', { ...trainerSave, level: 'LEVEL_2' }))
+    .rejects.toBeInstanceOf(UnprocessableEntityException);
 });

@@ -84,6 +84,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm prepare:checks
       - run: pnpm --dir apps/web exec next typegen
+      # Web browser fixtures import API dist modules during TypeScript checking.
+      - run: pnpm --dir apps/api build
       - run: pnpm typecheck:workspace
 
   unit:
@@ -128,6 +130,7 @@ jobs:
       - run: pnpm --dir apps/api exec vitest run --config vitest.config.identity.ts --disableConsoleIntercept
       - run: pnpm --dir apps/api exec vitest run --config vitest.config.tenancy-integration.ts --disableConsoleIntercept
       - run: pnpm --dir apps/api exec vitest run --config vitest.config.platform.ts --disableConsoleIntercept
+      - run: pnpm test:pt:owned
       - if: always()
         run: |
           mkdir -p safe-evidence
@@ -162,6 +165,7 @@ jobs:
       - run: pnpm build:workspace
       - run: pnpm --dir apps/web exec playwright install --with-deps chromium
       - run: pnpm test:isolated
+      - run: pnpm --dir apps/web exec playwright test tests/pt-workspaces.e2e.spec.ts tests/notifications-bell.e2e.spec.ts
       - if: always()
         run: |
           mkdir -p safe-evidence

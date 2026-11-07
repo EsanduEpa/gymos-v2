@@ -2,11 +2,11 @@ import type { MemberSessionOverview } from '@gymos/contracts';
 import styles from './owner-month-overview.module.css';
 
 const labels: Record<keyof MemberSessionOverview['items'][number]['monthSessionCounts'], string> = {
-  pending: 'Pending', scheduled: 'Scheduled', active: 'Active', completed: 'Completed', missed: 'No-show', cancelled: 'Cancelled', declined: 'Declined',
+  pending: 'Pending', scheduled: 'Scheduled', active: 'Active', completed: 'Completed', missed: 'No-show', cancelled: 'Cancelled', declined: 'Declined', expired: 'Expired',
 };
 
 function href(slug: string, month: string, q: string | undefined, page: number, memberId?: string) {
-  const query = new URLSearchParams({ mode: 'month', month, page: String(page) });
+  const query = new URLSearchParams({ view: 'list', mode: 'month', month, page: String(page) });
   if (q) query.set('q', q);
   if (memberId) query.set('memberId', memberId);
   return `/gyms/${encodeURIComponent(slug)}/owner/sessions?${query}`;

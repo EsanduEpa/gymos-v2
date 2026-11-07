@@ -170,3 +170,4 @@
 .owner-workspace .member-directory-filters > label { flex: 1 1 140px; min-width: 0; }
 .owner-workspace .owner-member-filters { display: grid; margin-top: 0; }
 @media (max-width: 560px) { .owner-workspace .member-directory-filters { flex-direction: column; align-items: stretch; }.owner-workspace .member-directory-filters > label { flex: none; } }
+@media (max-width: 560px) { .owner-workspace .ui-tabs { flex-wrap: wrap; gap: 2px 14px; overflow-x: visible; } }

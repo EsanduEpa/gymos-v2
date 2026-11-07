@@ -189,3 +189,7 @@ html[data-appearance="dark"] .member-workspace { --member-meal: #e9afe3; --membe
   .member-plan-pager { flex-wrap: wrap; }
   .member-workspace input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), .member-workspace select, .member-workspace textarea { font-size: 16px; }
 }
+
+.member-pt-priority { margin-bottom: 24px; }
+.member-pt-priority .member-section-heading { flex-wrap: wrap; gap: 12px; }
+.member-pt-priority li { margin-block: 8px; overflow-wrap: anywhere; }

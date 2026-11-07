@@ -148,7 +148,9 @@ it('completes the held credit using the booking policy snapshot, replays safely,
   expect(await ctx.tenant.payRecord.count({ where: { sessionId: ready.session.id } })).toBe(1);
   expect(await ctx.tenant.sessionCreditHold.count({ where: { sessionId: ready.session.id, state: 'CONSUMED' } })).toBe(1);
   expect(await ctx.tenant.packCreditMovement.count({ where: { packId: ready.pack.id, kind: 'CONSUME', creditOrdinal: 1 } })).toBe(1);
-  expect(await ctx.tenant.notification.count({ where: { resourceId: ready.session.id, eventCode: 'SESSION_COMPLETED' } })).toBe(1);
+  const completedNotices = await ctx.tenant.notification.findMany({ where: { resourceId: ready.session.id, eventCode: 'SESSION_COMPLETED' } });
+  expect(completedNotices).toHaveLength(2);
+  expect(new Set(completedNotices.map(notice => notice.recipientIdentityId))).toEqual(new Set([fixture.users.memberUser.id, fixture.users.trainerUser.id]));
   const payRow = await ctx.tenant.payRecord.findUniqueOrThrow({ where: { sessionId: ready.session.id } });
   expect(payRow.confirmationRate.toFixed(6)).toBe('0.400000');
   expect(payRow.confirmationLevel).toBe('LEVEL_1');
@@ -167,6 +169,13 @@ it('completes the held credit using the booking policy snapshot, replays safely,
   expect(replayedNote).toMatchObject({ receiptId: firstSaved.receiptId, replayed: true, notes: 'Member-safe shared note', version: 3 });
   const memberPage = await ctx.reads.list(ctx.memberAccess, {});
   expect(memberPage.items.find(row => row.id === ready.session.id)?.notes).toBe('New shared note');
+  for (const access of [ctx.memberAccess, ctx.trainerAccess, ctx.ownerAccess]) {
+    const detail = await ctx.reads.detail(access, ready.session.id);
+    expect(detail).toMatchObject({ reservation: 'CONSUMED', settlement: 'COMPLETED', creditConsumed: true,
+      minimumCompletionMinutes: thresholdMinutes, session: { id: ready.session.id, state: 'COMPLETED', notes: 'New shared note', version: 4 } });
+    expect(detail.timeline.filter(event => event.notesUpdated)).toHaveLength(2);
+    expect(detail.session).toMatchObject(access.role === 'MEMBER' ? { trainerPay: null, fee: null, currency: null } : access.role === 'TRAINER' ? { trainerPay: '40', fee: null } : { fee: '100', trainerPay: null });
+  }
   expect(await ctx.tenant.sessionCreditHold.count({ where: { sessionId: ready.session.id } })).toBe(countsBeforeNotes.holds);
   expect(await ctx.tenant.revenueRecord.count({ where: { sessionId: ready.session.id } })).toBe(countsBeforeNotes.revenue);
   expect(await ctx.tenant.payRecord.count({ where: { sessionId: ready.session.id } })).toBe(countsBeforeNotes.pay);
@@ -216,7 +225,7 @@ it('rolls back completion effects on an injected earning failure and writes a si
   const correctionReplay = await ctx.service.complete(ctx.trainerAccess, closed.session.id, closedBody);
   expect(correctionReplay).toMatchObject({ receiptId: correction.receiptId, replayed: true, trainerPay: correction.trainerPay, session: { version: 2, state: 'COMPLETED' } });
   expect(correction.trainerPay).toMatchObject({ recordId: expect.any(String), periodId: expect.not.stringMatching(closedPeriod.id), amount: '40' });
-  const row = await ctx.tenant.trainerPayCorrection.findUniqueOrThrow({ where: { sessionId: closed.session.id } });
+  const row = await ctx.tenant.trainerPayCorrection.findFirstOrThrow({ where: { sessionId: closed.session.id } });
   expect(row).toMatchObject({ originalPeriodId: closedPeriod.id, correctionPeriodId: correction.trainerPay.periodId, sourcePeriodState: 'CLOSED', reason: expect.any(String) });
   expect(await ctx.tenant.payRecord.count({ where: { sessionId: closed.session.id } })).toBe(0);
   expect(await ctx.tenant.trainerPayCorrection.count({ where: { sessionId: closed.session.id } })).toBe(1);
@@ -236,7 +245,7 @@ it('rolls back completion effects on an injected earning failure and writes a si
   const approvedCorrection = await ctx.service.complete(ctx.trainerAccess, approved.session.id, approvedBody);
   const approvedReplay = await ctx.service.complete(ctx.trainerAccess, approved.session.id, approvedBody);
   expect(approvedReplay).toMatchObject({ receiptId: approvedCorrection.receiptId, replayed: true, trainerPay: approvedCorrection.trainerPay });
-  const approvedRow = await ctx.tenant.trainerPayCorrection.findUniqueOrThrow({ where: { sessionId: approved.session.id } });
+  const approvedRow = await ctx.tenant.trainerPayCorrection.findFirstOrThrow({ where: { sessionId: approved.session.id } });
   expect(approvedRow).toMatchObject({ originalPeriodId: closedPeriod.id, correctionPeriodId: approvedCorrection.trainerPay.periodId, sourcePeriodState: 'APPROVED',
     sourcePeriodApprovedByIdentityId: ctx.ownerAccess.identityId });
   expect(approvedRow.sourcePeriodApprovedAt).toEqual(approvalTime);

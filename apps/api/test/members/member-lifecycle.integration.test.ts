@@ -39,7 +39,7 @@ it('revokes access before suspension, preserves operation replay, and reactivate
   const betaSessionId = `session-beta-lifecycle-${run.runId}`;
   const betaSessionStart = new Date(Date.now() + 24 * 60 * 60_000);
   await betaTenant.pTSession.create({ data: { id: betaSessionId, memberId: betaMember.id, trainerId: betaTrainer.id, state: 'PENDING_CONFIRMATION', type: 'IN_PERSON',
-    scheduledStartAt: betaSessionStart, scheduledEndAt: new Date(betaSessionStart.getTime() + 60 * 60_000), gymTimezone: 'Asia/Colombo', fee: '100.0000', currency: 'LKR',
+    scheduledStartAt: betaSessionStart, scheduledEndAt: new Date(betaSessionStart.getTime() + 60 * 60_000), requestExpiresAt: new Date(Date.now() + 12 * 60 * 60_000), gymTimezone: 'Asia/Colombo', fee: '100.0000', currency: 'LKR',
     configurationVersion: 0, createdByIdentityId: fixture.users.ownerB.id } });
   const trainer = await tenant.trainer.findFirstOrThrow({ where: { registrationState: 'COMPLETE' } });
   const starts = new Date(Date.now() + 48 * 60 * 60_000);

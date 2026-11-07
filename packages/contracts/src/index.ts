@@ -7,12 +7,15 @@ export * from './packs.js';
 export * from './session-booking.js';
 export * from './session-reads.js';
 export * from './session-requests.js';
+export * from './session-availability.js';
 export * from './session-lifecycle.js';
 export * from './member-lifecycle.js';
 export * from './coaching.js';
 export * from './finance.js';
 export * from './analytics.js';
 export * from './request-safety.js';
+export * from './account-profile.js';
+export * from './email-correction.js';
 
 // Transport syntax only: feature schemas own business bounds, currency support,
 // rounding and authorization. No Prisma-generated types cross this boundary.
@@ -136,3 +139,6 @@ export function commandSchema<T extends z.ZodType>(data: T) {
   });
 }
 export type ReadMeta = z.infer<typeof readMetaSchema>;
+export * from './session-exceptions.js';
+export * from './member-applications.js';
+export * from './sessions.js';

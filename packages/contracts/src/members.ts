@@ -66,6 +66,7 @@ export const memberDetailSchema = z.strictObject({
     heldCredits: z.number().int().min(0).max(1000), consumedCredits: z.number().int().min(0).max(1000), expiredCredits: z.number().int().min(0).max(1000),
     validityDays: z.number().int().min(1).max(3650),
     price: nonnegativeDecimalStringSchema, currency: z.enum(['LKR', 'USD']), startDate: localDateSchema, endDateExclusive: localDateSchema,
+    expiryAdjustments: z.array(z.strictObject({ creditOrdinal: z.number().int().positive(), endDateExclusive: localDateSchema, state: z.enum(['UNHELD','HELD','CONSUMED','EXPIRED']) })).max(1000).default([]),
     status: z.enum(['ACTIVE', 'EXPIRED', 'DEPLETED']) })).max(100),
   recentSessions: z.array(z.strictObject({ id: idSchema, scheduledStart: isoInstantSchema, state: z.string().min(1).max(40) })).max(5),
   asOf: isoInstantSchema,

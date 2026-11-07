@@ -2,7 +2,7 @@ import 'server-only';
 import { cookies } from 'next/headers';
 import { supportEntryResultSchema, supportSummarySchema } from '@gymos/contracts/platform';
 import { apiUrl, SESSION_COOKIE } from './gymos';
-export const SUPPORT_COOKIE = 'gymos_support_context';
+export const SUPPORT_COOKIE = `gymos_support_context${process.env.GYMOS_COOKIE_SUFFIX ?? ''}`;
 const contextCookieSchema = supportEntryResultSchema;
 export async function currentSupportCookie() {
   try { return contextCookieSchema.parse(JSON.parse((await cookies()).get(SUPPORT_COOKIE)?.value ?? 'null')); }

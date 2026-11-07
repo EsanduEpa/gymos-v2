@@ -6,10 +6,11 @@ import { SESSION_COOKIE } from '@/lib/gymos';
 import { ChangePasswordForm } from '@/components/credentials/change-password-form';
 import { LoadingState } from '@/components/ui';
 
-async function ChangePasswordContent() {
+async function ChangePasswordContent({ searchParams }: { searchParams: Promise<{ mode?: string }> }) {
+  const firstChange = (await searchParams).mode !== 'normal';
   if (!(await cookies()).get(SESSION_COOKIE)?.value) redirect('/login');
   return (
-    <main className="auth-shell">
+    <main className="auth-shell themed-workspace">
       <aside className="auth-illustration">
         <Link href="/" className="brand-lockup"><span className="brand-mark">G</span> GymOS</Link>
         <div className="auth-illustration-copy">
@@ -22,15 +23,15 @@ async function ChangePasswordContent() {
       <div className="auth-form-wrap">
         <section className="form-card auth-card">
           <div className="eyebrow dark">ACCOUNT SECURITY</div>
-          <h1>Choose your own password</h1>
-          <p className="muted">If your account was issued a temporary password, enter it as your current password.</p>
-          <ChangePasswordForm />
+          <h1>{firstChange ? 'Choose your own password' : 'Change your password'}</h1>
+          <p className="muted">{firstChange ? 'If your account was issued a temporary password, enter it as your current password.' : 'Enter your current password to confirm this security change.'}</p>
+          <ChangePasswordForm firstChange={firstChange} />
         </section>
       </div>
     </main>
   );
 }
 
-export default function ChangePasswordPage() {
-  return <Suspense fallback={<LoadingState label="Loading password form…" page />}><ChangePasswordContent /></Suspense>;
+export default function ChangePasswordPage({ searchParams }: { searchParams: Promise<{ mode?: string }> }) {
+  return <Suspense fallback={<LoadingState label="Loading password form…" page />}><ChangePasswordContent searchParams={searchParams} /></Suspense>;
 }

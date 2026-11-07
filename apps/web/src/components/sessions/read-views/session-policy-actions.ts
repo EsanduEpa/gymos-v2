@@ -17,6 +17,7 @@ export type SessionPolicyActionState = {
   currentKey?: string;
   nextKey?: string;
   refreshQuote?: boolean;
+  reauthenticate?: boolean;
 };
 export type SessionQuoteResult = { quote?: SessionLifecycleQuote; error?: string };
 
@@ -29,6 +30,7 @@ async function tokenOrRedirect() {
   return token;
 }
 function refresh(slug: string) {
+  revalidatePath(`/gyms/${encodeURIComponent(slug)}`, 'layout');
   revalidatePath(`/gyms/${encodeURIComponent(slug)}/trainer/schedule`);
   revalidatePath(`/gyms/${encodeURIComponent(slug)}/owner/sessions`);
   revalidatePath(`/gyms/${encodeURIComponent(slug)}/member/sessions`);
@@ -52,12 +54,13 @@ export async function getSessionPolicyQuote(slug: string, sessionId: string, act
 }
 
 export async function cancelSessionWithQuote(slug: string, sessionId: string, expectedVersion: number, policyVersion: number,
-  acknowledgmentToken: string | null, initialKey: string): Promise<SessionPolicyActionState> {
+  acknowledgmentToken: string | null, initialKey: string, reason?: string): Promise<SessionPolicyActionState> {
   if (!safeRoute(slug, sessionId)) return { error: 'This session action is invalid.' };
   const idempotencyKey = initialKey;
-  const parsed = sessionCancelInputSchema.safeParse({ expectedVersion, policyVersion, idempotencyKey, acknowledgmentToken });
+  const parsed = sessionCancelInputSchema.safeParse({ expectedVersion, policyVersion, idempotencyKey, acknowledgmentToken, ...(reason ? { reason } : {}) });
   if (!parsed.success) return { error: 'Refresh this session and review its current cancellation quote.', nextKey: randomUUID(), refreshQuote: true };
-  const token = await tokenOrRedirect();
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token) return { error: 'Your sign-in expired. Sign in in a new tab, then return and retry this same change.', currentKey: idempotencyKey, outcomeUnknown: true, reauthenticate: true };
   let response: Response;
   try {
     response = await fetch(apiUrl(`/gyms/${encodeURIComponent(slug)}/sessions/${encodeURIComponent(sessionId)}/cancel`), {
@@ -65,7 +68,7 @@ export async function cancelSessionWithQuote(slug: string, sessionId: string, ex
       body: JSON.stringify(parsed.data), cache: 'no-store',
     });
   } catch { return { error: 'The cancellation outcome is unknown. Retry with this same key to resolve it.', currentKey: idempotencyKey, outcomeUnknown: true }; }
-  if (response.status === 401) redirect('/login?error=expired');
+  if (response.status === 401) return { error: 'Your sign-in expired. Sign in in a new tab, then return and retry this same change.', currentKey: idempotencyKey, outcomeUnknown: true, reauthenticate: true };
   if (response.status === 403 || response.status === 404) return { error: 'This session is not available to your account.', nextKey: randomUUID() };
   if (response.status === 409) return { error: 'The session or policy changed. Request a fresh quote before continuing.', nextKey: randomUUID(), refreshQuote: true };
   const result = sessionCancelResultSchema.safeParse(await response.json().catch(() => null));
@@ -82,7 +85,8 @@ export async function markSessionNoShowWithQuote(slug: string, sessionId: string
   const idempotencyKey = initialKey;
   const parsed = sessionNoShowInputSchema.safeParse({ expectedVersion, policyVersion, idempotencyKey, acknowledgmentToken });
   if (!parsed.success) return { error: 'Refresh this session and review the current no-show quote.', nextKey: randomUUID(), refreshQuote: true };
-  const token = await tokenOrRedirect();
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token) return { error: 'Your sign-in expired. Sign in in a new tab, then return and retry this same change.', currentKey: idempotencyKey, outcomeUnknown: true, reauthenticate: true };
   let response: Response;
   try {
     response = await fetch(apiUrl(`/gyms/${encodeURIComponent(slug)}/sessions/${encodeURIComponent(sessionId)}/no-show`), {
@@ -90,7 +94,7 @@ export async function markSessionNoShowWithQuote(slug: string, sessionId: string
       body: JSON.stringify(parsed.data), cache: 'no-store',
     });
   } catch { return { error: 'The no-show outcome is unknown. Retry with this same key to resolve it.', currentKey: idempotencyKey, outcomeUnknown: true }; }
-  if (response.status === 401) redirect('/login?error=expired');
+  if (response.status === 401) return { error: 'Your sign-in expired. Sign in in a new tab, then return and retry this same change.', currentKey: idempotencyKey, outcomeUnknown: true, reauthenticate: true };
   if (response.status === 403 || response.status === 404) return { error: 'This session is not available to your account.', nextKey: randomUUID() };
   if (response.status === 409) return { error: 'The session or policy changed. Request a fresh no-show quote before continuing.', nextKey: randomUUID(), refreshQuote: true };
   const result = sessionNoShowResultSchema.safeParse(await response.json().catch(() => null));

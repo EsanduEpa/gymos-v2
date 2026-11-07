@@ -231,7 +231,8 @@ export class MemberLifecycleService {
     if (!configuration?.timezone || configuration.masterGymId !== access.gymId) throw new OperationIntegrityError('Gym configuration binding changed');
     for (;;) {
       const [clock] = await tenant.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS "now"`;
-      const sessions = await tenant.pTSession.findMany({ where: { memberId, state: { in: ['PENDING_CONFIRMATION', 'SCHEDULED'] }, scheduledStartAt: { gt: clock!.now } },
+      const sessions = await tenant.pTSession.findMany({ where: { memberId, state: { in: ['PENDING_CONFIRMATION', 'SCHEDULED'] },
+        AND: [{ OR: [{ state: { not: 'PENDING_CONFIRMATION' } }, { requestExpiresAt: { gt: clock!.now } }] }], scheduledStartAt: { gt: clock!.now } },
         orderBy: [{ scheduledStartAt: 'asc' }, { id: 'asc' }], take: 50, select: { id: true, version: true } });
       if (!sessions.length) return;
       for (const candidate of sessions) {
@@ -241,9 +242,10 @@ export class MemberLifecycleService {
           await receipts.execute({ masterGymId: access.gymId, actorIdentityId: access.identityId, commandKind: 'MEMBER_LIFECYCLE_RELEASE', idempotencyKey: key,
             normalizedIntent: { operationId, sessionId: candidate.id, targetStatus } }, async (tx, receipt) => {
             await tx.$queryRaw`SELECT "id" FROM "PTSession" WHERE "id" = ${candidate.id} FOR UPDATE`;
-            const current = await tx.pTSession.findUnique({ where: { id: candidate.id }, select: { id: true, state: true, version: true, scheduledStartAt: true, member: { select: { identityId: true } } } });
+            const current = await tx.pTSession.findUnique({ where: { id: candidate.id }, select: { id: true, state: true, version: true, scheduledStartAt: true, requestExpiresAt: true, member: { select: { identityId: true } } } });
             const [now] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS "now"`;
-            if (!current || !['PENDING_CONFIRMATION', 'SCHEDULED'].includes(current.state) || current.scheduledStartAt <= now!.now) return {
+            if (!current || !['PENDING_CONFIRMATION', 'SCHEDULED'].includes(current.state) || current.scheduledStartAt <= now!.now
+              || current.state === 'PENDING_CONFIRMATION' && (!current.requestExpiresAt || current.requestExpiresAt <= now!.now)) return {
               result: { operationId, state: 'COMPLETE', step: 'MEMBER_SESSIONS_RECONCILED', version: current?.version ?? candidate.version, resourceIds: [candidate.id] },
               resourceType: 'PT_SESSION', resourceId: candidate.id, audits: [{ actorIdentityId: access.identityId, eventCode: 'MEMBER_SESSION_RELEASE_SKIPPED', resourceType: 'PT_SESSION', resourceId: candidate.id,
                 transition: { from: 'PENDING_OR_SCHEDULED', to: 'UNCHANGED', version: current?.version ?? candidate.version } }] };

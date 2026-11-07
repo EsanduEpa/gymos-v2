@@ -17,8 +17,10 @@ describe('MemberLifecycleController gym scoping', () => {
   it('returns 404 for another gym operation and denies a member over the status route', async () => {
     const findFirst = vi.fn().mockResolvedValue(null);
     const database = { master: {
-      user: { findUnique: vi.fn().mockResolvedValue({ authVersion: 0, mustChangePassword: false, credentialExpiresAt: null }) },
+      user: { findUnique: vi.fn().mockResolvedValue({ authVersion: 0, globalRole: 'USER', mustChangePassword: false, credentialExpiresAt: null }) },
       $queryRaw: vi.fn().mockResolvedValue([{ now: new Date() }]),
+      identitySession: { findUnique: vi.fn(async ({ where }: { where: { id: string } }) => ({ identityId: where.id.replace(/-session$/, ''), gymAccountId: where.id.replace(/-session$/, '-account'), authVersion: 0, revokedAt: null })) },
+      gymAccount: { findUnique: vi.fn(async ({ where }: { where: { id: string } }) => ({ userId: where.id.replace(/-account$/, ''), gymId: 'gym-b', status: 'ACTIVE', authVersion: 0, mustChangePassword: false, credentialExpiresAt: null })) },
       gymAccess: { findFirst: vi.fn(async ({ where }: { where: { userId: string; gym: { is: { slug: string } } } }) => {
         if (where.gym.is.slug !== 'gym-b') return null;
         if (where.userId === 'owner-b') return { userId: 'owner-b', gymId: 'gym-b', role: 'OWNER', linkStatus: 'ACTIVE', version: 0,
@@ -41,7 +43,7 @@ describe('MemberLifecycleController gym scoping', () => {
     const previousSecret = process.env.JWT_SECRET;
     const secret = 'task033-member-lifecycle-test-secret-at-least-32-bytes';
     process.env.JWT_SECRET = secret;
-    const tokenFor = (identityId: string) => new SignJWT({ authVersion: 0 }).setProtectedHeader({ alg: 'HS256' }).setSubject(identityId)
+    const tokenFor = (identityId: string) => new SignJWT({ authVersion: 0, sid: `${identityId}-session`, gaid: `${identityId}-account` }).setProtectedHeader({ alg: 'HS256' }).setSubject(identityId)
       .setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('5m').sign(new TextEncoder().encode(secret));
     const ownerToken = await tokenFor('owner-b');
     const memberToken = await tokenFor('member-b');

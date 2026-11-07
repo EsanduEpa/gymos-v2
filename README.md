@@ -4,6 +4,8 @@ GymOS V2 is a development-stage SaaS foundation. Each gym has its own PostgreSQL
 
 ## Run locally
 
+For the permanent split between development on port 3000 and isolated manual testing on port 3002, follow [docs/manual-testing.md](docs/manual-testing.md). Future agents should use port 3002 for browser testing.
+
 Use Node.js 24 and pnpm. Copy `.env.example` to `.env` only for a fresh setup, replace the sample credentials, and keep `.env` private. If your local databases already work, keep your existing `.env`.
 
 ```sh
@@ -15,7 +17,7 @@ set +a
 pnpm --dir apps/api build
 ```
 
-Create the first Super Admin account with a password you choose. The password is read without echoing it to the terminal:
+For a fresh installation with no development admin yet, create the first Super Admin account with a password you choose. The password is read without echoing it to the terminal. This workspace already has a separate development admin saved in ignored `.env.development-account.json`:
 
 ```sh
 read -rs 'SUPER_ADMIN_PASSWORD?New Super Admin password: '
@@ -36,7 +38,7 @@ PORT=3001 pnpm dev:api
 In another terminal, start the web app:
 
 ```sh
-pnpm dev:web
+GYMOS_NEXT_DIST_DIR=.next-development GYMOS_API_URL=http://127.0.0.1:3001 GYMOS_WEB_ORIGIN=http://localhost:3000 pnpm dev:web
 ```
 
 Open `http://localhost:3000/login`. Sign in as Super Admin, create a gym and its owner, then sign in as that owner. The owner can add members and see the gym's branding. A new gym starts with the default theme; its owner can update branding through `PATCH /gyms/:slug/theme`.

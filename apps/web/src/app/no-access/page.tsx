@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { Suspense } from 'react';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Button, LoadingState } from '@/components/ui';
 import { signOut } from '../actions';
@@ -21,12 +22,18 @@ async function NoAccessContent() {
   const session = await response.json() as { globalRole: string; gyms: unknown[] };
   if (session.globalRole === 'SUPER_ADMIN') redirect('/admin');
   if (session.gyms.length > 0) redirect('/');
-  return <main className="auth-shell"><section className="form-card auth-card">
-    <div className="eyebrow dark">YOUR WORKSPACE</div>
-    <h1>No active gym access</h1>
-    <p className="muted">Ask your gym administrator to grant access, then sign in again.</p>
-    <form action={signOut} data-session-exit><Button variant="secondary" type="submit">Sign out</Button></form>
-  </section></main>;
+  return <main className="auth-shell themed-workspace application-status-shell">
+    <div className="auth-illustration"><Link href="/" className="brand-lockup"><span className="brand-mark">G</span> GymOS</Link>
+      <div className="auth-illustration-copy"><div className="eyebrow">YOUR ACCOUNT</div><h1>Your gym journey starts here.</h1>
+        <p>Keep track of your application and join your gym once enrollment is complete.</p></div>
+      <span className="auth-footnote">GymOS V2 · Member access</span></div>
+    <section className="auth-form-wrap"><div className="form-card auth-card"><div className="eyebrow dark">ACCESS STATUS</div>
+      <h2>No active gym access</h2><p className="muted">Your account is ready. Gym features appear after the owner approves your application and enrollment completes.</p>
+      <div className="application-status-actions"><Link className="ui-button ui-button-primary" href="/applications">View application status</Link>
+        <Link className="ui-button ui-button-secondary" href="/apply">Apply to join a gym</Link></div>
+      <p className="form-note"><Link href="/help">Need help with your access?</Link></p>
+      <form action={signOut} data-session-exit><Button variant="secondary" type="submit">Sign out</Button></form>
+    </div></section></main>;
 }
 
 export default function NoAccessPage() {

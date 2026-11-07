@@ -1,0 +1,90 @@
+/* Account and application pages use the same semantic appearance as role workspaces. */
+.auth-shell {
+  --ink: var(--foreground);
+  --paper: var(--background);
+  --brand: var(--primary);
+  min-width: 0;
+  background: var(--background);
+  color: var(--foreground);
+}
+.auth-shell .auth-illustration {
+  background: radial-gradient(circle at 82% 75%, #245b9f, #142d59 58%, #0a1933);
+  color: #eff7ff;
+}
+.auth-shell .auth-illustration p,
+.auth-shell .auth-footnote { color: #c3d9f4; }
+.auth-shell .brand-mark { background: var(--primary); color: var(--primary-foreground); }
+.auth-shell .auth-form-wrap { min-width: 0; background: var(--background); }
+.auth-shell .auth-card { color: var(--foreground); }
+.auth-shell .muted,
+.auth-shell .form-note,
+.auth-shell .stack-form small,
+.auth-shell .stack-form .optional { color: var(--muted-foreground); }
+.auth-shell .eyebrow.dark { color: var(--accent-foreground); }
+.auth-shell .stack-form input:not([type="checkbox"]),
+.auth-shell .stack-form select,
+.auth-shell .stack-form textarea {
+  min-width: 0;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-control);
+  background: var(--card);
+  color: var(--foreground);
+}
+.auth-shell .stack-form input:not([type="checkbox"]):focus,
+.auth-shell .stack-form select:focus,
+.auth-shell .stack-form textarea:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 20%, transparent);
+}
+.auth-shell .stack-form input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+.auth-shell .stack-form .ui-checkbox { display: flex; align-items: flex-start; gap: 10px; }
+.application-status-shell .auth-form-wrap { align-items: center; overflow: auto; }
+.application-status-shell .auth-card { max-width: 620px; }
+.application-status-shell .auth-card > .ui-card { margin: 22px 0; }
+.application-status-shell .auth-card > h2 { margin-bottom: 14px; }
+.application-status-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 28px 0 16px; }
+.application-status-actions .ui-button { flex: 1 1 180px; justify-content: center; }
+.application-status-shell .application-offer { padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--card); }
+.application-status-shell .application-legacy-consent { margin-top: 18px; }
+.trainer-review-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(280px, 1fr); gap: 20px; align-items: start; }
+.trainer-review-identity { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+.trainer-review-identity h2 { margin: 0; }
+.trainer-review-identity p { margin: 5px 0 0; color: var(--muted-foreground); }
+.profile-details-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 24px; margin: 16px 0 0; }
+.profile-details-grid > div { min-width: 0; padding: 12px 0; border-top: 1px solid var(--border); }
+.profile-details-grid dt { color: var(--muted-foreground); font-size: 13px; }
+.profile-details-grid dd { margin: 5px 0 0; overflow-wrap: anywhere; font-weight: 600; }
+.profile-details-wide { grid-column: 1 / -1; }
+@media (max-width: 800px) { .trainer-review-grid { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .profile-details-grid { grid-template-columns: 1fr; } }
+.auth-shell:has(> .form-card) {
+  grid-template-columns: minmax(0, 1fr);
+  place-items: center;
+  padding: clamp(20px, 5vw, 56px);
+}
+.auth-shell:has(> .form-card) > .form-card {
+  width: min(100%, 520px);
+  max-width: none;
+  padding: clamp(24px, 4vw, 40px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card);
+}
+.standalone-page {
+  width: min(100%, 1200px);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: clamp(20px, 4vw, 48px);
+}
+body:has(> .standalone-page) { background: #f3f6fa; }
+html[data-appearance="dark"] body:has(> .standalone-page) { background: #0a1528; }
+@media (max-width: 560px) {
+  .auth-shell .auth-form-wrap { padding: 24px 16px; }
+  .auth-shell .auth-illustration { min-height: 220px; padding: 24px; }
+  .auth-shell .auth-illustration h1 { font-size: clamp(30px, 8vw, 38px); }
+}

@@ -14,6 +14,12 @@ export const legacyLoginSchema = z.strictObject({
   accessToken: z.string().min(1).max(16384),
   tokenType: z.literal('Bearer'),
   expiresIn: z.number().int().positive(),
+  sessionId: idSchema,
+  refreshToken: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  refreshExpiresAt: isoInstantSchema,
+  absoluteExpiresAt: isoInstantSchema,
+  deviceClass: z.enum(['PERSONAL', 'SHARED']),
+  deviceLabel: z.string().min(1).max(80),
   globalRole: globalRoleSchema,
   mustChangePassword: z.boolean(),
   gyms: z.array(z.strictObject({ id: idSchema, slug: legacyGymSlugSchema, name: z.string(), role: gymRoleSchema })),
@@ -50,9 +56,10 @@ export const existingEndpointContracts = {
 } as const;
 
 // Safe shell projection; no credential or tenant connection material.
-export const currentSessionSchema = legacyLoginSchema.omit({ accessToken: true, tokenType: true, expiresIn: true }).extend({
+export const currentSessionSchema = legacyLoginSchema.omit({ accessToken: true, tokenType: true, expiresIn: true, refreshToken: true }).extend({
   identityId: idSchema,
   displayName: z.string().max(200).nullable(),
+  lastActivityAt: isoInstantSchema,
 });
 
 export const logoutResultSchema = z.strictObject({ revoked: z.literal(true) });

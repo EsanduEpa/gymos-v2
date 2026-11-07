@@ -3,6 +3,8 @@
   "private": true,
   "scripts": {
     "manual:setup": "node apps/api/scripts/manual-test.mjs setup",
+    "manual:rebind": "node apps/api/scripts/manual-test.mjs rebind",
+    "manual:sync": "node apps/api/scripts/manual-test.mjs sync",
     "manual:check": "node apps/api/scripts/manual-test.mjs check",
     "manual:start": "node apps/api/scripts/manual-test.mjs start",
     "dev:web": "pnpm --dir apps/web dev",
@@ -15,10 +17,12 @@
     "typecheck:workspace": "pnpm --dir packages/contracts typecheck && pnpm --dir packages/api-client typecheck && pnpm --dir apps/api exec tsc --noEmit --incremental false --pretty false && pnpm --dir apps/web exec tsc --noEmit --incremental false --pretty false",
     "test:unit": "pnpm --dir packages/contracts test && pnpm --dir packages/api-client test && pnpm --dir packages/theme-tokens test && pnpm --dir apps/api exec vitest run src && pnpm --dir apps/api exec vitest run --config vitest.config.pools.ts",
     "test:database:owned": "pnpm --dir apps/api exec vitest run --config vitest.config.environment-integration.ts --disableConsoleIntercept",
+    "test:pt:owned": "pnpm --dir apps/api exec vitest run --config vitest.config.pt.ts --disableConsoleIntercept",
     "test:finance:owned": "pnpm --dir apps/api exec vitest run --config vitest.config.finance.ts --disableConsoleIntercept",
     "test:recovery:owned": "pnpm --dir apps/api exec vitest run --config vitest.config.recovery.ts --disableConsoleIntercept",
     "generate:clients": "prisma generate --schema packages/database-master/prisma/schema.prisma && prisma generate --schema packages/database-tenant/prisma/schema.prisma",
-    "prepare:checks": "pnpm generate:clients && pnpm --filter \"./packages/**\" --recursive --if-present build"
+    "prepare:checks": "pnpm generate:clients && pnpm --filter \"./packages/**\" --recursive --if-present build",
+    "test:cf:owned": "pnpm --dir apps/api exec vitest run --config vitest.config.member-applications.ts --disableConsoleIntercept"
   },
   "packageManager": "pnpm@9.15.0+sha512.76e2379760a4328ec4415815bcd6628dee727af3779aaa4c914e3944156c4299921a89f976381ee107d41f12cfa4b66681ca9c718f0668fa0831ed4c6d8ba56c",
   "pnpm": {

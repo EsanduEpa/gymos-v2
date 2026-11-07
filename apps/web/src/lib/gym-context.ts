@@ -5,7 +5,7 @@ import { existingEndpointContracts, currentSessionSchema } from '@gymos/contract
 import { resolveCurrentSession } from './navigation';
 import { apiUrl, gymRoleUrl, SESSION_COOKIE, type GymRole } from './gymos';
 
-export async function requireGymContext(slug: string, expectedRole: GymRole) {
+export async function requireGymContext(slug: string, expectedRole?: GymRole) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) notFound();
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) redirect('/login');
@@ -17,7 +17,7 @@ export async function requireGymContext(slug: string, expectedRole: GymRole) {
   if (session.globalRole === 'SUPER_ADMIN') redirect('/admin');
   const gym = session.gyms.find(candidate => candidate.slug === slug);
   if (!gym) notFound();
-  if (gym.role !== expectedRole) redirect(gymRoleUrl(gym));
+  if (expectedRole && gym.role !== expectedRole) redirect(gymRoleUrl(gym));
   const access = await fetch(apiUrl(`/gyms/${slug}/access`), { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' });
   if (access.status === 401) redirect('/login');
   if (access.status === 403 || access.status === 404) notFound();

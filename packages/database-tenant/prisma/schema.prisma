@@ -88,6 +88,8 @@ model SessionPack {
   createdAt             DateTime          @default(now()) @db.Timestamptz(3)
   creditMovements       PackCreditMovement[]
   holds                 SessionCreditHold[]
+  remedies                      PTCreditRemedy[]
+
   @@unique([actorIdentityId, idempotencyKey])
   @@index([memberId, endDateExclusive, createdAt, id])
 }
@@ -109,6 +111,7 @@ model Trainer {
   status                TrainerStatus            @default(ACTIVE)
   version               Int                      @default(0)
   sessions              PTSession[]              @relation("SessionTrainer")
+  availabilityRules     PTAvailabilityRule[]
   workoutPlans          WorkoutPlan[]            @relation("WorkoutPlanTrainer")
   mealPlans             MealPlan[]               @relation("MealPlanTrainer")
   createdAt             DateTime                 @default(now())
@@ -185,6 +188,7 @@ enum PTSessionState {
   MISSED
   CANCELLED
   DECLINED
+  EXPIRED
 }
 
 enum SessionType {
@@ -200,6 +204,7 @@ enum SessionCreditHoldState {
 }
 
 enum PackCreditMovementKind {
+  CORRECTION
   ISSUE
   HOLD
   RELEASE
@@ -224,6 +229,38 @@ enum OperationalEarningCategory {
   MEMBERSHIP_DAILY
 }
 
+enum PTAvailabilityKind {
+  WEEKLY_WINDOW
+  DATED_WINDOW
+  BLOCK
+  GYM_CLOSURE
+}
+
+model PTAvailabilityRule {
+  id                    String             @id @default(cuid())
+  trainerId             String?
+  trainer               Trainer?           @relation(fields: [trainerId], references: [id], onDelete: Restrict)
+  kind                  PTAvailabilityKind
+  weekday               Int?
+  localDate             DateTime?          @db.Date
+  startMinute           Int?
+  endMinute             Int?
+  effectiveFrom         DateTime?          @db.Date
+  effectiveToExclusive  DateTime?          @db.Date
+  reason                String?
+  version               Int                @default(0)
+  createdByIdentityId   String
+  commandReceiptId      String
+  commandReceipt        CommandReceipt     @relation(fields: [commandReceiptId], references: [id], onDelete: Restrict)
+  createdAt             DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime           @updatedAt @db.Timestamptz(3)
+
+  @@index([commandReceiptId])
+  @@index([trainerId, kind, weekday, effectiveFrom])
+  @@index([trainerId, localDate, kind])
+  @@index([localDate, kind])
+}
+
 model PTSession {
   id                    String          @id @default(cuid())
   memberId              String
@@ -244,6 +281,8 @@ model PTSession {
   confirmationShiftEnd String?
   configurationVersion  Int
   confirmedAt           DateTime?       @db.Timestamptz(3)
+  requestExpiresAt      DateTime?       @db.Timestamptz(3)
+  availabilityVersion   Int?
   startedAt             DateTime?       @db.Timestamptz(3)
   endedAt               DateTime?       @db.Timestamptz(3)
   notes                 String?
@@ -256,11 +295,15 @@ model PTSession {
   settlement            SessionSettlement?
   revenueRecords        RevenueRecord[]
   payRecord             PayRecord?
-  payCorrection         TrainerPayCorrection?
+  payCorrections         TrainerPayCorrection[]
+  reminders              PTSessionReminder[]
+  adjustments            PTSessionAdjustment[]  @relation("AdjustedSession")
+  replacementAdjustment  PTSessionAdjustment?   @relation("ReplacementSession")
 
   @@index([memberId, scheduledStartAt, id])
   @@index([trainerId, scheduledStartAt, id])
   @@index([state, scheduledStartAt, id])
+  @@index([state, requestExpiresAt, id])
 }
 
 model SessionStateEvent {
@@ -275,6 +318,8 @@ model SessionStateEvent {
   receipt             CommandReceipt   @relation(fields: [receiptId], references: [id], onDelete: Restrict)
   eventKey            String          @unique
   createdAt           DateTime        @default(now()) @db.Timestamptz(3)
+
+  adjustments PTSessionAdjustment[]
 
   @@unique([sessionId, committedVersion])
   @@index([sessionId, createdAt, id])
@@ -293,6 +338,7 @@ model SessionCreditHold {
   resolvedAt          DateTime?              @db.Timestamptz(3)
   version             Int                    @default(0)
   movements           PackCreditMovement[]
+  remedies              PTCreditRemedy[]
 
   @@index([packId, state, heldAt, id])
 }
@@ -303,6 +349,8 @@ model PackCreditMovement {
   pack                SessionPack           @relation(fields: [packId], references: [id], onDelete: Restrict)
   holdId              String?
   hold                SessionCreditHold?    @relation(fields: [holdId], references: [id], onDelete: Restrict)
+  adjustmentId    String?
+  adjustment      PTSessionAdjustment?   @relation(fields: [adjustmentId], references: [id], onDelete: Restrict)
   kind                PackCreditMovementKind
   availableDelta      Int
   heldDelta           Int
@@ -315,6 +363,7 @@ model PackCreditMovement {
   actorIdentityId     String
   createdAt           DateTime              @default(now()) @db.Timestamptz(3)
 
+  @@index([packId, creditOrdinal])
   @@index([packId, createdAt, id])
 }
 
@@ -336,6 +385,9 @@ model RevenueRecord {
   sessionId           String
   session             PTSession       @relation(fields: [sessionId], references: [id], onDelete: Restrict)
   payCorrections      TrainerPayCorrection[]
+  reversesId     String?                    @unique
+  reverses       RevenueRecord?             @relation("RevenueReversal", fields: [reversesId], references: [id], onDelete: Restrict)
+  reversal       RevenueRecord?             @relation("RevenueReversal")
   category            OperationalEarningCategory
   amount              Decimal         @db.Decimal(19, 4)
   currency            String
@@ -392,7 +444,7 @@ model PayRecord {
 
 model TrainerPayCorrection {
   id                             String           @id @default(cuid())
-  sessionId                      String           @unique
+  sessionId                        String
   session                        PTSession        @relation(fields: [sessionId], references: [id], onDelete: Restrict)
   originalPeriodId               String
   originalPeriod                 TrainerPayPeriod @relation("CorrectionSourcePeriod", fields: [originalPeriodId], references: [id], onDelete: Restrict)
@@ -411,7 +463,56 @@ model TrainerPayCorrection {
   sourceKey                      String           @unique
   createdAt                      DateTime         @default(now()) @db.Timestamptz(3)
 
+  @@index([sessionId])
   @@index([correctionPeriodId, createdAt, id])
+}
+
+model PTSessionAdjustment {
+  id                      String                 @id @default(cuid())
+  sessionId               String
+  session                 PTSession              @relation("AdjustedSession", fields: [sessionId], references: [id], onDelete: Restrict)
+  replacementSessionId    String?                @unique
+  replacementSession      PTSession?             @relation("ReplacementSession", fields: [replacementSessionId], references: [id], onDelete: Restrict)
+  receiptId               String                 @unique
+  receipt                 CommandReceipt         @relation(fields: [receiptId], references: [id], onDelete: Restrict)
+  sourceEventId           String?
+  sourceEvent             SessionStateEvent?     @relation(fields: [sourceEventId], references: [id], onDelete: Restrict)
+  kind                    String
+  initiatedBy             String
+  reason                  String
+  actorIdentityId         String
+  committedVersion        Int
+  fromState               PTSessionState
+  toState                 PTSessionState
+  effectiveSettlementKind SessionSettlementKind?
+  creditConsumed          Boolean?
+  previousStartedAt       DateTime?              @db.Timestamptz(3)
+  previousEndedAt         DateTime?              @db.Timestamptz(3)
+  actualStartedAt         DateTime?              @db.Timestamptz(3)
+  actualEndedAt           DateTime?              @db.Timestamptz(3)
+  createdAt               DateTime               @default(now()) @db.Timestamptz(3)
+  movements               PackCreditMovement[]
+  remedy                  PTCreditRemedy?
+
+  @@unique([sessionId, committedVersion])
+  @@index([sessionId, createdAt, id])
+}
+
+model PTCreditRemedy {
+  id                       String              @id @default(cuid())
+  adjustmentId             String              @unique
+  adjustment               PTSessionAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Restrict)
+  sourceHoldId             String              @unique
+  sourceHold               SessionCreditHold   @relation(fields: [sourceHoldId], references: [id], onDelete: Restrict)
+  packId                   String
+  pack                     SessionPack         @relation(fields: [packId], references: [id], onDelete: Restrict)
+  creditOrdinal            Int
+  originalEndDateExclusive DateTime            @db.Date
+  newEndDateExclusive      DateTime            @db.Date
+  valueMinorUnits          BigInt
+  createdAt                DateTime            @default(now()) @db.Timestamptz(3)
+
+  @@index([packId, creditOrdinal, newEndDateExclusive])
 }
 
 enum NotificationLinkKind {
@@ -419,12 +520,17 @@ enum NotificationLinkKind {
   TRAINER_SCHEDULE
   MEMBER_SESSIONS
   TRAINER_REQUESTS
+  MEMBER_PROFILE
+  MEMBER_WORKOUT_PLANS
+  MEMBER_MEAL_PLANS
 }
 
 model Notification {
   id                  String          @id @default(cuid())
   recipientIdentityId String
   sourceEventKey      String
+  supersededAt        DateTime?       @db.Timestamptz(3)
+  reminder            PTSessionReminder?
   eventCode           String
   title               String
   message             String
@@ -497,6 +603,7 @@ model GymConfigurationVersion {
   lateCancelDeduction Boolean
   minimumSessionDurationMinutes Int
   createdAt DateTime @default(now()) @db.Timestamptz(3)
+
   @@unique([gymConfigurationId, configurationVersion])
   @@index([configurationVersion])
 }
@@ -523,6 +630,7 @@ model MembershipPlan {
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime @updatedAt @db.Timestamptz(3)
   memberships  MembershipTerm[]
+
   @@index([status, createdAt])
 }
 
@@ -542,6 +650,7 @@ model MembershipTerm {
   idempotencyKey        String
   requestDigest         String
   createdAt             DateTime @default(now()) @db.Timestamptz(3)
+
   @@unique([actorIdentityId, idempotencyKey])
   @@index([memberId, startDate, endDateExclusive])
 }
@@ -576,10 +685,12 @@ model CommandReceipt {
   committedAt             DateTime?           @db.Timestamptz(3)
   audits                  AuditLog[]
   sessionEvents           SessionStateEvent[]
+  availabilityRules       PTAvailabilityRule[]
   settlements             SessionSettlement[]
   packCreditMovements     PackCreditMovement[]
   expenses                ExpenseRecord[]
   budgets                 CategoryBudget[]
+  ptAdjustments           PTSessionAdjustment[]
 
   @@unique([actorIdentityId, commandKind, idempotencyKey])
   @@index([state, createdAt])
@@ -627,6 +738,7 @@ model ExpenseRecord {
   createdByIdentityId String
   createdAt         DateTime @default(now()) @db.Timestamptz(3)
   updatedAt         DateTime @updatedAt @db.Timestamptz(3)
+
   @@index([accountingDate, category, id])
   @@index([category, accountingDate, id])
 }
@@ -643,6 +755,36 @@ model CategoryBudget {
   actorIdentityId  String
   createdAt        DateTime @default(now()) @db.Timestamptz(3)
   updatedAt        DateTime @updatedAt @db.Timestamptz(3)
+
   @@unique([category, month])
   @@index([month, category])
+}
+
+model PTSessionReminder {
+  id String @id
+  sessionId String
+  session PTSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  scheduledStartAt DateTime @db.Timestamptz(3)
+  scheduledEndAt DateTime @db.Timestamptz(3)
+  kind String
+  recipientIdentityId String
+  recipientRole String
+  dueAt DateTime @db.Timestamptz(3)
+  status String @default("PENDING")
+  attempts Int @default(0)
+  nextAttemptAt DateTime @db.Timestamptz(3)
+  finishedAt DateTime? @db.Timestamptz(3)
+  notificationId String? @unique
+  notification Notification? @relation(fields: [notificationId], references: [id], onDelete: Restrict)
+  lastError String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([sessionId, scheduledStartAt, scheduledEndAt, kind, recipientIdentityId], map: "PTSessionReminder_revision_key")
+  @@index([status, nextAttemptAt, dueAt, id], map: "PTSessionReminder_due_idx")
+}
+model PTScheduledWorkStatus {
+  id String @id
+  lastAttemptAt DateTime @db.Timestamptz(3)
+  lastSuccessAt DateTime? @db.Timestamptz(3)
+  totalFailures Int @default(0)
+  lastError String?
 }

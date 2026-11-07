@@ -10,7 +10,7 @@ import { Button, Card, CardHeader, Feedback } from '@/components/ui';
 export function MemberRegistrationForm({ slug, plans, initialRequestKey }: { slug: string; plans: MembershipPlan[]; initialRequestKey: string }) {
   const router = useRouter();
   const [state, action, pending] = useActionState(registerMemberAction.bind(null, slug), { idempotencyKey: initialRequestKey } satisfies MemberRegistrationActionState);
-  const [requestKey] = useState(initialRequestKey);
+  const [requestKey, setRequestKey] = useState(initialRequestKey);
   const [draft, setDraft] = useState({ fullName: '', email: '', phone: '', dateOfBirth: '', emergencyContact: '', healthNotes: '', membershipPlanId: '' });
   const [replacement, setReplacement] = useState<{ password?: string; version: number } | null>(null);
   const [handoffComplete, setHandoffComplete] = useState(false);
@@ -83,7 +83,7 @@ export function MemberRegistrationForm({ slug, plans, initialRequestKey }: { slu
         membershipPlanId: String(submitted.get('membershipPlanId') ?? ''),
       });
     }}>
-      <input type="hidden" name="idempotencyKey" value={requestKey} minLength={16} maxLength={128}/>
+      <label className="ui-field member-field-full"><span className="ui-field-label">Enrollment reference</span><input name="idempotencyKey" autoComplete="off" minLength={16} maxLength={128} required value={requestKey} onChange={event => setRequestKey(event.currentTarget.value)}/><small>Keep this reference. If the result is uncertain, enter it again to safely check or resume the same enrollment.</small></label>
       <label className="ui-field member-field-full"><span className="ui-field-label">Full name</span><input name="fullName" autoComplete="name" minLength={2} maxLength={120} required value={draft.fullName} onChange={event => updateDraft('fullName', event.currentTarget.value)} /></label>
       <label className="ui-field member-field-half"><span className="ui-field-label">Email address</span><input name="email" type="email" autoComplete="email" maxLength={254} required value={draft.email} onChange={event => updateDraft('email', event.currentTarget.value)} /></label>
       <label className="ui-field member-field-half"><span className="ui-field-label">Phone</span><input name="phone" type="tel" autoComplete="tel" maxLength={40} required value={draft.phone} onChange={event => updateDraft('phone', event.currentTarget.value)} /></label>

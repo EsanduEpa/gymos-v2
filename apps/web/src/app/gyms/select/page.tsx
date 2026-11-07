@@ -26,16 +26,9 @@ async function GymSelectionContent() {
     if (gym) redirect(`/gyms/${encodeURIComponent(gym.slug)}/${gymRoleLandingPath(gym.role)}`);
   }
 
-  return <main className="auth-shell"><section className="form-card auth-card" aria-labelledby="gym-selection-heading">
-    <div className="eyebrow dark">YOUR WORKSPACES</div>
-    <h1 id="gym-selection-heading">Choose a gym</h1>
-    <p className="muted">Select the gym workspace you want to open.</p>
-    <div className="stack-form">
-      {session.gyms.map((gym) => <a className="primary-button" key={gym.id}
-        href={`/gyms/${encodeURIComponent(gym.slug)}/${gymRoleLandingPath(gym.role)}`}>
-        {gym.name} <span>{gym.role.toLowerCase()} →</span>
-      </a>)}
-    </div>
+  return <main className="auth-shell themed-workspace"><section className="form-card auth-card" aria-labelledby="gym-selection-heading">
+    <h1 id="gym-selection-heading">Gym account unavailable</h1>
+    <p className="muted">Sign in with the username for one gym account.</p>
     <form action={signOut} data-session-exit><Button type="submit" variant="secondary">Sign out</Button></form>
   </section></main>;
 }

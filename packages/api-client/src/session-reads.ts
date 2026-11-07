@@ -1,9 +1,17 @@
-import { memberSessionOverviewQuerySchema, memberSessionOverviewSchema, recentSessionListSchema, sessionReadPageSchema, sessionReadQuerySchema } from '@gymos/contracts';
+import { sessionDetailSchema, sessionDetailQuerySchema, sessionAttentionQuerySchema, sessionAttentionPageSchema, memberSessionOverviewQuerySchema, memberSessionOverviewSchema, recentSessionListSchema, sessionReadPageSchema, sessionReadQuerySchema } from '@gymos/contracts';
 import type { RequestOptions } from './index.js';
 
 type Requester = { request<T>(path: string, options: RequestOptions<T>): Promise<T> };
 
 export const sessionReadsApi = (client: Requester) => ({
+  detail: (slug: string, accessToken: string, sessionId: string, query: unknown = {}) => {
+    const input = sessionDetailQuerySchema.parse(query);
+    return client.request(`/gyms/${encodeURIComponent(slug)}/sessions/${encodeURIComponent(sessionId)}?timelinePage=${input.timelinePage}`, { method: 'GET', response: sessionDetailSchema, accessToken });
+  },
+  attention: (slug: string, accessToken: string, query: unknown = {}) => {
+    const input = sessionAttentionQuerySchema.parse(query);
+    return client.request(`/gyms/${encodeURIComponent(slug)}/sessions/attention?page=${input.page}&pageSize=${input.pageSize}`, { method: 'GET', response: sessionAttentionPageSchema, accessToken });
+  },
   memberOverview: (slug: string, accessToken: string, query: unknown) => {
     const input = memberSessionOverviewQuerySchema.parse(query);
     const params = new URLSearchParams(Object.entries(input).map(([key, value]) => [key, String(value)]));

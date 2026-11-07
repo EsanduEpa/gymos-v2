@@ -64,6 +64,7 @@ it('serves role-safe, Master-published trainer pages and versioned/audited shift
       configurationVersion: 1, confirmedAt: confirmed ? new Date(scheduledStartAt.getTime() - 3_600_000) : null,
       confirmationRate: confirmed ? '0.500000' : null, confirmationLevel: confirmed ? 'LEVEL_1' as const : null,
       startedAt: ['ACTIVE', 'COMPLETED'].includes(state) ? scheduledStartAt : null, endedAt,
+      requestExpiresAt: state === 'PENDING_CONFIRMATION' ? new Date(scheduledStartAt.getTime() - 3_600_000) : null,
       confirmationShiftStart: confirmed ? '06:00' : null, confirmationShiftEnd: confirmed ? '14:00' : null,
       createdByIdentityId: fixture.users.ownerA.id, createdAt: scheduledStartAt, updatedAt: scheduledStartAt };
   }) });
@@ -77,6 +78,7 @@ it('serves role-safe, Master-published trainer pages and versioned/audited shift
       configurationVersion: 1, confirmedAt: confirmed ? new Date(scheduledStartAt.getTime() - 3_600_000) : null,
       confirmationRate: confirmed ? '0.500000' : null, confirmationLevel: confirmed ? 'LEVEL_1' as const : null,
       startedAt: null, endedAt: ['CANCELLED', 'MISSED'].includes(state) ? new Date(scheduledStartAt.getTime() + 3_600_000) : null,
+      requestExpiresAt: state === 'PENDING_CONFIRMATION' ? new Date(scheduledStartAt.getTime() - 3_600_000) : null,
       confirmationShiftStart: confirmed ? '06:00' : null, confirmationShiftEnd: confirmed ? '14:00' : null,
       createdByIdentityId: fixture.users.ownerA.id, createdAt: scheduledStartAt, updatedAt: scheduledStartAt };
   }) });
@@ -145,6 +147,16 @@ it('serves role-safe, Master-published trainer pages and versioned/audited shift
   expect(directoryBody.items.every((item: Record<string, unknown>) => !('email' in item) && !('phone' in item) && !('identityId' in item))).toBe(true);
   expect(directoryBody.items.some((item: { id: string }) => item.id === trainers[0]!.id)).toBe(false);
   expect((await call(`/gyms/${gymA.slug}/me/trainer-directory`, trainerIdentity)).status).toBe(403);
+  const visibleTrainerId = directoryBody.items[0].id as string;
+  const memberProfileResponse = await call(`/gyms/${gymA.slug}/me/trainers/${visibleTrainerId}/profile`, member);
+  expect(memberProfileResponse.status).toBe(200);
+  const memberProfile = await memberProfileResponse.json();
+  expect(memberProfile).toMatchObject({ trainer: { id: visibleTrainerId, rating: null }, completedSessions: expect.any(Number) });
+  expect(JSON.stringify(memberProfile)).not.toMatch(/identityId|email|phone|privateNote|healthNotes/);
+  expect((await call(`/gyms/${gymA.slug}/me/trainers/${visibleTrainerId}/profile`, trainerIdentity)).status).toBe(403);
+  expect((await call(`/gyms/${gymA.slug}/me/trainers/${visibleTrainerId}/profile`, owner)).status).toBe(403);
+  expect((await call(`/gyms/${gymB.slug}/me/trainers/${visibleTrainerId}/profile`, member)).status).toBe(403);
+  expect((await call(`/gyms/${gymA.slug}/me/trainers/${trainers[0]!.id}/profile`, member)).status).toBe(404);
 
   const receiptsBefore = await fixture.tenants[0]!.commandReceipt.count({ where: { commandKind: 'APPROVE_TRAINER_SHIFT' } });
   const auditsBefore = await fixture.tenants[0]!.auditLog.count({ where: { eventCode: 'TRAINER_SHIFT_APPROVED' } });

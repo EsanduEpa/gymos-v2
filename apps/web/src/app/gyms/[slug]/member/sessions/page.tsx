@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { redirect } from 'next/navigation';
 import { resolveGymBrandColors } from '@gymos/theme-tokens';
 import { Card, CardHeader } from '@/components/ui';
 import { DashboardChrome } from '@/components/navigation/dashboard-chrome';
@@ -8,11 +9,12 @@ import { requireGymContext } from '@/lib/gym-context';
 
 export default async function MemberSessionsPage({ params, searchParams }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ date?: string; month?: string; mode?: string; state?: string; q?: string; memberId?: string; page?: string; pageSize?: string }>;
+  searchParams: Promise<{ date?: string; month?: string; mode?: string; state?: string; q?: string; memberId?: string; page?: string; pageSize?: string; session?: string }>;
 }) {
   const { slug } = await params;
   const query = await searchParams;
   const { token, session, gym, theme } = await requireGymContext(slug, 'MEMBER');
+  if (query.session && /^[A-Za-z0-9_:-]{1,128}$/.test(query.session)) redirect(`/gyms/${encodeURIComponent(slug)}/sessions/${encodeURIComponent(query.session)}`);
   const loaded = await loadSessionReadPage({ slug, token, role: 'MEMBER', query, defaultMode: query.date ? 'day' : 'month' });
   const brand = resolveGymBrandColors(theme.primaryColor);
   const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;

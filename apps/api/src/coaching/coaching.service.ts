@@ -1,3 +1,4 @@
+import { creditTotals } from '../sessions/credit-unit-projection.js';
 import { ConflictException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { Prisma } from '../generated/tenant/client.js';
 import {
@@ -6,6 +7,7 @@ import {
   trainerClientQuerySchema,
   workoutPlanCreateSchema,
   workoutPlanCreateResultSchema,
+  workoutPlanViewSchema,
   mealPlanCreateSchema,
   mealPlanCreateResultSchema,
   mealPlanViewSchema,
@@ -14,7 +16,11 @@ import {
   memberWorkoutPlansQuerySchema,
   type TrainerClientQuery,
   type WorkoutPlanCreate,
+  workoutPlanUpdateSchema,
+  type WorkoutPlanUpdate,
   type MealPlanCreate,
+  mealPlanUpdateSchema,
+  type MealPlanUpdate,
 } from '@gymos/contracts';
 import { DatabaseService } from '../database.service.js';
 import { withGymAccessFence } from '../identity/gym-access-fence.js';
@@ -56,7 +62,12 @@ function relationshipWhere(trainerId: string, now: Date, q?: string): MemberWher
 }
 
 function workoutPlanDto(plan: WorkoutPlanWithExercises) {
+  const exercises = [...plan.exercises].sort((a, b) => a.sortOrder - b.sortOrder).map(exercise => ({
+    name: exercise.name, sets: exercise.sets, reps: exercise.reps,
+    weightKg: exercise.weightKg?.toString() ?? null, durationMinutes: exercise.durationMinutes, notes: exercise.notes,
+  }));
   return { id: plan.id, name: plan.name, description: plan.description, createdAt: plan.createdAt.toISOString(),
+    revision: requestDigest({ name: plan.name, description: plan.description, exercises }),
     exercises: plan.exercises.sort((a, b) => a.sortOrder - b.sortOrder).map(exercise => ({
       id: exercise.id, order: exercise.sortOrder, name: exercise.name, sets: exercise.sets, reps: exercise.reps,
       weightKg: exercise.weightKg?.toString() ?? null, durationMinutes: exercise.durationMinutes, notes: exercise.notes,
@@ -84,7 +95,10 @@ function mealPlanDto(plan: MealPlanWithEntries) {
     const fats = decimalHundredths(entry.fatsGrams); if (fats !== null) { totals.fatsGrams += fats; fatsHasValue = true; }
   }
   if (!Number.isSafeInteger(totals.calories) || totals.calories > 10_000_000) invalid('Meal plan calorie total exceeds the safe range');
-  return mealPlanViewSchema.parse({ id: plan.id, name: plan.name, createdAt: plan.createdAt.toISOString(),
+  const revision = requestDigest({ name: plan.name, entries: entries.map(entry => ({ dayOfWeek: entry.dayOfWeek, mealType: entry.mealType,
+    foodItem: entry.foodItem, calories: entry.calories, proteinGrams: entry.proteinGrams?.toString() ?? null,
+    carbsGrams: entry.carbsGrams?.toString() ?? null, fatsGrams: entry.fatsGrams?.toString() ?? null })) });
+  return mealPlanViewSchema.parse({ id: plan.id, revision, name: plan.name, createdAt: plan.createdAt.toISOString(),
     entries: entries.map(entry => ({ id: entry.id, dayOfWeek: entry.dayOfWeek, mealType: entry.mealType, foodItem: entry.foodItem,
       calories: entry.calories, proteinGrams: entry.proteinGrams?.toString() ?? null,
       carbsGrams: entry.carbsGrams?.toString() ?? null, fatsGrams: entry.fatsGrams?.toString() ?? null })),
@@ -264,6 +278,68 @@ export class CoachingService {
           await appendTenantAudit(tx, { masterGymId: access.gymId, receiptId: receipt.id, actorIdentityId: access.identityId,
             eventCode: 'WORKOUT_PLAN_ASSIGNED', resourceType: 'WORKOUT_PLAN', resourceId: plan.id,
             transition: { to: 'ASSIGNED', version: 0 } });
+          await this.notifyPlan(tx, { receiptId: receipt.id, recipientIdentityId: candidate.identityId, planId: plan.id, type: 'WORKOUT', updated: false });
+          return result;
+        });
+      }, { isolationLevel: 'Serializable' });
+    });
+  }
+
+  async updateWorkoutPlan(access: Access, memberId: string, planId: string, idempotencyKey: string, input: unknown) {
+    if (access.role !== 'TRAINER' || access.actor?.kind !== 'TRAINER') throw new ForbiddenException('Trainer access is required');
+    const parsed = workoutPlanUpdateSchema.safeParse(input);
+    if (!parsed.success) invalid('Enter a valid workout plan and current revision');
+    const body: WorkoutPlanUpdate = parsed.data;
+    return this.tenantGate.withVerifiedTenant(access, async tenant => {
+      const configuration = await tenant.gymConfiguration.findUnique({ where: { id: 'current' }, select: { masterGymId: true } });
+      if (!configuration || configuration.masterGymId !== access.gymId) throw new NotFoundException('Client not found');
+      return tenant.$transaction(async tx => {
+        const [clock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
+        const now = clock!.now;
+        const memberActor = await tx.member.findFirst({ where: { id: memberId, registrationState: 'COMPLETE', status: 'ACTIVE' },
+          select: { id: true, identityId: true, enrollmentOperationId: true } });
+        if (!memberActor?.identityId || !memberActor.enrollmentOperationId) throw new NotFoundException('Client not found');
+        const candidate = { id: memberActor.id, identityId: memberActor.identityId, operationId: memberActor.enrollmentOperationId };
+        const bindings = await this.publishedMemberBindings(tx, access.gymId, [candidate]);
+        if (!bindings.some(binding => binding.id === candidate.id && binding.identityId === candidate.identityId && binding.operationId === candidate.operationId)) throw new NotFoundException('Client not found');
+        return withGymAccessFence(this.database.master, [
+          { identityId: access.identityId, gymId: access.gymId, role: 'TRAINER', tenantActorId: access.actor!.id },
+          { identityId: candidate.identityId, gymId: access.gymId, role: 'MEMBER', tenantActorId: candidate.id },
+        ], async () => {
+          const trainer = await this.verifiedTrainer(tx, access);
+          const freshBindings = await this.publishedMemberBindings(tx, access.gymId, [candidate]);
+          if (!freshBindings.some(binding => binding.id === candidate.id && binding.identityId === candidate.identityId && binding.operationId === candidate.operationId)) throw new NotFoundException('Client not found');
+          const member = await tx.member.findFirst({ where: { id: memberId, identityId: candidate.identityId, enrollmentOperationId: candidate.operationId,
+            registrationState: 'COMPLETE', status: 'ACTIVE', sessionsAsMember: { some: relationPredicate(trainer.id, now) } }, select: { id: true } });
+          if (!member) throw new NotFoundException('Client not found');
+          const digest = requestDigest({ memberId, planId, ...body });
+          const lockKey = `update-workout-plan:${access.identityId}:${planId}`;
+          await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+          const prior = await tx.commandReceipt.findUnique({ where: { actorIdentityId_commandKind_idempotencyKey: {
+            actorIdentityId: access.identityId, commandKind: 'UPDATE_WORKOUT_PLAN', idempotencyKey,
+          } } });
+          if (prior) {
+            if (prior.requestDigest !== digest || prior.resourceType !== 'WORKOUT_PLAN' || prior.resourceId !== planId || prior.state !== 'COMMITTED' || !prior.safeResult) throw new ConflictException('This idempotency key is already bound to another workout plan update');
+            const result = workoutPlanCreateResultSchema.safeParse(prior.safeResult);
+            if (!result.success || result.data.plan.id !== planId) throw new Error('Stored workout update receipt failed integrity verification');
+            return workoutPlanCreateResultSchema.parse({ ...result.data, replayed: true });
+          }
+          const current = await tx.workoutPlan.findFirst({ where: { id: planId, memberId, trainerId: trainer.id }, include: { exercises: { orderBy: { sortOrder: 'asc' } } } });
+          if (!current) throw new NotFoundException('Workout plan not found');
+          if (workoutPlanDto(current).revision !== body.expectedRevision) throw new ConflictException('Workout plan changed; reload before editing');
+          const updated = await tx.workoutPlan.update({ where: { id: planId }, data: { name: body.name, description: body.description ?? null } });
+          await tx.workoutExercise.deleteMany({ where: { planId } });
+          await tx.workoutExercise.createMany({ data: body.exercises.map((exercise, sortOrder) => ({ planId, sortOrder, name: exercise.name,
+            sets: exercise.sets, reps: exercise.reps ?? null, weightKg: exercise.weightKg ?? null,
+            durationMinutes: exercise.durationMinutes ?? null, notes: exercise.notes ?? null })) });
+          const plan = await tx.workoutPlan.findUniqueOrThrow({ where: { id: updated.id }, include: { exercises: { orderBy: { sortOrder: 'asc' } } } });
+          const result = workoutPlanCreateResultSchema.parse({ plan: workoutPlanDto(plan), replayed: false });
+          const receipt = await tx.commandReceipt.create({ data: { actorIdentityId: access.identityId, commandKind: 'UPDATE_WORKOUT_PLAN', idempotencyKey,
+            requestDigest: digest, resourceType: 'WORKOUT_PLAN', resourceId: planId, state: 'COMMITTED', safeResult: result, committedAt: now } });
+          await appendTenantAudit(tx, { masterGymId: access.gymId, receiptId: receipt.id, actorIdentityId: access.identityId,
+            eventCode: 'WORKOUT_PLAN_UPDATED', resourceType: 'WORKOUT_PLAN', resourceId: planId,
+            transition: { from: body.expectedRevision, to: result.plan.revision } });
+          await this.notifyPlan(tx, { receiptId: receipt.id, recipientIdentityId: candidate.identityId, planId, type: 'WORKOUT', updated: true });
           return result;
         });
       }, { isolationLevel: 'Serializable' });
@@ -301,6 +377,54 @@ export class CoachingService {
             asOf: now.toISOString(), timeZone: configuration.timezone });
         });
       }, { isolationLevel: 'RepeatableRead' });
+    });
+  }
+
+  async trainerWorkoutPlans(access: Access, memberId: string, queryInput: unknown) {
+    const parsed = memberWorkoutPlansQuerySchema.safeParse(queryInput ?? {});
+    if (!parsed.success) invalid('Enter valid workout plan page details');
+    return this.withRelatedMember(access, memberId, async (tx, member, trainer, now, timeZone) => {
+      const where = { memberId: member.id, trainerId: trainer.id };
+      const [totalCount, plans] = await Promise.all([
+        tx.workoutPlan.count({ where }),
+        tx.workoutPlan.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (parsed.data.page - 1) * parsed.data.pageSize,
+          take: parsed.data.pageSize, include: { exercises: { orderBy: { sortOrder: 'asc' } } } }),
+      ]);
+      return memberWorkoutPlanPageSchema.parse({ items: plans.map(workoutPlanDto), page: parsed.data.page, pageSize: parsed.data.pageSize,
+        totalCount, totalPages: Math.ceil(totalCount / parsed.data.pageSize), hasMore: parsed.data.page * parsed.data.pageSize < totalCount,
+        asOf: now.toISOString(), timeZone });
+    });
+  }
+
+  async trainerWorkoutPlan(access: Access, memberId: string, planId: string) {
+    return this.withRelatedMember(access, memberId, async (tx, member, trainer) => {
+      const plan = await tx.workoutPlan.findFirst({ where: { id: planId, memberId: member.id, trainerId: trainer.id }, include: { exercises: { orderBy: { sortOrder: 'asc' } } } });
+      if (!plan) throw new NotFoundException('Workout plan not found');
+      return workoutPlanViewSchema.parse(workoutPlanDto(plan));
+    });
+  }
+
+  async trainerMealPlans(access: Access, memberId: string, queryInput: unknown) {
+    const parsed = memberWorkoutPlansQuerySchema.safeParse(queryInput ?? {});
+    if (!parsed.success) invalid('Enter valid meal plan page details');
+    return this.withRelatedMember(access, memberId, async (tx, member, trainer, now, timeZone) => {
+      const where = { memberId: member.id, trainerId: trainer.id };
+      const [totalCount, plans] = await Promise.all([
+        tx.mealPlan.count({ where }),
+        tx.mealPlan.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (parsed.data.page - 1) * parsed.data.pageSize,
+          take: parsed.data.pageSize, include: { entries: { orderBy: { sortOrder: 'asc' } } } }),
+      ]);
+      return memberMealPlanPageSchema.parse({ items: plans.map(mealPlanDto), page: parsed.data.page, pageSize: parsed.data.pageSize,
+        totalCount, totalPages: Math.ceil(totalCount / parsed.data.pageSize), hasMore: parsed.data.page * parsed.data.pageSize < totalCount,
+        asOf: now.toISOString(), timeZone });
+    });
+  }
+
+  async trainerMealPlan(access: Access, memberId: string, planId: string) {
+    return this.withRelatedMember(access, memberId, async (tx, member, trainer) => {
+      const plan = await tx.mealPlan.findFirst({ where: { id: planId, memberId: member.id, trainerId: trainer.id }, include: { entries: { orderBy: { sortOrder: 'asc' } } } });
+      if (!plan) throw new NotFoundException('Meal plan not found');
+      return mealPlanViewSchema.parse(mealPlanDto(plan));
     });
   }
 
@@ -355,6 +479,70 @@ export class CoachingService {
             requestDigest: digest, resourceType: 'MEAL_PLAN', resourceId: plan.id, state: 'COMMITTED', safeResult: result, committedAt: now } });
           await appendTenantAudit(tx, { masterGymId: access.gymId, receiptId: receipt.id, actorIdentityId: access.identityId,
             eventCode: 'MEAL_PLAN_ASSIGNED', resourceType: 'MEAL_PLAN', resourceId: plan.id, transition: { to: 'ASSIGNED', version: 0 } });
+          await this.notifyPlan(tx, { receiptId: receipt.id, recipientIdentityId: candidate.identityId, planId: plan.id, type: 'MEAL', updated: false });
+          return result;
+        });
+      }, { isolationLevel: 'Serializable' });
+    });
+  }
+
+  async updateMealPlan(access: Access, memberId: string, planId: string, idempotencyKey: string, input: unknown) {
+    if (access.role !== 'TRAINER' || access.actor?.kind !== 'TRAINER') throw new ForbiddenException('Trainer access is required');
+    const parsed = mealPlanUpdateSchema.safeParse(input);
+    if (!parsed.success) invalid('Enter a valid meal plan and current revision');
+    const body: MealPlanUpdate = parsed.data;
+    const calories = body.entries.reduce((sum, entry) => sum + (entry.calories ?? 0), 0);
+    if (!Number.isSafeInteger(calories) || calories > 10_000_000) invalid('Meal plan calorie total exceeds the safe range');
+    return this.tenantGate.withVerifiedTenant(access, async tenant => {
+      const configuration = await tenant.gymConfiguration.findUnique({ where: { id: 'current' }, select: { masterGymId: true } });
+      if (!configuration || configuration.masterGymId !== access.gymId) throw new NotFoundException('Client not found');
+      return tenant.$transaction(async tx => {
+        const [clock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
+        const now = clock!.now;
+        const memberActor = await tx.member.findFirst({ where: { id: memberId, registrationState: 'COMPLETE', status: 'ACTIVE' },
+          select: { id: true, identityId: true, enrollmentOperationId: true } });
+        if (!memberActor?.identityId || !memberActor.enrollmentOperationId) throw new NotFoundException('Client not found');
+        const candidate = { id: memberActor.id, identityId: memberActor.identityId, operationId: memberActor.enrollmentOperationId };
+        const bindings = await this.publishedMemberBindings(tx, access.gymId, [candidate]);
+        if (!bindings.some(binding => binding.id === candidate.id && binding.identityId === candidate.identityId && binding.operationId === candidate.operationId)) throw new NotFoundException('Client not found');
+        return withGymAccessFence(this.database.master, [
+          { identityId: access.identityId, gymId: access.gymId, role: 'TRAINER', tenantActorId: access.actor!.id },
+          { identityId: candidate.identityId, gymId: access.gymId, role: 'MEMBER', tenantActorId: candidate.id },
+        ], async () => {
+          const trainer = await this.verifiedTrainer(tx, access);
+          const freshBindings = await this.publishedMemberBindings(tx, access.gymId, [candidate]);
+          if (!freshBindings.some(binding => binding.id === candidate.id && binding.identityId === candidate.identityId && binding.operationId === candidate.operationId)) throw new NotFoundException('Client not found');
+          const member = await tx.member.findFirst({ where: { id: memberId, identityId: candidate.identityId, enrollmentOperationId: candidate.operationId,
+            registrationState: 'COMPLETE', status: 'ACTIVE', sessionsAsMember: { some: relationPredicate(trainer.id, now) } }, select: { id: true } });
+          if (!member) throw new NotFoundException('Client not found');
+          const digest = requestDigest({ memberId, planId, ...body });
+          const lockKey = `update-meal-plan:${access.identityId}:${planId}`;
+          await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+          const prior = await tx.commandReceipt.findUnique({ where: { actorIdentityId_commandKind_idempotencyKey: {
+            actorIdentityId: access.identityId, commandKind: 'UPDATE_MEAL_PLAN', idempotencyKey,
+          } } });
+          if (prior) {
+            if (prior.requestDigest !== digest || prior.resourceType !== 'MEAL_PLAN' || prior.resourceId !== planId || prior.state !== 'COMMITTED' || !prior.safeResult) throw new ConflictException('This idempotency key is already bound to another meal plan update');
+            const result = mealPlanCreateResultSchema.safeParse(prior.safeResult);
+            if (!result.success || result.data.plan.id !== planId) throw new Error('Stored meal update receipt failed integrity verification');
+            return mealPlanCreateResultSchema.parse({ ...result.data, replayed: true });
+          }
+          const current = await tx.mealPlan.findFirst({ where: { id: planId, memberId, trainerId: trainer.id }, include: { entries: { orderBy: { sortOrder: 'asc' } } } });
+          if (!current) throw new NotFoundException('Meal plan not found');
+          if (mealPlanDto(current).revision !== body.expectedRevision) throw new ConflictException('Meal plan changed; reload before editing');
+          await tx.mealPlan.update({ where: { id: planId }, data: { name: body.name } });
+          await tx.mealPlanEntry.deleteMany({ where: { planId } });
+          await tx.mealPlanEntry.createMany({ data: body.entries.map((entry, sortOrder) => ({ planId, sortOrder, dayOfWeek: entry.dayOfWeek,
+            mealType: entry.mealType, foodItem: entry.foodItem, calories: entry.calories ?? null,
+            proteinGrams: entry.proteinGrams ?? null, carbsGrams: entry.carbsGrams ?? null, fatsGrams: entry.fatsGrams ?? null })) });
+          const plan = await tx.mealPlan.findUniqueOrThrow({ where: { id: planId }, include: { entries: { orderBy: { sortOrder: 'asc' } } } });
+          const result = mealPlanCreateResultSchema.parse({ plan: mealPlanDto(plan), replayed: false });
+          const receipt = await tx.commandReceipt.create({ data: { actorIdentityId: access.identityId, commandKind: 'UPDATE_MEAL_PLAN', idempotencyKey,
+            requestDigest: digest, resourceType: 'MEAL_PLAN', resourceId: planId, state: 'COMMITTED', safeResult: result, committedAt: now } });
+          await appendTenantAudit(tx, { masterGymId: access.gymId, receiptId: receipt.id, actorIdentityId: access.identityId,
+            eventCode: 'MEAL_PLAN_UPDATED', resourceType: 'MEAL_PLAN', resourceId: planId,
+            transition: { from: body.expectedRevision, to: result.plan.revision } });
+          await this.notifyPlan(tx, { receiptId: receipt.id, recipientIdentityId: candidate.identityId, planId, type: 'MEAL', updated: true });
           return result;
         });
       }, { isolationLevel: 'Serializable' });
@@ -402,6 +590,47 @@ export class CoachingService {
     return trainer;
   }
 
+  private async withRelatedMember<Result>(access: Access, memberId: string,
+    work: (tx: Prisma.TransactionClient, member: { id: string }, trainer: { id: string }, now: Date, timeZone: string) => Promise<Result>): Promise<Result> {
+    if (access.role !== 'TRAINER' || access.actor?.kind !== 'TRAINER') throw new ForbiddenException('Trainer access is required');
+    return this.tenantGate.withVerifiedTenant(access, async tenant => {
+      const configuration = await tenant.gymConfiguration.findUnique({ where: { id: 'current' }, select: { timezone: true, masterGymId: true } });
+      if (!configuration?.timezone || configuration.masterGymId !== access.gymId) throw new NotFoundException('Client not found');
+      return tenant.$transaction(async tx => {
+        await tx.$executeRaw`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`;
+        const [clock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
+        const targetActor = await tx.member.findFirst({ where: { id: memberId, registrationState: 'COMPLETE', status: 'ACTIVE' },
+          select: { id: true, identityId: true, enrollmentOperationId: true } });
+        if (!targetActor?.identityId || !targetActor.enrollmentOperationId) throw new NotFoundException('Client not found');
+        const candidate = { id: targetActor.id, identityId: targetActor.identityId, operationId: targetActor.enrollmentOperationId };
+        const bindings = await this.publishedMemberBindings(tx, access.gymId, [candidate]);
+        if (!bindings.some(binding => binding.id === candidate.id && binding.identityId === candidate.identityId && binding.operationId === candidate.operationId)) throw new NotFoundException('Client not found');
+        return withGymAccessFence(this.database.master, [
+          { identityId: access.identityId, gymId: access.gymId, role: 'TRAINER', tenantActorId: access.actor!.id },
+          { identityId: candidate.identityId, gymId: access.gymId, role: 'MEMBER', tenantActorId: candidate.id },
+        ], async () => {
+          const trainer = await this.verifiedTrainer(tx, access);
+          const freshBindings = await this.publishedMemberBindings(tx, access.gymId, [candidate]);
+          if (!freshBindings.some(binding => binding.id === candidate.id && binding.identityId === candidate.identityId && binding.operationId === candidate.operationId)) throw new NotFoundException('Client not found');
+          const member = await tx.member.findFirst({ where: { id: memberId, identityId: candidate.identityId, enrollmentOperationId: candidate.operationId,
+            registrationState: 'COMPLETE', status: 'ACTIVE', sessionsAsMember: { some: relationPredicate(trainer.id, clock!.now) } }, select: { id: true } });
+          if (!member) throw new NotFoundException('Client not found');
+          return work(tx, member, trainer, clock!.now, configuration.timezone!);
+        });
+      }, { isolationLevel: 'RepeatableRead' });
+    });
+  }
+
+  private async notifyPlan(tx: Prisma.TransactionClient, input: { receiptId: string; recipientIdentityId: string; planId: string; type: 'WORKOUT' | 'MEAL'; updated: boolean }) {
+    const label = input.type === 'WORKOUT' ? 'workout' : 'meal';
+    const eventCode = `${input.type}_PLAN_${input.updated ? 'UPDATED' : 'ASSIGNED'}`;
+    const sourceEventKey = `plan:${input.receiptId}:${eventCode}`;
+    await tx.notification.create({ data: { recipientIdentityId: input.recipientIdentityId, sourceEventKey, eventCode,
+      title: input.updated ? `${label === 'workout' ? 'Workout' : 'Meal'} plan updated` : `New ${label} plan`,
+      message: input.updated ? `Your trainer updated a ${label} plan. Review your ${label} plans.` : `Your trainer assigned a ${label} plan. Review your ${label} plans.`,
+      linkKind: input.type === 'WORKOUT' ? 'MEMBER_WORKOUT_PLANS' : 'MEMBER_MEAL_PLANS', resourceId: input.planId } });
+  }
+
   private async withTrainerFence<Result>(access: Access, work: () => Promise<Result>) {
     return withGymAccessFence(this.database.master, [
       { identityId: access.identityId, gymId: access.gymId, role: 'TRAINER', tenantActorId: access.actor!.id },
@@ -438,38 +667,7 @@ export class CoachingService {
   }
 
   private async packSummaries(tx: Prisma.TransactionClient, memberIds: string[], localDate: string) {
-    const result = new Map<string, { available: number; held: number; consumed: number; expired: number }>();
-    if (!memberIds.length) return result;
-    const rows = await tx.$queryRaw<Array<{ memberId: string; issued: bigint; ledgerAvailable: bigint; ledgerHeld: bigint; ledgerConsumed: bigint; ledgerExpired: bigint;
-      available: bigint; held: bigint; consumed: bigint; expired: bigint }>>`
-      SELECT p."memberId",
-        COALESCE(SUM(p."issuedCredits"), 0)::bigint AS issued,
-        COALESCE(SUM(m.available), 0)::bigint AS "ledgerAvailable",
-        COALESCE(SUM(m.held), 0)::bigint AS "ledgerHeld",
-        COALESCE(SUM(m.consumed), 0)::bigint AS "ledgerConsumed",
-        COALESCE(SUM(m.expired), 0)::bigint AS "ledgerExpired",
-        COALESCE(SUM(CASE WHEN p."startDate" <= ${localDate}::date AND p."endDateExclusive" > ${localDate}::date THEN m.available ELSE 0 END), 0)::bigint AS available,
-        COALESCE(SUM(CASE WHEN p."startDate" <= ${localDate}::date AND p."endDateExclusive" > ${localDate}::date THEN m.held ELSE 0 END), 0)::bigint AS held,
-        COALESCE(SUM(m.consumed), 0)::bigint AS consumed,
-        COALESCE(SUM(m.expired + CASE WHEN p."endDateExclusive" <= ${localDate}::date THEN m.available ELSE 0 END), 0)::bigint AS expired
-      FROM "SessionPack" p
-      LEFT JOIN (
-        SELECT "packId", SUM("availableDelta") AS available, SUM("heldDelta") AS held,
-          SUM("consumedDelta") AS consumed, SUM("expiredDelta") AS expired
-        FROM "PackCreditMovement"
-        WHERE "packId" IN (SELECT id FROM "SessionPack" WHERE "memberId" = ANY(${memberIds}::text[]))
-        GROUP BY "packId"
-      ) m ON m."packId" = p.id
-      WHERE p."memberId" = ANY(${memberIds}::text[])
-      GROUP BY p."memberId"`;
-    for (const row of rows) {
-      const balance = { available: Number(row.available), held: Number(row.held), consumed: Number(row.consumed), expired: Number(row.expired) };
-      const ledgerTotal = Number(row.ledgerAvailable) + Number(row.ledgerHeld) + Number(row.ledgerConsumed) + Number(row.ledgerExpired);
-      if (!Number.isSafeInteger(Number(row.issued)) || !Number.isSafeInteger(ledgerTotal) || ledgerTotal !== Number(row.issued)) {
-        throw new Error('Session pack credit ledger invariant failed');
-      }
-      result.set(row.memberId, balance);
-    }
-    return result;
+    const totals = await creditTotals(tx, memberIds, localDate, true);
+    return new Map([...totals].map(([id, total]) => [id, { available: total.available, held: total.held, consumed: total.consumed, expired: total.expired }]));
   }
 }

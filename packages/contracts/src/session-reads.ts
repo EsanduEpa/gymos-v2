@@ -3,7 +3,7 @@ const idSchema = z.string().min(1).max(128).regex(/^[A-Za-z0-9_:-]+$/);
 const isoInstantSchema = z.iso.datetime({ offset: true });
 const localDateSchema = z.iso.date();
 
-export const sessionReadStateSchema = z.enum(['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE', 'COMPLETED', 'MISSED', 'CANCELLED', 'DECLINED']);
+export const sessionReadStateSchema = z.enum(['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE', 'COMPLETED', 'MISSED', 'CANCELLED', 'DECLINED', 'EXPIRED']);
 export type SessionReadState = z.infer<typeof sessionReadStateSchema>;
 const positivePage = z.union([z.number(), z.string().regex(/^[1-9][0-9]*$/)]).transform(v => typeof v === 'string' ? Number(v) : v).pipe(z.number().int().min(1).max(1_000_000));
 const pageSize = z.union([z.number(), z.string().regex(/^[1-9][0-9]*$/)]).transform(v => typeof v === 'string' ? Number(v) : v).pipe(z.number().int().min(1).max(100));
@@ -30,7 +30,7 @@ export const sessionReadItemSchema = z.strictObject({
   id: idSchema, memberId: idSchema, memberName: z.string().min(1).max(120), trainerId: idSchema, trainerName: z.string().min(1).max(120),
   state: sessionReadStateSchema, type: z.enum(['IN_PERSON', 'VIRTUAL', 'INTRODUCTORY']), version: z.number().int().nonnegative(),
   scheduledStartAt: isoInstantSchema, scheduledEndAt: isoInstantSchema, gymTimeZone: z.string().min(1).max(100),
-  startedAt: isoInstantSchema.nullable(), endedAt: isoInstantSchema.nullable(), confirmedAt: isoInstantSchema.nullable(), createdAt: isoInstantSchema,
+  startedAt: isoInstantSchema.nullable(), endedAt: isoInstantSchema.nullable(), confirmedAt: isoInstantSchema.nullable(), requestExpiresAt: isoInstantSchema.nullable(), createdAt: isoInstantSchema,
   declineReason: z.string().max(500).nullable(),
   fee: z.string().regex(/^(?:0|[1-9]\d{0,14})(?:\.\d{1,4})?$/).nullable(), currency: z.string().regex(/^[A-Z]{3}$/).nullable(),
   notes: z.string().max(4000).nullable(), trainerPay: z.string().regex(/^(?:0|[1-9]\d{0,14})(?:\.\d{1,4})?$/).nullable(),
@@ -41,7 +41,7 @@ export const sessionReadPageSchema = z.strictObject({
   totalCount: z.number().int().nonnegative(), totalPages: z.number().int().nonnegative(), asOf: isoInstantSchema,
   timeZone: z.string().min(1).max(100), rangeStart: isoInstantSchema.nullable(), rangeEndExclusive: isoInstantSchema.nullable(),
   filterTotal: z.number().int().nonnegative(),
-  summary: z.strictObject({ monthBookings: z.number().int().nonnegative().nullable(), lifetimePackCredits: z.strictObject({ available: z.number().int().nonnegative(), held: z.number().int().nonnegative(), consumed: z.number().int().nonnegative(), expired: z.number().int().nonnegative() }).nullable() }),
+  summary: z.strictObject({ nextCreditExpiry: localDateSchema.nullable().default(null), monthBookings: z.number().int().nonnegative().nullable(), lifetimePackCredits: z.strictObject({ available: z.number().int().nonnegative(), held: z.number().int().nonnegative(), consumed: z.number().int().nonnegative(), expired: z.number().int().nonnegative() }).nullable() }),
 });
 export const recentSessionListSchema = z.strictObject({
   items: z.array(sessionReadItemSchema).max(10), limit: z.literal(10), totalCount: z.number().int().nonnegative(), hasMore: z.boolean(), asOf: isoInstantSchema, timeZone: z.string().min(1).max(100),
@@ -50,7 +50,7 @@ export const memberSessionOverviewQuerySchema = z.strictObject({
   month: monthSchema, q: z.string().trim().min(1).max(100).optional(), page: positivePage.default(1), pageSize: pageSize.default(25),
 });
 const memberMonthCountsSchema = z.strictObject({ pending: z.number().int().nonnegative(), scheduled: z.number().int().nonnegative(), active: z.number().int().nonnegative(),
-  completed: z.number().int().nonnegative(), missed: z.number().int().nonnegative(), cancelled: z.number().int().nonnegative(), declined: z.number().int().nonnegative() });
+  completed: z.number().int().nonnegative(), missed: z.number().int().nonnegative(), cancelled: z.number().int().nonnegative(), declined: z.number().int().nonnegative(), expired: z.number().int().nonnegative() });
 export const memberSessionOverviewItemSchema = z.strictObject({
   member: z.strictObject({ id: idSchema, fullName: z.string().min(2).max(120), email: z.email().max(254).nullable(), status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']) }),
   latestMembership: z.strictObject({ planName: z.string().min(1).max(80), startDate: localDateSchema, endDateExclusive: localDateSchema }).nullable(),
@@ -66,3 +66,32 @@ export type SessionReadQuery = z.infer<typeof sessionReadQuerySchema>;
 export type SessionReadPage = z.infer<typeof sessionReadPageSchema>;
 export type MemberSessionOverviewQuery = z.infer<typeof memberSessionOverviewQuerySchema>;
 export type MemberSessionOverview = z.infer<typeof memberSessionOverviewSchema>;
+
+export const sessionDetailQuerySchema = z.strictObject({ timelinePage: positivePage.default(1) });
+export const sessionAttentionQuerySchema = z.strictObject({ page: positivePage.default(1), pageSize: pageSize.default(25) });
+export const sessionAttentionReasonSchema = z.enum(['SCHEDULED_PAST_END', 'ACTIVE_PAST_END', 'REQUEST_EXPIRED', 'CREDIT_REMEDY_REQUIRED']);
+export const sessionDetailSchema = z.strictObject({
+  session: sessionReadItemSchema,
+  location: z.string().max(2000).nullable(),
+  creditCost: z.literal(1),
+  reservation: z.enum(['NONE', 'HELD', 'CONSUMED', 'RELEASED']),
+  settlement: z.enum(['COMPLETED', 'MISSED', 'LATE_CANCELLED', 'FREE_CANCELLED', 'WITHDRAWN', 'LIFECYCLE_RELEASE']).nullable(),
+  creditConsumed: z.boolean().nullable(),
+  cancellationDeadline: isoInstantSchema.nullable(),
+  minimumCompletionMinutes: z.number().int().nonnegative().nullable(),
+  completionAvailableAt: isoInstantSchema.nullable(),
+  expiryAwaitingSweep: z.boolean(),
+  ownerAttention: sessionAttentionReasonSchema.nullable(),
+  creditRemedyStatus: z.enum(['AWAITING_OWNER', 'APPROVED']).nullable(), restoredCreditExpiry: localDateSchema.nullable(),
+  replacementSessionId: idSchema.nullable(), originalSessionId: idSchema.nullable(),
+  ownerRecovery: z.strictObject({ latestEventId: idSchema.nullable(), allowedKinds: z.array(z.enum(['CANCEL','RESCHEDULE','CORRECTION','REMEDY'])).max(4), latestReason: z.string().max(500).nullable() }).nullable(),
+  timeline: z.array(z.strictObject({ from: sessionReadStateSchema.nullable(), to: sessionReadStateSchema, at: isoInstantSchema, notesUpdated: z.boolean(), adjustmentKind: z.enum(['CORRECTION','RESCHEDULE','REMEDY','CANCELLATION']).nullable() })).max(50),
+  timelinePage: z.number().int().positive(), timelineTotal: z.number().int().nonnegative(), timelinePages: z.number().int().nonnegative(),
+  asOf: isoInstantSchema,
+});
+export const sessionAttentionPageSchema = z.strictObject({
+  items: z.array(z.strictObject({ session: sessionReadItemSchema, reason: sessionAttentionReasonSchema })).max(100),
+  page: z.number().int().positive(), pageSize: z.number().int().min(1).max(100), totalCount: z.number().int().nonnegative(), totalPages: z.number().int().nonnegative(), asOf: isoInstantSchema,
+});
+export type SessionDetail = z.infer<typeof sessionDetailSchema>;
+export type SessionAttentionPage = z.infer<typeof sessionAttentionPageSchema>;

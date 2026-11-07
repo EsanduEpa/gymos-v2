@@ -39,7 +39,7 @@ function trainerPageSchema<T extends z.ZodType>(item: T) {
 export const trainerListSchema = trainerPageSchema(trainerSummarySchema);
 const trainerRecentSessionSchema = z.strictObject({
   id: idSchema,
-  state: z.enum(['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE', 'COMPLETED', 'MISSED', 'CANCELLED', 'DECLINED']),
+  state: z.enum(['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE', 'COMPLETED', 'MISSED', 'CANCELLED', 'DECLINED', 'EXPIRED']),
   type: z.enum(['IN_PERSON', 'VIRTUAL', 'INTRODUCTORY']),
   scheduledStartAt: z.iso.datetime({ offset: true }),
   scheduledEndAt: z.iso.datetime({ offset: true }),
@@ -68,6 +68,11 @@ export const trainerLifecycleResultSchema = z.strictObject({
 });
 export const memberTrainerDirectoryQuerySchema = pageQuerySchema.extend({ q: z.string().trim().max(120).optional() });
 export const memberTrainerDirectorySchema = trainerPageSchema(trainerMemberSummarySchema);
+export const memberTrainerProfileSchema = z.strictObject({
+  trainer: trainerMemberSummarySchema.extend({ yearsExperience: z.number().int().nonnegative().max(80).nullable() }),
+  completedSessions: z.number().int().nonnegative(),
+  asOf: z.iso.datetime({ offset: true }),
+});
 
 export const trainerRegistrationInputSchema = z.strictObject({
   fullName: z.string().trim().min(2).max(120),

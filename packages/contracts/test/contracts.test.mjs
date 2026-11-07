@@ -7,7 +7,9 @@ import {
   moneySchema, pageQuerySchema, pageSchema, readSchema, signedMoneySchema,
 } from '../dist/index.js';
 import { existingEndpointContracts } from '../dist/legacy.js';
-import { changePasswordInputSchema, credentialAcknowledgementInputSchema, credentialAcknowledgementResultSchema, credentialIssueInputSchema, credentialReissueInputSchema, credentialReissueResultSchema } from '../dist/credentials.js';
+import { changePasswordInputSchema, credentialAcknowledgementInputSchema, credentialAcknowledgementResultSchema, credentialIssueInputSchema,
+  credentialReissueInputSchema, credentialReissueResultSchema, recoveryIssueInputSchema, operatorRecoveryIssueInputSchema,
+  recoveryCompleteInputSchema, recoveryIssueResultSchema } from '../dist/credentials.js';
 import { createMembershipPlanSchema, gymConfigurationSchema, updateGymThemeSchema } from '../dist/configuration.js';
 import { memberEnrollmentConsentInputSchema, memberEnrollmentConsentResultSchema, memberListQuerySchema, memberListSchema,
   memberRegistrationInputSchema, memberRegistrationResultSchema } from '../dist/members.js';
@@ -21,7 +23,8 @@ const gym = { id: 'gym-1', name: 'Synthetic Gym', slug: 'test-a', status: 'ACTIV
 const theme = { primaryColor: '#123456', logoUrl: 'https://example.test/logo.svg' };
 const member = { id: 'member-1', fullName: 'Synthetic Member', email: null, status: 'ACTIVE' };
 const fixtures = {
-  E01: { accessToken: 'fixture-only-token', tokenType: 'Bearer', expiresIn: 900,
+  E01: { accessToken: 'fixture-only-token', tokenType: 'Bearer', expiresIn: 900, sessionId: 'session-1', refreshToken: 'A'.repeat(43),
+    refreshExpiresAt: asOf, absoluteExpiresAt: asOf, deviceClass: 'SHARED', deviceLabel: 'Chrome on Linux',
     globalRole: 'USER', mustChangePassword: false, gyms: [{ id: gym.id, name: gym.name, slug: gym.slug, role: 'OWNER' }] },
   E02: [gym], E03: gym, E04: { slug: gym.slug, name: gym.name, theme },
   E05: { slug: gym.slug, theme: { ...theme, version: 1 } }, E06: { gymId: gym.id, slug: gym.slug, role: 'OWNER' },
@@ -171,14 +174,45 @@ test('credential contracts enforce password policy and one-time reissue envelope
   assert.deepEqual(credentialAcknowledgementResultSchema.parse({ status: 'ACKNOWLEDGED', deliveryVersion: 1 }), { status: 'ACKNOWLEDGED', deliveryVersion: 1 });
 });
 
+test('staff recovery contracts require fresh verification and keep the one-time secret out of durable input projections', () => {
+  const request = { verificationMethod: 'IN_PERSON', reason: 'Identity matched to the gym record.', currentPassword: 'Owner-password-42' };
+  assert.deepEqual(recoveryIssueInputSchema.parse(request), request);
+  assert.equal(recoveryIssueInputSchema.safeParse({ ...request, currentPassword: '' }).success, false);
+  assert.equal(operatorRecoveryIssueInputSchema.safeParse({ email: 'member@example.test', ...request }).success, true);
+  const completion = { credentialId: 'recovery-1', secret: 'A'.repeat(43), newPassword: 'Recovery-password-42', confirmPassword: 'Recovery-password-42' };
+  assert.deepEqual(recoveryCompleteInputSchema.parse(completion), completion);
+  assert.equal(recoveryCompleteInputSchema.safeParse({ ...completion, secret: 'short' }).success, false);
+  assert.equal(recoveryIssueResultSchema.safeParse({ credentialId: 'r1', secret: 'A'.repeat(43), expiresAt: asOf, subjectLabel: 'Member' }).success, true);
+  assert.equal(recoveryIssueResultSchema.safeParse({ credentialId: 'r1', secret: 'A'.repeat(43), expiresAt: asOf, subjectLabel: 'Member', passwordHash: 'secret' }).success, false);
+});
+
+test('profile contracts keep global identity, self-service fields, and owner corrections field-scoped', async () => {
+  const { updateAccountProfileSchema, updateSelfMemberProfileSchema, updateSelfTrainerProfileSchema, ownerMemberProfileCorrectionSchema } = await import('../dist/index.js');
+  assert.equal(updateAccountProfileSchema.safeParse({ displayName: 'Synthetic account name', expectedVersion: 0, idempotencyKey: 'profile-0123456789' }).success, true);
+  assert.equal(updateAccountProfileSchema.safeParse({ displayName: 'Changed', email: 'attacker@example.test', expectedVersion: 0, idempotencyKey: 'profile-0123456789' }).success, false);
+  assert.equal(updateSelfMemberProfileSchema.safeParse({ phone: null, emergencyContact: null, expectedVersion: 0, idempotencyKey: 'member-profile-012345' }).success, true);
+  assert.equal(updateSelfMemberProfileSchema.safeParse({ phone: null, emergencyContact: null, healthNotes: 'private', expectedVersion: 0, idempotencyKey: 'member-profile-012345' }).success, false);
+  const trainer = { phone: null, biography: 'Synthetic biography', specialisations: ['Strength', 'Mobility'], yearsExperience: 8, expectedVersion: 1, idempotencyKey: 'trainer-profile-012345' };
+  assert.equal(updateSelfTrainerProfileSchema.safeParse(trainer).success, true);
+  assert.equal(updateSelfTrainerProfileSchema.safeParse({ ...trainer, specialisations: ['Strength', 'strength'] }).success, false);
+  assert.equal(updateSelfTrainerProfileSchema.safeParse({ ...trainer, level: 'LEVEL_2' }).success, false);
+  const correction = { fullName: 'Synthetic Corrected Name', dateOfBirth: null, phone: null, emergencyContact: null, healthNotes: null, expectedVersion: 2,
+    reason: 'MEMBER_REQUEST', idempotencyKey: 'owner-profile-0123456' };
+  assert.equal(ownerMemberProfileCorrectionSchema.safeParse(correction).success, true);
+  assert.equal(ownerMemberProfileCorrectionSchema.safeParse(Object.fromEntries(Object.entries(correction).filter(([key]) => key !== 'healthNotes'))).success, true);
+  assert.equal(ownerMemberProfileCorrectionSchema.safeParse({ ...correction, status: 'SUSPENDED' }).success, false);
+});
+
 test('shell session projection excludes credential and connection material', async () => {
   const { currentSessionSchema, logoutResultSchema } = await import('../dist/legacy.js');
-  const session = { identityId: 'identity-1', displayName: 'Synthetic owner', globalRole: 'USER', mustChangePassword: false, gyms: fixtures.E01.gyms };
+  const session = { identityId: 'identity-1', displayName: 'Synthetic owner', globalRole: 'USER', mustChangePassword: false,
+    sessionId: 'session-1', refreshExpiresAt: asOf, absoluteExpiresAt: asOf, deviceClass: 'SHARED', deviceLabel: 'Chrome on Linux',
+    lastActivityAt: asOf, gyms: fixtures.E01.gyms };
   assert.deepEqual(currentSessionSchema.parse(session), session);
   assert.deepEqual(logoutResultSchema.parse({ revoked: true }), { revoked: true });
   assert.equal(logoutResultSchema.safeParse({ revoked: false }).success, false);
   assert.equal(logoutResultSchema.safeParse({ revoked: true, accessToken: 'fixture-only' }).success, false);
-  for (const field of ['accessToken', 'passwordHash', 'databaseName', 'authVersion']) {
+  for (const field of ['accessToken', 'refreshToken', 'passwordHash', 'databaseName', 'authVersion']) {
     assert.equal(currentSessionSchema.safeParse({ ...session, [field]: 'fixture-only' }).success, false);
   }
 });

@@ -16,7 +16,7 @@ import { createDisposablePostgresRun } from '../support/disposable-postgres.js';
 let run:Awaited<ReturnType<typeof createDisposablePostgresRun>>;let master:PrismaClient;let app:INestApplication;let base:string;let actor:string;let bearer:string;let other:string;let tenants:TenantDatabaseService;let registry:PlatformRegistryService;
 let gymA:{id:string;slug:string};let gymB:{id:string;slug:string};let pending:{id:string;slug:string};
 const secret=randomBytes(32).toString('hex');
-const token=async(id:string,authVersion=0)=>new SignJWT({authVersion}).setProtectedHeader({alg:'HS256'}).setSubject(id).setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('15m').sign(new TextEncoder().encode(secret));
+const token=async(id:string,authVersion=0,sessionId?:string)=>new SignJWT({authVersion,...(sessionId?{sid:sessionId}:{})}).setProtectedHeader({alg:'HS256'}).setSubject(id).setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('15m').sign(new TextEncoder().encode(secret));
 async function call(path:string,method='GET',body?:unknown,context?:string,identity=bearer){return fetch(`${base}${path}`,{method,headers:{authorization:`Bearer ${identity}`,'content-type':'application/json',...(context?{'x-gymos-support-context':context}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})});}
 const entry=(gymId:string)=>({gymId,scope:'GYM_SUMMARY_READ',reasonCode:'DIAGNOSE_ACCESS',explanation:'Synthetic support acceptance check'});
 const enter=async(gymId:string)=>{const response=await call('/admin/support-sessions','POST',entry(gymId));expect(response.status).toBe(201);return response.json();};
@@ -109,7 +109,10 @@ it('expires at the exact boundary, rejects changed security versions and revokes
  const changed=await enter(gymA.id);await master.user.update({where:{id:actor},data:{authVersion:{increment:1}}});bearer=await token(actor,1);
  expect((await call(summary(changed,gymA.slug),'GET',undefined,changed.context)).status).toBe(403);
  expect((await master.supportSession.findUniqueOrThrow({where:{id:changed.id}})).revocationReason).toBe('SECURITY_REVOKED');
- const current=await enter(gymA.id);expect((await call('/auth/logout','POST',{})).status).toBe(201);
+ const now=Date.now();const login=await master.identitySession.create({data:{identityId:actor,authVersion:1,deviceClass:'SHARED',deviceLabel:'Support integration test',
+  refreshTokenHash:createHash('sha256').update(randomBytes(32)).digest('hex'),idleExpiresAt:new Date(now+600_000),absoluteExpiresAt:new Date(now+900_000)}});
+ bearer=await token(actor,1,login.id);
+ const current=await enter(gymA.id);expect((await call('/auth/logout','POST',{scope:'ALL'})).status).toBe(201);
  expect((await master.supportSession.findUniqueOrThrow({where:{id:current.id}})).revocationReason).toBe('LOGOUT_REVOKED');
  expect((await call(summary(current,gymA.slug),'GET',undefined,current.context)).status).toBe(401);
 });

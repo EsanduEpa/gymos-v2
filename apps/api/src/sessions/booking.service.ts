@@ -1,3 +1,4 @@
+import { creditUnits, eligibleUnits } from './credit-unit-projection.js';
 import { randomUUID } from 'node:crypto';
 import { ConflictException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { PrismaClient } from '../generated/tenant/client.js';
@@ -7,8 +8,8 @@ import { DatabaseService } from '../database.service.js';
 import { withGymAccessFence } from '../identity/gym-access-fence.js';
 import { appendTenantNotification } from '../notifications.service.js';
 import { TenantSchemaGateService, type TenantGateContext } from '../tenancy/tenant-schema-gate.service.js';
-import { derivePackCreditBalance } from './session-state.js';
 import { reserveSessionCredit } from './credit-holds.js';
+import { allowedStartMinutes, type AvailabilityRule } from './availability-policy.js';
 import { retrySessionTransaction } from './session-transactions.js';
 import {
   sessionBookingInputSchema, sessionBookingOptionsSchema, sessionBookingResultSchema,
@@ -58,7 +59,7 @@ function addDays(date: string, days: number) {
 }
 function decimal(value: { toString(): string } | string | null | undefined) { return value == null ? null : typeof value === 'string' ? value : value.toString(); }
 function minorUnitsAmount(value: bigint) { return `${value / 100n}.${(value % 100n).toString().padStart(2, '0')}`; }
-function decimalSum(a: string, b: string) {
+export function decimalSum(a: string, b: string) {
   const [aw = '0', af = ''] = a.split('.'); const [bw = '0', bf = ''] = b.split('.');
   const scale = Math.max(af.length, bf.length); const factor = 10n ** BigInt(scale);
   const left = BigInt(aw) * factor + BigInt((af + '0'.repeat(scale)).slice(0, scale) || '0');
@@ -67,7 +68,7 @@ function decimalSum(a: string, b: string) {
   return fraction ? `${whole}.${fraction}` : whole.toString();
 }
 function totalPages(total: number, size: number) { return Math.ceil(total / size); }
-function withinShift(start: Date, end: Date, timeZone: string, shiftStart: string | null, shiftEnd: string | null) {
+export function withinShift(start: Date, end: Date, timeZone: string, shiftStart: string | null, shiftEnd: string | null) {
   if (!shiftStart || !shiftEnd) return true;
   const localStart = partsAt(start, timeZone); const localEnd = partsAt(new Date(end.getTime() - 60_000), timeZone);
   const startMinute = localStart.hour * 60 + localStart.minute;
@@ -96,7 +97,7 @@ function conflictFromDatabase(error: unknown): never {
 export class SessionBookingService {
   constructor(private readonly database: DatabaseService, private readonly tenantGate: TenantSchemaGateService) {}
 
-  private async publishedBindings(tenant: PrismaClient, gymId: string, role: 'MEMBER' | 'TRAINER') {
+  async publishedBindings(tenant: PrismaClient, gymId: string, role: 'MEMBER' | 'TRAINER') {
     const links = await this.database.master.gymAccess.findMany({ where: { gymId, role, actorKind: role, linkStatus: 'ACTIVE', tenantActorId: { not: null }, enrollmentOperationId: { not: null } },
       select: { userId: true, tenantActorId: true, enrollmentOperationId: true } });
     if (!links.length) return [];
@@ -145,13 +146,8 @@ export class SessionBookingService {
         const memberPageRows = membersAll.slice((query.memberPage - 1) * query.memberPageSize, query.memberPage * query.memberPageSize);
         const trainerPageRows = trainersAll.slice((query.trainerPage - 1) * query.trainerPageSize, query.trainerPage * query.trainerPageSize);
         const makeMemberOption = async (member: { id: string; fullName: string }) => {
-          const [termCount, packs] = await Promise.all([
-            tenant.membershipTerm.count({ where: { memberId: member.id, startDate: { lte: localDateValue }, endDateExclusive: { gt: localDateValue } } }),
-            tenant.sessionPack.findMany({ where: { memberId: member.id, startDate: { lte: localDateValue }, endDateExclusive: { gt: localDateValue }, currency },
-              include: { creditMovements: { select: { availableDelta: true, heldDelta: true, consumedDelta: true, expiredDelta: true } } } }),
-          ]);
-          const availableCredits = packs.reduce((total, pack) => total + derivePackCreditBalance(pack.issuedCredits, pack.creditMovements.map(movement => ({ available: movement.availableDelta,
-            held: movement.heldDelta, consumed: movement.consumedDelta, expired: movement.expiredDelta }))).available, 0);
+          const termCount = await tenant.membershipTerm.count({ where: { memberId: member.id, startDate: { lte: localDateValue }, endDateExclusive: { gt: localDateValue } } });
+          const availableCredits = eligibleUnits(await creditUnits(tenant, member.id), localDate).filter(unit => unit.currency === currency).length;
           return { memberId: member.id, name: member.fullName, availableCredits,
             eligibility: termCount === 0 ? 'NO_ACTIVE_MEMBERSHIP' as const : availableCredits === 0 ? 'NO_CREDIT' as const : 'ELIGIBLE' as const };
         };
@@ -166,8 +162,8 @@ export class SessionBookingService {
           members: { items: members, page: query.memberPage, pageSize: query.memberPageSize, totalCount: membersAll.length, totalPages: totalPages(membersAll.length, query.memberPageSize), asOf: now.toISOString() },
           trainers: { items: trainers, page: query.trainerPage, pageSize: query.trainerPageSize, totalCount: trainersAll.length, totalPages: totalPages(trainersAll.length, query.trainerPageSize), asOf: now.toISOString() },
           selectedMember, selectedTrainer: selectedTrainerRow ? { trainerId: selectedTrainerRow.id, name: selectedTrainerRow.fullName, level: selectedTrainerRow.level!, shiftStart: selectedTrainerRow.shiftStart, shiftEnd: selectedTrainerRow.shiftEnd } : null,
-          policy: { timeZone, localDate, minimumDurationMinutes: config.minimumSessionDurationMinutes, maximumDurationMinutes: 480 as const,
-            scheduleHorizonDays: 365 as const, configurationVersion: config.version, cancellationWindowMinutes: config.cancellationWindowMinutes },
+          policy: { timeZone, localDate, minimumDurationMinutes: 60 as const, maximumDurationMinutes: 60 as const,
+            scheduleHorizonDays: 14 as const, configurationVersion: config.version, cancellationWindowMinutes: config.cancellationWindowMinutes },
           rateInfo: { currency, defaultSessionFee: config.defaultSessionFee.toString(), level2SessionFee: decimal(config.level2SessionFee), introSessionFee: decimal(config.introSessionFee),
             level1BaseRate: config.level1BaseRate.toString(), level2BaseRate: config.level2BaseRate.toString(), offShiftPremium: config.offShiftPremium.toString() },
           noEligibleMembersReason: membersAll.length === 0 || members.every(item => item.eligibility !== 'ELIGIBLE') ? 'NO_ACTIVE_MEMBERSHIP_OR_CREDIT' as const : null,
@@ -175,6 +171,66 @@ export class SessionBookingService {
         };
         return sessionBookingOptionsSchema.parse(result);
       }));
+  }
+
+  async bookInTransaction(tx: import('../generated/tenant/client.js').Prisma.TransactionClient, receipt: { id: string }, access: Access,
+    input: import('@gymos/contracts').SessionBookingInput,
+    memberBinding: { identityId: string; operationId: string; actorId: string }, trainerBinding: { identityId: string; operationId: string; actorId: string }, forcedSessionId?: string) {
+            await tx.$queryRaw`SELECT "id" FROM "Member" WHERE "id" = ${input.memberId} FOR UPDATE`;
+            await tx.$queryRaw`SELECT "id" FROM "Trainer" WHERE "id" = ${input.trainerId} FOR UPDATE`;
+            const config = await tx.gymConfiguration.findUnique({ where: { id: 'current' } });
+            if (!config?.timezone || !config.currency || config.masterGymId !== access.gymId) throw new UnprocessableEntityException('Gym currency and time zone must be configured');
+            if (input.timeZone !== config.timezone) throw new ConflictException('Gym time zone changed; reload booking options');
+            const start = resolveSessionLocalTime(input.localDate, input.localTime, config.timezone, input.offset);
+            const end = new Date(start.instant.getTime() + input.durationMinutes * 60_000);
+            const [clock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
+            if (input.type !== 'IN_PERSON' || input.durationMinutes !== 60) throw new UnprocessableEntityException('New PT bookings must be in-person and 60 minutes');
+            const earliest = new Date(clock!.now.getTime() + 2 * 60 * 60_000);
+            const latest = new Date(clock!.now.getTime() + 14 * 24 * 60 * 60_000);
+            if (start.instant < earliest || start.instant > latest) throw new UnprocessableEntityException('Choose a start at least 2 hours from now and within the next 14 days');
+            const [member, trainer] = await Promise.all([
+              tx.member.findFirst({ where: { id: input.memberId, identityId: memberBinding.identityId, enrollmentOperationId: memberBinding.operationId,
+                registrationState: 'COMPLETE', status: 'ACTIVE' }, select: { id: true, fullName: true, identityId: true } }),
+              tx.trainer.findFirst({ where: { id: input.trainerId, identityId: trainerBinding.identityId, enrollmentOperationId: trainerBinding.operationId,
+                registrationState: 'COMPLETE', status: 'ACTIVE', level: { not: null } }, select: { id: true, fullName: true, identityId: true, level: true, shiftStart: true, shiftEnd: true } }),
+            ]);
+            if (!member || !trainer) throw new UnprocessableEntityException('Member and trainer must be active and published in this gym');
+            const availability = await tx.pTAvailabilityRule.findMany({ where: { OR: [{ trainerId: trainer.id }, { kind: 'GYM_CLOSURE', localDate: new Date(`${input.localDate}T00:00:00.000Z`) }] } });
+            const startParts = partsAt(start.instant, config.timezone);
+            const startMinute = startParts.hour * 60 + startParts.minute;
+            const weekday = new Date(`${input.localDate}T00:00:00.000Z`).getUTCDay();
+            if (!allowedStartMinutes(input.localDate, availability as AvailabilityRule[], weekday).includes(startMinute)) {
+              throw new ConflictException('This time is outside the trainer’s published availability or is no longer available');
+            }
+            const overlap = await tx.pTSession.findFirst({ where: { state: { in: ['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE'] },
+              AND: [{ OR: [{ state: { not: 'PENDING_CONFIRMATION' } }, { requestExpiresAt: { gt: clock!.now } }] }],
+              OR: [{ memberId: input.memberId }, { trainerId: input.trainerId }], scheduledStartAt: { lt: end }, scheduledEndAt: { gt: start.instant } }, select: { id: true } });
+            if (overlap) throw new ConflictException('Member or trainer already has a request or session in that time range. Resolve it before booking directly.');
+            const dateValue = new Date(`${input.localDate}T00:00:00.000Z`);
+            if (await tx.membershipTerm.count({ where: { memberId: member.id, startDate: { lte: dateValue }, endDateExclusive: { gt: dateValue } } }) === 0) {
+              throw new UnprocessableEntityException('Member has no active membership for the session date');
+            }
+            const fee = trainer.level === 'LEVEL_2' ? config.level2SessionFee ?? config.defaultSessionFee : config.defaultSessionFee;
+            const coveredByShift = withinShift(start.instant, end, config.timezone, trainer.shiftStart, trainer.shiftEnd);
+            const rate = trainer.level === 'LEVEL_2' ? config.level2BaseRate : config.level1BaseRate;
+            const confirmationRate = coveredByShift ? rate : decimalSum(rate.toString(), config.offShiftPremium.toString());
+            const sessionId = forcedSessionId ?? randomUUID();
+            const session = await tx.pTSession.create({ data: { id: sessionId, memberId: member.id, trainerId: trainer.id, state: 'SCHEDULED',
+              type: input.type, scheduledStartAt: start.instant, scheduledEndAt: end, gymTimezone: config.timezone,
+              fee: fee.toString(), currency: config.currency, confirmationRate, confirmationLevel: trainer.level!,
+              confirmationShiftStart: trainer.shiftStart, confirmationShiftEnd: trainer.shiftEnd, configurationVersion: config.version,
+              confirmedAt: clock!.now, availabilityVersion: (await tx.trainer.findUniqueOrThrow({ where: { id: trainer.id }, select: { version: true } })).version, notes: (input.notes ?? '').replace(/\r\n?/g, '\n') || null, createdByIdentityId: access.identityId } });
+            await reserveSessionCredit(tx, { masterGymId: access.gymId, sessionId: session.id, memberId: member.id, trainerId: trainer.id,
+              scheduledLocalDate: input.localDate, actorIdentityId: access.identityId, receiptId: receipt.id });
+            const eventKey = tenantAuditKey({ masterGymId: access.gymId, receiptId: receipt.id, eventCode: 'PT_SESSION_BOOKED', resourceType: 'PT_SESSION', resourceId: session.id, eventOrdinal: 0 });
+            await tx.sessionStateEvent.create({ data: { sessionId: session.id, fromState: null, toState: 'SCHEDULED', committedVersion: 0,
+              actorIdentityId: access.identityId, receiptId: receipt.id, eventKey } });
+            const notification = await appendTenantNotification(tx, { masterGymId: access.gymId, receiptId: receipt.id, eventCode: 'SESSION_BOOKED', resourceId: session.id,
+              recipientIdentityId: member.identityId! });
+            const trainerNotice = await appendTenantNotification(tx, { masterGymId: access.gymId, receiptId: receipt.id, eventCode: 'SESSION_BOOKED', resourceId: session.id, recipientIdentityId: trainer.identityId!, linkKind: 'TRAINER_SCHEDULE' });
+            return { result: { resourceIds: [session.id, notification.id, trainerNotice.id], notificationState: 'AVAILABLE' as const }, resourceType: 'PT_SESSION', resourceId: session.id,
+              audits: [{ actorIdentityId: access.identityId, eventCode: 'PT_SESSION_BOOKED', resourceType: 'PT_SESSION', resourceId: session.id,
+                transition: { to: 'SCHEDULED', version: 0 } }] };
   }
 
   async book(access: Access, raw: unknown, idempotencyHeader?: string) {
@@ -199,51 +255,7 @@ export class SessionBookingService {
             actorIdentityId: access.identityId, commandKind: 'BOOK_PT_SESSION', idempotencyKey: input.idempotencyKey,
             normalizedIntent: { gymId: access.gymId, memberId: input.memberId, trainerId: input.trainerId, localDate: input.localDate,
               localTime: input.localTime, timeZone: input.timeZone, offset: input.offset ?? null, type: input.type, durationMinutes: input.durationMinutes, notes: input.notes ?? null } },
-          async (tx, receipt) => {
-            const config = await tx.gymConfiguration.findUnique({ where: { id: 'current' } });
-            if (!config?.timezone || !config.currency || config.masterGymId !== access.gymId) throw new UnprocessableEntityException('Gym currency and time zone must be configured');
-            if (input.timeZone !== config.timezone) throw new ConflictException('Gym time zone changed; reload booking options');
-            const start = resolveSessionLocalTime(input.localDate, input.localTime, config.timezone, input.offset);
-            const end = new Date(start.instant.getTime() + input.durationMinutes * 60_000);
-            const [clock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
-            const localToday = localDateAt(clock!.now, config.timezone);
-            if (input.durationMinutes < config.minimumSessionDurationMinutes) throw new UnprocessableEntityException(`Session duration must be at least ${config.minimumSessionDurationMinutes} minutes`);
-            if (input.localDate < localToday || input.localDate > addDays(localToday, 365) || start.instant <= clock!.now) {
-              throw new UnprocessableEntityException('Choose a future date within the 365-day booking horizon');
-            }
-            const [member, trainer] = await Promise.all([
-              tx.member.findFirst({ where: { id: input.memberId, identityId: memberBinding.identityId, enrollmentOperationId: memberBinding.operationId,
-                registrationState: 'COMPLETE', status: 'ACTIVE' }, select: { id: true, fullName: true, identityId: true } }),
-              tx.trainer.findFirst({ where: { id: input.trainerId, identityId: trainerBinding.identityId, enrollmentOperationId: trainerBinding.operationId,
-                registrationState: 'COMPLETE', status: 'ACTIVE', level: { not: null } }, select: { id: true, fullName: true, identityId: true, level: true, shiftStart: true, shiftEnd: true } }),
-            ]);
-            if (!member || !trainer) throw new UnprocessableEntityException('Member and trainer must be active and published in this gym');
-            const dateValue = new Date(`${input.localDate}T00:00:00.000Z`);
-            if (await tx.membershipTerm.count({ where: { memberId: member.id, startDate: { lte: dateValue }, endDateExclusive: { gt: dateValue } } }) === 0) {
-              throw new UnprocessableEntityException('Member has no active membership for the session date');
-            }
-            const fee = input.type === 'INTRODUCTORY' ? config.introSessionFee ?? config.defaultSessionFee
-              : trainer.level === 'LEVEL_2' ? config.level2SessionFee ?? config.defaultSessionFee : config.defaultSessionFee;
-            const coveredByShift = withinShift(start.instant, end, config.timezone, trainer.shiftStart, trainer.shiftEnd);
-            const rate = trainer.level === 'LEVEL_2' ? config.level2BaseRate : config.level1BaseRate;
-            const confirmationRate = coveredByShift ? rate : decimalSum(rate.toString(), config.offShiftPremium.toString());
-            const sessionId = randomUUID();
-            const session = await tx.pTSession.create({ data: { id: sessionId, memberId: member.id, trainerId: trainer.id, state: 'SCHEDULED',
-              type: input.type, scheduledStartAt: start.instant, scheduledEndAt: end, gymTimezone: config.timezone,
-              fee: fee.toString(), currency: config.currency, confirmationRate, confirmationLevel: trainer.level!,
-              confirmationShiftStart: trainer.shiftStart, confirmationShiftEnd: trainer.shiftEnd, configurationVersion: config.version,
-              confirmedAt: clock!.now, notes: (input.notes ?? '').replace(/\r\n?/g, '\n') || null, createdByIdentityId: access.identityId } });
-            await reserveSessionCredit(tx, { masterGymId: access.gymId, sessionId: session.id, memberId: member.id, trainerId: trainer.id,
-              scheduledLocalDate: input.localDate, actorIdentityId: access.identityId, receiptId: receipt.id });
-            const eventKey = tenantAuditKey({ masterGymId: access.gymId, receiptId: receipt.id, eventCode: 'PT_SESSION_BOOKED', resourceType: 'PT_SESSION', resourceId: session.id, eventOrdinal: 0 });
-            await tx.sessionStateEvent.create({ data: { sessionId: session.id, fromState: null, toState: 'SCHEDULED', committedVersion: 0,
-              actorIdentityId: access.identityId, receiptId: receipt.id, eventKey } });
-            const notification = await appendTenantNotification(tx, { masterGymId: access.gymId, receiptId: receipt.id, eventCode: 'SESSION_BOOKED', resourceId: session.id,
-              recipientIdentityId: member.identityId! });
-            return { result: { resourceIds: [session.id, notification.id], notificationState: 'AVAILABLE' }, resourceType: 'PT_SESSION', resourceId: session.id,
-              audits: [{ actorIdentityId: access.identityId, eventCode: 'PT_SESSION_BOOKED', resourceType: 'PT_SESSION', resourceId: session.id,
-                transition: { to: 'SCHEDULED', version: 0 } }] };
-          }));
+          (tx, receipt) => this.bookInTransaction(tx, receipt, access, input, memberBinding, trainerBinding)));
           const sessionId = command.result.resourceIds?.[0];
           const eventId = command.result.resourceIds?.[1];
           if (!sessionId || !eventId) throw new ConflictException('Booking receipt has no session or notification resource');

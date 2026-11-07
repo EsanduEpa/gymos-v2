@@ -1,0 +1,16 @@
+.layout { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 1rem; margin-top: 1rem; }
+.stack { display: grid; align-content: start; gap: 1rem; min-width: 0; }
+.facts { display: grid; gap: .75rem; }
+.facts div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: .75rem; }
+.facts dt { font-weight: 600; }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
+.notes { white-space: pre-wrap; overflow-wrap: anywhere; }
+.timeline { padding-inline-start: 1.25rem; }
+.timeline li { margin-bottom: .75rem; overflow-wrap: anywhere; }
+.pager { display: flex; flex-wrap: wrap; gap: 1rem; }
+@media (max-width: 768px) { .layout { grid-template-columns: minmax(0, 1fr); } .facts div { grid-template-columns: minmax(0, 1fr); gap: .25rem; } }
+
+.controls { min-width: 0; overflow-wrap: anywhere; }
+.review dl { display: grid; gap: .35rem; min-width: 0; }
+.review dt { font-weight: 600; }
+.review dd { margin: 0 0 .5rem; overflow-wrap: anywhere; }

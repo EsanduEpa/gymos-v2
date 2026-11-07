@@ -1,10 +1,11 @@
-import { auditPageSchema, auditQuerySchema, notificationListQuerySchema, notificationListSchema,
+import { ptScheduledWorkHealthSchema, auditPageSchema, auditQuerySchema, notificationListQuerySchema, notificationListSchema,
   notificationReadAllInputSchema, notificationReadAllSchema, notificationReadSchema } from '@gymos/contracts';
 import type { RequestOptions } from './index.js';
 
 type Requester = { request<T>(path: string, options: RequestOptions<T>): Promise<T> };
 
 export const notificationApi = (client: Requester) => ({
+  scheduledWorkHealth: (slug: string, accessToken: string) => client.request(`/gyms/${encodeURIComponent(slug)}/sessions/scheduled-work-health`, { response: ptScheduledWorkHealthSchema, accessToken }),
   list: (slug: string, accessToken: string, query: unknown = {}, signal?: AbortSignal) => {
     const input = notificationListQuerySchema.parse(query);
     return client.request(`/gyms/${encodeURIComponent(slug)}/me/notifications?limit=${input.limit}`, {

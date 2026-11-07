@@ -1,8 +1,9 @@
+import { creditUnits, eligibleUnits } from './credit-unit-projection.js';
 import { ConflictException, UnprocessableEntityException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import type { Prisma as TenantPrisma } from '../generated/tenant/client.js';
 import { canonicalJson, reference } from '../operations/primitives.js';
-import { allocatedPackCreditMinorUnits, derivePackCreditBalance, selectEligibleSessionPack, type EligibleSessionPack } from './session-state.js';
+import { derivePackCreditBalance } from './session-state.js';
 
 export type ReservationInput = {
   masterGymId: string;
@@ -48,7 +49,7 @@ async function packBalance(tx: TenantPrisma.TransactionClient, packId: string, i
  */
 export async function reserveSessionCredit(tx: TenantPrisma.TransactionClient, input: ReservationInput) {
   const session = await tx.pTSession.findUnique({ where: { id: input.sessionId }, select: {
-    memberId: true, trainerId: true, state: true, scheduledStartAt: true,
+    memberId: true, trainerId: true, state: true, scheduledStartAt: true, currency: true,
   } });
   if (!session || session.memberId !== input.memberId || session.trainerId !== input.trainerId || session.state !== 'SCHEDULED') {
     throw new ConflictException('Session is no longer eligible for credit reservation');
@@ -57,43 +58,15 @@ export async function reserveSessionCredit(tx: TenantPrisma.TransactionClient, i
   const date = localDate(input.scheduledLocalDate);
   const term = await tx.membershipTerm.findFirst({ where: { memberId: input.memberId, startDate: { lte: date }, endDateExclusive: { gt: date } }, select: { id: true } });
   if (!term) throw new UnprocessableEntityException('Member has no active membership for this session date');
-  const candidates = await tx.sessionPack.findMany({
-    where: { memberId: input.memberId, startDate: { lte: date }, endDateExclusive: { gt: date } },
-    orderBy: [{ endDateExclusive: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
-    select: { id: true, startDate: true, endDateExclusive: true, createdAt: true, issuedCredits: true,
-      creditBaseMinorUnits: true, creditRemainder: true, creditAllocationPolicyVersion: true },
-  });
-  const chooserRows: EligibleSessionPack[] = [];
-  let selected: (typeof candidates)[number] | null = null;
-  for (const candidate of candidates) {
-    if (input.explicitPackId && candidate.id !== input.explicitPackId) continue;
-    await tx.$queryRaw`SELECT "id" FROM "SessionPack" WHERE "id" = ${candidate.id} FOR UPDATE`;
-    const current = await tx.sessionPack.findUnique({ where: { id: candidate.id }, select: {
-      id: true, memberId: true, startDate: true, endDateExclusive: true, createdAt: true, issuedCredits: true,
-      creditBaseMinorUnits: true, creditRemainder: true, creditAllocationPolicyVersion: true,
-    } });
-    if (!current || current.memberId !== input.memberId || current.startDate > date || current.endDateExclusive <= date) continue;
-    const balance = await packBalance(tx, current.id, current.issuedCredits);
-    chooserRows.push({ id: current.id, startDate: current.startDate.toISOString().slice(0, 10),
-      endDateExclusive: current.endDateExclusive.toISOString().slice(0, 10), createdAt: current.createdAt,
-      availableCredits: balance.available });
-    selected = selectEligibleSessionPack(chooserRows, input.scheduledLocalDate, input.explicitPackId)
-      ? current : null;
-    if (selected) break;
-  }
-  if (!selected) throw new UnprocessableEntityException('No eligible session-pack credit is available for this date');
-
+  let selectedUnit = eligibleUnits(await creditUnits(tx, input.memberId), input.scheduledLocalDate).find(unit => unit.currency === session.currency && (!input.explicitPackId || unit.packId === input.explicitPackId));
+  if (!selectedUnit) throw new UnprocessableEntityException('No eligible session-pack credit is available for this date');
+  await tx.$queryRaw`SELECT "id" FROM "SessionPack" WHERE "id" = ${selectedUnit.packId} FOR UPDATE`;
+  selectedUnit = eligibleUnits(await creditUnits(tx, input.memberId), input.scheduledLocalDate).find(unit => unit.packId === selectedUnit!.packId && unit.creditOrdinal === selectedUnit!.creditOrdinal);
+  if (!selectedUnit) throw new ConflictException('The selected credit changed; refresh and try again');
+  const selected = await tx.sessionPack.findUniqueOrThrow({ where: { id: selectedUnit.packId } });
   if (selected.creditAllocationPolicyVersion !== 'DEC-06-v1') throw new ConflictException('Pack credit allocation requires review');
-  const existingHolds = await tx.sessionCreditHold.findMany({ where: { packId: selected.id }, select: {
-    creditOrdinal: true, state: true, movements: { where: { kind: { in: ['CONSUME', 'EXPIRE'] } }, select: { kind: true } },
-  } });
-  const occupied = new Set(existingHolds.filter(item => item.state === 'HELD' || item.state === 'CONSUMED' || item.movements.length > 0)
-    .map(item => item.creditOrdinal));
-  let creditOrdinal = 1;
-  while (creditOrdinal <= selected.issuedCredits && occupied.has(creditOrdinal)) creditOrdinal++;
-  if (creditOrdinal > selected.issuedCredits) throw new ConflictException('Pack has no unallocated credit ordinal');
-  const creditValueMinorUnits = allocatedPackCreditMinorUnits({ baseMinorUnits: selected.creditBaseMinorUnits,
-    remainderMinorUnits: selected.creditRemainder, issuedCredits: selected.issuedCredits, ordinal: creditOrdinal });
+  const creditOrdinal = selectedUnit.creditOrdinal;
+  const creditValueMinorUnits = selectedUnit.valueMinorUnits;
 
   const existing = await tx.sessionCreditHold.findUnique({ where: { sessionId: input.sessionId } });
   if (existing) throw new ConflictException('A credit hold already exists for this session');
@@ -115,8 +88,10 @@ export async function resolveSessionCreditHold(tx: TenantPrisma.TransactionClien
   await tx.$queryRaw`SELECT "id" FROM "SessionPack" WHERE "id" = ${hold.packId} FOR UPDATE`;
   const currentHold = await tx.sessionCreditHold.findUnique({ where: { id: hold.id } });
   if (!currentHold || currentHold.state !== 'HELD') throw new ConflictException('Session credit hold has already been resolved');
-  const expiryDate = hold.pack.endDateExclusive.toISOString().slice(0, 10);
-  const expiredAtResolution = input.resolution === 'RELEASE' && localDate(input.gymLocalDate) >= hold.pack.endDateExclusive;
+  const unit = (await creditUnits(tx, hold.pack.memberId)).find(unit => unit.packId === hold.packId && unit.creditOrdinal === hold.creditOrdinal);
+  if (!unit || unit.held !== 1) throw new ConflictException('The original held credit is inconsistent');
+  const expiryDate = unit.effectiveEndDateExclusive.toISOString().slice(0, 10);
+  const expiredAtResolution = input.resolution === 'RELEASE' && localDate(input.gymLocalDate) >= unit.effectiveEndDateExclusive;
   const kind = input.resolution === 'CONSUME' ? 'CONSUME' : expiredAtResolution ? 'EXPIRE' : 'RELEASE';
   await tx.packCreditMovement.create({ data: {
     packId: hold.packId, holdId: hold.id, kind,

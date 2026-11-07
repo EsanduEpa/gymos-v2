@@ -13,7 +13,7 @@ import { DashboardChrome } from '@/components/navigation/dashboard-chrome';
 import { resolveCurrentSession } from '@/lib/navigation';
 import { currentSupportCookie } from '@/lib/support-context';
 import { currentSessionSchema } from '@gymos/contracts/legacy';
-import { platformAnalyticsSummarySchema, registryPageSchema } from '@gymos/contracts/platform';
+import { operationalVisibilitySchema, platformAnalyticsSummarySchema, registryPageSchema } from '@gymos/contracts/platform';
 
 type Search = Promise<{ error?: string; cursor?: string }>;
 async function AdminContent({ searchParams }: { searchParams: Search }) {
@@ -26,13 +26,15 @@ async function AdminContent({ searchParams }: { searchParams: Search }) {
   const session = currentSessionSchema.parse(await current.json());
   if (session.globalRole !== 'SUPER_ADMIN') redirect('/');
   const { error, cursor } = await searchParams;
-  const [registryResponse, summaryResponse] = await Promise.all([
+  const [registryResponse, summaryResponse, visibilityResponse] = await Promise.all([
     fetch(apiUrl(`/admin/gyms${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`), { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' }).catch(() => null),
     fetch(apiUrl('/admin/analytics/summary'), { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' }).catch(() => null),
+    fetch(apiUrl('/admin/operations/visibility'), { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' }).catch(() => null),
   ]);
   if (registryResponse?.status === 401 || summaryResponse?.status === 401) redirect('/login');
   const registryParsed = registryResponse?.ok ? registryPageSchema.safeParse(await registryResponse.json().catch(() => null)) : null;
   const summaryParsed = summaryResponse?.ok ? platformAnalyticsSummarySchema.safeParse(await summaryResponse.json().catch(() => null)) : null;
+  const visibilityParsed = visibilityResponse?.ok ? operationalVisibilitySchema.safeParse(await visibilityResponse.json().catch(() => null)) : null;
   const page = registryParsed?.success ? registryParsed.data : null;
   const selected = await currentSupportCookie();
   return <DashboardChrome identityId={session.identityId} gyms={[]} displayName={session.displayName ?? 'Platform administrator'}>
@@ -40,6 +42,10 @@ async function AdminContent({ searchParams }: { searchParams: Search }) {
       <header className="platform-page-heading"><div><span className="platform-eyebrow">YOUR PLATFORM, AT A GLANCE</span><h1>Platform overview</h1><p>Keep your gyms connected. Keep every workspace running smoothly.</p></div><a className="ui-button ui-button-primary" href="#create-gym"><Plus size={17}/> Create a gym</a></header>
       {error === 'support-exit-uncertain' ? <Feedback tone="error">Browser support state was cleared. The API could not confirm revocation; the context still expires at its original time.</Feedback> : null}
       {page ? <PlatformOverview total={page.total} summary={summaryParsed?.success ? summaryParsed.data : null} cursor={cursor}/> : <section className="platform-panel"><h2>Gym registry unavailable</h2><Feedback tone="error">We couldn’t load this registry page. Your workspaces have not been changed.</Feedback><Link className="ui-button ui-button-secondary" href="/admin">Retry from the first page</Link></section>}
+      <section className="platform-panel"><div className="platform-panel-heading"><div><span className="platform-eyebrow">OPERATIONS</span><h2>Account and enrollment signals</h2><p>Counts are Master-only snapshots. Check the responsible gym queue for action.</p></div></div>
+        {visibilityParsed?.success ? <><p>{visibilityParsed.data.pendingApplications} pending applications · {visibilityParsed.data.recoveryRequiredApplications} applications needing enrollment recovery · {visibilityParsed.data.stuckEnrollmentOperations} stuck enrollment operations · {visibilityParsed.data.exhaustedRecoveryCredentials} exhausted recovery links</p><p className="form-note">Gym profile operations: not centrally recorded. Session renewal or revocation failures: not recorded. Inbox projection backlog: not applicable; current inbox events are written with their source transaction.</p><p className="form-note">Observed {new Date(visibilityParsed.data.asOf).toLocaleString()}.</p></> : <Feedback tone="error">Operational counts are unavailable. No zero count is assumed.</Feedback>}
+        <p><Link href="/admin/email-correction-requests">Open identity correction follow-up</Link></p>
+      </section>
       {page ? <Registry page={page} selectedSlug={selected?.slug} supportExpiresAt={selected?.expiresAt} hasCursor={Boolean(cursor)}/> : null}
       <div className="platform-onboarding-grid" id="create-gym"><section className="platform-panel"><div className="platform-panel-heading"><div><span className="platform-eyebrow">GROW YOUR PLATFORM</span><h2>Create a gym workspace</h2><p>Set up a dedicated space for a gym and its owner.</p></div><span className="platform-section-icon"><Plus size={22}/></span></div><ProvisioningForm requestKey={randomUUID()}/></section>
         <aside className="platform-onboarding-note"><span className="platform-section-icon"><ShieldCheck size={25}/></span><span className="platform-eyebrow">A THOUGHTFUL START</span><h2>One gym.<br/>Its own workspace.</h2><p>Each gym gets an isolated environment for its members, trainers and day-to-day operations.</p><ol><li><span>01</span><div><strong>Add the gym details</strong><p>Choose its web address, currency and time zone.</p></div></li><li><span>02</span><div><strong>Follow the setup</strong><p>Check progress while the workspace is prepared.</p></div></li><li><span>03</span><div><strong>Connect the owner</strong><p>Complete private approval or securely hand over their one-time sign-in details.</p></div></li></ol><a className="platform-text-link" href="#gym-registry">Back to gym registry <ArrowUpRight size={16}/></a></aside>

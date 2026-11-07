@@ -2,6 +2,7 @@
 
 import { useActionState, useMemo, useState } from 'react';
 import { saveMealPlan, type MealPlanActionState } from '@/app/meal-plan-actions';
+import type { MealPlanView } from '@gymos/contracts';
 import styles from './meal-plan-builder.module.css';
 
 type Row = { id: string; dayOfWeek: string; mealType: string; foodItem: string; calories: string; proteinGrams: string; carbsGrams: string; fatsGrams: string };
@@ -11,9 +12,11 @@ const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Pre-Workout', 'Post
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 function numeric(value: string) { const parsed = Number(value); return value.trim() && Number.isFinite(parsed) && parsed >= 0 ? parsed : 0; }
 
-export function MealPlanBuilder({ slug, memberId, memberName, initialKey }: { slug: string; memberId: string; memberName: string; initialKey: string }) {
-  const [rows, setRows] = useState<Row[]>([newRow()]);
-  const [name, setName] = useState('');
+export function MealPlanBuilder({ slug, memberId, memberName, initialKey, initialPlan }: { slug: string; memberId: string; memberName: string; initialKey: string; initialPlan?: MealPlanView }) {
+  const [rows, setRows] = useState<Row[]>(() => initialPlan?.entries.map(entry => ({ id: globalThis.crypto.randomUUID(), dayOfWeek: String(entry.dayOfWeek),
+    mealType: entry.mealType, foodItem: entry.foodItem, calories: entry.calories === null ? '' : String(entry.calories),
+    proteinGrams: entry.proteinGrams ?? '', carbsGrams: entry.carbsGrams ?? '', fatsGrams: entry.fatsGrams ?? '' })) ?? [newRow()]);
+  const [name, setName] = useState(initialPlan?.name ?? '');
   const action = saveMealPlan.bind(null, slug, initialKey);
   const [state, formAction, pending] = useActionState(action, initialState);
   const currentKey = state.currentKey ?? state.nextKey ?? initialKey;
@@ -26,9 +29,10 @@ export function MealPlanBuilder({ slug, memberId, memberName, initialKey }: { sl
   function update(index: number, patch: Partial<Row>) { setRows(current => current.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row)); }
   return <form action={formAction} className={styles.form}>
     <input type="hidden" name="memberId" value={memberId}/><input type="hidden" name="entryCount" value={rows.length}/>
+    {initialPlan ? <><input type="hidden" name="planId" value={initialPlan.id}/><input type="hidden" name="expectedRevision" value={initialPlan.revision}/></> : null}
     <input type="hidden" name="idempotencyKey" value={currentKey}/>
     <label className={styles.title}>Plan title<input name="name" value={name} onChange={event => setName(event.currentTarget.value)} required maxLength={120}/></label>
-    <p className={styles.assigned}>Client: <strong>{memberName}</strong>. Saving explicitly assigns this meal plan.</p>
+    <p className={styles.assigned}>Client: <strong>{memberName}</strong>. {initialPlan ? 'Saving updates this assigned plan.' : 'Saving explicitly assigns this meal plan.'}</p>
     <section className={styles.totals} aria-live="polite" aria-label="Live nutrition totals"><h2>Live totals</h2>
       <dl><div><dt>Calories</dt><dd>{totals.calories}</dd></div><div><dt>Protein</dt><dd>{totals.proteinGrams.toFixed(2)} g</dd></div>
         <div><dt>Carbs</dt><dd>{totals.carbsGrams.toFixed(2)} g</dd></div><div><dt>Fat</dt><dd>{totals.fatsGrams.toFixed(2)} g</dd></div></dl>
@@ -49,6 +53,6 @@ export function MealPlanBuilder({ slug, memberId, memberName, initialKey }: { sl
     </fieldset>)}</div>
     {state.error ? <p className={styles.error} role="alert">{state.error}</p> : null}
     {state.success ? <p className={styles.success} role="status">{state.success}</p> : null}
-    <button className="ui-button ui-button-primary" type="submit" disabled={pending}>{pending ? 'Saving…' : state.outcomeUnknown ? 'Retry save with same key' : 'Save and assign meal plan'}</button>
+    <button className="ui-button ui-button-primary" type="submit" disabled={pending}>{pending ? 'Saving…' : state.outcomeUnknown ? 'Retry save with same key' : initialPlan ? 'Save meal plan changes' : 'Save and assign meal plan'}</button>
   </form>;
 }

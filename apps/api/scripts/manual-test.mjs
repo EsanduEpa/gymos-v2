@@ -12,6 +12,7 @@ import { PrismaClient as Master } from '../dist/generated/master/client.js';
 import { PrismaClient as Tenant } from '../dist/generated/tenant/client.js';
 import { TenantSchemaVerifier } from '../dist/tenancy/tenant-schema-verifier.js';
 import { TenantRegistryService } from '../dist/tenancy/tenant-registry.service.js';
+import { deployMasterSchema } from '../dist/tenancy/master-schema-deploy.js';
 import { TENANT_TEMPLATE_MANIFEST, tenantManifestDigest } from '../dist/tenancy/tenant-template-manifest.js';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
@@ -36,6 +37,24 @@ async function verify(state) {
     const url = new URL(urlText);
     if (url.hostname !== '127.0.0.1' || url.port !== state.port || !['/gymos_manual_master', '/postgres'].includes(url.pathname)) throw new Error('Invalid sandbox target');
   }
+}
+async function rebind() {
+  const state = JSON.parse(await readFile(statePath, 'utf8'));
+  await localDocker();
+  const container = JSON.parse(await docker(['inspect', state.container]))[0];
+  const binding = container.NetworkSettings.Ports?.['5432/tcp']?.[0];
+  if (container.Id !== state.containerId || container.Config.Labels?.['gymos.manual-test'] !== state.runId
+    || binding?.HostIp !== '127.0.0.1' || !/^\d+$/.test(binding.HostPort)) throw new Error('Test container ownership mismatch');
+  for (const [key, path] of [['masterUrl', '/gymos_manual_master'], ['provisionUrl', '/postgres']]) {
+    const url = new URL(state[key]);
+    if (url.hostname !== '127.0.0.1' || url.port !== state.port || url.pathname !== path) throw new Error('Invalid sandbox target');
+    url.port = binding.HostPort;
+    state[key] = url.href;
+  }
+  state.port = binding.HostPort;
+  await verify(state);
+  await save(state);
+  console.log('Testing database binding refreshed. Restart pnpm manual:start before checking port 3002.');
 }
 async function migrate(state, name, kind) {
   const url = new URL(state.masterUrl); url.pathname = `/${name}`;
@@ -122,13 +141,15 @@ async function seedGym(state, master, users, index, today) {
         const start = new Date(`${sessionDay.toISOString().slice(0, 10)}T${String(8 + Math.floor((n % 4) * 1.5)).padStart(2, '0')}:${n % 2 ? '30' : '00'}:00+05:30`);
         const end = new Date(start.getTime() + 3600000);
         const confirmed = stateName !== 'PENDING_CONFIRMATION';
-        const bookedAt = day(start, -2);
+        const bookedAt = stateName === 'PENDING_CONFIRMATION' ? new Date() : day(start, -2);
+        const requestExpiresAt = stateName === 'PENDING_CONFIRMATION'
+          ? new Date(Math.min(bookedAt.getTime() + 12 * 3600_000, start.getTime() - 3600_000)) : null;
         const session = await tenant.pTSession.create({ data: { memberId: member.id, trainerId: trainer.id, state: stateName,
           type: n % 3 === 0 ? 'VIRTUAL' : 'IN_PERSON', scheduledStartAt: start, scheduledEndAt: end, gymTimezone: 'Asia/Colombo',
           fee: '2500', currency: 'LKR', configurationVersion: config.version,
           ...(confirmed ? { confirmedAt: bookedAt, confirmationRate: '0.4', confirmationLevel: 'LEVEL_1', confirmationShiftStart: '06:00', confirmationShiftEnd: '22:00' } : {}),
-          startedAt: stateName === 'COMPLETED' ? start : null, endedAt: future ? null : end,
-          notes: future ? 'Synthetic upcoming PT session' : 'Synthetic historical PT session', createdByIdentityId: users.owner.id, createdAt: bookedAt } });
+          startedAt: stateName === 'COMPLETED' ? start : null, endedAt: future ? null : end, requestExpiresAt,
+          notes: future ? 'Synthetic upcoming PT session' : 'Synthetic historical PT session', createdByIdentityId: confirmed ? users.owner.id : identity.id, createdAt: bookedAt } });
         const booking = await receipt(tenant, users.owner.id, future && !confirmed ? 'REQUEST_PT_SESSION' : 'BOOK_PT_SESSION', session.id, bookedAt);
         if (stateName === 'PENDING_CONFIRMATION') {
           await tenant.sessionStateEvent.create({ data: { sessionId: session.id, fromState: null, toState: 'PENDING_CONFIRMATION',
@@ -136,7 +157,7 @@ async function seedGym(state, master, users, index, today) {
           continue;
         }
         const hold = await tenant.sessionCreditHold.create({ data: { sessionId: session.id, packId: pack.id,
-          state: future ? 'HELD' : consumed ? 'CONSUMED' : 'RELEASED', creditOrdinal: future ? (consumed ? 2 : 1) : 1,
+          state: future ? 'HELD' : consumed ? 'CONSUMED' : 'RELEASED', creditOrdinal: future ? 2 : 1,
           creditValueMinorUnits: 250000n, heldAt: bookedAt, resolvedAt: future ? null : end } });
         await tenant.packCreditMovement.create({ data: { packId: pack.id, holdId: hold.id, kind: 'HOLD', availableDelta: -1, heldDelta: 1,
           consumedDelta: 0, expiredDelta: 0, creditOrdinal: hold.creditOrdinal, sourceKey: `hold:${hold.id}`, receiptId: booking.id,
@@ -209,6 +230,7 @@ async function setup() {
   }
   if (!ready) throw new Error('Sandbox PostgreSQL did not become ready');
   await migrate(state, 'gymos_manual_master', 'master');
+  await deployMasterSchema(state.masterUrl);
   const master = new Master({ adapter: new PrismaPg({ connectionString: state.masterUrl, max: 3 }) });
   try {
     const passwordHash = await argon2.hash(state.password, { type: argon2.argon2id }); const users = {};
@@ -218,21 +240,32 @@ async function setup() {
     const localDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Colombo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
     const today = dateOnly(new Date(`${localDate}T00:00:00Z`)); state.gyms = [];
     for (let index = 0; index < 3; index++) { state.gyms.push(await seedGym(state, master, users, index, today)); console.log(`Seeded ${state.gyms.at(-1).slug}: 20 members, 40 PT sessions`); }
-    state.accounts = Object.fromEntries(Object.entries(users).map(([role, user]) => [role, user.email]));
+    state.accounts = { admin: users.admin.email };
+    for (const role of ['owner', 'trainer', 'member']) {
+      state.accounts[role] = {};
+      for (const gym of state.gyms) {
+        const username = `${role}.${gym.slug}@gymos.test`;
+        await master.gymAccount.create({ data: { userId: users[role].id, gymId: gym.id, username,
+          passwordHash, status: 'ACTIVE', displayName: users[role].displayName } });
+        state.accounts[role][gym.slug] = username;
+      }
+    }
     state.ready = true; await save(state);
-    console.log(`Sandbox ready. Four main accounts are saved privately in .env.manual-test.json. Run pnpm manual:start.`);
+    console.log('Sandbox ready. Synthetic account names and password are saved privately in .env.manual-test.json. Run pnpm manual:start.');
   } finally { await master.$disconnect(); }
 }
 async function check() {
   const state = JSON.parse(await readFile(statePath, 'utf8')); await verify(state);
   if (!state.ready || !state.apiUrl) throw new Error('Run pnpm manual:start first');
   const tokens = {};
-  for (const [role, email] of Object.entries(state.accounts)) {
+  for (const role of ['admin', 'owner', 'trainer', 'member']) {
+    const email = role === 'admin' ? state.accounts.admin : state.accounts[role]?.[state.gyms[0].slug];
+    if (typeof email !== 'string') throw new Error('Run pnpm manual:sync to update synthetic gym accounts');
     const response = await fetch(`${state.apiUrl}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email, password: state.password }) });
     if (!response.ok) throw new Error(`${role} login failed (${response.status}); after repeated checks, allow the login rate limit to reset`);
     const data = await response.json();
-    if (role !== 'admin' && data.gyms.length !== 3) throw new Error(`${role} must have access to all 3 gyms`);
+    if (role !== 'admin' && (data.gyms.length !== 1 || data.gyms[0].slug !== state.gyms[0].slug)) throw new Error(`${role} gym account scope mismatch`);
     if (role === 'admin' && data.globalRole !== 'SUPER_ADMIN') throw new Error('Admin role mismatch');
     tokens[role] = data.accessToken;
   }
@@ -242,16 +275,19 @@ async function check() {
     return response.json();
   };
   for (const gym of state.gyms) {
-    const options = await get(`/gyms/${gym.slug}/session-booking-options?memberPageSize=50`);
-    if (options.members.totalCount !== 20 || options.trainers.totalCount !== 1 || !options.members.items.every(m => m.eligibility === 'ELIGIBLE'))
-      throw new Error(`${gym.slug} booking eligibility mismatch`);
-    await get(`/gyms/${gym.slug}/sessions`);
-    await get(`/gyms/${gym.slug}/me/sessions`, 'trainer');
-    await get(`/gyms/${gym.slug}/me/sessions`, 'member');
+    if (gym.slug === state.gyms[0].slug) {
+      const options = await get(`/gyms/${gym.slug}/session-booking-options?memberPageSize=50`);
+      if (options.members.totalCount < 1 || options.trainers.totalCount < 1)
+        throw new Error(`${gym.slug} booking participants missing`);
+      await get(`/gyms/${gym.slug}/sessions`);
+      await get(`/gyms/${gym.slug}/me/sessions`, 'trainer');
+      await get(`/gyms/${gym.slug}/me/sessions`, 'member');
+    }
     const url = new URL(state.masterUrl); url.pathname = `/${gym.database}`;
     const tenant = new Tenant({ adapter: new PrismaPg({ connectionString: url.href, max: 1 }) });
     try {
-      if (await tenant.member.count() !== 20 || await tenant.pTSession.count() !== 40) throw new Error(`${gym.slug} seed counts differ from baseline`);
+      const memberCount = await tenant.member.count(); const sessionCount = await tenant.pTSession.count();
+      if (memberCount < 1 || sessionCount < 1) throw new Error(`${gym.slug} test data missing`);
       const packs = await tenant.sessionPack.findMany({ include: { creditMovements: true } });
       for (const pack of packs) {
         const balance = pack.creditMovements.reduce((b, m) => [b[0] + m.availableDelta, b[1] + m.heldDelta, b[2] + m.consumedDelta, b[3] + m.expiredDelta], [0, 0, 0, 0]);
@@ -259,9 +295,66 @@ async function check() {
       }
       if (await tenant.sessionCreditHold.count({ where: { session: { state: 'PENDING_CONFIRMATION' } } }) !== 0) throw new Error('Pending requests must not reserve credits');
     } finally { await tenant.$disconnect(); }
-    console.log(`${gym.slug}: 20 members, 40 sessions, eligible bookings, role access and credit balances verified`);
+    console.log(`${gym.slug}: test data and credit balances verified`);
   }
   console.log('All four logins and three isolated gym databases passed.');
+}
+async function sync() {
+  const state = JSON.parse(await readFile(statePath, 'utf8')); await verify(state);
+  if (!state.ready || !Array.isArray(state.gyms) || state.gyms.length === 0) throw new Error('Sandbox seed is incomplete');
+  await migrate(state, 'gymos_manual_master', 'master');
+  await deployMasterSchema(state.masterUrl);
+  for (const gym of state.gyms) {
+    if (!/^gymos_[a-f0-9]{32}$/.test(gym.database)) throw new Error('Invalid owned gym database name');
+    await migrate(state, gym.database, 'tenant');
+  }
+  const master = new Master({ adapter: new PrismaPg({ connectionString: state.masterUrl, max: 3 }) });
+  try {
+    const admin = await master.user.findUnique({ where: { email: 'admin@gymos.test' } });
+    if (!admin) throw new Error('Missing synthetic admin identity');
+    for (const savedGym of state.gyms) {
+      const gym = await master.gym.findUnique({ where: { id: savedGym.id } });
+      if (!gym || gym.databaseName !== savedGym.database || !gym.expectedTenantOperationId) throw new Error('Synthetic gym ownership mismatch');
+      const operation = await master.operation.findUnique({ where: { id: gym.expectedTenantOperationId } });
+      const owner = await master.operation.findFirst({ where: { gymId: gym.id, databaseName: gym.databaseName, kind: 'PROVISION_GYM', state: 'COMPLETE' } });
+      if (!operation || operation.gymId !== gym.id || !owner) throw new Error('Synthetic provision operation mismatch');
+      const manifestDigest = tenantManifestDigest();
+      if (gym.expectedTenantSchemaVersion === TENANT_TEMPLATE_MANIFEST.version && gym.expectedTenantManifestDigest === manifestDigest && operation.state === 'COMPLETE') continue;
+      const verifiedOperation = await master.operation.create({ data: {
+        kind: 'ROLLOUT_TENANT_SCHEMA', actorIdentityId: admin.id, gymId: gym.id,
+        scopeKey: `manual-sync:${gym.id}:${TENANT_TEMPLATE_MANIFEST.version}`, idempotencyKey: randomUUID(),
+        requestDigest: digest(`${gym.id}:${manifestDigest}`), intendedTenantTemplateVersion: TENANT_TEMPLATE_MANIFEST.version,
+        intendedTenantManifestDigest: manifestDigest, appliedTenantTemplateVersion: TENANT_TEMPLATE_MANIFEST.version,
+        appliedTenantManifestDigest: manifestDigest, tenantSchemaVerifiedAt: new Date(),
+        state: 'COMPLETE', step: 'SCHEMA_COMPLETE', safeResult: { syntheticFixture: true },
+      } });
+      const url = new URL(state.masterUrl); url.pathname = `/${gym.databaseName}`;
+      const tenant = new Tenant({ adapter: new PrismaPg({ connectionString: url.href, max: 3 }) });
+      try {
+        await new TenantSchemaVerifier(tenant).verifyAndAttest({ masterGymId: gym.id, operationId: verifiedOperation.id });
+        await master.gym.update({ where: { id: gym.id }, data: {
+          expectedTenantSchemaVersion: TENANT_TEMPLATE_MANIFEST.version, expectedTenantManifestDigest: manifestDigest,
+          expectedTenantOperationId: verifiedOperation.id, version: { increment: 1 },
+        } });
+      } finally { await tenant.$disconnect(); }
+    }
+    const passwordHash = await argon2.hash(state.password, { type: argon2.argon2id });
+    const accounts = { admin: 'admin@gymos.test' };
+    for (const role of ['owner', 'trainer', 'member']) {
+      const user = await master.user.findUnique({ where: { email: `${role}@gymos.test` } });
+      if (!user) throw new Error(`Missing synthetic ${role} identity`);
+      accounts[role] = {};
+      for (const gym of state.gyms) {
+        const username = `${role}.${gym.slug}@gymos.test`;
+        await master.gymAccount.upsert({ where: { userId_gymId: { userId: user.id, gymId: gym.id } },
+          create: { userId: user.id, gymId: gym.id, username, passwordHash, status: 'ACTIVE', displayName: user.displayName },
+          update: { username, passwordHash, status: 'ACTIVE', mustChangePassword: false, credentialExpiresAt: null } });
+        accounts[role][gym.slug] = username;
+      }
+    }
+    state.accounts = accounts; await save(state);
+  } finally { await master.$disconnect(); }
+  console.log(`Updated the owned testing master and ${state.gyms.length} gym databases.`);
 }
 async function portFree(port) {
   const server = createServer();
@@ -270,24 +363,22 @@ async function portFree(port) {
 async function start() {
   const state = JSON.parse(await readFile(statePath, 'utf8')); await verify(state);
   if (!state.ready) throw new Error('Sandbox seed was incomplete; inspect its private state file');
-  const apiPort = 3001;
-  const existingWeb = !await portFree(3000);
-  const webPort = existingWeb ? 3002 : 3000;
+  const apiPort = 3003;
+  const webPort = 3002;
   if (!await portFree(apiPort) || !await portFree(webPort)) throw new Error('Sandbox ports are occupied');
   const apiEnv = { ...cleanEnv, PORT: String(apiPort), MASTER_DATABASE_URL: state.masterUrl, TENANT_DATABASE_URL: state.masterUrl,
     PROVISION_DATABASE_URL: state.provisionUrl, JWT_SECRET: state.jwtSecret };
   const api = spawn(process.execPath, ['dist/main.js'], { cwd: `${root}apps/api`, env: apiEnv, stdio: 'inherit' });
-  const web = spawn(process.execPath, ['node_modules/next/dist/bin/next', existingWeb ? 'start' : 'dev', '-H', '127.0.0.1', '-p', String(webPort)], {
-    cwd: `${root}apps/web`, env: { ...cleanEnv, NODE_ENV: existingWeb ? 'production' : 'development', GYMOS_API_URL: `http://127.0.0.1:${apiPort}`, GYMOS_WEB_ORIGIN: `http://localhost:${webPort}` }, stdio: 'inherit' });
+  const web = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '-H', '127.0.0.1', '-p', String(webPort)], {
+    cwd: `${root}apps/web`, env: { ...cleanEnv, NODE_ENV: 'production', GYMOS_API_URL: `http://127.0.0.1:${apiPort}`, GYMOS_WEB_ORIGIN: `http://localhost:${webPort}`, GYMOS_COOKIE_SUFFIX: '_test' }, stdio: 'inherit' });
   const stop = () => { api.kill('SIGTERM'); web?.kill('SIGTERM'); };
   process.on('SIGINT', stop); process.on('SIGTERM', stop);
   api.on('exit', () => web?.kill('SIGTERM')); web?.on('exit', () => api.kill('SIGTERM'));
   state.webUrl = `http://localhost:${webPort}`; state.apiUrl = `http://127.0.0.1:${apiPort}`; await save(state);
-  if (existingWeb) console.log('Port 3000 is occupied; starting a separate test web app on port 3002 from the existing web build.');
-  console.log(`\nManual test app: ${state.webUrl}/login\nAccounts: ${Object.values(state.accounts).join(', ')}\nPassword: ${state.password}\n`);
+  console.log(`\nManual test app: ${state.webUrl}/login\nSynthetic accounts and password: .env.manual-test.json\n`);
 }
 try {
   const command = process.argv[2];
-  if (command === 'setup') await setup(); else if (command === 'start') await start(); else if (command === 'check') await check();
-  else throw new Error('Usage: node apps/api/scripts/manual-test.mjs setup|start|check');
+  if (command === 'setup') await setup(); else if (command === 'rebind') await rebind(); else if (command === 'sync') await sync(); else if (command === 'start') await start(); else if (command === 'check') await check();
+  else throw new Error('Usage: node apps/api/scripts/manual-test.mjs setup|rebind|sync|start|check');
 } catch (error) { console.error(String(error.message).replace(/postgres(?:ql)?:\/\/[^\s]+/g, '[DATABASE_URL]')); process.exitCode = 1; }

@@ -1,3 +1,4 @@
+import { creditUnits } from './sessions/credit-unit-projection.js';
 import {
   BadRequestException,
   Body,
@@ -32,7 +33,6 @@ import { MemberEnrollmentService } from './member-enrollment.service.js';
 import { TrainerEnrollmentService } from './trainer-enrollment.service.js';
 import { identityFromAuthorization } from './auth-token.js';
 import { trainerRegistrationInputSchema } from '@gymos/contracts';
-import { derivePackCreditBalance } from './sessions/session-state.js';
 
 const createMemberInput = z.strictObject({
   fullName: z.string().trim().min(2).max(120),
@@ -298,6 +298,7 @@ export class GymsController {
         orderBy: [{ startDate: 'desc' }, { id: 'desc' }], skip: (membershipPage - 1) * parsedPage.data.pageSize,
         take: parsedPage.data.pageSize,
         select: { id: true, planNameSnapshot: true, startDate: true, endDateExclusive: true, agreedPrice: true, currency: true } });
+      const units = await creditUnits(tenant, member.id);
       return memberDetailSchema.parse({
         accountState: member.registrationState === 'BASIC' ? 'BASIC' : activeLink && member.status === 'ACTIVE' ? 'OPERATIONAL' : 'HISTORICAL',
         gymCurrency: config.currency,
@@ -311,14 +312,14 @@ export class GymsController {
           agreedPrice: term.agreedPrice.toString(), currency: term.currency })),
         membershipPage, membershipPageSize: parsedPage.data.pageSize, membershipTotalCount, membershipTotalPages,
         sessionPacks: member.sessionPacks.map(pack => {
-          const ledgerBalance = derivePackCreditBalance(pack.issuedCredits, pack.creditMovements.map(movement => ({
-            available: movement.availableDelta, held: movement.heldDelta,
-            consumed: movement.consumedDelta, expired: movement.expiredDelta,
-          })));
-          const expired = gymLocalDate(config.timezone!, asOf) >= pack.endDateExclusive.toISOString().slice(0, 10);
-          const balance = expired ? { ...ledgerBalance, available: 0, expired: ledgerBalance.expired + ledgerBalance.available } : ledgerBalance;
-          const status = balance.available + balance.held === 0 ? 'DEPLETED' : expired ? 'EXPIRED' : 'ACTIVE';
+          const unitRows = units.filter(unit => unit.packId === pack.id);
+          const today = gymLocalDate(config.timezone!, asOf);
+          const balance = unitRows.reduce((total, unit) => ({ available: total.available + (unit.effectiveEndDateExclusive.toISOString().slice(0,10) > today ? unit.available : 0),
+            held: total.held + unit.held, consumed: total.consumed + unit.consumed,
+            expired: total.expired + unit.expired + (unit.effectiveEndDateExclusive.toISOString().slice(0,10) <= today ? unit.available : 0) }), { available: 0, held: 0, consumed: 0, expired: 0 });
+          const status = balance.available + balance.held > 0 ? 'ACTIVE' : balance.expired > 0 ? 'EXPIRED' : 'DEPLETED';
           return { id: pack.id, issuedCredits: pack.issuedCredits, availableCredits: balance.available,
+            expiryAdjustments: unitRows.filter(unit => unit.effectiveEndDateExclusive > unit.endDateExclusive).map(unit => ({ creditOrdinal: unit.creditOrdinal, endDateExclusive: unit.effectiveEndDateExclusive.toISOString().slice(0,10), state: unit.held ? 'HELD' : unit.consumed ? 'CONSUMED' : unit.expired || unit.effectiveEndDateExclusive.toISOString().slice(0,10) <= today ? 'EXPIRED' : 'UNHELD' })),
             heldCredits: balance.held, consumedCredits: balance.consumed, expiredCredits: balance.expired,
             validityDays: pack.validityDays, price: pack.price.toString(), currency: pack.currency,
             startDate: pack.startDate.toISOString().slice(0, 10), endDateExclusive: pack.endDateExclusive.toISOString().slice(0, 10), status };

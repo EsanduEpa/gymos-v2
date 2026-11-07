@@ -1,15 +1,37 @@
-import { ServiceUnavailableException, type ExecutionContext } from '@nestjs/common';
+import { ForbiddenException, ServiceUnavailableException, type ExecutionContext } from '@nestjs/common';
 import { SignJWT } from 'jose';
 import type { DatabaseService } from './database.service.js';
 import { GymAccessGuard } from './gym-access.guard.js';
 import type { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js';
 
 describe('GymAccessGuard availability boundary', () => {
-  it('returns a sanitized 503 when Master access resolution is unavailable', async () => {
+  it('denies platform administrators before resolving any gym access link', async () => {
     const previousSecret = process.env.JWT_SECRET;
     process.env.JWT_SECRET = 'task005-test-secret-at-least-32-bytes-long';
     try {
       const token = await new SignJWT({ authVersion: 0 })
+        .setProtectedHeader({ alg: 'HS256' }).setSubject('platform-admin')
+        .setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('5m')
+        .sign(new TextEncoder().encode(process.env.JWT_SECRET));
+      const findFirst = vi.fn();
+      const guard = new GymAccessGuard({ master: {
+        user: { findUnique: async () => ({ authVersion: 0, globalRole: 'SUPER_ADMIN', mustChangePassword: false, credentialExpiresAt: null }) },
+        $queryRaw: async () => [{ now: new Date() }], gymAccess: { findFirst },
+      } } as unknown as DatabaseService, {} as TenantSchemaGateService);
+      const execution = { switchToHttp: () => ({ getRequest: () => ({ headers: { authorization: `Bearer ${token}` }, params: { slug: 'any-gym' } }) }) } as ExecutionContext;
+      await expect(guard.canActivate(execution)).rejects.toBeInstanceOf(ForbiddenException);
+      expect(findFirst).not.toHaveBeenCalled();
+    } finally {
+      if (previousSecret === undefined) delete process.env.JWT_SECRET;
+      else process.env.JWT_SECRET = previousSecret;
+    }
+  });
+
+  it('returns a sanitized 503 when Master access resolution is unavailable', async () => {
+    const previousSecret = process.env.JWT_SECRET;
+    process.env.JWT_SECRET = 'task005-test-secret-at-least-32-bytes-long';
+    try {
+      const token = await new SignJWT({ authVersion: 0, sid: 'test-session', gaid: 'test-account' })
         .setProtectedHeader({ alg: 'HS256' })
         .setSubject('task005-user')
         .setIssuer('gymos-v2')
@@ -18,8 +40,10 @@ describe('GymAccessGuard availability boundary', () => {
         .sign(new TextEncoder().encode(process.env.JWT_SECRET));
       const request = { headers: { authorization: `Bearer ${token}` }, params: { slug: 'task005-gym' } };
       const guard = new GymAccessGuard({ master: {
-        user: { findUnique: async () => ({ authVersion: 0, mustChangePassword: false, credentialExpiresAt: null }) },
+        user: { findUnique: async () => ({ authVersion: 0, globalRole: 'USER', mustChangePassword: false, credentialExpiresAt: null }) },
         $queryRaw: async () => [{ now: new Date() }],
+        identitySession: { findUnique: async () => ({ identityId: 'task005-user', gymAccountId: 'test-account', authVersion: 0, revokedAt: null }) },
+        gymAccount: { findUnique: async () => ({ userId: 'task005-user', gymId: 'task005-gym-id', status: 'ACTIVE', authVersion: 0, mustChangePassword: false, credentialExpiresAt: null }) },
         gymAccess: { findFirst: async () => {
           throw new Error('postgresql://sensitive:details@remote.example.invalid/gym');
         } },

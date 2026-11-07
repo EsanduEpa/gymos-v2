@@ -1,11 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { allocatedPackCreditMinorUnits, derivePackCreditBalance, minorUnitsDecimal, selectEligibleSessionPack, sessionIntervalsOverlap, transitionSession } from './session-state.js';
+import { allocatedPackCreditMinorUnits, derivePackCreditBalance, minorUnitsDecimal, selectEligibleSessionPack, sessionIntervalsOverlap, transitionSession, requestCanBeAccepted, requestExpiryInstant } from './session-state.js';
 
 describe('session state and credit invariants', () => {
+  it('expires requests at the earlier of creation plus 12 hours or start minus one hour, with cutoff inclusive for expiry', () => {
+    const created = new Date('2026-11-06T00:00:00.000Z');
+    expect(requestExpiryInstant(created, new Date('2026-11-06T08:00:00.000Z')).toISOString()).toBe('2026-11-06T07:00:00.000Z');
+    expect(requestExpiryInstant(created, new Date('2026-11-06T20:00:00.000Z')).toISOString()).toBe('2026-11-06T12:00:00.000Z');
+    const expiry = requestExpiryInstant(created, new Date('2026-11-06T08:00:00.000Z'));
+    expect(requestCanBeAccepted(new Date(expiry.getTime() - 1), expiry)).toBe(true);
+    expect(requestCanBeAccepted(expiry, expiry)).toBe(false);
+    expect(requestCanBeAccepted(new Date(expiry.getTime() + 1), expiry)).toBe(false);
+  });
   it('allows only named transitions and requires ACTIVE before completion', () => {
     expect(transitionSession({ state: null, command: 'OWNER_BOOK', actorRole: 'OWNER' })).toBe('SCHEDULED');
     expect(transitionSession({ state: null, command: 'MEMBER_REQUEST', actorRole: 'MEMBER' })).toBe('PENDING_CONFIRMATION');
     expect(transitionSession({ state: 'PENDING_CONFIRMATION', command: 'TRAINER_ACCEPT', actorRole: 'TRAINER' })).toBe('SCHEDULED');
+    expect(transitionSession({ state: 'PENDING_CONFIRMATION', command: 'SYSTEM_EXPIRE_REQUEST', actorRole: 'SYSTEM' })).toBe('EXPIRED');
+    expect(transitionSession({ state: 'EXPIRED', command: 'TRAINER_ACCEPT', actorRole: 'TRAINER' })).toBeNull();
     expect(transitionSession({ state: 'SCHEDULED', command: 'COMPLETE', actorRole: 'OWNER' })).toBeNull();
     expect(transitionSession({ state: 'ACTIVE', command: 'COMPLETE', actorRole: 'TRAINER' })).toBe('COMPLETED');
     expect(transitionSession({ state: 'COMPLETED', command: 'CANCEL', actorRole: 'OWNER' })).toBeNull();

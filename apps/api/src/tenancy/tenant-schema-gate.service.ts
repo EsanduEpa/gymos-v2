@@ -4,6 +4,7 @@ import { canonicalJson } from '../operations/primitives.js';
 import { TenantDatabaseService } from '../tenant-database.service.js';
 import {
   assertRunningApiCompatibility,
+  TENANT_TEMPLATE_MANIFEST,
   reviewedTenantManifest,
 } from './tenant-template-manifest.js';
 
@@ -33,7 +34,9 @@ export class TenantSchemaGateService {
     let metadataVerified = false;
     try {
       const manifest = reviewedTenantManifest(context.expectedTenantSchemaVersion, context.expectedTenantManifestDigest);
-      if (!manifest) throw unavailable();
+      // This binary's operational projections require its current additive schema.
+      // Older reviewed manifests remain available to administrative rollout/recovery inspection.
+      if (!manifest || manifest.version !== TENANT_TEMPLATE_MANIFEST.version) throw unavailable();
       assertRunningApiCompatibility(manifest);
       if (!context.expectedTenantOperationId
         || context.expectedTenantOperationState !== 'COMPLETE'

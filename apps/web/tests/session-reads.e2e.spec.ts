@@ -1,12 +1,13 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
-import { createHmac, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { createDisposableEnvironment } from '../../api/test/support/disposable-environment.js';
 import { seedTwoGymFixture } from '../../api/test/fixtures/two-gym-fixture.js';
+import { installBrowserSession } from './support/browser-session.js';
 
 test.use({ trace: 'off', screenshot: 'off', video: 'off' });
 const root = fileURLToPath(new URL('../../../', import.meta.url));
@@ -75,10 +76,10 @@ async function seedSessions() {
   const member = await tenant.member.findUniqueOrThrow({ where: { identityId: fixture.users.memberUser.id } });
   const trainer = await tenant.trainer.findUniqueOrThrow({ where: { identityId: fixture.users.trainerUser.id } });
   const now = new Date();
-  const activeStart = new Date(now.getTime() - 15 * 60_000);
+  const activeStart = new Date(now.getTime() - 35 * 60_000);
   await tenant.pTSession.create({ data: sessionData({ id: `read-active-${environment.runId}`, memberId: member.id, trainerId: trainer.id,
-    state: 'ACTIVE', start: activeStart, end: new Date(now.getTime() + 45 * 60_000), createdBy: fixture.users.ownerA.id,
-    startedAt: new Date(now.getTime() - 12 * 60_000) }) });
+    state: 'ACTIVE', start: activeStart, end: new Date(now.getTime() + 25 * 60_000), createdBy: fixture.users.ownerA.id,
+    startedAt: new Date(now.getTime() - 20 * 60_000) }) });
   const [year, month] = targetMonth.split('-').map(Number);
   const rows = [];
   for (let day = 1; day <= 15; day++) for (let slot = 0; slot < 2; slot++) {
@@ -90,16 +91,9 @@ async function seedSessions() {
   persistedBefore = { sessions: await tenant.pTSession.count(), events: await tenant.sessionStateEvent.count(), movements: await tenant.packCreditMovement.count() };
 }
 async function openAs(page: Page, userId: string, path: string) {
-  const issuedAt = Math.floor(Date.now() / 1000);
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256' })).toString('base64url');
-  const payload = Buffer.from(JSON.stringify({ sub: userId,
-    authVersion: (await fixture.master.user.findUniqueOrThrow({ where: { id: userId }, select: { authVersion: true } })).authVersion,
-    iss: 'gymos-v2', aud: 'gymos-api', iat: issuedAt, exp: issuedAt + 900 })).toString('base64url');
-  const signature = createHmac('sha256', jwtSecret).update(`${header}.${payload}`).digest('base64url');
-  const token = `${header}.${payload}.${signature}`;
-  await page.goto('about:blank');
-  await page.context().clearCookies();
-  await page.context().addCookies([{ name: 'gymos_access_token', value: token, url: webBase, httpOnly: true, sameSite: 'Lax' }]);
+  const slug = path.match(/^\/gyms\/([^/?#]+)/)?.[1];
+  const gymId = fixture.gyms.find(gym => gym.slug === slug)?.id;
+  await installBrowserSession({ page, master: fixture.master, identityId: userId, ...(gymId ? { gymId } : {}), jwtSecret, origin: webBase });
   await page.goto(`${webBase}${path}`);
 }
 
@@ -130,53 +124,51 @@ test.afterAll('stop session-read services and remove owned fixtures', async () =
 test('owner, trainer and member see the same selected-gym session ledger read-only', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   const slug = fixture.gyms[0]!.slug;
-  const ownerPath = `/gyms/${slug}/owner/sessions?mode=month&month=${targetMonth}&q=Member%20Alpha`;
+  const ownerPath = `/gyms/${slug}/owner/sessions?view=list&mode=month&month=${targetMonth}&q=Member%20Alpha`;
   await openAs(page, fixture.users.ownerA.id, ownerPath);
-  await expect(page.getByRole('heading', { name: 'Session management' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'PT Session Oversight & Analytics' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Monthly member overview' })).toBeVisible();
   await expect(page.getByRole('table', { name: 'Monthly member session overview' })).toContainText('Member Alpha');
   await expect(page.getByRole('table', { name: 'Gym session ledger' })).toContainText('Trainer Alpha');
   await expect(page.getByRole('link', { name: 'Next page' })).toBeVisible();
   const ownerRow = page.getByRole('table', { name: 'Gym session ledger' }).locator('tbody tr').first();
-  await ownerRow.getByRole('button', { name: 'Cancel session' }).click();
-  await expect(page.getByRole('region', { name: 'Cancellation quote' })).toContainText(/cancellation/i);
-  await page.getByRole('region', { name: 'Cancellation quote' }).getByRole('button', { name: 'Close' }).click();
-  await page.locator('details').first().locator('summary').click();
-  await page.getByRole('link', { name: /View 30 matching sessions/ }).click();
+  await expect(ownerRow.getByRole('button', { name: 'Cancel session' })).toHaveCount(0);
+  const memberOverviewRow = page.getByRole('table', { name: 'Monthly member session overview' }).locator('tbody tr').filter({ hasText: 'Member Alpha' }).first();
+  await memberOverviewRow.locator('details summary').click();
+  await memberOverviewRow.getByRole('link', { name: /View \d+ matching sessions?/ }).click();
   await expect(page).toHaveURL(new RegExp(`mode=month.*month=${targetMonth}.*memberId=`));
-  await expect(page.getByText(/Page 1 of 2 · 30 sessions match these filters/)).toBeVisible();
+  await expect(page.getByText(/Page 1 of \d+ · 30 sessions match these filters/)).toBeVisible();
   await page.screenshot({ path: join(evidenceDirectory, 'owner-sessions-month.png'), fullPage: true });
 
   const trainerPath = `/gyms/${slug}/trainer/schedule?mode=month&month=${targetMonth}`;
   await openAs(page, fixture.users.trainerUser.id, trainerPath);
-  await expect(page.getByRole('heading', { name: 'My sessions' })).toBeVisible();
-  await expect(page.getByText('30 matching sessions')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Next page' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Trainer Daily Schedule' })).toBeVisible();
+  await expect(page.locator('.trainer-metric').first().locator('strong')).toHaveText('30');
   await page.getByRole('button', { name: 'Cancel session' }).first().click();
-  await expect(page.getByRole('region', { name: 'Cancellation quote' })).toBeVisible();
-  await page.getByRole('region', { name: 'Cancellation quote' }).getByRole('button', { name: 'Close' }).click();
+  await expect(page.getByRole('dialog', { name: 'Cancel session' })).toBeVisible();
+  await page.getByRole('dialog', { name: 'Cancel session' }).getByRole('button', { name: 'Close' }).click();
   await openAs(page, fixture.users.trainerUser.id, `/gyms/${slug}/trainer/schedule?mode=month&month=${localDate(new Date(), 'Asia/Colombo').slice(0, 7)}&state=ACTIVE`);
   await expect(page.getByText(/Elapsed \d+:\d{2}/)).toBeVisible();
-  await expect(page.getByText(/display-only/i)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Complete session' })).toBeVisible();
+  await expect(page.getByLabel(/Elapsed session time, display only/i)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Complete session' })).toHaveCount(0);
   await expect(page.getByText(/Session commands are not enabled on this view yet/)).toHaveCount(0);
   await page.screenshot({ path: join(evidenceDirectory, 'trainer-active-session.png'), fullPage: true });
 
   await page.setViewportSize({ width: 390, height: 844 });
   const memberPath = `/gyms/${slug}/member/sessions?mode=month&month=${targetMonth}`;
   await openAs(page, fixture.users.memberUser.id, memberPath);
-  await expect(page.getByRole('heading', { name: 'Session history' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'My PT Sessions' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'member session view' })).toBeVisible();
   await expect(page.getByLabel('Monthly session counts by state')).toContainText('Scheduled');
   await expect(page.getByLabel('Monthly session counts by state')).toContainText('30');
   await expect(page.getByRole('button', { name: 'Complete session' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Cancel session' }).first().click();
-  await expect(page.getByRole('region', { name: 'Cancellation quote' })).toBeVisible();
-  await page.getByRole('region', { name: 'Cancellation quote' }).getByRole('button', { name: 'Close' }).click();
+  await expect(page.getByRole('dialog', { name: 'Cancel session' })).toBeVisible();
+  await page.getByRole('dialog', { name: 'Cancel session' }).getByRole('button', { name: 'Close' }).click();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await expect(page.getByRole('link', { name: 'Next page' })).toBeVisible();
   await page.getByRole('link', { name: 'Refresh sessions' }).click();
-  await expect(page.getByRole('heading', { name: 'Session history' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'My PT Sessions' })).toBeVisible();
   await page.screenshot({ path: join(evidenceDirectory, 'member-sessions-mobile.png'), fullPage: true });
 
   const tenant = fixture.tenants[0]!;

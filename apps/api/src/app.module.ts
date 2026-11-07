@@ -1,3 +1,5 @@
+import { SessionExceptionsController } from './sessions/session-exceptions.controller.js';
+import { SessionExceptionsService } from './sessions/session-exceptions.service.js';
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -5,7 +7,9 @@ import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { AdminController } from './admin.controller.js';
 import { AuthController } from './auth.controller.js';
-import { CredentialReissueController, CredentialsController } from './credentials.controller.js';
+import { AccountProfileController, GymProfileController } from './profiles.controller.js';
+import { AdminEmailCorrectionController, EmailCorrectionController } from './email-correction.controller.js';
+import { AccountRecoveryController, CredentialReissueController, CredentialsController, OperatorRecoveryController } from './credentials.controller.js';
 import { CredentialService } from './identity/credential.service.js';
 import { DatabaseService } from './database.service.js';
 import { GymAccessGuard } from './gym-access.guard.js';
@@ -30,6 +34,7 @@ import { TrainerEnrollmentService } from './trainer-enrollment.service.js';
 import { TrainersController } from './trainers.controller.js';
 import { PacksController } from './packs.controller.js';
 import { NotificationsController } from './notifications.controller.js';
+import { AccountNotificationsController } from './account-notifications.controller.js';
 import { TrainerLifecycleService } from './trainer-lifecycle.service.js';
 import { SessionBookingController } from './sessions/booking.controller.js';
 import { SessionBookingService } from './sessions/booking.service.js';
@@ -52,16 +57,26 @@ import { DashboardController } from './dashboard/dashboard.controller.js';
 import { DashboardService } from './dashboard/dashboard.service.js';
 import { AnalyticsController } from './analytics/analytics.controller.js';
 import { AnalyticsService } from './analytics/analytics.service.js';
+import { SessionAvailabilityController } from './sessions/availability.controller.js';
+import { SessionAvailabilityService } from './sessions/availability.service.js';
+import { SessionExpiryRunner } from './sessions/session-expiry-runner.js';
+import { MemberApplicationsController } from './member-applications.controller.js';
+import { MemberApplicationsService } from './member-applications.service.js';
+import { AuthSessionService } from './identity/auth-session.service.js';
+import { AuthSessionGuard } from './identity/auth-session.guard.js';
 
 @Module({
   imports: [
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
   ],
-  controllers: [AppController, AdminController, AuthController, CredentialsController, CredentialReissueController, GymsController, TrainersController, PacksController, NotificationsController, ConfigurationController, ProvisioningOwnerController, SupportSessionController, GymLifecycleController, SessionBookingController, SessionReadsController, SessionRequestsController, MemberSessionOverviewController, CoachingController, MemberLifecycleController, SessionLifecycleController, FinanceController, DashboardController, AnalyticsController],
-  providers: [
+  controllers: [SessionExceptionsController, AppController, AdminController, AuthController, AccountProfileController, GymProfileController, EmailCorrectionController, AdminEmailCorrectionController, AccountNotificationsController, CredentialsController, CredentialReissueController, AccountRecoveryController, OperatorRecoveryController, GymsController, MemberApplicationsController, TrainersController, PacksController, NotificationsController, ConfigurationController, ProvisioningOwnerController, SupportSessionController, GymLifecycleController, SessionBookingController, SessionReadsController, SessionRequestsController, MemberSessionOverviewController, CoachingController, MemberLifecycleController, SessionLifecycleController, FinanceController, DashboardController, AnalyticsController, SessionAvailabilityController],
+  providers: [SessionExceptionsService,
     AppService,
     DatabaseService,
     MemberEnrollmentService,
+    MemberApplicationsService,
+    AuthSessionService,
+    AuthSessionGuard,
     TrainerEnrollmentService,
     CredentialService,
     GymAccessGuard,
@@ -87,7 +102,10 @@ import { AnalyticsService } from './analytics/analytics.service.js';
     PayrollService,
     DashboardService,
     AnalyticsService,
+    SessionAvailabilityService,
+    SessionExpiryRunner,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: AuthSessionGuard },
     { provide: APP_GUARD, useClass: SupportScopeGuard },
   ],
 })

@@ -1,7 +1,7 @@
 import { contentDigest } from '../operations/primitives.js';
 // Immutable reviewed chain; schema deployment is an explicit owned runner command.
 export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
-  version: 'master-2026-11-03.1',
+  version: 'master-2026-11-06.11',
   migrations: [
     {
       name: '20261021100256_init_master',
@@ -60,6 +60,42 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       name: '20261103040000_member_lifecycle_intent',
       checksum: '304c97681a03e5bff34226bafeda0d0385aed6d22e40ed412cc64437f1a7eebc',
     },
+    {
+      name: '20261106060000_member_applications',
+      checksum: '3926ee8596018da0f8047a1ca9fda0333f6fcf5ca2c370bca24d0744069b445d',
+    },
+    {
+      name: '20261106070000_identity_sessions',
+      checksum: 'd35aa4917bce8a6c1d5a490b4395ac555f0f0c0995e2d0015a42505c6a92fe60',
+    },
+    {
+      name: '20261106080000_identity_recovery',
+      checksum: 'c09cd5b94716b5a7c7714f2be4f57ec54fe57bdfbd1d1a2b77a22949a24a50bd',
+    },
+    {
+      name: '20261106090000_profile_command_receipts',
+      checksum: 'de3417f9317369918e27fe68b0f77fd4682d721263fd4d38afcbdaab024f3fa8',
+    },
+    {
+      name: '20261106100000_identity_email_correction_requests',
+      checksum: 'b5444d2ae4391cf6f1d5a770636b506d392d8b66c7e12fa68e34746a66f89387',
+    },
+    {
+      name: '20261106110000_account_notification_read_receipts',
+      checksum: '7e3bbbd82046e3562fbe445657b94e8c51b4d62dd71d71f7bf7e3e5b3ed2e6fd',
+    },
+    {
+      name: '20261106130000_gym_accounts',
+      checksum: '47761ab2aa82a65638b8aa1728bef27b6fb08c6d9d83eae74c14f957d0c9c0d9',
+    },
+    {
+      name: '20261106140000_scoped_operator_recovery',
+      checksum: 'e47d20dffcf138afc94e1df98cfd9d44327ec3b6f6eaa695e8e5b1bff1ff61c9',
+    },
+    {
+      name: '20261106150000_scoped_security_events',
+      checksum: 'ea906388fe35846659b8ff05ae42ea780b609c750f6eea59a846b79a91a008c9',
+    },
   ],
   postconditions: {
     tables: [
@@ -67,11 +103,20 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       'EnrollmentProof',
       'Gym',
       'GymAccess',
+      'GymAccount',
+      'IdentitySession',
+      'RecoveryCredential',
+      'IdentitySecurityEvent',
       'GymLifecycleIntent',
       'GymRegistrySummary',
       'MasterSchemaDeployment',
       'MasterSchemaState',
       'MemberLifecycleIntent',
+      'MemberApplication',
+      'MemberApplicationNotice',
+      'ProfileCommandReceipt',
+      'IdentityEmailCorrectionRequest',
+      'IdentitySecurityEventRead',
       'Operation',
       'PlatformAuditLog',
       'ProvisioningIntent',
@@ -99,6 +144,14 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       'SchemaRollout_guard',
       'SupportEvent_append_only',
       'SupportSession_immutable',
+      'IdentitySession_immutable_history',
+      'RecoveryCredential_immutable_history',
+      'IdentitySecurityEvent_append_only',
+      'MemberApplication_immutable_subject',
+      'MemberApplicationNotice_immutable',
+      'ProfileCommandReceipt_immutable',
+      'IdentityEmailCorrectionRequest_immutable',
+      'IdentitySecurityEventRead_append_only',
     ],
     requiredColumns: {
       Theme: ['id', 'gymId', 'primaryColor', 'logoUrl', 'version'],
@@ -155,6 +208,14 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
         'targetStatus',
         'reason',
       ],
+      MemberApplication: ['id', 'gymId', 'identityId', 'fullName', 'phone', 'consentedAt', 'state', 'version', 'enrollmentOperationId', 'membershipPlanId', 'dateOfBirth', 'membershipPlanName', 'membershipPrice', 'membershipCurrency', 'membershipDurationDays', 'membershipPlanVersion'],
+      MemberApplicationNotice: ['id', 'applicationId', 'gymId', 'recipientId', 'event', 'createdAt', 'readAt'],
+      IdentitySession: ['id', 'identityId', 'gymAccountId', 'authVersion', 'deviceClass', 'deviceLabel', 'refreshTokenHash', 'version', 'createdAt', 'lastActivityAt', 'idleExpiresAt', 'absoluteExpiresAt', 'revokedAt'],
+      IdentitySecurityEvent: ['id', 'identityId', 'gymAccountId', 'event', 'createdAt'],
+      ProfileCommandReceipt: ['id', 'actorIdentityId', 'commandKind', 'idempotencyKey', 'requestDigest', 'resourceId', 'resultVersion', 'createdAt'],
+      IdentityEmailCorrectionRequest: ['id', 'identityId', 'requestedEmail', 'state', 'resolution', 'version', 'idempotencyKey', 'requestDigest', 'submittedAt', 'resolvedAt', 'resolvedByIdentityId'],
+      IdentitySecurityEventRead: ['id', 'securityEventId', 'identityId', 'readAt'],
+      GymAccount: ['id', 'userId', 'gymId', 'username', 'displayName', 'passwordHash', 'status', 'mustChangePassword', 'credentialExpiresAt', 'passwordChangedAt', 'authVersion', 'version', 'createdAt', 'updatedAt'],
     },
   },
 } as const);

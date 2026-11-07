@@ -38,9 +38,9 @@ export async function verifyInstalledMaster(client: pg.Client) {
     )
   ).rows.map((row) => row.name);
   if (
-    JSON.stringify(tables) !== JSON.stringify(manifest.postconditions.tables) ||
+    JSON.stringify(tables) !== JSON.stringify([...manifest.postconditions.tables].sort()) ||
     JSON.stringify(triggers) !==
-      JSON.stringify(manifest.postconditions.triggers)
+      JSON.stringify([...manifest.postconditions.triggers].sort())
   )
     throw new OperationIntegrityError(
       'Master catalog postconditions require review',

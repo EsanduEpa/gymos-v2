@@ -7,7 +7,8 @@ const amount = z.string().regex(/^(?:0|[1-9][0-9]{0,14})(?:\.[0-9]{1,4})?$/);
 const currency = z.enum(['LKR', 'USD']);
 const level = z.enum(['LEVEL_1', 'LEVEL_2']);
 const sessionType = z.enum(['IN_PERSON', 'VIRTUAL', 'INTRODUCTORY']);
-const sessionState = z.enum(['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE', 'COMPLETED', 'MISSED', 'CANCELLED', 'DECLINED']);
+const newSessionType = z.literal('IN_PERSON');
+const sessionState = z.enum(['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE', 'COMPLETED', 'MISSED', 'CANCELLED', 'DECLINED', 'EXPIRED']);
 const pageSchema = <T extends z.ZodType>(item: T) => z.strictObject({
   items: z.array(item).max(100), page: z.number().int().min(1), pageSize: z.number().int().min(1).max(100),
   totalCount: z.number().int().nonnegative(), totalPages: z.number().int().nonnegative(), asOf: z.iso.datetime({ offset: true }),
@@ -31,8 +32,8 @@ const trainerOptionSchema = z.strictObject({ trainerId: id, name: z.string().min
 export const sessionBookingOptionsSchema = z.strictObject({
   members: pageSchema(memberOptionSchema), trainers: pageSchema(trainerOptionSchema),
   selectedMember: memberOptionSchema.nullable(), selectedTrainer: trainerOptionSchema.nullable(),
-  policy: z.strictObject({ timeZone: z.string().min(1).max(100), localDate: date, minimumDurationMinutes: z.number().int().min(15).max(480),
-    maximumDurationMinutes: z.literal(480), scheduleHorizonDays: z.literal(365), configurationVersion: z.number().int().nonnegative(),
+  policy: z.strictObject({ timeZone: z.string().min(1).max(100), localDate: date, minimumDurationMinutes: z.literal(60),
+    maximumDurationMinutes: z.literal(60), scheduleHorizonDays: z.literal(14), configurationVersion: z.number().int().nonnegative(),
     cancellationWindowMinutes: z.number().int().min(0).max(10080) }),
   rateInfo: z.strictObject({ currency, defaultSessionFee: amount, level2SessionFee: amount.nullable(), introSessionFee: amount.nullable(),
     level1BaseRate: amount, level2BaseRate: amount, offShiftPremium: amount }),
@@ -42,7 +43,7 @@ export const sessionBookingOptionsSchema = z.strictObject({
 export const sessionBookingInputSchema = z.strictObject({
   memberId: id, trainerId: id, localDate: date, localTime: time, timeZone: z.string().min(1).max(100),
   offset: z.string().regex(/^(?:\+|-)(?:0[0-9]|1[0-4]):[0-5][0-9]$/).optional(),
-  type: sessionType, durationMinutes: z.number().int().min(15).max(480), notes: z.string().max(4000).nullable().optional(),
+  type: newSessionType, durationMinutes: z.literal(60), notes: z.string().max(4000).nullable().optional(),
   idempotencyKey: z.string().min(16).max(128).regex(/^[\x21-\x7e]+$/),
 });
 const notificationOutcomeSchema = z.strictObject({ eventId: id, recipient: z.strictObject({ role: z.literal('MEMBER'), actorId: id }),

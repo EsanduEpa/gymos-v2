@@ -157,12 +157,13 @@ export type SafeResult = {
   operationId?: string; state?: OperationState; step?: StepCode; version?: number;
   resourceIds?: string[]; publicationState?: 'PENDING' | 'ACTIVE' | 'FAILED';
   notificationState?: 'AVAILABLE' | 'QUEUED' | 'FAILED'; retryable?: boolean; refreshScopes?: string[];
+  requestOutcome?: 'EXPIRED' | 'SKIPPED';
   notesSnapshot?: string | null;
 };
 export function safeResult(value: unknown): SafeResult {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new TypeError('Safe result must be an object');
   canonicalJson(value, true);
-  const allowed = new Set(['operationId', 'state', 'step', 'version', 'resourceIds', 'publicationState', 'notificationState', 'retryable', 'refreshScopes', 'notesSnapshot']);
+  const allowed = new Set(['operationId', 'state', 'step', 'version', 'resourceIds', 'publicationState', 'notificationState', 'retryable', 'refreshScopes', 'notesSnapshot', 'requestOutcome']);
   for (const [key, item] of Object.entries(value)) {
     if (!allowed.has(key)) throw new TypeError('Unsafe operation result field');
     if (key === 'operationId') reference(item);
@@ -172,6 +173,7 @@ export function safeResult(value: unknown): SafeResult {
     if (key === 'retryable' && typeof item !== 'boolean') throw new TypeError('Invalid retryability');
     if (key === 'publicationState' && !['PENDING', 'ACTIVE', 'FAILED'].includes(item as string)) throw new TypeError('Invalid publication');
     if (key === 'notificationState' && !['AVAILABLE', 'QUEUED', 'FAILED'].includes(item as string)) throw new TypeError('Invalid delivery state');
+    if (key === 'requestOutcome' && !['EXPIRED', 'SKIPPED'].includes(item as string)) throw new TypeError('Invalid PT request outcome');
     if (key === 'notesSnapshot' && item !== null && (typeof item !== 'string' || Array.from(item).length > 4000)) throw new TypeError('Invalid notes snapshot');
     if (key === 'resourceIds' || key === 'refreshScopes') {
       if (!Array.isArray(item) || item.length > 1000) throw new TypeError('Invalid result list');

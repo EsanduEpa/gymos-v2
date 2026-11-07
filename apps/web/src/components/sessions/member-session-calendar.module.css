@@ -21,7 +21,7 @@
 .noEvents { color:var(--classic-text-muted); font-size:12px; }
 .dots { display:flex; gap:4px; }
 .dots i,.legend i { display:block; width:7px; height:7px; border-radius:50%; background:var(--classic-text-muted); }
-.statePENDING_CONFIRMATION { background:var(--classic-warning)!important; }.stateSCHEDULED { background:var(--classic-info)!important; }.stateACTIVE { background:var(--classic-primary)!important; }.stateCOMPLETED { background:var(--classic-success)!important; }.stateCANCELLED,.stateDECLINED,.stateMISSED { background:var(--classic-text-muted)!important; }
+.statePENDING_CONFIRMATION { background:var(--classic-warning)!important; }.stateSCHEDULED { background:var(--classic-info)!important; }.stateACTIVE { background:var(--classic-primary)!important; }.stateCOMPLETED { background:var(--classic-success)!important; }.stateCANCELLED,.stateDECLINED,.stateMISSED,.stateEXPIRED { background:var(--classic-text-muted)!important; }
 .mealDot { background:var(--member-meal,var(--classic-success))!important; }
 .dayPanel { display:flex; min-width:0; flex-direction:column; gap:12px; padding:18px; border:1px solid var(--classic-border); border-radius:14px; background:var(--classic-surface); }
 .panelEyebrow { color:var(--classic-primary); font-size:10px; font-weight:800; letter-spacing:.12em; }
@@ -32,7 +32,7 @@
 .event small { color:var(--classic-text-muted); font-size:10px; text-transform:capitalize; }.event .note { white-space:pre-wrap; }
 .statePill { display:inline-flex; padding:4px 8px; border-radius:99px; background:var(--classic-info-soft); color:var(--classic-info); font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
 .mealEvent { border-left-color:var(--member-meal,var(--classic-success)); }.mealPill { display:inline-flex; padding:4px 8px; border-radius:99px; background:var(--member-meal-soft,var(--classic-success-soft)); color:var(--member-meal,var(--classic-success)); font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
-.pillPENDING_CONFIRMATION { background:var(--classic-warning-soft); color:var(--classic-warning); }.pillACTIVE { background:var(--classic-primary-soft); color:var(--classic-primary); }.pillCOMPLETED { background:var(--classic-success-soft); color:var(--classic-success); }.pillCANCELLED,.pillDECLINED,.pillMISSED { background:var(--classic-surface-muted); color:var(--classic-text-secondary); }
+.pillPENDING_CONFIRMATION { background:var(--classic-warning-soft); color:var(--classic-warning); }.pillACTIVE { background:var(--classic-primary-soft); color:var(--classic-primary); }.pillCOMPLETED { background:var(--classic-success-soft); color:var(--classic-success); }.pillCANCELLED,.pillDECLINED,.pillMISSED,.pillEXPIRED { background:var(--classic-surface-muted); color:var(--classic-text-secondary); }
 .empty { display:grid; justify-items:start; gap:7px; padding:12px 4px; }.empty > span { color:var(--classic-primary); font-size:25px; }.empty strong { font-size:13px; }.empty p { margin:0; color:var(--classic-text-muted); font-size:11px; line-height:1.45; }
 .dayPanel > a { margin-top:auto; }
 .legend { display:flex; flex-wrap:wrap; gap:8px 15px; color:var(--classic-text-muted); font-size:10px; }

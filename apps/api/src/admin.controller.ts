@@ -19,6 +19,8 @@ export class AdminController {
   }
   @Get('analytics/summary')
   analyticsSummary() { return this.registry.analyticsSummary(); }
+  @Get('operations/visibility')
+  operationalVisibility() { return this.registry.operationalVisibility(); }
   @Post('analytics/refresh')
   @HttpCode(200)
   refreshAnalytics(@Req() request: PlatformRequest, @Body() body: unknown) {

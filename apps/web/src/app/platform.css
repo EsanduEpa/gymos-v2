@@ -135,6 +135,24 @@ html[data-appearance="dark"] .themed-workspace {
 .themed-workspace .shell-profile { padding-left: 20px; border-left: 1px solid var(--border); }
 .themed-workspace .shell-profile strong { max-width: 160px; font-size: 12px; font-weight: 600; color: var(--foreground); }
 .themed-workspace .shell-profile small { margin-top: 2px; color: var(--muted-foreground); font-size: 11px; }
+.themed-workspace .shell-account-menu { position: relative; margin-left: 8px; }
+.themed-workspace .shell-account-menu > summary { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px 8px; border: 1px solid transparent; border-radius: 10px; cursor: pointer; list-style: none; }
+.themed-workspace .shell-account-menu > summary::-webkit-details-marker { display: none; }
+.themed-workspace .shell-account-menu > summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.themed-workspace .shell-account-menu > summary:hover, .themed-workspace .shell-account-menu[open] > summary { background: var(--secondary); border-color: var(--border); }
+.themed-workspace .shell-account-label { display: grid; min-width: 0; }
+.themed-workspace .shell-account-label strong { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--foreground); }
+.themed-workspace .shell-account-label small { color: var(--muted-foreground); font-size: 10px; }
+.themed-workspace .shell-account-panel { position: absolute; z-index: 60; top: calc(100% + 8px); right: 0; display: grid; gap: 4px; width: min(260px, calc(100vw - 32px)); padding: 8px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); box-shadow: 0 12px 32px rgb(20 30 50 / 18%); }
+.themed-workspace .shell-account-panel a { display: flex; align-items: center; min-height: 40px; padding: 8px 10px; border-radius: 8px; color: var(--foreground); font-size: 13px; text-decoration: none; }
+.themed-workspace .shell-account-panel a:hover, .themed-workspace .shell-account-panel a:focus-visible { background: var(--secondary); outline: 2px solid var(--ring); outline-offset: 1px; }
+.themed-workspace .shell-account-panel form, .themed-workspace .shell-account-panel button { width: 100%; }
+.themed-workspace .shell-account-panel button { justify-content: flex-start; min-height: 40px; }
+.profile-form { display: grid; gap: 16px; max-width: 720px; margin-top: 20px; }
+.profile-readonly { display: grid; gap: 5px; padding: 12px 0; border-bottom: 1px solid var(--border); color: var(--foreground); }
+.profile-readonly small, .profile-readonly + small { color: var(--muted-foreground); }
+.themed-workspace .profile-form textarea, .themed-workspace .profile-form select { width: 100%; min-height: 42px; padding: 10px 12px; border: 1px solid var(--input); border-radius: 8px; background: var(--card); color: var(--foreground); font: inherit; }
+.themed-workspace .profile-form textarea:focus, .themed-workspace .profile-form select:focus { border-color: var(--ring); outline: 0; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 20%, transparent); }
 .platform-collapse, .platform-drawer-close { display: grid; place-items: center; width: 36px; min-height: 36px; padding: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--muted-foreground); cursor: pointer; }
 .platform-collapse:hover { background: var(--muted); color: var(--foreground); }
 .platform-collapse .expand-icon { display: none; }
@@ -228,6 +246,10 @@ html:not([data-appearance="dark"]) .appearance-toggle button:first-child, html[d
 .themed-workspace .ui-field input, .themed-workspace .ui-field select, .themed-workspace .ui-field textarea { width: 100%; min-width: 0; min-height: 42px; padding: 10px 12px; border: 1px solid var(--input); border-radius: 8px; background: var(--card); color: var(--foreground); font-size: 12px; line-height: 1.5; outline: none; }
 .themed-workspace .ui-field input:focus, .themed-workspace .ui-field select:focus, .themed-workspace .ui-field textarea:focus { border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 20%, transparent); }
 .themed-workspace .ui-field input::placeholder { color: var(--muted-foreground); }
+.password-input-row { position: relative; display: block; }
+.themed-workspace .password-input-row input { padding-right: 104px; }
+.password-visibility { position: absolute; top: 50%; right: 10px; transform: translateY(-50%); border: 0; background: transparent; color: var(--primary); font-size: 11px; font-weight: 600; cursor: pointer; }
+.password-visibility:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; }
 .themed-workspace .ui-field input[readonly] { background: var(--muted); }
 .themed-workspace .ui-field-hint { color: var(--muted-foreground); font-size: 11px; line-height: 1.6; }
 .platform-create-actions { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-top: 4px; padding-top: 20px; border-top: 1px solid var(--border); }
@@ -302,7 +324,7 @@ html:not([data-appearance="dark"]) .appearance-toggle button:first-child, html[d
 }
 @media (max-width: 1023px) {
   .themed-workspace .shell-sidebar { width: 200px; }.platform-brand { padding: 20px; gap: 8px; }.platform-brand-copy strong { font-size: 21px; }
-  .themed-workspace .shell-header { padding: 0 24px; gap: 12px; }.themed-workspace .shell-profile > div { display: none; }
+  .themed-workspace .shell-header { padding: 0 24px; gap: 12px; }.themed-workspace .shell-profile > div, .themed-workspace .shell-account-label { display: none; }
   .platform-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .platform-health-body { gap: 20px; }.platform-freshness { padding-left: 20px; }
   .platform-onboarding-grid { grid-template-columns: minmax(0, 1fr); }.platform-onboarding-note { display: none; }
@@ -313,7 +335,7 @@ html:not([data-appearance="dark"]) .appearance-toggle button:first-child, html[d
   .themed-workspace .shell-content { padding: 28px 20px 20px; }
   .themed-workspace .shell-drawer { width: 280px; background: var(--sidebar); color: var(--foreground); }.themed-workspace .shell-drawer-panel { width: 100%; }.themed-workspace .shell-drawer::backdrop { background: #060e2066; }
   .themed-workspace .shell-drawer .platform-sidebar-note { margin-top: 40px; }
-  .themed-workspace .shell-profile { padding-left: 0; border: 0; }
+  .themed-workspace .shell-profile { padding-left: 0; border: 0; }.themed-workspace .shell-account-menu { margin-left: 0; }
   .appearance-toggle button { min-height: 36px; padding: 6px 8px; }.appearance-toggle button > span { display: none; }
   .platform-page { gap: 24px; }.platform-page-heading { align-items: flex-start; }.platform-page-heading h1 { font-size: 28px; }
   .platform-page-heading > a { align-self: flex-start; flex-shrink: 0; }

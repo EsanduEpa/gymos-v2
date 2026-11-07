@@ -5,7 +5,7 @@ import { issueSessionPackAction, type IssuePackActionState } from '@/app/pack-ac
 import { EmptyState, Feedback } from '@/components/ui';
 
 type Pack = { id: string; issuedCredits: number; availableCredits: number; heldCredits: number; consumedCredits: number;
-  expiredCredits: number; validityDays: number; price: string; currency: 'LKR' | 'USD'; startDate: string; endDateExclusive: string; status: 'ACTIVE' | 'EXPIRED' | 'DEPLETED' };
+  expiryAdjustments?: Array<{ creditOrdinal: number; endDateExclusive: string; state: string }>; expiredCredits: number; validityDays: number; price: string; currency: 'LKR' | 'USD'; startDate: string; endDateExclusive: string; status: 'ACTIVE' | 'EXPIRED' | 'DEPLETED' };
 
 export function SessionPackPanel({ slug, memberId, status, currency, packs, requestKey }: {
   slug: string; memberId: string; status: string; currency: string | null; packs: Pack[]; requestKey: string;
@@ -16,7 +16,7 @@ export function SessionPackPanel({ slug, memberId, status, currency, packs, requ
     <h3 id="session-packs-heading">Session-pack balance</h3>
     {packs.length ? <div className="member-history-list">{packs.map(pack => <article key={pack.id}>
       <div><strong>{pack.issuedCredits} sessions issued · {pack.status.toLowerCase()}</strong>
-        <small>{pack.startDate} to the day before {pack.endDateExclusive} · {pack.validityDays} days</small></div>
+        <small>Original validity: {pack.startDate} to the day before {pack.endDateExclusive} · {pack.validityDays} days</small>{pack.expiryAdjustments?.map(unit => <small key={unit.creditOrdinal}>Restored credit {unit.creditOrdinal}: usable before {unit.endDateExclusive} · {unit.state.toLowerCase()}</small>)}</div>
       <span>{pack.availableCredits} available · {pack.heldCredits} held
         <small>{pack.consumedCredits} consumed · {pack.expiredCredits} expired</small>
         <small>{pack.price} {pack.currency} · entitlement only</small></span>

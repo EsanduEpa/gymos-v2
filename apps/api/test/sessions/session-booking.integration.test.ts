@@ -12,6 +12,12 @@ let fixture: Awaited<ReturnType<typeof seedTwoGymFixture>>;
 beforeAll(async () => {
   run = await createDisposableEnvironment();
   fixture = await seedTwoGymFixture(run);
+  const tenant = fixture.tenants[0]!;
+  const receipt = await tenant.commandReceipt.create({ data: { actorIdentityId: fixture.users.ownerA.id, commandKind: 'TEST_AVAILABILITY', idempotencyKey: `booking-avail-${run.runId}`,
+    requestDigest: requestDigest({ runId: run.runId, availability: true }), state: 'COMMITTED', committedAt: new Date(), safeResult: { state: 'COMPLETE' } } });
+  const trainer = await tenant.trainer.findUniqueOrThrow({ where: { identityId: fixture.users.trainerUser.id } });
+  await tenant.pTAvailabilityRule.createMany({ data: Array.from({ length: 7 }, (_, weekday) => ({ id: `book_avail_${weekday}_${run.runId}`, trainerId: trainer.id, kind: 'WEEKLY_WINDOW' as const, weekday,
+    startMinute: 0, endMinute: 1440, effectiveFrom: new Date('2026-01-01T00:00:00Z'), effectiveToExclusive: new Date('2027-01-01T00:00:00Z'), createdByIdentityId: fixture.users.ownerA.id, commandReceiptId: receipt.id, updatedAt: new Date() })) });
 }, 120_000);
 
 afterAll(async () => {
@@ -73,7 +79,7 @@ it('serves sanitized owner booking options and atomically books, reserves, audit
   const options = await service.options(access, { memberPage: 1, memberPageSize: 25, trainerPage: 1, trainerPageSize: 25, localDate: addDays(localDate(), 1) });
   expect(options.members.items.find(row => row.memberId === member.id)).toMatchObject({ eligibility: 'ELIGIBLE', availableCredits: 2 });
   expect(options.trainers.items.find(row => row.trainerId === trainer.id)).toMatchObject({ trainerId: trainer.id, level: 'LEVEL_1' });
-  expect(options.policy).toMatchObject({ timeZone: 'Asia/Colombo', maximumDurationMinutes: 480, scheduleHorizonDays: 365 });
+  expect(options.policy).toMatchObject({ timeZone: 'Asia/Colombo', maximumDurationMinutes: 60, scheduleHorizonDays: 14 });
   await expect(service.options({ ...access, role: 'MEMBER' }, { memberPage: 1, memberPageSize: 25, trainerPage: 1, trainerPageSize: 25 }))
     .rejects.toBeInstanceOf(ForbiddenException);
 
@@ -90,7 +96,8 @@ it('serves sanitized owner booking options and atomically books, reserves, audit
   expect(replay).toMatchObject({ receiptId: result.receiptId, replayed: true, session: { id: result.session.id } });
   expect(await tenant.pTSession.count({ where: { id: result.session.id } })).toBe(1);
   expect(await tenant.packCreditMovement.count({ where: { holdId: result.creditReservation.holdId } })).toBe(1);
-  expect(await tenant.notification.count({ where: { resourceId: result.session.id } })).toBe(1);
+  expect(await tenant.notification.count({ where: { resourceId: result.session.id } })).toBe(2);
+  expect(await tenant.notification.count({ where: { resourceId: result.session.id, recipientIdentityId: fixture.users.trainerUser.id, eventCode: 'SESSION_BOOKED' } })).toBe(1);
   const altered = { ...booking, notes: 'changed body' };
   await expect(service.book(access, altered, altered.idempotencyKey)).rejects.toMatchObject({ status: 409 });
   expect(await tenant.pTSession.count({ where: { id: result.session.id } })).toBe(1);
@@ -99,20 +106,21 @@ it('serves sanitized owner booking options and atomically books, reserves, audit
 
 it('allows only one of concurrent bookings to hold the last credit and rejects a foreign gym member safely', async () => {
   const { service, tenant, gym, access } = await serviceFor();
-  const member = await tenant.member.findUniqueOrThrow({ where: { identityId: fixture.users.memberUser.id } });
+  const member = await tenant.member.findFirstOrThrow({ where: { identityId: fixture.users.memberUser.id } });
   const trainer = await tenant.trainer.findUniqueOrThrow({ where: { identityId: fixture.users.trainerUser.id } });
-  // Consume the remaining credit from the prior test's pack so the race below
-  // exercises a single isolated last-credit pack.
-  await service.book(access, input(member.id, trainer.id, addDays(localDate(), 1), `${run.runId}-drain`, '10:00'));
+  // Consume the remaining credit from the preceding booking case so this race owns exactly one available credit.
+  const drainDate = addDays(localDate(), 1);
+  await service.book(access, input(member.id, trainer.id, drainDate, `${run.runId}-drain-a`, '09:00'));
   await issueTestEntitlement(tenant, 0, member.id, `${run.runId}-race`, 1);
+  const isolatedMember = member;
   const date = addDays(localDate(), 2);
   const attempts = await Promise.allSettled([
-    service.book(access, input(member.id, trainer.id, date, `${run.runId}-left`, '13:00')),
-    service.book(access, input(member.id, trainer.id, date, `${run.runId}-right`, '16:00')),
+    service.book(access, input(isolatedMember.id, trainer.id, date, `${run.runId}-left`, '13:00')),
+    service.book(access, input(isolatedMember.id, trainer.id, date, `${run.runId}-right`, '16:00')),
   ]);
   expect(attempts.filter(item => item.status === 'fulfilled')).toHaveLength(1);
   expect(attempts.filter(item => item.status === 'rejected')).toHaveLength(1);
-  expect(await tenant.sessionCreditHold.count({ where: { state: 'HELD', session: { memberId: member.id, scheduledStartAt: { gte: new Date(`${date}T00:00:00.000Z`) } } } })).toBe(1);
+  expect(await tenant.sessionCreditHold.count({ where: { state: 'HELD', session: { memberId: isolatedMember.id, scheduledStartAt: { gte: new Date(`${date}T00:00:00.000Z`) } } } })).toBe(1);
   const foreign = await fixture.tenants[1]!.member.findFirstOrThrow({ where: { status: 'ACTIVE' } });
   await expect(service.book(access, input(foreign.id, trainer.id, addDays(date, 1), `${run.runId}-foreign`))).rejects.toBeInstanceOf(NotFoundException);
   expect(await tenant.pTSession.count({ where: { memberId: foreign.id } })).toBe(0);
@@ -133,6 +141,14 @@ it('rejects DST gaps, unresolved ambiguity, stale timezone and out-of-horizon or
   const tomorrow = addDays(localDate(), 1);
   await expect(service.book(access, { ...input(member.id, trainer.id, tomorrow, `${run.runId}-zone`), timeZone: 'UTC' })).rejects.toMatchObject({ status: 409 });
   await expect(service.book(access, input(member.id, trainer.id, addDays(localDate(), 366), `${run.runId}-horizon`))).rejects.toMatchObject({ status: 422 });
-  await expect(service.book(access, input(member.id, trainer.id, localDate(), `${run.runId}-past`, '00:01'))).rejects.toMatchObject({ status: 422 });
+  const afterPolicyHorizon = new Date(Date.now() + 14 * 24 * 60 * 60_000 + 60_000);
+  const horizonParts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Colombo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(afterPolicyHorizon);
+  const horizonValues = Object.fromEntries(horizonParts.map(part => [part.type, part.value]));
+  const horizonDate = `${horizonValues.year}-${horizonValues.month}-${horizonValues.day}`;
+  const horizonTime = `${horizonValues.hour}:${horizonValues.minute}`;
+  await expect(service.book(access, input(member.id, trainer.id, horizonDate, `${run.runId}-over14`, horizonTime))).rejects.toMatchObject({ status: 422 });
+  await expect(service.book(access, input(member.id, trainer.id, localDate(), `${run.runId}-notice`, '00:01'))).rejects.toMatchObject({ status: 422 });
+  await expect(service.book(access, { ...input(member.id, trainer.id, tomorrow, `${run.runId}-duration`), durationMinutes: 90 })).rejects.toMatchObject({ status: 422 });
+  await expect(service.book(access, { ...input(member.id, trainer.id, tomorrow, `${run.runId}-virtual`), type: 'VIRTUAL' })).rejects.toMatchObject({ status: 422 });
   expect(await tenant.pTSession.count()).toBe(before);
 });

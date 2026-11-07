@@ -7,7 +7,15 @@ import { seedTwoGymFixture } from '../fixtures/two-gym-fixture.js';
 
 let run: Awaited<ReturnType<typeof createDisposableEnvironment>>;
 let fixture: Awaited<ReturnType<typeof seedTwoGymFixture>>;
-beforeAll(async () => { run = await createDisposableEnvironment(); fixture = await seedTwoGymFixture(run); }, 120_000);
+beforeAll(async () => {
+  run = await createDisposableEnvironment(); fixture = await seedTwoGymFixture(run);
+  const tenant = fixture.tenants[0]!;
+  const receipt = await tenant.commandReceipt.create({ data: { actorIdentityId: fixture.users.ownerA.id, commandKind: 'TEST_AVAILABILITY', idempotencyKey: `request-avail-${run.runId}`,
+    requestDigest: requestDigest({ runId: run.runId, availability: true }), state: 'COMMITTED', committedAt: new Date(), safeResult: { state: 'COMPLETE' } } });
+  const trainer = await tenant.trainer.findUniqueOrThrow({ where: { identityId: fixture.users.trainerUser.id } });
+  await tenant.pTAvailabilityRule.createMany({ data: Array.from({ length: 7 }, (_, weekday) => ({ id: `request_avail_${weekday}_${run.runId}`, trainerId: trainer.id, kind: 'WEEKLY_WINDOW' as const, weekday,
+    startMinute: 0, endMinute: 1440, effectiveFrom: new Date('2026-01-01T00:00:00Z'), effectiveToExclusive: new Date('2027-01-01T00:00:00Z'), createdByIdentityId: fixture.users.ownerA.id, commandReceiptId: receipt.id, updatedAt: new Date() })) });
+}, 120_000);
 afterAll(async () => { await fixture?.close(); if (run) console.info('[session-requests-owned-cleanup]', JSON.stringify(await run.cleanup())); }, 120_000);
 
 function datePlus(days: number) {
@@ -74,6 +82,8 @@ it('creates a pending request without a hold, audits/notifies once and accepts i
   const requestReceipt = await tenant.commandReceipt.findUniqueOrThrow({ where: { id: pending.receiptId } });
   expect(requestReceipt.safeResult).toMatchObject({ resourceIds: [pending.session.id, pending.notificationOutcome.eventId], notificationState: 'AVAILABLE', retryable: false });
   expect(await tenant.sessionCreditHold.count({ where: { sessionId: pending.session.id } })).toBe(0);
+  const persistedRequest = await tenant.pTSession.findUniqueOrThrow({ where: { id: pending.session.id } });
+  expect(persistedRequest.requestExpiresAt?.getTime()).toBe(Math.min(persistedRequest.createdAt.getTime() + 12 * 60 * 60_000, persistedRequest.scheduledStartAt.getTime() - 60 * 60_000));
   expect(await tenant.packCreditMovement.count({ where: { packId: mainPack.id } })).toBe(1);
   expect(await tenant.sessionSettlement.count({ where: { sessionId: pending.session.id } })).toBe(0);
   expect(await tenant.revenueRecord.count({ where: { sessionId: pending.session.id } })).toBe(0);
@@ -118,24 +128,33 @@ it('declines without reserving credit; stale decisions and foreign trainer reque
   expect(await tenant.pTSession.findUniqueOrThrow({ where: { id: pending.session.id } })).toMatchObject({ declineReason: 'Unavailable\nthis week' });
 });
 
-it('rechecks current minimum duration and rejects requests that have expired before acceptance', async () => {
+it('rejects legacy request terms and expires a request exactly at its deadline without reserving credit', async () => {
   const { service, tenant, trainer, memberAccess, trainerAccess } = await setup();
   await entitlement(tenant, `${run.runId}-policy`, 2);
-  const config = await tenant.gymConfiguration.findUniqueOrThrow({ where: { id: 'current' } });
   const request = await service.request(memberAccess, requestBody(`${run.runId}-policy`, trainer.id, '11:00'));
-  try {
-    await tenant.gymConfiguration.update({ where: { id: 'current' }, data: { minimumSessionDurationMinutes: 120, version: { increment: 1 } } });
+    await tenant.pTSession.update({ where: { id: request.session.id }, data: { scheduledEndAt: new Date(new Date(request.session.scheduledStartAt).getTime() + 45 * 60_000) } });
     await expect(service.decide(trainerAccess, request.session.id, { action: 'ACCEPT', expectedVersion: 0, idempotencyKey: `short-${run.runId}-0123456789` })).rejects.toMatchObject({ status: 422 });
     expect(await tenant.pTSession.findUniqueOrThrow({ where: { id: request.session.id } })).toMatchObject({ state: 'PENDING_CONFIRMATION', version: 0 });
     expect(await tenant.sessionCreditHold.count({ where: { sessionId: request.session.id } })).toBe(0);
-    await tenant.gymConfiguration.update({ where: { id: 'current' }, data: { minimumSessionDurationMinutes: config.minimumSessionDurationMinutes, version: { increment: 1 } } });
-    await tenant.pTSession.update({ where: { id: request.session.id }, data: { scheduledStartAt: new Date('2020-01-01T10:00:00Z'), scheduledEndAt: new Date('2020-01-01T11:00:00Z') } });
+    await tenant.pTSession.update({ where: { id: request.session.id }, data: { scheduledStartAt: new Date('2020-01-01T10:00:00Z'), scheduledEndAt: new Date('2020-01-01T11:00:00Z'), requestExpiresAt: new Date(Date.now() - 1) } });
     await expect(service.decide(trainerAccess, request.session.id, { action: 'ACCEPT', expectedVersion: 0, idempotencyKey: `expired-${run.runId}-0123456789` })).rejects.toMatchObject({ status: 409 });
-    expect(await tenant.pTSession.findUniqueOrThrow({ where: { id: request.session.id } })).toMatchObject({ state: 'PENDING_CONFIRMATION', version: 0 });
+    expect(await tenant.pTSession.findUniqueOrThrow({ where: { id: request.session.id } })).toMatchObject({ state: 'EXPIRED', version: 1 });
     expect(await tenant.sessionCreditHold.count({ where: { sessionId: request.session.id } })).toBe(0);
-  } finally {
-    await tenant.gymConfiguration.update({ where: { id: 'current' }, data: { minimumSessionDurationMinutes: config.minimumSessionDurationMinutes, version: { increment: 1 } } });
-  }
+
+});
+
+it('serializes a two-live-pending limit and ignores requests whose deadline has passed', async () => {
+  const { service, tenant, trainer, member, memberAccess } = await setup();
+  await tenant.pTSession.updateMany({ where: { memberId: member.id, state: 'PENDING_CONFIRMATION' }, data: { requestExpiresAt: new Date(Date.now() - 1) } });
+  await entitlement(tenant, `${run.runId}-pending-limit`, 3);
+  const first = await service.request(memberAccess, { ...requestBody(`${run.runId}-limit-a`, trainer.id, '10:00'), localDate: datePlus(4) });
+  const second = await service.request(memberAccess, { ...requestBody(`${run.runId}-limit-b`, trainer.id, '12:00'), localDate: datePlus(4) });
+  expect(await tenant.sessionCreditHold.count({ where: { sessionId: { in: [first.session.id, second.session.id] } } })).toBe(0);
+  await expect(service.request(memberAccess, { ...requestBody(`${run.runId}-limit-c`, trainer.id, '14:00'), localDate: datePlus(4) })).rejects.toMatchObject({ status: 409 });
+  await tenant.pTSession.update({ where: { id: first.session.id }, data: { requestExpiresAt: new Date(Date.now() - 1) } });
+  const third = await service.request(memberAccess, { ...requestBody(`${run.runId}-limit-d`, trainer.id, '14:00'), localDate: datePlus(4) });
+  expect(third.session.state).toBe('PENDING_CONFIRMATION');
+  expect(await tenant.pTSession.count({ where: { memberId: member.id, state: 'PENDING_CONFIRMATION', requestExpiresAt: { gt: new Date() } } })).toBe(2);
 });
 
 it('rolls back the entire pending request when the required trainer notification insert fails', async () => {

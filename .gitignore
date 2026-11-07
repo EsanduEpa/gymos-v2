@@ -1,5 +1,7 @@
 node_modules/
 .next/
+.next-development/
+.local-backups/
 dist/
 .env
 .env.*

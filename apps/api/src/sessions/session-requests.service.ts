@@ -1,3 +1,4 @@
+import { creditTotals, creditUnits, eligibleUnits } from './credit-unit-projection.js';
 import { randomUUID } from 'node:crypto';
 import { ConflictException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { Prisma as TP, PrismaClient } from '../generated/tenant/client.js';
@@ -8,8 +9,9 @@ import { CommandReceiptFoundationService } from '../operations/receipt.service.j
 import { tenantAuditKey, OperationConflictError } from '../operations/primitives.js';
 import { TenantSchemaGateService, type TenantGateContext } from '../tenancy/tenant-schema-gate.service.js';
 import { reserveSessionCredit } from './credit-holds.js';
-import { derivePackCreditBalance, selectEligibleSessionPack } from './session-state.js';
 import { retrySessionTransaction } from './session-transactions.js';
+import { allowedStartMinutes, type AvailabilityRule } from './availability-policy.js';
+import { requestCanBeAccepted, requestExpiryInstant } from './session-state.js';
 import { sessionDecisionInputSchema, sessionDecisionResultSchema, sessionRequestInputSchema, sessionRequestOptionsSchema, sessionRequestResultSchema, trainerSessionRequestsSchema } from '@gymos/contracts';
 
 type Access = TenantGateContext & { identityId: string; identityVersion: number; accessVersion: number; role: string; slug: string;
@@ -109,21 +111,13 @@ export class SessionRequestsService {
         if (!config?.timezone || !config.currency || config.masterGymId !== access.gymId) throw new UnprocessableEntityException('Gym session policy is unavailable');
         const asOf = clockRows[0]!.now;
         const localToday = localDateAt(asOf, config.timezone);
-        const [membership, packs] = await Promise.all([
-          tenant.membershipTerm.findFirst({ where: { memberId: member.actorId, startDate: { lte: new Date(`${localToday}T00:00:00.000Z`) }, endDateExclusive: { gt: new Date(`${localToday}T00:00:00.000Z`) } }, select: { id: true } }),
-          tenant.sessionPack.findMany({ where: { memberId: member.actorId }, include: { creditMovements: { select: { availableDelta: true, heldDelta: true, consumedDelta: true, expiredDelta: true } } } }),
-        ]);
-        const balances = packs.map(pack => ({ pack, balance: derivePackCreditBalance(pack.issuedCredits, pack.creditMovements.map(row => ({
-          available: row.availableDelta, held: row.heldDelta, consumed: row.consumedDelta, expired: row.expiredDelta,
-        }))) }));
-        const currentlyEligible = balances.filter(({ pack }) => pack.startDate.toISOString().slice(0, 10) <= localToday && pack.endDateExclusive.toISOString().slice(0, 10) > localToday);
-        const expiredCredits = balances.reduce((total, { pack, balance }) => total + balance.expired +
-          (pack.endDateExclusive.toISOString().slice(0, 10) <= localToday ? balance.available : 0), 0);
+        const membership = await tenant.membershipTerm.findFirst({ where: { memberId: member.actorId, startDate: { lte: new Date(`${localToday}T00:00:00.000Z`) }, endDateExclusive: { gt: new Date(`${localToday}T00:00:00.000Z`) } }, select: { id: true } });
+        const totals = (await creditTotals(tenant, [member.actorId], localToday, true)).get(member.actorId);
         return sessionRequestOptionsSchema.parse({ trainerId, trainerName: trainer.fullName, level: trainer.level, specialisations: trainer.specialisations,
           shiftStart: trainer.shiftStart, shiftEnd: trainer.shiftEnd,
-          timeZone: config.timezone, minimumDurationMinutes: config.minimumSessionDurationMinutes, maximumDurationMinutes: 480,
-          currency: config.currency, availableCredits: currentlyEligible.reduce((total, row) => total + row.balance.available, 0),
-          heldCredits: balances.reduce((total, row) => total + row.balance.held, 0), expiredCredits,
+          timeZone: config.timezone, minimumDurationMinutes: 60, maximumDurationMinutes: 60,
+          currency: config.currency, availableCredits: totals?.available ?? 0,
+          heldCredits: totals?.held ?? 0, expiredCredits: totals?.expired ?? 0,
           activeMembershipToday: Boolean(membership), asOf: asOf.toISOString() });
       });
     });
@@ -139,11 +133,11 @@ export class SessionRequestsService {
         tenant.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`,
       ]);
       if (!trainer || trainer.identityId !== access.identityId || trainer.registrationState !== 'COMPLETE' || trainer.status !== 'ACTIVE') throw new ForbiddenException('Trainer access is inactive');
-      const rows = await tenant.pTSession.findMany({ where: { trainerId: access.actor!.id, state: 'PENDING_CONFIRMATION' },
+      const rows = await tenant.pTSession.findMany({ where: { trainerId: access.actor!.id, state: 'PENDING_CONFIRMATION', requestExpiresAt: { gt: clockRows[0]!.now } },
         orderBy: [{ scheduledStartAt: 'asc' }, { id: 'asc' }], take: 100, include: { member: { select: { fullName: true } } } });
       return trainerSessionRequestsSchema.parse({ items: rows.map(session => ({ id: session.id, memberId: session.memberId,
         memberName: session.member.fullName, state: session.state, type: session.type, scheduledStartAt: session.scheduledStartAt.toISOString(),
-        scheduledEndAt: session.scheduledEndAt.toISOString(), timeZone: session.gymTimezone,
+        scheduledEndAt: session.scheduledEndAt.toISOString(), timeZone: session.gymTimezone, requestExpiresAt: session.requestExpiresAt!.toISOString(),
         durationMinutes: Math.round((session.scheduledEndAt.getTime() - session.scheduledStartAt.getTime()) / 60_000), notes: session.notes, version: session.version })),
         asOf: clockRows[0]!.now.toISOString() });
     }));
@@ -176,28 +170,30 @@ export class SessionRequestsService {
             if (input.data.timeZone !== config.timezone) throw new UnprocessableEntityException('Use the configured gym time zone');
             const start = resolveLocal(input.data.localDate, input.data.localTime, config.timezone, input.data.offset);
             const end = new Date(start.getTime() + input.data.durationMinutes * 60_000); const now = clockRows[0]!.now;
-            const today = localDateAt(now, config.timezone);
-            if (input.data.durationMinutes < config.minimumSessionDurationMinutes || input.data.localDate < today) throw new UnprocessableEntityException('Choose an allowed future session time and duration');
-            const max = new Date(`${today}T00:00:00.000Z`); max.setUTCDate(max.getUTCDate() + 365);
-            if (input.data.localDate > max.toISOString().slice(0, 10) || start <= now) throw new UnprocessableEntityException('Choose a future date within the 365-day booking horizon');
+            if (input.data.type !== 'IN_PERSON' || input.data.durationMinutes !== 60) throw new UnprocessableEntityException('New PT requests must be in-person and 60 minutes');
+            const earliest = new Date(now.getTime() + 2 * 60 * 60_000);
+            const latest = new Date(now.getTime() + 14 * 24 * 60 * 60_000);
+            if (start < earliest || start > latest) throw new UnprocessableEntityException('Choose a start at least 2 hours from now and within the next 14 days');
+            const availability = await tx.pTAvailabilityRule.findMany({ where: { OR: [{ trainerId: trainer.actorId }, { kind: 'GYM_CLOSURE', localDate: new Date(`${input.data.localDate}T00:00:00.000Z`) }] } });
+            const weekday = new Date(`${input.data.localDate}T00:00:00.000Z`).getUTCDay();
+            const localMinute = Number(input.data.localTime.slice(0, 2)) * 60 + Number(input.data.localTime.slice(3));
+            if (!allowedStartMinutes(input.data.localDate, availability as AvailabilityRule[], weekday).includes(localMinute)) throw new ConflictException('This time is outside the trainer’s published availability or is no longer available');
+            const livePendingCount = await tx.pTSession.count({ where: { memberId: member.actorId, state: 'PENDING_CONFIRMATION', requestExpiresAt: { gt: now } } });
+            if (livePendingCount >= 2) throw new ConflictException('You already have two pending PT requests in this gym. Withdraw one or wait for a decision before requesting another.');
             const day = new Date(`${input.data.localDate}T00:00:00.000Z`);
             const term = await tx.membershipTerm.findFirst({ where: { memberId: member.actorId, startDate: { lte: day }, endDateExclusive: { gt: day } }, select: { id: true } });
             if (!term) throw new UnprocessableEntityException('Member has no active membership for the session date');
-            const packs = await tx.sessionPack.findMany({ where: { memberId: member.actorId, startDate: { lte: day }, endDateExclusive: { gt: day } },
-              orderBy: [{ endDateExclusive: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }], select: { id: true, startDate: true, endDateExclusive: true, createdAt: true, issuedCredits: true } });
-            const eligibles = [];
-            for (const pack of packs) {
-              const movements = await tx.packCreditMovement.findMany({ where: { packId: pack.id }, select: { availableDelta: true, heldDelta: true, consumedDelta: true, expiredDelta: true } });
-              const balance = derivePackCreditBalance(pack.issuedCredits, movements.map(m => ({ available: m.availableDelta, held: m.heldDelta, consumed: m.consumedDelta, expired: m.expiredDelta })));
-              eligibles.push({ id: pack.id, startDate: pack.startDate.toISOString().slice(0, 10), endDateExclusive: pack.endDateExclusive.toISOString().slice(0, 10), createdAt: pack.createdAt, availableCredits: balance.available });
-            }
-            if (!selectEligibleSessionPack(eligibles, input.data.localDate)) throw new UnprocessableEntityException('No available unexpired session credit');
-            const overlap = await tx.pTSession.findFirst({ where: { state: { in: ['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE'] }, OR: [{ memberId: member.actorId }, { trainerId: trainer.actorId }], scheduledStartAt: { lt: end }, scheduledEndAt: { gt: start } }, select: { id: true } });
+            if (!eligibleUnits(await creditUnits(tx, member.actorId), input.data.localDate).length) throw new UnprocessableEntityException('No available unexpired session credit');
+            const overlap = await tx.pTSession.findFirst({ where: { state: { in: ['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE'] },
+              AND: [{ OR: [{ state: { not: 'PENDING_CONFIRMATION' } }, { requestExpiresAt: { gt: now } }] }],
+              OR: [{ memberId: member.actorId }, { trainerId: trainer.actorId }], scheduledStartAt: { lt: end }, scheduledEndAt: { gt: start } }, select: { id: true } });
             if (overlap) throw new ConflictException('Member or trainer already has a request or session in that time range');
             const id = randomUUID();
+            const requestExpiresAt = requestExpiryInstant(now, start);
             await tx.pTSession.create({ data: { id, memberId: member.actorId, trainerId: trainer.actorId, state: 'PENDING_CONFIRMATION',
               type: input.data.type, scheduledStartAt: start, scheduledEndAt: end, gymTimezone: config.timezone,
-              fee: (input.data.type === 'INTRODUCTORY' ? config.introSessionFee ?? config.defaultSessionFee : trainerRow.level === 'LEVEL_2' ? config.level2SessionFee ?? config.defaultSessionFee : config.defaultSessionFee).toString(),
+              createdAt: now, requestExpiresAt, availabilityVersion: trainerRow.version,
+              fee: (trainerRow.level === 'LEVEL_2' ? config.level2SessionFee ?? config.defaultSessionFee : config.defaultSessionFee).toString(),
               currency: config.currency, confirmationShiftStart: trainerRow.shiftStart, confirmationShiftEnd: trainerRow.shiftEnd,
               configurationVersion: config.version, notes: (input.data.notes ?? '').replace(/\r\n?/g, '\n') || null, createdByIdentityId: member.identityId } });
             const eventKey = tenantAuditKey({ masterGymId: access.gymId, receiptId: receipt.id, eventCode: 'PT_SESSION_REQUESTED', resourceType: 'PT_SESSION', resourceId: id, eventOrdinal: 0 });
@@ -213,7 +209,7 @@ export class SessionRequestsService {
           if (!session) throw new ConflictException('Request receipt references a missing session');
           return sessionRequestResultSchema.parse({ receiptId: command.receiptId, replayed: command.replayed, session: { id: session.id, memberId: session.memberId,
             trainerId: session.trainerId, state: session.state, type: session.type, scheduledStartAt: session.scheduledStartAt.toISOString(),
-            scheduledEndAt: session.scheduledEndAt.toISOString(), timeZone: session.gymTimezone,
+            scheduledEndAt: session.scheduledEndAt.toISOString(), timeZone: session.gymTimezone, requestExpiresAt: session.requestExpiresAt?.toISOString() ?? null,
             durationMinutes: Math.round((session.scheduledEndAt.getTime() - session.scheduledStartAt.getTime()) / 60_000), notes: session.notes, version: session.version },
             notificationOutcome: { eventId, recipient: { role: 'TRAINER', actorId: trainer.actorId }, gymSlug: access.slug,
               state: command.result.notificationState ?? 'AVAILABLE', retryable: command.result.retryable ?? false } });
@@ -246,25 +242,34 @@ export class SessionRequestsService {
             if (!session || session.trainerId !== access.actor!.id || session.trainer.identityId !== access.identityId || session.member.identityId !== member.userId) throw new NotFoundException('Session request not found');
             if (session.version !== input.data.expectedVersion) throw new ConflictException('Session request changed; reload before deciding');
             if (session.state !== 'PENDING_CONFIRMATION') throw new ConflictException('Only a pending session request can be decided');
-            const eventCode = input.data.action === 'ACCEPT' ? 'PT_SESSION_ACCEPTED' : 'PT_SESSION_DECLINED';
+            let eventCode: string = input.data.action === 'ACCEPT' ? 'PT_SESSION_ACCEPTED' : 'PT_SESSION_DECLINED';
             let updated: TP.PTSessionGetPayload<object>;
+            const [requestClock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
+            if (!session.requestExpiresAt || !requestCanBeAccepted(requestClock!.now, session.requestExpiresAt)) {
+              eventCode = 'PT_SESSION_EXPIRED';
+              updated = await tx.pTSession.update({ where: { id: session.id, version: input.data.expectedVersion, state: 'PENDING_CONFIRMATION' }, data: { state: 'EXPIRED', version: { increment: 1 } } });
+              const eventKey = tenantAuditKey({ masterGymId: access.gymId, receiptId: receipt.id, eventCode, resourceType: 'PT_SESSION', resourceId: session.id, eventOrdinal: updated.version });
+              await tx.sessionStateEvent.create({ data: { sessionId: session.id, fromState: session.state, toState: updated.state, committedVersion: updated.version, actorIdentityId: access.identityId, receiptId: receipt.id, eventKey } });
+              const memberNotice = await appendTenantNotification(tx, { masterGymId: access.gymId, receiptId: receipt.id, eventCode: 'SESSION_EXPIRED', resourceId: session.id, recipientIdentityId: member.userId });
+              const trainerNotice = await appendTenantNotification(tx, { masterGymId: access.gymId, receiptId: receipt.id, eventCode: 'SESSION_EXPIRED', resourceId: session.id, recipientIdentityId: access.identityId, linkKind: 'TRAINER_REQUESTS' });
+              return { result: { resourceIds: [session.id, memberNotice.id, trainerNotice.id], requestOutcome: 'EXPIRED' }, resourceType: 'PT_SESSION', resourceId: session.id,
+                audits: [{ actorIdentityId: access.identityId, eventCode, resourceType: 'PT_SESSION', resourceId: session.id, transition: { from: session.state, to: updated.state, version: updated.version } }] };
+            }
             if (input.data.action === 'ACCEPT') {
-              const [config, clockRows] = await Promise.all([tx.gymConfiguration.findUnique({ where: { id: 'current' } }), tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`]);
+              const config = await tx.gymConfiguration.findUnique({ where: { id: 'current' } });
               if (!config?.timezone || !config.currency || config.masterGymId !== access.gymId || session.member.status !== 'ACTIVE' || session.trainer.status !== 'ACTIVE') throw new UnprocessableEntityException('Session eligibility changed; the request cannot be accepted');
               const local = localDateAt(session.scheduledStartAt, config.timezone); const day = new Date(`${local}T00:00:00.000Z`);
-              if (session.scheduledStartAt <= clockRows[0]!.now) throw new ConflictException('This request time has passed and cannot be accepted');
+              if (session.scheduledStartAt <= requestClock!.now) throw new ConflictException('This request time has passed and cannot be accepted');
               const durationMinutes = Math.round((session.scheduledEndAt.getTime() - session.scheduledStartAt.getTime()) / 60_000);
-              if (durationMinutes < config.minimumSessionDurationMinutes) throw new UnprocessableEntityException('Current gym policy requires a longer session duration');
-              const today = localDateAt(clockRows[0]!.now, config.timezone); const horizon = new Date(`${today}T00:00:00.000Z`); horizon.setUTCDate(horizon.getUTCDate() + 365);
-              if (local > horizon.toISOString().slice(0, 10)) throw new UnprocessableEntityException('This request is outside the current booking horizon');
+              if (session.type !== 'IN_PERSON' || durationMinutes !== 60) throw new UnprocessableEntityException('This legacy request cannot be accepted under current PT policy');
               const term = await tx.membershipTerm.findFirst({ where: { memberId: session.memberId, startDate: { lte: day }, endDateExclusive: { gt: day } }, select: { id: true } });
               if (!term) throw new UnprocessableEntityException('Member has no active membership for the session date');
-              const fee = session.type === 'INTRODUCTORY' ? config.introSessionFee ?? config.defaultSessionFee : session.trainer.level === 'LEVEL_2' ? config.level2SessionFee ?? config.defaultSessionFee : config.defaultSessionFee;
+              const fee = session.trainer.level === 'LEVEL_2' ? config.level2SessionFee ?? config.defaultSessionFee : config.defaultSessionFee;
               const rate = session.trainer.level === 'LEVEL_2' ? config.level2BaseRate : config.level1BaseRate;
               const coveredByShift = shiftCovered(session.scheduledStartAt, session.scheduledEndAt, config.timezone, session.trainer.shiftStart, session.trainer.shiftEnd);
               const confirmationRate = coveredByShift ? rate.toString() : addDecimal(rate.toString(), config.offShiftPremium.toString());
               updated = await tx.pTSession.update({ where: { id: session.id, version: input.data.expectedVersion, state: 'PENDING_CONFIRMATION' }, data: {
-                state: 'SCHEDULED', version: { increment: 1 }, confirmedAt: clockRows[0]!.now, gymTimezone: config.timezone,
+                state: 'SCHEDULED', version: { increment: 1 }, confirmedAt: requestClock!.now, gymTimezone: config.timezone,
                 fee: fee.toString(), currency: config.currency, confirmationLevel: session.trainer.level!, confirmationRate,
                 confirmationShiftStart: session.trainer.shiftStart, confirmationShiftEnd: session.trainer.shiftEnd, configurationVersion: config.version,
               } });
@@ -281,6 +286,7 @@ export class SessionRequestsService {
               resourceType: 'PT_SESSION', resourceId: session.id,
               audits: [{ actorIdentityId: access.identityId, eventCode, resourceType: 'PT_SESSION', resourceId: session.id, transition: { from: session.state, to: updated.state, version: updated.version } }] };
           });
+          if (command.result.requestOutcome === 'EXPIRED') throw new ConflictException('This request expired before it could be accepted; no credit was reserved.');
           const id = command.result.resourceIds?.[0];
           const eventId = command.result.resourceIds?.[1];
           if (!id || !eventId) throw new ConflictException('Decision receipt has no session or notification resource');
@@ -292,7 +298,7 @@ export class SessionRequestsService {
             allocationPolicyVersion: hold.pack.creditAllocationPolicyVersion } : null;
           return sessionDecisionResultSchema.parse({ receiptId: command.receiptId, replayed: command.replayed, decision: input.data.action,
             session: { id: session.id, memberId: session.memberId, trainerId: session.trainerId, state: session.state, type: session.type,
-              scheduledStartAt: session.scheduledStartAt.toISOString(), scheduledEndAt: session.scheduledEndAt.toISOString(), timeZone: session.gymTimezone,
+              scheduledStartAt: session.scheduledStartAt.toISOString(), scheduledEndAt: session.scheduledEndAt.toISOString(), timeZone: session.gymTimezone, requestExpiresAt: session.requestExpiresAt?.toISOString() ?? null,
               durationMinutes: Math.round((session.scheduledEndAt.getTime() - session.scheduledStartAt.getTime()) / 60_000), notes: session.notes, version: session.version }, creditReservation,
             notificationOutcome: { eventId, recipient: { role: 'MEMBER', actorId: member.tenantActorId! }, gymSlug: access.slug,
               state: command.result.notificationState ?? 'AVAILABLE', retryable: command.result.retryable ?? false } });

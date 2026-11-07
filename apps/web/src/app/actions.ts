@@ -3,16 +3,27 @@
 import { platformOperationSchema, provisioningInputSchema, idempotencyKeySchema } from '@gymos/contracts/platform';
 import { existingEndpointContracts, logoutResultSchema } from '@gymos/contracts/legacy';
 import { changePasswordInputSchema, changePasswordResultSchema } from '@gymos/contracts/credentials';
+import { recoveryCompleteInputSchema, recoveryCompleteResultSchema, recoveryIssueInputSchema, recoveryIssueResultSchema,
+  operatorRecoveryIssueInputSchema } from '@gymos/contracts/credentials';
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { sessionCookieOptions } from '@/lib/session-transport';
-import { apiUrl, gymRoleLandingPath, SESSION_COOKIE } from '@/lib/gymos';
-import { SUPPORT_COOKIE } from '@/lib/support-context';
+import { refreshCookieOptions, sessionCookieOptions } from '@/lib/session-transport';
+import { apiUrl, gymRoleLandingPath, SESSION_COOKIE, SESSION_REFRESH_COOKIE } from '@/lib/gymos';
+import { currentSupportCookie, SUPPORT_COOKIE } from '@/lib/support-context';
 
 function field(formData: FormData, key: string): string {
   const value = formData.get(key);
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function safeReturnTo(value: string) {
+  if (!value.startsWith('/') || value.startsWith('//') || value.includes('\\') || /[\u0000-\u001f\u007f]/.test(value)) return null;
+  try {
+    const parsed = new URL(value, 'https://gymos.invalid');
+    if (parsed.origin !== 'https://gymos.invalid' || !(/^\/gyms\//.test(parsed.pathname) || ['/applications', '/security', '/admin', '/gyms/select'].includes(parsed.pathname))) return null;
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch { return null; }
 }
 
 async function sessionToken(): Promise<string | undefined> {
@@ -31,7 +42,7 @@ export async function login(formData: FormData) {
     response = await fetch(apiUrl('/auth/login'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, deviceClass: formData.get('deviceClass') === 'PERSONAL' ? 'PERSONAL' : 'SHARED' }),
       cache: 'no-store',
     });
   } catch {
@@ -54,23 +65,29 @@ export async function login(formData: FormData) {
   const options = sessionCookieOptions(result.accessToken, result.expiresIn);
   if (options.expires.getTime() <= Date.now()) redirect('/login?error=expired');
   (await cookies()).set(SESSION_COOKIE, result.accessToken, options);
+  (await cookies()).set(SESSION_REFRESH_COOKIE, result.refreshToken, refreshCookieOptions(result.refreshExpiresAt));
   (await cookies()).delete(SUPPORT_COOKIE);
   revalidatePath('/', 'layout');
   if (result.mustChangePassword) redirect('/change-password');
+  const returnTo = safeReturnTo(field(formData, 'returnTo'));
+  if (returnTo) redirect(returnTo);
+  const applyGym = field(formData, 'applyGym');
+  if (/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(applyGym)) redirect(`/gyms/${encodeURIComponent(applyGym)}/apply`);
 
   const firstGym = result.gyms[0];
-  redirect(result.globalRole === 'SUPER_ADMIN' ? '/admin' : firstGym === undefined ? '/no-access'
-    : result.gyms.length === 1 ? `/gyms/${encodeURIComponent(firstGym.slug)}/${gymRoleLandingPath(firstGym.role)}` : '/gyms/select');
+  redirect(result.globalRole === 'SUPER_ADMIN' ? '/admin' : result.gyms.length !== 1 || firstGym === undefined ? '/no-access'
+    : `/gyms/${encodeURIComponent(firstGym.slug)}/${gymRoleLandingPath(firstGym.role)}`);
 }
 
-export async function signOut() {
+async function endSession(scope: 'CURRENT' | 'ALL') {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   let uncertain = false;
   try {
     if (token) {
       const response = await fetch(apiUrl('/auth/logout'), {
-        method: 'POST', headers: { authorization: `Bearer ${token}` },
+        method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ scope }),
         cache: 'no-store', signal: AbortSignal.timeout(5000),
       });
       // Even a 401 cannot confirm identity-wide revocation of other sessions.
@@ -79,11 +96,15 @@ export async function signOut() {
   } catch { uncertain = true; }
   finally {
     jar.delete(SESSION_COOKIE);
+    jar.delete(SESSION_REFRESH_COOKIE);
     jar.delete(SUPPORT_COOKIE);
     revalidatePath('/', 'layout');
   }
-  redirect(uncertain ? '/login?error=logout-uncertain' : '/login');
+  redirect(uncertain ? `/login?error=logout-uncertain&scope=${scope.toLowerCase()}` : '/login');
 }
+
+export async function signOut() { return endSession('CURRENT'); }
+export async function signOutAll() { return endSession('ALL'); }
 
 export async function changePasswordAction(formData: FormData) {
   const token = await sessionToken();
@@ -121,9 +142,86 @@ export async function changePasswordAction(formData: FormData) {
 
 export async function finishPasswordChangeAction() {
   (await cookies()).delete(SESSION_COOKIE);
+  (await cookies()).delete(SESSION_REFRESH_COOKIE);
   (await cookies()).delete(SUPPORT_COOKIE);
   revalidatePath('/', 'layout');
   redirect('/login');
+}
+
+export async function issueRecoveryAction(slug: string, identityId: string, _previous: unknown, formData: FormData) {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || !/^[A-Za-z0-9_:-]{1,128}$/.test(identityId)) return { error: 'Recovery could not be confirmed.' };
+  if (await currentSupportCookie()) return { error: 'Exit read-only support before issuing recovery.' };
+  const token = await sessionToken();
+  if (!token) redirect('/login');
+  const parsed = recoveryIssueInputSchema.safeParse({ verificationMethod: formData.get('verificationMethod'), reason: formData.get('reason') });
+  if (!parsed.success) return { error: 'Choose how identity was checked and enter a brief attestation.' };
+  let response: Response;
+  try {
+    response = await fetch(apiUrl(`/gyms/${encodeURIComponent(slug)}/owner/account-recovery/${encodeURIComponent(identityId)}`), {
+      method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify(parsed.data), cache: 'no-store', signal: AbortSignal.timeout(8000),
+    });
+  } catch { return { error: 'GymOS is temporarily unavailable. No recovery result could be confirmed.' }; }
+  if (response.status === 401) redirect('/login?error=expired');
+  if (!response.ok) return { error: response.status === 403 ? 'This account requires an independent operator recovery process. No credential was issued.' : 'Recovery could not be confirmed. Check the eligible list and try again.' };
+  const result = recoveryIssueResultSchema.safeParse(await response.json().catch(() => null));
+  if (!result.success) return { error: 'Recovery was issued but its one-time handoff could not be confirmed. Reissue a credential before handoff.' };
+  return { recovery: result.data };
+}
+
+export async function completeRecoveryAction(formData: FormData) {
+  const parsed = recoveryCompleteInputSchema.safeParse({ credentialId: formData.get('credentialId'), secret: formData.get('secret'),
+    newPassword: formData.get('newPassword'), confirmPassword: formData.get('confirmPassword') });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Check the recovery details and password requirements.' };
+  try {
+    const response = await fetch(apiUrl('/auth/recovery/complete'), { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(parsed.data), cache: 'no-store', signal: AbortSignal.timeout(10000) });
+    if (!response.ok) return { error: response.status === 429 ? 'Too many attempts. Wait a minute and try again.' : 'This recovery credential is invalid, expired, used, or locked. Ask the gym to issue a new one.' };
+    const result = recoveryCompleteResultSchema.safeParse(await response.json().catch(() => null));
+    return result.success ? { success: true as const } : { error: 'The password update could not be confirmed. Try signing in with the new password.' };
+  } catch { return { error: 'GymOS is temporarily unavailable. The recovery result could not be confirmed.' }; }
+}
+
+export async function issueOperatorRecoveryAction(_previous: unknown, formData: FormData) {
+  if (await currentSupportCookie()) return { error: 'Exit read-only support before issuing recovery.' };
+  const token = await sessionToken();
+  if (!token) redirect('/login');
+  const parsed = operatorRecoveryIssueInputSchema.safeParse({ email: field(formData, 'email').toLowerCase(),
+    ...(field(formData, 'gymSlug') ? { gymSlug: field(formData, 'gymSlug') } : {}),
+    verificationMethod: formData.get('verificationMethod'), reason: formData.get('reason'), currentPassword: formData.get('currentPassword') });
+  if (!parsed.success) return { error: 'Enter the identity, verification method, attestation, and current password.' };
+  let response: Response;
+  try {
+    response = await fetch(apiUrl('/admin/account-recovery'), { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify(parsed.data), cache: 'no-store', signal: AbortSignal.timeout(10000) });
+  } catch { return { error: 'GymOS is temporarily unavailable. No recovery result could be confirmed.' }; }
+  if (response.status === 401) redirect('/login?error=expired');
+  if (!response.ok) return { error: response.status === 403 ? 'Operator authorization or current-password verification failed. No recovery was issued.' : 'No recovery could be issued for that identity.' };
+  const result = recoveryIssueResultSchema.safeParse(await response.json().catch(() => null));
+  return result.success ? { recovery: result.data } : { error: 'The one-time handoff could not be confirmed. Reissue before handoff.' };
+}
+
+export async function revokeIdentitySession(sessionId: string) {
+  if (!/^[A-Za-z0-9_:-]{1,128}$/.test(sessionId)) redirect('/security?error=invalid');
+  const jar = await cookies();
+  const token = jar.get(SESSION_COOKIE)?.value;
+  if (!token) redirect('/login');
+  let response: Response;
+  try {
+    response = await fetch(apiUrl(`/auth/sessions/${encodeURIComponent(sessionId)}/revoke`), {
+      method: 'POST', headers: { authorization: `Bearer ${token}` }, cache: 'no-store', signal: AbortSignal.timeout(8000),
+    });
+  } catch { redirect('/security?error=unavailable'); }
+  if (response.status === 401) redirect('/login?error=expired');
+  if (!response.ok) redirect('/security?error=unavailable');
+  const result = await response.json().catch(() => null) as { sessionId?: unknown; revoked?: unknown } | null;
+  if (!result || result.sessionId !== sessionId || result.revoked !== true) redirect('/security?error=unavailable');
+  const claims = JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString()) as { sid?: string };
+  if (claims.sid === sessionId) {
+    jar.delete(SESSION_COOKIE); jar.delete(SESSION_REFRESH_COOKIE); jar.delete(SUPPORT_COOKIE); revalidatePath('/', 'layout'); redirect('/login');
+  }
+  revalidatePath('/security');
+  redirect('/security?revoked=1');
 }
 
 export async function createMember(slug: string, formData: FormData) {

@@ -53,28 +53,48 @@ export class GymAccessGuard implements CanActivate {
     try {
       user = await this.database.master.user.findUnique({
         where: { id: identity.userId },
-        select: { authVersion: true, mustChangePassword: true, credentialExpiresAt: true },
+        select: { authVersion: true, globalRole: true, mustChangePassword: true, credentialExpiresAt: true },
       });
       const [clock] = await this.database.master.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS "now"`;
       masterNow = clock.now;
     } catch {
       throw new ServiceUnavailableException('Gym access is temporarily unavailable');
     }
-    if (!user || user.authVersion !== identity.authVersion) {
+    if (!user || (!identity.gymAccountId && user.authVersion !== identity.authVersion)) {
       throw new UnauthorizedException('Invalid or revoked token');
     }
-    if (user.credentialExpiresAt && user.credentialExpiresAt <= masterNow) {
-      throw new UnauthorizedException('Credential expired');
+    if (user.globalRole === 'SUPER_ADMIN') {
+      throw new ForbiddenException('Platform accounts cannot enter gym workspaces');
     }
-    if (user.mustChangePassword) {
-      throw new ForbiddenException('Password change required');
+    if (!identity.sessionId || !identity.gymAccountId) {
+      throw new ForbiddenException('A gym-specific sign-in is required');
     }
+    let scopedSession;
+    let scopedAccount;
+    try {
+      [scopedSession, scopedAccount] = await Promise.all([
+        this.database.master.identitySession.findUnique({ where: { id: identity.sessionId },
+          select: { identityId: true, gymAccountId: true, authVersion: true, revokedAt: true } }),
+        this.database.master.gymAccount.findUnique({ where: { id: identity.gymAccountId },
+          select: { userId: true, gymId: true, status: true, authVersion: true, mustChangePassword: true, credentialExpiresAt: true } }),
+      ]);
+    } catch {
+      throw new ServiceUnavailableException('Gym account access is temporarily unavailable');
+    }
+    if (!scopedSession || scopedSession.identityId !== identity.userId || scopedSession.gymAccountId !== identity.gymAccountId
+      || scopedSession.authVersion !== identity.authVersion || scopedSession.revokedAt
+      || !scopedAccount || scopedAccount.userId !== identity.userId || scopedAccount.authVersion !== identity.authVersion || scopedAccount.status !== 'ACTIVE'
+      || (scopedAccount.credentialExpiresAt && scopedAccount.credentialExpiresAt <= masterNow)) {
+      throw new ForbiddenException('Gym account access denied');
+    }
+    if (scopedAccount.mustChangePassword) throw new ForbiddenException('Password change required');
 
     let access;
     try {
       access = await this.database.master.gymAccess.findFirst({
         where: {
           userId: identity.userId,
+          gymId: scopedAccount.gymId,
           linkStatus: 'ACTIVE',
           gym: { is: { slug, status: 'ACTIVE' } },
         },

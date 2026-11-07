@@ -35,10 +35,13 @@ export class DashboardService {
         const date = localDate(asOf, zone);
         const start = boundary(date, zone);
         const end = boundary(new Date(Date.parse(`${date}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10), zone);
-        const [activeToday, allActive, scheduledToday, earningRows, pending, sessions, trainers] = await Promise.all([
+        const today = { scheduledStartAt: { gte: start, lt: end } };
+        const todaySessionStates = ['SCHEDULED', 'ACTIVE', 'COMPLETED', 'MISSED'] as const;
+        const [activeToday, activeSessions, scheduledToday, earningRows, pending, sessions, trainers] = await Promise.all([
           tx.pTSession.count({ where: { state: 'ACTIVE', scheduledStartAt: { gte: start, lt: end } } }),
-          tx.pTSession.count({ where: { state: 'ACTIVE' } }),
-          tx.pTSession.count({ where: { scheduledStartAt: { gte: start, lt: end } } }),
+          tx.pTSession.findMany({ where: { state: 'ACTIVE' }, orderBy: [{ startedAt: 'asc' }, { id: 'asc' }],
+            include: { member: { select: { fullName: true } }, trainer: { select: { fullName: true } } } }),
+          tx.pTSession.count({ where: { ...today, state: { in: [...todaySessionStates] } } }),
           tx.$queryRaw<{ hour: number; amount: string; sourceCount: bigint }[]>`
             SELECT EXTRACT(HOUR FROM (s."scheduledStartAt" AT TIME ZONE ${zone}))::int AS hour,
               COALESCE(SUM(r."amount"),0)::text AS amount, COUNT(*)::bigint AS "sourceCount"
@@ -46,13 +49,14 @@ export class DashboardService {
             WHERE s."scheduledStartAt" >= ${start} AND s."scheduledStartAt" < ${end}
               AND r."currency" = ${currency} AND r."category" <> 'EXPIRED_UNUSED'
             GROUP BY 1 ORDER BY 1`,
-          tx.pTSession.count({ where: { state: 'PENDING_CONFIRMATION' } }),
-          tx.pTSession.findMany({ where: { scheduledStartAt: { gte: start, lt: end } }, orderBy: [{ scheduledStartAt: 'asc' }, { id: 'asc' }], take: 10,
+          tx.pTSession.count({ where: { state: 'PENDING_CONFIRMATION', requestExpiresAt: { gt: asOf } } }),
+          tx.pTSession.findMany({ where: { ...today, state: { in: [...todaySessionStates] } }, orderBy: [{ scheduledStartAt: 'asc' }, { id: 'asc' }], take: 10,
             include: { member: { select: { fullName: true } }, trainer: { select: { fullName: true } } } }),
-          tx.pTSession.groupBy({ by: ['trainerId'], where: { scheduledStartAt: { gte: start, lt: end } }, _count: { _all: true } }),
+          tx.pTSession.groupBy({ by: ['trainerId'], where: { ...today, state: { in: [...todaySessionStates] } }, _count: { _all: true } }),
         ]);
-        const floorTrainers = trainers.length ? await tx.trainer.findMany({ where: { id: { in: trainers.map(row => row.trainerId) } }, select: { id: true, fullName: true } }) : [];
-        const activeTrainerIds = new Set((await tx.pTSession.findMany({ where: { state: 'ACTIVE', scheduledStartAt: { gte: start, lt: end } }, select: { trainerId: true }, distinct: ['trainerId'] })).map(row => row.trainerId));
+        const trainerIds = new Set([...trainers.map(row => row.trainerId), ...activeSessions.map(row => row.trainerId)]);
+        const floorTrainers = trainerIds.size ? await tx.trainer.findMany({ where: { id: { in: [...trainerIds] } }, select: { id: true, fullName: true } }) : [];
+        const activeTrainerIds = new Set(activeSessions.map(row => row.trainerId));
         const buckets = Array.from({ length: 8 }, (_, i) => ({ startHour: 6 + 2 * i, endHour: 8 + 2 * i, amount: 0n, sourceCount: 0 }));
         let earning = 0n;
         let revenueSourceCount = 0;
@@ -68,15 +72,16 @@ export class DashboardService {
         const metric = (value: number, definition: string, sourceCount: number) => ({ value, definition, numerator: value, denominator: null as null, sourceCount });
         const payload = { gymSlug: access.slug, date, timeZone: zone, rangeStart: start.toISOString(), rangeEndExclusive: end.toISOString(), asOf: asOf.toISOString(), currency: config.currency,
           metrics: {
-            membersInGym: metric(activeToday, 'Count of PT session records in ACTIVE state scheduled during this gym-local day; this is not a people count or physical attendance.', activeToday),
-            activeSessions: metric(allActive, 'Count of PT session records currently in ACTIVE state, across all scheduled dates.', allActive),
-            trainersOnFloor: metric(floorTrainers.length, 'Distinct trainers with at least one PT session scheduled during this gym-local day; this does not prove physical presence.', scheduledToday),
+            activeSessionsToday: metric(activeToday, 'Count of PT session records currently in ACTIVE state whose scheduled start falls during this gym-local day.', activeToday),
+            activeSessions: metric(activeSessions.length, 'Count of PT session records currently in ACTIVE state, across all scheduled dates.', activeSessions.length),
+            trainersWithSessionsToday: metric(trainers.length, 'Distinct trainers with a scheduled, active, completed, or missed PT session during this gym-local day; this does not prove physical presence.', scheduledToday),
             todayOperationalEarning: { value: money(earning), definition: 'RevenueRecord operational earnings recognized during this gym-local day; excludes expired unused value and does not represent cash received.', numerator: money(earning), denominator: null, sourceCount: revenueSourceCount, currency },
             pendingRequests: metric(pending, 'Count of all PT session records currently awaiting confirmation.', pending),
           },
           earningChart: buckets.map(bucket => ({ startHour: bucket.startHour, endHour: bucket.endHour, amount: money(bucket.amount), sourceCount: bucket.sourceCount })),
           sessions: sessions.map(row => ({ id: row.id, state: row.state, type: row.type, scheduledStartAt: row.scheduledStartAt.toISOString(), scheduledEndAt: row.scheduledEndAt.toISOString(), memberName: row.member.fullName, trainerName: row.trainer.fullName, currency: row.currency, fee: row.fee.toString() })),
-          trainerCards: floorTrainers.map(trainer => ({ id: trainer.id, name: trainer.fullName, scheduledToday: trainers.find(row => row.trainerId === trainer.id)?._count._all ?? 0, activeToday: activeTrainerIds.has(trainer.id) ? 1 : 0 })),
+          activeSessionItems: activeSessions.map(row => ({ id: row.id, startedAt: row.startedAt!.toISOString(), scheduledStartAt: row.scheduledStartAt.toISOString(), memberName: row.member.fullName, trainerName: row.trainer.fullName })),
+          trainerCards: floorTrainers.map(trainer => ({ id: trainer.id, name: trainer.fullName, scheduledToday: trainers.find(row => row.trainerId === trainer.id)?._count._all ?? 0, activeNow: activeTrainerIds.has(trainer.id) ? 1 : 0 })),
         };
         return ownerDashboardSchema.parse(payload);
       }, { isolationLevel: 'RepeatableRead', timeout: 10_000 });

@@ -1,0 +1,1 @@
+ALTER TYPE "NotificationLinkKind" ADD VALUE 'MEMBER_PROFILE';

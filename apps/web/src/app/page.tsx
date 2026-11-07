@@ -24,7 +24,7 @@ async function HomeContent() {
   if (session.gyms.length === 0) redirect('/no-access');
   const firstGym = session.gyms[0];
   if (session.gyms.length === 1 && firstGym) redirect(`/gyms/${encodeURIComponent(firstGym.slug)}/${gymRoleLandingPath(firstGym.role)}`);
-  redirect('/gyms/select');
+  redirect('/no-access');
 }
 
 export default function Home() {

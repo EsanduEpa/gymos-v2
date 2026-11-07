@@ -1,9 +1,10 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { ConflictException, type ExecutionContext } from '@nestjs/common';
+import type { Request } from 'express';
 import { PrismaPg } from '@prisma/adapter-pg';
 import argon2 from 'argon2';
 import { SignJWT } from 'jose';
@@ -16,7 +17,10 @@ import { isOperationalActor } from '../../src/identity/publication-policy.js';
 import { GymAccessGuard, type GymRequest } from '../../src/gym-access.guard.js';
 import type { TenantSchemaGateService } from '../../src/tenancy/tenant-schema-gate.service.js';
 import { AuthController } from '../../src/auth.controller.js';
-import { SuperAdminGuard } from '../../src/super-admin.guard.js';
+import { AuthSessionService } from '../../src/identity/auth-session.service.js';
+import { AuthSessionGuard } from '../../src/identity/auth-session.guard.js';
+import { SuperAdminGuard, type PlatformRequest } from '../../src/super-admin.guard.js';
+import { EmailCorrectionController, AdminEmailCorrectionController } from '../../src/email-correction.controller.js';
 import type { DatabaseService } from '../../src/database.service.js';
 import { assertOwnedTarget, createDisposablePostgresRun } from '../support/disposable-postgres.js';
 
@@ -229,16 +233,15 @@ it('retains login response compatibility and safe owner access while pending/unv
   await master.gymAccess.create({ data: { userId: user.id, gymId: gym.id, role: 'OWNER', linkStatus: 'ACTIVE' } });
   const database = { master } as DatabaseService;
   const result = await new AuthController(database).login({ email: ' LOGIN@Example.TEST ', password });
-  expect(Object.keys(result).sort()).toEqual(['accessToken', 'tokenType', 'expiresIn', 'globalRole', 'mustChangePassword', 'gyms'].sort());
+  expect(Object.keys(result).sort()).toEqual(['accessToken', 'tokenType', 'expiresIn', 'sessionId', 'refreshToken', 'refreshExpiresAt',
+    'absoluteExpiresAt', 'deviceClass', 'deviceLabel', 'globalRole', 'mustChangePassword', 'gyms'].sort());
   expect(result.expiresIn).toBe(900);
   expect(result.mustChangePassword).toBe(false);
   expect(result.gyms).toHaveLength(1);
   expect(JSON.stringify(result)).not.toContain(passwordHash);
   await expect(new AuthController(database).login({ email: 'login@example.test', password: 'wrong' })).rejects.toThrow('Invalid email or password');
   const guard = new GymAccessGuard(database, {} as TenantSchemaGateService);
-  const requestFor = async (identityId: string, slug: string, authVersion = 0) => {
-    const token = await new SignJWT({ authVersion }).setProtectedHeader({ alg: 'HS256' }).setSubject(identityId)
-      .setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('15m').sign(new TextEncoder().encode(tokenSecret));
+  const requestFor = async (_identityId: string, slug: string, token = result.accessToken) => {
     const request = { headers: { authorization: `Bearer ${token}` }, params: { slug } } as unknown as GymRequest;
     const context = { switchToHttp: () => ({ getRequest: () => request }) } as ExecutionContext;
     return guard.canActivate(context);
@@ -257,12 +260,13 @@ it('retains login response compatibility and safe owner access while pending/unv
   await master.gymAccess.create({ data: { userId: forced.id, gymId: gym.id, role: 'OWNER', linkStatus: 'ACTIVE' } });
   const restricted = await new AuthController(database).login({ email: 'forced-login@example.test', password });
   expect(restricted.mustChangePassword).toBe(true);
-  await expect(requestFor(forced.id, gym.slug)).rejects.toThrow('Password change required');
+  await expect(requestFor(forced.id, gym.slug, restricted.accessToken)).rejects.toThrow('Password change required');
   const adminRequest = { headers: { authorization: `Bearer ${restricted.accessToken}` } };
   const adminContext = { switchToHttp: () => ({ getRequest: () => adminRequest }) } as ExecutionContext;
   await expect(new SuperAdminGuard(database).canActivate(adminContext)).rejects.toThrow('Password change required');
-  await master.user.update({ where: { id: user.id }, data: { authVersion: { increment: 1 } } });
-  await expect(requestFor(user.id, gym.slug, 0)).rejects.toThrow('Invalid or revoked token');
+  const account = await master.gymAccount.findUniqueOrThrow({ where: { userId_gymId: { userId: user.id, gymId: gym.id } } });
+  await master.gymAccount.update({ where: { id: account.id }, data: { authVersion: { increment: 1 } } });
+  await expect(requestFor(user.id, gym.slug)).rejects.toThrow('Gym account access denied');
 
   const expired = await fixtureIdentity('expired-login@example.test');
   await master.user.update({ where: { id: expired.id }, data: { credentialExpiresAt: new Date(0) } });
@@ -272,6 +276,158 @@ it('retains login response compatibility and safe owner access while pending/unv
   await master.user.update({ where: { id: missingExpiry.id }, data: { mustChangePassword: true } });
   await expect(new AuthController(database).login({ email: 'missing-expiry@example.test', password }))
     .rejects.toThrow('Invalid email or password');
+});
+
+it('requires separate credentials for a shared identity and binds each session to one gym', async () => {
+  const user = await fixtureIdentity('shared-gym-account@example.test');
+  const firstDb = await run.createOwnedDatabase();
+  const secondDb = await run.createOwnedDatabase();
+  const gyms = [await master.gym.create({ data: { name: 'Shared A', slug: `shared-a-${run.runId}`, databaseName: firstDb.name, status: 'ACTIVE' } }),
+    await master.gym.create({ data: { name: 'Shared B', slug: `shared-b-${run.runId}`, databaseName: secondDb.name, status: 'ACTIVE' } })];
+  for (const gym of gyms) await master.gymAccess.create({ data: { userId: user.id, gymId: gym.id, role: 'OWNER', linkStatus: 'ACTIVE' } });
+  const controller = new AuthController({ master } as DatabaseService);
+  await expect(controller.login({ email: user.email, password })).rejects.toThrow('Invalid email or password');
+  const [first, second] = gyms;
+  await controller.setupGymAccount({ gymSlug: first!.slug, legacyEmail: user.email, legacyPassword: password,
+    username: 'shared-gym-a@example.test', newPassword: 'First-gym-password-51' });
+  await controller.setupGymAccount({ gymSlug: second!.slug, legacyEmail: user.email, legacyPassword: password,
+    username: 'shared-gym-b@example.test', newPassword: 'Second-gym-password-52' });
+  const a = await controller.login({ email: 'shared-gym-a@example.test', password: 'First-gym-password-51' });
+  const b = await controller.login({ email: 'shared-gym-b@example.test', password: 'Second-gym-password-52' });
+  expect(a.gyms.map(gym => gym.id)).toEqual([first!.id]);
+  expect(b.gyms.map(gym => gym.id)).toEqual([second!.id]);
+  await expect(controller.login({ email: 'shared-gym-a@example.test', password: 'Second-gym-password-52' })).rejects.toThrow('Invalid email or password');
+  const guard = new GymAccessGuard({ master } as DatabaseService, {} as TenantSchemaGateService);
+  const access = async (token: string, slug: string) => guard.canActivate({ switchToHttp: () => ({ getRequest: () => ({
+    headers: { authorization: `Bearer ${token}` }, params: { slug },
+  }) }) } as ExecutionContext);
+  await expect(access(a.accessToken, first!.slug)).resolves.toBe(true);
+  await expect(access(a.accessToken, second!.slug)).rejects.toThrow('Gym access denied');
+  await expect(access(b.accessToken, second!.slug)).resolves.toBe(true);
+  await expect(access(b.accessToken, first!.slug)).rejects.toThrow('Gym access denied');
+  const renewed = await controller.refresh({ refreshToken: a.refreshToken, activity: true });
+  await expect(access(renewed.accessToken, first!.slug)).resolves.toBe(true);
+  await expect(access(renewed.accessToken, second!.slug)).rejects.toThrow('Gym access denied');
+  expect((await controller.sessionsList({ headers: { authorization: `Bearer ${a.accessToken}` } })).items)
+    .toEqual([expect.objectContaining({ id: a.sessionId, current: true })]);
+  const accountA = await master.gymAccount.findUniqueOrThrow({ where: { username: 'shared-gym-a@example.test' } });
+  await new CredentialService({ master } as DatabaseService).changePassword({ identityId: user.id, authVersion: accountA.authVersion,
+    gymAccountId: accountA.id, currentPassword: 'First-gym-password-51', newPassword: 'First-gym-updated-53' });
+  await expect(access(a.accessToken, first!.slug)).rejects.toThrow('Gym account access denied');
+  await expect(access(b.accessToken, second!.slug)).resolves.toBe(true);
+  await expect(controller.login({ email: 'shared-gym-a@example.test', password: 'First-gym-password-51' })).rejects.toThrow('Invalid email or password');
+  const renewedA = await controller.login({ email: 'shared-gym-a@example.test', password: 'First-gym-updated-53' });
+  expect(renewedA.gyms.map(gym => gym.id)).toEqual([first!.id]);
+  await controller.logout({ headers: { authorization: `Bearer ${renewedA.accessToken}` } }, { scope: 'ALL' });
+  await expect(controller.session({ headers: { authorization: `Bearer ${renewedA.accessToken}` } })).rejects.toThrow('Session revoked or expired');
+  await expect(access(b.accessToken, second!.slug)).resolves.toBe(true);
+  expect((await controller.login({ email: 'shared-gym-b@example.test', password: 'Second-gym-password-52' })).gyms.map(gym => gym.id)).toEqual([second!.id]);
+  const operator = await fixtureIdentity('shared-recovery-operator@example.test');
+  await master.user.update({ where: { id: operator.id }, data: { globalRole: 'SUPER_ADMIN' } });
+  const credentials = new CredentialService({ master } as DatabaseService);
+  const recovery = await credentials.issueOperatorRecovery({ actorIdentityId: operator.id, email: user.email,
+    gymSlug: second!.slug, currentPassword: password, verificationMethod: 'IN_PERSON', reason: 'Verified account holder in person.' });
+  await credentials.completeRecovery({ credentialId: recovery.credentialId, secret: recovery.secret, newPassword: 'Second-gym-recovered-54' });
+  await expect(controller.login({ email: 'shared-gym-b@example.test', password: 'Second-gym-password-52' })).rejects.toThrow('Invalid email or password');
+  expect((await controller.login({ email: 'shared-gym-b@example.test', password: 'Second-gym-recovered-54' })).gyms.map(gym => gym.id)).toEqual([second!.id]);
+  expect((await controller.login({ email: 'shared-gym-a@example.test', password: 'First-gym-updated-53' })).gyms.map(gym => gym.id)).toEqual([first!.id]);
+});
+
+it('backfills one-gym credentials and preserves shared links for explicit setup', async () => {
+  const database = await run.createOwnedDatabase();
+  const client = await run.connect(database.name);
+  try {
+    await client.query(`
+      CREATE TABLE "User" (
+        id TEXT PRIMARY KEY, email TEXT NOT NULL, "globalRole" TEXT NOT NULL DEFAULT 'USER',
+        "passwordHash" TEXT NOT NULL, "displayName" TEXT, "mustChangePassword" BOOLEAN NOT NULL DEFAULT false,
+        "credentialExpiresAt" TIMESTAMPTZ(3), "passwordChangedAt" TIMESTAMPTZ(3),
+        "authVersion" INTEGER NOT NULL DEFAULT 0, "createdAt" TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+        "updatedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT now()
+      );
+      CREATE TABLE "Gym" (id TEXT PRIMARY KEY);
+      CREATE TABLE "GymAccess" (
+        "userId" TEXT NOT NULL REFERENCES "User"(id), "gymId" TEXT NOT NULL REFERENCES "Gym"(id),
+        role TEXT NOT NULL, PRIMARY KEY ("userId", "gymId")
+      );
+      CREATE TABLE "IdentitySession" (id TEXT PRIMARY KEY, "identityId" TEXT NOT NULL REFERENCES "User"(id), "revokedAt" TIMESTAMPTZ(3));
+      INSERT INTO "User" (id,email,"passwordHash","displayName") VALUES
+        ('single','single@example.test','single-hash','Single'),
+        ('shared','shared@example.test','shared-hash','Shared'),
+        ('admin','admin@example.test','admin-hash','Admin');
+      UPDATE "User" SET "globalRole"='SUPER_ADMIN' WHERE id='admin';
+      INSERT INTO "Gym" (id) VALUES ('gym-a'),('gym-b');
+      INSERT INTO "GymAccess" ("userId","gymId",role) VALUES
+        ('single','gym-a','OWNER'),('shared','gym-a','MEMBER'),('shared','gym-b','TRAINER'),('admin','gym-b','OWNER');
+    `);
+    await client.query(await readFile(`${root}packages/database-master/prisma/migrations/20261106130000_gym_accounts/migration.sql`, 'utf8'));
+    const rows = (await client.query(`SELECT "userId","gymId",username,"passwordHash",status FROM "GymAccount" ORDER BY "userId","gymId"`)).rows;
+    expect(rows).toContainEqual(expect.objectContaining({ userId: 'single', gymId: 'gym-a', username: 'single@example.test', passwordHash: 'single-hash', status: 'ACTIVE' }));
+    expect(rows.filter((row) => row.userId === 'shared')).toEqual([
+      expect.objectContaining({ userId: 'shared', gymId: 'gym-a', username: null, passwordHash: null, status: 'SETUP_REQUIRED' }),
+      expect.objectContaining({ userId: 'shared', gymId: 'gym-b', username: null, passwordHash: null, status: 'SETUP_REQUIRED' }),
+    ]);
+    expect(rows.find((row) => row.userId === 'admin')).toMatchObject({ username: null, passwordHash: null, status: 'SETUP_REQUIRED' });
+    expect((await client.query('SELECT count(*)::int AS count FROM "GymAccess"')).rows[0].count).toBe(4);
+  } finally { await client.end(); }
+});
+
+it('records authenticated email correction requests without changing credentials or gym contact snapshots', async () => {
+  const subject = await fixtureIdentity('correction-subject@example.test');
+  const admin = await fixtureIdentity('correction-admin@example.test');
+  await master.user.update({ where: { id: admin.id }, data: { globalRole: 'SUPER_ADMIN' } });
+  const member = await tenants[0].member.create({ data: { fullName: 'Synthetic Applicant', identityId: subject.id,
+    email: 'contact-snapshot@example.test', registrationState: 'COMPLETE', enrollmentOperationId: 'contact-snapshot-op' } });
+  const database = { master } as DatabaseService;
+  const sessions = new AuthSessionService(database);
+  const subjectSession = await sessions.create(subject.id, subject.authVersion, 'PERSONAL', 'Synthetic test device');
+  const controller = new EmailCorrectionController(database);
+  const token = subjectSession.accessToken;
+  const request = { headers: { authorization: `Bearer ${token}` } } as unknown as Request;
+  const sessionContext = { switchToHttp: () => ({ getRequest: () => request }) } as ExecutionContext;
+  await expect(new AuthSessionGuard(sessions).canActivate(sessionContext)).resolves.toBe(true);
+  await expect(controller.submit(request, 'correction-key-0001', { requestedEmail: 'correction-target@example.test', currentPassword: 'wrong' }))
+    .rejects.toThrow('Current password was not accepted');
+  const subjectPasswordHash = (await master.user.findUniqueOrThrow({ where: { id: subject.id } })).passwordHash;
+  const command = () => controller.submit(request, 'correction-key-0002', { requestedEmail: ' Correction-Target@Example.test ', currentPassword: password });
+  const [first, retry] = await Promise.all([command(), command()]);
+  expect(first).toMatchObject({ requestedEmail: 'correction-target@example.test', state: 'PENDING' });
+  expect(retry.id).toBe(first.id);
+  expect(await master.identityEmailCorrectionRequest.count({ where: { identityId: subject.id } })).toBe(1);
+  await expect(controller.submit(request, 'correction-key-0003', { requestedEmail: 'correction-target@example.test', currentPassword: password }))
+    .rejects.toThrow('pending request');
+  await expect(controller.submit(request, 'correction-key-0004', { requestedEmail: admin.email, currentPassword: password }))
+    .rejects.toThrow('cannot be requested');
+  const persistedRequest = await master.identityEmailCorrectionRequest.findUniqueOrThrow({ where: { id: first.id } });
+  expect(JSON.stringify(persistedRequest)).not.toContain(password);
+  expect((await master.user.findUniqueOrThrow({ where: { id: subject.id } })).email).toBe('correction-subject@example.test');
+  expect(await argon2.verify((await master.user.findUniqueOrThrow({ where: { id: subject.id } })).passwordHash, password)).toBe(true);
+  expect((await tenants[0].member.findUniqueOrThrow({ where: { id: member.id } })).email).toBe('contact-snapshot@example.test');
+  const own = await controller.own(request);
+  expect(own).toHaveLength(1);
+  await controller.withdraw(request, first.id);
+  expect((await controller.own(request))[0].state).toBe('WITHDRAWN');
+  const adminController = new AdminEmailCorrectionController(database);
+  const ordinaryContext = { switchToHttp: () => ({ getRequest: () => ({ headers: { authorization: `Bearer ${token}` }, method: 'GET', path: '/admin/email-correction-requests' }) }) } as unknown as ExecutionContext;
+  await expect(new SuperAdminGuard(database).canActivate(ordinaryContext)).rejects.toThrow('Super Admin access required');
+  const adminSession = await sessions.create(admin.id, admin.authVersion, 'PERSONAL', 'Synthetic reviewer');
+  const second = await controller.submit(request, 'correction-key-0005', { requestedEmail: 'second-correction@example.test', currentPassword: password });
+  const reviewer = { headers: { authorization: `Bearer ${adminSession.accessToken}` }, method: 'POST', path: `/admin/email-correction-requests/${second.id}/close` } as PlatformRequest;
+  const reviewerContext = { switchToHttp: () => ({ getRequest: () => reviewer }) } as ExecutionContext;
+  await expect(new AuthSessionGuard(sessions).canActivate(reviewerContext)).resolves.toBe(true);
+  await expect(new SuperAdminGuard(database).canActivate(reviewerContext)).resolves.toBe(true);
+  expect(await adminController.list()).toHaveLength(1);
+  const decisions = await Promise.allSettled([
+    adminController.close(reviewer, second.id, { expectedVersion: 0, resolution: 'FOLLOW_UP_RECORDED' }),
+    adminController.close(reviewer, second.id, { expectedVersion: 0, resolution: 'CLOSED_NO_CHANGE' }),
+  ]);
+  expect(decisions.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+  expect(decisions.filter(result => result.status === 'rejected')).toHaveLength(1);
+  expect(['FOLLOW_UP_RECORDED', 'CLOSED_NO_CHANGE']).toContain((await controller.own(request)).find(row => row.id === second.id)?.resolution);
+  const audit = await master.platformAuditLog.findMany({ where: { resourceType: 'EMAIL_CORRECTION_REQUEST', resourceId: first.id } });
+  expect(audit.map(event => event.eventCode)).toContain('IDENTITY_EMAIL_CORRECTION_WITHDRAWN');
+  expect(JSON.stringify(audit)).not.toContain('correction-target@example.test');
+  expect(subjectPasswordHash).toBe((await master.user.findUniqueOrThrow({ where: { id: subject.id } })).passwordHash);
 });
 
 
@@ -390,6 +546,7 @@ it('issues a one-time credential, rotates it once, and atomically changes it wit
   expect(await argon2.verify(changed.passwordHash, secondSecret)).toBe(false);
   expect(await argon2.verify(changed.passwordHash, finalTemporaryPassword)).toBe(false);
   expect(await argon2.verify(changed.passwordHash, 'New-member-password-42')).toBe(true);
+  expect((await master.identitySession.findMany({ where: { identityId: subject.id } })).every(session => session.revokedAt !== null)).toBe(true);
 
   const reused = await master.user.findUniqueOrThrow({ where: { email: 'multi@example.test' } });
   const reusedHash = reused.passwordHash;
@@ -435,6 +592,110 @@ it('issues a one-time credential, rotates it once, and atomically changes it wit
   expect(await argon2.verify((await master.user.findUniqueOrThrow({ where: { id: expiredSubject.id } })).passwordHash, password)).toBe(false);
 });
 
+it('issues one-use staff recovery to an ordinary member, serializes redemption and confirms retries safely', async () => {
+  const owner = await fixtureIdentity('staff-recovery-owner@example.test');
+  const subject = await fixtureIdentity('staff-recovery-member@example.test');
+  const gym = await master.gym.findFirstOrThrow({ where: { databaseName: run.tenantNames[0], status: 'ACTIVE' } });
+  await master.gymAccess.create({ data: { userId: owner.id, gymId: gym.id, role: 'OWNER', linkStatus: 'ACTIVE' } });
+  const operationId = `recovery_member_${randomBytes(8).toString('hex')}`;
+  const member = await tenants[0].member.create({ data: { fullName: 'Recovery Member', identityId: subject.id,
+    registrationState: 'COMPLETE', enrollmentOperationId: operationId } });
+  await master.operation.create({ data: { id: operationId, kind: 'REGISTER_MEMBER', actorIdentityId: owner.id,
+    scopeKey: `gym:${gym.id}`, idempotencyKey: `recovery-${randomBytes(8).toString('hex')}`,
+    requestDigest: `d1:${'f'.repeat(64)}`, gymId: gym.id, subjectIdentityId: subject.id, tenantActorId: member.id,
+    state: 'COMPLETE', step: 'MASTER_ACTIVATED', safeResult: { operationId, memberId: member.id } } });
+  await master.gymAccess.create({ data: { userId: subject.id, gymId: gym.id, role: 'MEMBER', linkStatus: 'ACTIVE',
+    actorKind: 'MEMBER', tenantActorId: member.id, enrollmentOperationId: operationId } });
+  const credentials = new CredentialService({ master } as DatabaseService);
+  const controller = new AuthController({ master } as DatabaseService);
+  const firstSession = await controller.login({ email: subject.email, password });
+  const secondSession = await controller.login({ email: subject.email, password });
+  expect((await credentials.recoveryCandidates(gym.id)).items).toContainEqual(expect.objectContaining({ identityId: subject.id, relationship: 'MEMBER' }));
+  await expect(credentials.issueRecovery({ actorIdentityId: owner.id, gymId: gym.id, identityId: owner.id,
+    verificationMethod: 'IN_PERSON', reason: 'Owner identity verified in person.', currentPassword: password })).rejects.toThrow('not eligible');
+  const input = { actorIdentityId: owner.id, gymId: gym.id, identityId: subject.id,
+    verificationMethod: 'KNOWN_CONTACT' as const, reason: 'Known contact confirmed against the enrollment record.', currentPassword: password };
+  const issued = await credentials.issueRecovery(input);
+  const firstRow = await master.recoveryCredential.findUniqueOrThrow({ where: { id: issued.credentialId } });
+  expect(firstRow.secretHash).not.toContain(issued.secret);
+  expect(JSON.stringify(await master.platformAuditLog.findMany({ where: { resourceId: issued.credentialId } }))).not.toContain(issued.secret);
+  const revokedIssuer = await fixtureIdentity('staff-recovery-revoked-issuer@example.test');
+  await master.gymAccess.create({ data: { userId: revokedIssuer.id, gymId: gym.id, role: 'OWNER', linkStatus: 'ACTIVE' } });
+  const revokedAuthority = await credentials.issueRecovery({ ...input, actorIdentityId: revokedIssuer.id });
+  await master.gymAccess.update({ where: { userId_gymId: { userId: revokedIssuer.id, gymId: gym.id } }, data: { linkStatus: 'REVOKED' } });
+  await expect(credentials.completeRecovery({ credentialId: revokedAuthority.credentialId, secret: revokedAuthority.secret,
+    newPassword: 'Recovery-password-44' })).rejects.toThrow('invalid');
+  expect(await master.recoveryCredential.findUniqueOrThrow({ where: { id: revokedAuthority.credentialId } })).toMatchObject({ revokedAt: expect.any(Date) });
+  const replacement = await credentials.issueRecovery(input);
+  await expect(credentials.completeRecovery({ credentialId: issued.credentialId, secret: issued.secret,
+    newPassword: 'Recovery-password-44' })).rejects.toThrow('invalid');
+  const redeemInput = { credentialId: replacement.credentialId, secret: replacement.secret, newPassword: 'Recovery-password-44' };
+  expect(await Promise.all([credentials.completeRecovery(redeemInput), credentials.completeRecovery(redeemInput)])).toEqual([{ success: true }, { success: true }]);
+  expect((await master.user.findUniqueOrThrow({ where: { id: subject.id } })).authVersion).toBe(subject.authVersion + 1);
+  expect(await master.identitySecurityEvent.count({ where: { identityId: subject.id, event: 'PASSWORD_RECOVERED' } })).toBe(1);
+  expect(await master.identitySession.count({ where: { identityId: subject.id, revokedAt: null } })).toBe(0);
+  const auth = (token: string) => ({ headers: { authorization: `Bearer ${token}` } });
+  await expect(controller.session(auth(firstSession.accessToken))).rejects.toThrow('Session revoked or expired');
+  await expect(controller.session(auth(secondSession.accessToken))).rejects.toThrow('Session revoked or expired');
+  await expect(controller.login({ email: subject.email, password })).rejects.toThrow('Invalid email or password');
+  await expect(controller.login({ email: subject.email, password: 'Recovery-password-44' })).resolves.toMatchObject({ mustChangePassword: false });
+  const subjectAccount = await master.gymAccount.findUniqueOrThrow({ where: { userId_gymId: { userId: subject.id, gymId: gym.id } } });
+  expect(await credentials.securityEvents(subject.id, subjectAccount.id)).toMatchObject({ items: [{ event: 'PASSWORD_RECOVERED' }] });
+});
+
+it('permits pending-applicant recovery without activating access and caps failed credential attempts', async () => {
+  const owner = await fixtureIdentity('pending-recovery-owner@example.test');
+  const applicant = await fixtureIdentity('pending-recovery-applicant@example.test');
+  const gym = await master.gym.findFirstOrThrow({ where: { databaseName: run.tenantNames[0], status: 'ACTIVE' } });
+  await master.gymAccess.create({ data: { userId: owner.id, gymId: gym.id, role: 'OWNER', linkStatus: 'ACTIVE' } });
+  await master.memberApplication.create({ data: { gymId: gym.id, identityId: applicant.id, fullName: 'Pending Recovery',
+    phone: '+15550000005', consentedAt: new Date() } });
+  const credentials = new CredentialService({ master } as DatabaseService);
+  expect((await credentials.recoveryCandidates(gym.id)).items).toContainEqual(expect.objectContaining({ identityId: applicant.id, relationship: 'PENDING_APPLICANT' }));
+  const input = { actorIdentityId: owner.id, gymId: gym.id, identityId: applicant.id,
+    verificationMethod: 'IN_PERSON' as const, reason: 'Applicant matched in person to the pending application.', currentPassword: password };
+  const issued = await credentials.issueRecovery(input);
+  for (let attempt = 0; attempt < 5; attempt++) await expect(credentials.completeRecovery({ credentialId: issued.credentialId,
+    secret: 'A'.repeat(43), newPassword: 'Recovery-password-45' })).rejects.toThrow('invalid');
+  expect(await master.recoveryCredential.findUniqueOrThrow({ where: { id: issued.credentialId } })).toMatchObject({ attempts: 5, revokedAt: expect.any(Date) });
+  const replacement = await credentials.issueRecovery(input);
+  await credentials.completeRecovery({ credentialId: replacement.credentialId, secret: replacement.secret, newPassword: 'Recovery-password-45' });
+  expect(await master.gymAccess.count({ where: { userId: applicant.id } })).toBe(0);
+  expect(await master.memberApplication.findFirstOrThrow({ where: { identityId: applicant.id } })).toMatchObject({ state: 'PENDING' });
+});
+
+it('uses a separately reauthenticated Super Admin path for owner accounts and blocks revoked operator authority', async () => {
+  const operator = await fixtureIdentity('operator-recovery-admin@example.test');
+  const owner = await fixtureIdentity('operator-recovery-owner@example.test');
+  const targetAdmin = await fixtureIdentity('operator-recovery-admin-target@example.test');
+  await master.user.update({ where: { id: operator.id }, data: { globalRole: 'SUPER_ADMIN' } });
+  await master.user.update({ where: { id: targetAdmin.id }, data: { globalRole: 'SUPER_ADMIN' } });
+  const gym = await master.gym.findFirstOrThrow({ where: { databaseName: run.tenantNames[0], status: 'ACTIVE' } });
+  await master.gymAccess.create({ data: { userId: owner.id, gymId: gym.id, role: 'OWNER', linkStatus: 'ACTIVE' } });
+  const credentials = new CredentialService({ master } as DatabaseService);
+  await expect(credentials.issueOperatorRecovery({ actorIdentityId: operator.id, email: owner.email, currentPassword: 'wrong',
+    verificationMethod: 'IN_PERSON', reason: 'Owner verified in person by the platform operator.' })).rejects.toThrow('Independent operator verification');
+  await expect(credentials.issueOperatorRecovery({ actorIdentityId: operator.id, email: operator.email, currentPassword: password,
+    verificationMethod: 'IN_PERSON', reason: 'Self reset is explicitly disallowed.' })).rejects.toThrow('not eligible');
+  const ownerIssue = await credentials.issueOperatorRecovery({ actorIdentityId: operator.id, email: owner.email, currentPassword: password,
+    verificationMethod: 'KNOWN_CONTACT', reason: 'Owner verified through the established platform contact.' });
+  const ownerRecovery = await master.recoveryCredential.findUniqueOrThrow({ where: { id: ownerIssue.credentialId } });
+  expect(ownerRecovery).toMatchObject({ scope: 'OPERATOR', gymId: null, issuerAuthVersion: operator.authVersion });
+  expect(ownerRecovery.secretHash).not.toContain(ownerIssue.secret);
+  await credentials.completeRecovery({ credentialId: ownerIssue.credentialId, secret: ownerIssue.secret, newPassword: 'Owner-recovered-password-51' });
+  expect(await master.gymAccess.findUniqueOrThrow({ where: { userId_gymId: { userId: owner.id, gymId: gym.id } } }))
+    .toMatchObject({ role: 'OWNER', linkStatus: 'ACTIVE' });
+  await expect(new AuthController({ master } as DatabaseService).login({ email: owner.email, password: 'Owner-recovered-password-51' }))
+    .resolves.toMatchObject({ globalRole: 'USER' });
+
+  const pendingAuthority = await credentials.issueOperatorRecovery({ actorIdentityId: operator.id, email: targetAdmin.email, currentPassword: password,
+    verificationMethod: 'IN_PERSON', reason: 'Administrator verified in person by the platform operator.' });
+  await master.user.update({ where: { id: operator.id }, data: { globalRole: 'USER' } });
+  await expect(credentials.completeRecovery({ credentialId: pendingAuthority.credentialId, secret: pendingAuthority.secret,
+    newPassword: 'Admin-recovered-password-52' })).rejects.toThrow('invalid');
+  expect((await master.user.findUniqueOrThrow({ where: { id: targetAdmin.id } })).passwordChangedAt).toBeNull();
+});
+
 it('logout atomically revokes every current identity session including restricted credentials', async () => {
   const user = await fixtureIdentity('logout@example.test');
   const database = { master } as DatabaseService;
@@ -446,8 +707,8 @@ it('logout atomically revokes every current identity session including restricte
   const results = await Promise.allSettled([controller.logout(auth(first.accessToken)), controller.logout(auth(second.accessToken))]);
   expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
   expect((await master.user.findUniqueOrThrow({ where: { id: user.id } })).authVersion).toBe(user.authVersion + 1);
-  await expect(controller.session(auth(first.accessToken))).rejects.toThrow('Invalid or expired session');
-  await expect(controller.session(auth(second.accessToken))).rejects.toThrow('Invalid or expired session');
+  await expect(controller.session(auth(first.accessToken))).rejects.toThrow('Session revoked or expired');
+  await expect(controller.session(auth(second.accessToken))).rejects.toThrow('Session revoked or expired');
   const fresh = await controller.login({ email: user.email, password });
   await expect(controller.logout(auth(first.accessToken))).rejects.toThrow('Invalid or expired session');
   await expect(controller.session(auth(fresh.accessToken))).resolves.toMatchObject({ identityId: user.id, displayName: null });
@@ -456,6 +717,47 @@ it('logout atomically revokes every current identity session including restricte
   await expect(controller.logout(auth(restricted.accessToken))).resolves.toEqual({ revoked: true });
   expect((await master.user.findUniqueOrThrow({ where: { id: user.id } })).authVersion).toBe(user.authVersion + 2);
   expect(await master.$transaction([master.user.count(), master.gymAccess.count(), master.operation.count()])).toEqual(before);
+});
+
+it('rotates a device refresh token once across concurrent tabs, detects replay, and isolates current-device logout', async () => {
+  const user = await fixtureIdentity('device-sessions@example.test');
+  const controller = new AuthController({ master } as DatabaseService);
+  const auth = (token: string) => ({ headers: { authorization: `Bearer ${token}` } });
+  const personal = await controller.login({ email: user.email, password, deviceClass: 'PERSONAL' });
+  const shared = await controller.login({ email: user.email, password });
+  expect(personal.deviceClass).toBe('PERSONAL');
+  expect(personal.deviceLabel).toBe('Web browser');
+  expect(shared.deviceClass).toBe('SHARED');
+  const rows = await controller.sessionsList(auth(personal.accessToken));
+  expect(rows.items).toHaveLength(2);
+  expect(rows.items.filter((row: { current: boolean }) => row.current)).toHaveLength(1);
+  const sessionBeforeRenewal = await master.identitySession.findUniqueOrThrow({ where: { id: personal.sessionId } });
+  const concurrent = await Promise.all([
+    controller.refresh({ refreshToken: personal.refreshToken }),
+    controller.refresh({ refreshToken: personal.refreshToken }),
+  ]);
+  expect(concurrent[0].refreshToken).toBe(concurrent[1].refreshToken);
+  expect(concurrent[0].refreshToken).not.toBe(personal.refreshToken);
+  const passiveRenewal = await master.identitySession.findUniqueOrThrow({ where: { id: personal.sessionId } });
+  expect(passiveRenewal.lastActivityAt).toEqual(sessionBeforeRenewal.lastActivityAt);
+  expect(passiveRenewal.idleExpiresAt).toEqual(sessionBeforeRenewal.idleExpiresAt);
+  const activityRenewal = await controller.refresh({ refreshToken: concurrent[0].refreshToken, activity: true });
+  const activeRenewal = await master.identitySession.findUniqueOrThrow({ where: { id: personal.sessionId } });
+  expect(activeRenewal.lastActivityAt.getTime()).toBeGreaterThan(sessionBeforeRenewal.lastActivityAt.getTime());
+  expect(activeRenewal.idleExpiresAt.getTime()).toBeGreaterThanOrEqual(passiveRenewal.idleExpiresAt.getTime());
+  await expect(controller.session(auth(personal.accessToken))).resolves.toMatchObject({ identityId: user.id });
+  await expect(controller.session(auth(activityRenewal.accessToken))).resolves.toMatchObject({ identityId: user.id, deviceClass: 'PERSONAL' });
+
+  const oldHash = createHash('sha256').update(concurrent[0].refreshToken).digest('hex');
+  await master.identitySession.updateMany({ where: { identityId: user.id, previousRefreshTokenHash: oldHash },
+    data: { previousRefreshValidUntil: new Date(0) } });
+  await expect(controller.refresh({ refreshToken: concurrent[0].refreshToken })).rejects.toThrow('replay detected');
+  await expect(controller.session(auth(activityRenewal.accessToken))).rejects.toThrow('Session revoked or expired');
+  await expect(controller.session(auth(shared.accessToken))).resolves.toMatchObject({ identityId: user.id });
+
+  await expect(controller.logout(auth(shared.accessToken), { scope: 'CURRENT' })).resolves.toEqual({ revoked: true });
+  await expect(controller.session(auth(shared.accessToken))).rejects.toThrow('Session revoked or expired');
+  await expect(controller.session(auth(activityRenewal.accessToken))).rejects.toThrow('Session revoked or expired');
 });
 
 it('serializes the owner acknowledgement and credential-reissue race to one delivery outcome', async () => {

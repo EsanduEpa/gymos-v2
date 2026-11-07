@@ -17,6 +17,9 @@ export async function GET(request: Request) {
     const supportCheck = slug && session.globalRole === 'SUPER_ADMIN' ? await checkSupportSummary(slug, token) : null;
     if (supportCheck?.kind === 'unavailable') return new Response(null, { status: 503, headers });
     const summary = supportCheck?.kind === 'valid' ? supportCheck.summary : null;
-    return Response.json({ identityId: session.identityId, expiresAt: tokenExpiry(token), gyms: session.gyms.map(({ slug, role }) => ({ slug, role })), support: summary ? { id: summary.id, slug: summary.gym.slug, expiresAt: Date.parse(summary.expiresAt) } : null }, { headers });
+    return Response.json({ identityId: session.identityId, sessionId: session.sessionId, deviceClass: session.deviceClass,
+      expiresAt: tokenExpiry(token), refreshExpiresAt: Date.parse(session.refreshExpiresAt),
+      gyms: session.gyms.map(({ slug, role }) => ({ slug, role })),
+      support: summary ? { id: summary.id, slug: summary.gym.slug, expiresAt: Date.parse(summary.expiresAt) } : null }, { headers });
   } catch { return new Response(null, { status: 503, headers }); }
 }
