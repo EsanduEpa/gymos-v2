@@ -5,6 +5,7 @@ import type { INestApplication } from '@nestjs/common';
 import { SignJWT } from 'jose';
 import { AppModule } from '../../src/app.module.js';
 import { DatabaseService } from '../../src/database.service.js';
+import { AuthController } from '../../src/auth.controller.js';
 import type { DatabaseService as DatabaseServiceType } from '../../src/database.service.js';
 import { createDisposableEnvironment } from '../support/disposable-environment.js';
 import { seedTwoGymFixture } from '../fixtures/two-gym-fixture.js';
@@ -45,7 +46,9 @@ it('activates a self-applicant only after owner approval reconciles, preserving 
   const identity = await fixture.master.user.findUniqueOrThrow({ where: { email } });
   expect(await argon2.verify(identity.passwordHash, password)).toBe(true);
   expect(await fixture.master.gymAccess.count({ where: { userId: identity.id, gymId: gym.id } })).toBe(0);
-  const ownerToken = await token(fixture.users.ownerA.id);
+  const ownerToken = (await new AuthController({ master: fixture.master } as DatabaseServiceType).login({
+    email: fixture.users.ownerA.email, password: fixture.password,
+  })).accessToken;
   const queueResponse = await fetch(`${base}/gyms/${gym.slug}/owner/applications`, { headers: { authorization: `Bearer ${ownerToken}` } });
   expect(queueResponse.status).toBe(200);
   const application = (await queueResponse.json()).items.find((item: { email: string }) => item.email === email);

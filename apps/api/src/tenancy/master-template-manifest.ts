@@ -1,7 +1,7 @@
 import { contentDigest } from '../operations/primitives.js';
 // Immutable reviewed chain; schema deployment is an explicit owned runner command.
 export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
-  version: 'master-2026-11-06.8',
+  version: 'master-2026-11-06.11',
   migrations: [
     {
       name: '20261021100256_init_master',
@@ -84,6 +84,18 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       name: '20261106110000_account_notification_read_receipts',
       checksum: '7e3bbbd82046e3562fbe445657b94e8c51b4d62dd71d71f7bf7e3e5b3ed2e6fd',
     },
+    {
+      name: '20261106130000_gym_accounts',
+      checksum: '47761ab2aa82a65638b8aa1728bef27b6fb08c6d9d83eae74c14f957d0c9c0d9',
+    },
+    {
+      name: '20261106140000_scoped_operator_recovery',
+      checksum: 'e47d20dffcf138afc94e1df98cfd9d44327ec3b6f6eaa695e8e5b1bff1ff61c9',
+    },
+    {
+      name: '20261106150000_scoped_security_events',
+      checksum: 'ea906388fe35846659b8ff05ae42ea780b609c750f6eea59a846b79a91a008c9',
+    },
   ],
   postconditions: {
     tables: [
@@ -91,6 +103,7 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       'EnrollmentProof',
       'Gym',
       'GymAccess',
+      'GymAccount',
       'IdentitySession',
       'RecoveryCredential',
       'IdentitySecurityEvent',
@@ -197,11 +210,12 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       ],
       MemberApplication: ['id', 'gymId', 'identityId', 'fullName', 'phone', 'consentedAt', 'state', 'version', 'enrollmentOperationId', 'membershipPlanId', 'dateOfBirth', 'membershipPlanName', 'membershipPrice', 'membershipCurrency', 'membershipDurationDays', 'membershipPlanVersion'],
       MemberApplicationNotice: ['id', 'applicationId', 'gymId', 'recipientId', 'event', 'createdAt', 'readAt'],
-      IdentitySession: ['id', 'identityId', 'authVersion', 'deviceClass', 'deviceLabel', 'refreshTokenHash', 'version', 'createdAt', 'lastActivityAt', 'idleExpiresAt', 'absoluteExpiresAt', 'revokedAt'],
-      IdentitySecurityEvent: ['id', 'identityId', 'event', 'createdAt'],
+      IdentitySession: ['id', 'identityId', 'gymAccountId', 'authVersion', 'deviceClass', 'deviceLabel', 'refreshTokenHash', 'version', 'createdAt', 'lastActivityAt', 'idleExpiresAt', 'absoluteExpiresAt', 'revokedAt'],
+      IdentitySecurityEvent: ['id', 'identityId', 'gymAccountId', 'event', 'createdAt'],
       ProfileCommandReceipt: ['id', 'actorIdentityId', 'commandKind', 'idempotencyKey', 'requestDigest', 'resourceId', 'resultVersion', 'createdAt'],
       IdentityEmailCorrectionRequest: ['id', 'identityId', 'requestedEmail', 'state', 'resolution', 'version', 'idempotencyKey', 'requestDigest', 'submittedAt', 'resolvedAt', 'resolvedByIdentityId'],
       IdentitySecurityEventRead: ['id', 'securityEventId', 'identityId', 'readAt'],
+      GymAccount: ['id', 'userId', 'gymId', 'username', 'displayName', 'passwordHash', 'status', 'mustChangePassword', 'credentialExpiresAt', 'passwordChangedAt', 'authVersion', 'version', 'createdAt', 'updatedAt'],
     },
   },
 } as const);

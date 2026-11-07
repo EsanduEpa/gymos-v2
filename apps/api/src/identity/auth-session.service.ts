@@ -35,7 +35,7 @@ export type SessionIssue = {
 export class AuthSessionService {
   constructor(private readonly database: DatabaseService) {}
 
-  async create(identityId: string, authVersion: number, deviceClass: SessionDeviceClass, deviceLabel: string): Promise<SessionIssue> {
+  async create(identityId: string, authVersion: number, deviceClass: SessionDeviceClass, deviceLabel: string, gymAccountId?: string): Promise<SessionIssue> {
     const [{ now }] = await this.database.master.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
     const idleMs = deviceClass === 'PERSONAL' ? PERSONAL_IDLE_MS : SHARED_IDLE_MS;
     const absoluteMs = deviceClass === 'PERSONAL' ? PERSONAL_ABSOLUTE_MS : SHARED_ABSOLUTE_MS;
@@ -43,9 +43,9 @@ export class AuthSessionService {
     const idleExpiresAt = new Date(Math.min(now.getTime() + idleMs, absoluteExpiresAt.getTime()));
     const refreshToken = randomBytes(32).toString('base64url');
     const session = await this.database.master.identitySession.create({ data: {
-      identityId, authVersion, deviceClass, deviceLabel, refreshTokenHash: tokenHash(refreshToken), idleExpiresAt, absoluteExpiresAt,
+      identityId, gymAccountId, authVersion, deviceClass, deviceLabel, refreshTokenHash: tokenHash(refreshToken), idleExpiresAt, absoluteExpiresAt,
     }, select: { id: true } });
-    return { ...await this.issueAccessToken(identityId, authVersion, session.id), refreshToken, sessionId: session.id,
+    return { ...await this.issueAccessToken(identityId, authVersion, session.id, gymAccountId), refreshToken, sessionId: session.id,
       expiresIn: 900, refreshExpiresAt: idleExpiresAt.toISOString(), absoluteExpiresAt: absoluteExpiresAt.toISOString(), deviceClass, deviceLabel };
   }
 
@@ -65,9 +65,16 @@ export class AuthSessionService {
         return { kind: 'invalid' as const };
       }
       const user = await tx.user.findUnique({ where: { id: session.identityId }, select: { authVersion: true, credentialExpiresAt: true } });
-      if (!user || user.authVersion !== session.authVersion || (user.credentialExpiresAt !== null && user.credentialExpiresAt <= now)) {
+      if (!user || (!session.gymAccountId && user.authVersion !== session.authVersion) || (!session.gymAccountId && user.credentialExpiresAt !== null && user.credentialExpiresAt <= now)) {
         await tx.identitySession.update({ where: { id }, data: { revokedAt: now, revocationReason: 'PASSWORD_CHANGED' } });
         return { kind: 'invalid' as const };
+      }
+      if (session.gymAccountId) {
+        const account = await tx.gymAccount.findUnique({ where: { id: session.gymAccountId }, select: { userId: true, authVersion: true, status: true, credentialExpiresAt: true } });
+        if (!account || account.userId !== session.identityId || account.authVersion !== session.authVersion || account.status !== 'ACTIVE' || (account.credentialExpiresAt && account.credentialExpiresAt <= now)) {
+          await tx.identitySession.update({ where: { id }, data: { revokedAt: now, revocationReason: 'PASSWORD_CHANGED' } });
+          return { kind: 'invalid' as const };
+        }
       }
       let nextToken: string;
       let nextIdleExpiresAt = session.idleExpiresAt;
@@ -88,7 +95,7 @@ export class AuthSessionService {
       return { kind: 'ok' as const, session, user, nextToken, idleExpiresAt: nextIdleExpiresAt };
     });
     if (result.kind !== 'ok') throw new UnauthorizedException(result.kind === 'replay' ? 'Session renewal replay detected' : 'Session renewal is invalid');
-    return { ...await this.issueAccessToken(result.session.identityId, result.session.authVersion, result.session.id),
+    return { ...await this.issueAccessToken(result.session.identityId, result.session.authVersion, result.session.id, result.session.gymAccountId ?? undefined),
       refreshToken: result.nextToken, sessionId: result.session.id, expiresIn: 900,
       refreshExpiresAt: result.idleExpiresAt.toISOString(), absoluteExpiresAt: result.session.absoluteExpiresAt.toISOString(),
       deviceClass: result.session.deviceClass, deviceLabel: result.session.deviceLabel };
@@ -97,20 +104,27 @@ export class AuthSessionService {
   async assertActive(identityId: string, authVersion: number, sessionId: string): Promise<void> {
     const [{ now }] = await this.database.master.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
     const session = await this.database.master.identitySession.findUnique({ where: { id: sessionId },
-      select: { identityId: true, authVersion: true, idleExpiresAt: true, absoluteExpiresAt: true, revokedAt: true } });
+      select: { identityId: true, gymAccountId: true, authVersion: true, idleExpiresAt: true, absoluteExpiresAt: true, revokedAt: true } });
     if (!session || session.identityId !== identityId || session.authVersion !== authVersion || session.revokedAt
       || session.idleExpiresAt <= now || session.absoluteExpiresAt <= now) throw new UnauthorizedException('Session revoked or expired');
     const current = await this.database.master.user.findUnique({ where: { id: identityId }, select: { authVersion: true, credentialExpiresAt: true } });
-    if (!current || current.authVersion !== authVersion || (current.credentialExpiresAt !== null && current.credentialExpiresAt <= now)) {
+    if (!current || (!session.gymAccountId && current.authVersion !== authVersion) || (!session.gymAccountId && current.credentialExpiresAt !== null && current.credentialExpiresAt <= now)) {
       throw new UnauthorizedException('Session revoked or expired');
+    }
+    if (session.gymAccountId) {
+      const account = await this.database.master.gymAccount.findUnique({ where: { id: session.gymAccountId }, select: { userId: true, authVersion: true, status: true, credentialExpiresAt: true } });
+      if (!account || account.userId !== identityId || account.authVersion !== session.authVersion || account.status !== 'ACTIVE' || (account.credentialExpiresAt && account.credentialExpiresAt <= now)) {
+        throw new UnauthorizedException('Session revoked or expired');
+      }
     }
   }
 
-  async list(identityId: string, currentSessionId: string) {
+  async list(identityId: string, currentSessionId: string, gymAccountId?: string) {
     const [{ now }] = await this.database.master.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
     const user = await this.database.master.user.findUniqueOrThrow({ where: { id: identityId }, select: { authVersion: true } });
-    const rows = await this.database.master.identitySession.findMany({ where: { identityId, revokedAt: null,
-      authVersion: user.authVersion, idleExpiresAt: { gt: now }, absoluteExpiresAt: { gt: now } },
+    const account = gymAccountId ? await this.database.master.gymAccount.findUnique({ where: { id: gymAccountId }, select: { authVersion: true } }) : null;
+    const rows = await this.database.master.identitySession.findMany({ where: { identityId, gymAccountId: gymAccountId ?? null, revokedAt: null,
+      authVersion: gymAccountId ? account?.authVersion ?? -1 : user.authVersion, idleExpiresAt: { gt: now }, absoluteExpiresAt: { gt: now } },
       orderBy: [{ lastActivityAt: 'desc' }, { id: 'asc' }], take: 50,
       select: { id: true, deviceClass: true, deviceLabel: true, createdAt: true, lastActivityAt: true, idleExpiresAt: true, absoluteExpiresAt: true } });
     return { items: rows.map(row => ({ ...row, current: row.id === currentSessionId, createdAt: row.createdAt.toISOString(),
@@ -120,22 +134,24 @@ export class AuthSessionService {
   async revokeCurrent(identityId: string, sessionId: string) {
     await this.database.master.$transaction(async tx => {
       const [{ now }] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
+      const session = await tx.identitySession.findUnique({ where: { id: sessionId }, select: { identityId: true, gymAccountId: true } });
       const changed = await tx.identitySession.updateMany({ where: { id: sessionId, identityId, revokedAt: null },
         data: { revokedAt: now, revocationReason: 'CURRENT_DEVICE_LOGOUT' } });
       if (!changed.count) throw new UnauthorizedException('Session is already revoked or unavailable');
-      await tx.identitySecurityEvent.create({ data: { identityId, event: 'SESSIONS_REVOKED', createdAt: now } });
+      await tx.identitySecurityEvent.create({ data: { identityId, gymAccountId: session?.identityId === identityId ? session.gymAccountId : null,
+        event: 'SESSIONS_REVOKED', createdAt: now } });
       await revokeSupportForActor(tx, identityId, 'LOGOUT_REVOKED');
     });
   }
 
-  async revokeOther(identityId: string, sessionId: string, targetSessionId: string) {
+  async revokeOther(identityId: string, sessionId: string, targetSessionId: string, gymAccountId?: string) {
     if (targetSessionId === sessionId) return { revoked: false as const };
     return this.database.master.$transaction(async tx => {
       const [{ now }] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
-      const changed = await tx.identitySession.updateMany({ where: { id: targetSessionId, identityId, revokedAt: null },
+      const changed = await tx.identitySession.updateMany({ where: { id: targetSessionId, identityId, gymAccountId: gymAccountId ?? null, revokedAt: null },
         data: { revokedAt: now, revocationReason: 'ADMIN_REVOKED' } });
       if (!changed.count) return { revoked: false as const };
-      await tx.identitySecurityEvent.create({ data: { identityId, event: 'SESSIONS_REVOKED', createdAt: now } });
+      await tx.identitySecurityEvent.create({ data: { identityId, gymAccountId: gymAccountId ?? null, event: 'SESSIONS_REVOKED', createdAt: now } });
       return { revoked: true as const };
     });
   }
@@ -151,9 +167,20 @@ export class AuthSessionService {
     });
   }
 
-  async logout(identityId: string, authVersion: number, sessionId: string | undefined, scope: 'CURRENT' | 'ALL') {
+  async logout(identityId: string, authVersion: number, sessionId: string | undefined, scope: 'CURRENT' | 'ALL', gymAccountId?: string) {
     if (scope === 'CURRENT' && sessionId) {
       await this.revokeCurrent(identityId, sessionId);
+      return { revoked: true as const };
+    }
+    if (gymAccountId) {
+      await this.database.master.$transaction(async tx => {
+        const [{ now }] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
+        const changed = await tx.identitySession.updateMany({ where: { identityId, gymAccountId, revokedAt: null },
+          data: { revokedAt: now, revocationReason: 'ALL_DEVICE_LOGOUT' } });
+        if (!changed.count) throw new UnauthorizedException('Invalid or expired session');
+        await tx.gymAccount.update({ where: { id: gymAccountId }, data: { authVersion: { increment: 1 } } });
+        await tx.identitySecurityEvent.create({ data: { identityId, gymAccountId, event: 'SESSIONS_REVOKED', createdAt: now } });
+      });
       return { revoked: true as const };
     }
     const changed = await this.database.master.$transaction(async tx => {
@@ -170,10 +197,10 @@ export class AuthSessionService {
     return { revoked: true as const };
   }
 
-  private async issueAccessToken(identityId: string, authVersion: number, sessionId: string) {
+  private async issueAccessToken(identityId: string, authVersion: number, sessionId: string, gymAccountId?: string) {
     const secret = process.env.JWT_SECRET;
     if (!secret || secret.length < 32) throw new Error('JWT_SECRET is missing or too short');
-    const accessToken = await new SignJWT({ authVersion, sid: sessionId }).setProtectedHeader({ alg: 'HS256' })
+    const accessToken = await new SignJWT({ authVersion, sid: sessionId, ...(gymAccountId ? { gaid: gymAccountId } : {}) }).setProtectedHeader({ alg: 'HS256' })
       .setSubject(identityId).setIssuer('gymos-v2').setAudience('gymos-api').setIssuedAt().setExpirationTime('15m')
       .sign(new TextEncoder().encode(secret));
     return { accessToken, tokenType: 'Bearer' as const };

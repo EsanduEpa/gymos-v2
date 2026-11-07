@@ -22,7 +22,7 @@ function decodeCursor(value?: string): CursorData|undefined {
 }
 function encodeCursor(value: CursorData) { return Buffer.from(JSON.stringify(value)).toString('base64url'); }
 
-function sourceRows(identityId: string, asOf: Date) {
+function sourceRows(identityId: string, asOf: Date, gymId?: string, gymAccountId?: string) {
   return Prisma.sql`
     SELECT n."id", 'APPLICATION'::text AS kind, n."event"::text AS event_code,
       CASE n."event" WHEN 'APPLICANT_SUBMITTED' THEN 'Application received' WHEN 'APPLICANT_APPROVED' THEN 'Enrollment approved'
@@ -37,7 +37,7 @@ function sourceRows(identityId: string, asOf: Date) {
       CASE WHEN n."event"::text LIKE 'OWNER_%' THEN 'OWNER_APPLICATION_QUEUE' ELSE 'APPLICATION_STATUS' END AS target_kind,
       g."slug" AS gym_slug, n."applicationId" AS application_id, n."readAt" AS read_at, n."createdAt" AS created_at
     FROM "MemberApplicationNotice" n JOIN "Gym" g ON g."id" = n."gymId"
-    WHERE n."recipientId" = ${identityId} AND n."createdAt" <= ${asOf}
+    WHERE n."recipientId" = ${identityId} AND n."createdAt" <= ${asOf} AND (${gymId ?? null}::text IS NULL OR n."gymId" = ${gymId ?? null})
       AND (n."event"::text NOT LIKE 'OWNER_%' OR EXISTS (
         SELECT 1 FROM "GymAccess" ga JOIN "Gym" active_gym ON active_gym."id" = ga."gymId"
         WHERE ga."userId" = n."recipientId" AND ga."gymId" = n."gymId" AND ga."role" = 'OWNER' AND ga."linkStatus" = 'ACTIVE' AND active_gym."status" = 'ACTIVE'))
@@ -49,11 +49,12 @@ function sourceRows(identityId: string, asOf: Date) {
         ELSE 'One or more active sessions were signed out.' END AS message,
       'ACCOUNT_SECURITY'::text AS target_kind, NULL::text AS gym_slug, NULL::text AS application_id, r."readAt" AS read_at, e."createdAt" AS created_at
     FROM "IdentitySecurityEvent" e LEFT JOIN "IdentitySecurityEventRead" r ON r."securityEventId" = e."id" AND r."identityId" = e."identityId"
-    WHERE e."identityId" = ${identityId} AND e."createdAt" <= ${asOf}`;
+    WHERE e."identityId" = ${identityId} AND e."createdAt" <= ${asOf}
+      AND e."gymAccountId" IS NOT DISTINCT FROM ${gymAccountId ?? null}`;
 }
 
-async function unreadCount(tx: Prisma.TransactionClient, identityId: string) {
-  const [row] = await tx.$queryRaw<{ count: bigint }[]>(Prisma.sql`WITH source AS (${sourceRows(identityId, new Date('9999-12-31T23:59:59.999Z'))}) SELECT count(*) AS count FROM source WHERE read_at IS NULL`);
+async function unreadCount(tx: Prisma.TransactionClient, identityId: string, gymId?: string, gymAccountId?: string) {
+  const [row] = await tx.$queryRaw<{ count: bigint }[]>(Prisma.sql`WITH source AS (${sourceRows(identityId, new Date('9999-12-31T23:59:59.999Z'), gymId, gymAccountId)}) SELECT count(*) AS count FROM source WHERE read_at IS NULL`);
   return Number(row?.count ?? 0n);
 }
 
@@ -61,9 +62,17 @@ async function unreadCount(tx: Prisma.TransactionClient, identityId: string) {
 export class AccountNotificationsController {
   constructor(private readonly database: DatabaseService) {}
 
+  private async scopeGymId(identityId: string, accountId?: string) {
+    if (!accountId) return undefined;
+    const account = await this.database.master.gymAccount.findUnique({ where: { id: accountId }, select: { userId: true, gymId: true, status: true } });
+    if (!account || account.userId !== identityId || account.status !== 'ACTIVE') throw new NotFoundException('Account notifications unavailable');
+    return account.gymId;
+  }
+
   @Get()
   async list(@Req() request: Request, @Query() query: unknown) {
     const identity = await identityFromAuthorization(request.headers.authorization);
+    const gymId = await this.scopeGymId(identity.userId, identity.gymAccountId);
     const parsed = accountNotificationQuerySchema.safeParse(query ?? {});
     if (!parsed.success) invalid();
     const cursor = decodeCursor(parsed.data.cursor);
@@ -72,12 +81,12 @@ export class AccountNotificationsController {
       await tx.$executeRaw`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`;
       const clock = cursor ? null : (await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`)[0]!.now;
       const asOf = cursor ? new Date(cursor.asOf) : clock!;
-      const source = sourceRows(identity.userId, asOf);
+      const source = sourceRows(identity.userId, asOf, gymId, identity.gymAccountId);
       const rows = await tx.$queryRaw<AccountRow[]>(Prisma.sql`WITH source AS (${source}) SELECT * FROM source
           WHERE (${parsed.data.filter} = 'ALL' OR read_at IS NULL)
             AND (${cursor ? true : false} = false OR (created_at, kind, id) < (${cursor?.createdAt ?? null}::timestamptz, ${cursor?.kind ?? null}::text, ${cursor?.id ?? null}::text))
           ORDER BY created_at DESC, kind DESC, id DESC LIMIT ${parsed.data.pageSize + 1}`);
-      const unread = await unreadCount(tx, identity.userId);
+      const unread = await unreadCount(tx, identity.userId, gymId, identity.gymAccountId);
       const hasMore = rows.length > parsed.data.pageSize;
       const page = rows.slice(0, parsed.data.pageSize).map(row => ({ id: `${row.kind}:${row.id}`, sourceId: row.id, kind: row.kind, eventCode: row.event_code,
         title: row.title, message: row.message, target: row.target_kind === 'ACCOUNT_SECURITY' ? { kind: 'ACCOUNT_SECURITY' as const }
@@ -95,13 +104,14 @@ export class AccountNotificationsController {
   @Post(':source/:id/read')
   async markOne(@Req() request: Request, @Param('source') source: string, @Param('id') id: string) {
     const identity = await identityFromAuthorization(request.headers.authorization);
+    const gymId = await this.scopeGymId(identity.userId, identity.gymAccountId);
     const parsed = accountNotificationReadInputSchema.safeParse({ source, id });
     if (!parsed.success) invalid();
     return this.database.master.$transaction(async tx => {
       const [clock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
       let readAt: Date|undefined;
       if (parsed.data.source === 'APPLICATION') {
-        const existing = await tx.memberApplicationNotice.findFirst({ where: { id: parsed.data.id, recipientId: identity.userId },
+        const existing = await tx.memberApplicationNotice.findFirst({ where: { id: parsed.data.id, recipientId: identity.userId, ...(gymId ? { gymId } : {}) },
           select: { id: true, event: true, gymId: true, readAt: true } });
         if (!existing || (existing.event.startsWith('OWNER_') && !await tx.gymAccess.findFirst({ where: { userId: identity.userId, gymId: existing.gymId, role: 'OWNER', linkStatus: 'ACTIVE', gym: { status: 'ACTIVE' } }, select: { userId: true } }))) {
           throw new NotFoundException('Notification not found');
@@ -112,18 +122,20 @@ export class AccountNotificationsController {
           readAt = clock!.now;
         }
       } else {
-        const event = await tx.identitySecurityEvent.findFirst({ where: { id: parsed.data.id, identityId: identity.userId }, select: { id: true } });
+        const event = await tx.identitySecurityEvent.findFirst({ where: { id: parsed.data.id, identityId: identity.userId,
+          gymAccountId: identity.gymAccountId ?? null }, select: { id: true } });
         if (!event) throw new NotFoundException('Notification not found');
         await tx.identitySecurityEventRead.createMany({ data: [{ securityEventId: event.id, identityId: identity.userId, readAt: clock!.now }], skipDuplicates: true });
         readAt = (await tx.identitySecurityEventRead.findUniqueOrThrow({ where: { securityEventId: event.id }, select: { readAt: true } })).readAt;
       }
-      return accountNotificationReadResultSchema.parse({ id: `${parsed.data.source}:${parsed.data.id}`, readAt: readAt!.toISOString(), unreadCount: await unreadCount(tx, identity.userId) });
+      return accountNotificationReadResultSchema.parse({ id: `${parsed.data.source}:${parsed.data.id}`, readAt: readAt!.toISOString(), unreadCount: await unreadCount(tx, identity.userId, gymId, identity.gymAccountId) });
     });
   }
 
   @Post('read-all')
   async markAll(@Req() request: Request, @Body() body: unknown) {
     const identity = await identityFromAuthorization(request.headers.authorization);
+    const gymId = await this.scopeGymId(identity.userId, identity.gymAccountId);
     const parsed = accountNotificationReadAllInputSchema.safeParse(body);
     if (!parsed.success) invalid();
     return this.database.master.$transaction(async tx => {
@@ -132,15 +144,17 @@ export class AccountNotificationsController {
       if (through > clock!.now) invalid();
       const applicationChanged = await tx.$executeRaw`UPDATE "MemberApplicationNotice" n SET "readAt" = ${clock!.now}
         WHERE n."recipientId" = ${identity.userId} AND n."readAt" IS NULL AND n."createdAt" <= ${through}
+          AND (${gymId ?? null}::text IS NULL OR n."gymId" = ${gymId ?? null})
           AND (n."event"::text NOT LIKE 'OWNER_%' OR EXISTS (SELECT 1 FROM "GymAccess" ga JOIN "Gym" g ON g."id" = ga."gymId"
             WHERE ga."userId" = n."recipientId" AND ga."gymId" = n."gymId" AND ga."role" = 'OWNER' AND ga."linkStatus" = 'ACTIVE' AND g."status" = 'ACTIVE'))`;
       const securityRows = await tx.$queryRaw<{ securityEventId: string }[]>(Prisma.sql`INSERT INTO "IdentitySecurityEventRead" ("id", "securityEventId", "identityId", "readAt")
         SELECT 'security_read_' || gen_random_uuid()::text, e."id", ${identity.userId}, ${clock!.now}
         FROM "IdentitySecurityEvent" e LEFT JOIN "IdentitySecurityEventRead" r ON r."securityEventId" = e."id"
-        WHERE e."identityId" = ${identity.userId} AND e."createdAt" <= ${through} AND r."securityEventId" IS NULL
+        WHERE e."identityId" = ${identity.userId} AND e."createdAt" <= ${through}
+          AND e."gymAccountId" IS NOT DISTINCT FROM ${identity.gymAccountId ?? null} AND r."securityEventId" IS NULL
         ON CONFLICT ("securityEventId") DO NOTHING RETURNING "securityEventId"`);
       return accountNotificationReadAllResultSchema.parse({ changedCount: applicationChanged + securityRows.length,
-        unreadCount: await unreadCount(tx, identity.userId), through: through.toISOString(), asOf: clock!.now.toISOString() });
+        unreadCount: await unreadCount(tx, identity.userId, gymId, identity.gymAccountId), through: through.toISOString(), asOf: clock!.now.toISOString() });
     });
   }
 }

@@ -29,9 +29,15 @@ export class AccountProfileController {
     const identity = await identityFromAuthorization(request.headers.authorization);
     const user = await this.database.master.user.findUnique({ where: { id: identity.userId },
       select: { id: true, email: true, displayName: true, globalRole: true, version: true, authVersion: true, mustChangePassword: true } });
-    if (!user || user.authVersion !== identity.authVersion || user.mustChangePassword) throw new ForbiddenException('Current account access is required');
-    return accountProfileSchema.parse({ identityId: user.id, email: user.email, displayName: user.displayName,
-      globalRole: user.globalRole, version: user.version });
+    const gymAccount = identity.gymAccountId ? await this.database.master.gymAccount.findUnique({ where: { id: identity.gymAccountId },
+      include: { gym: { select: { name: true } } } }) : null;
+    if (!user || (!gymAccount && (user.authVersion !== identity.authVersion || user.mustChangePassword))
+      || (identity.gymAccountId && (!gymAccount || gymAccount.userId !== user.id || gymAccount.authVersion !== identity.authVersion || gymAccount.status !== 'ACTIVE' || gymAccount.mustChangePassword))) {
+      throw new ForbiddenException('Current account access is required');
+    }
+    return accountProfileSchema.parse({ identityId: user.id, email: user.email, username: gymAccount?.username ?? null,
+      gymName: gymAccount?.gym.name ?? null, displayName: gymAccount ? gymAccount.displayName : user.displayName,
+      globalRole: user.globalRole, version: gymAccount ? gymAccount.version : user.version });
   }
 
   @Patch()
@@ -40,14 +46,31 @@ export class AccountProfileController {
     if (!identity.sessionId) throw new ForbiddenException('Sign in again to update your profile');
     const parsed = updateAccountProfileSchema.safeParse({ ...(typeof body === 'object' && body !== null ? body : {}), idempotencyKey: key });
     if (!parsed.success) invalid();
-    const digest = requestDigest({ displayName: parsed.data.displayName, expectedVersion: parsed.data.expectedVersion });
+    const commandKind = identity.gymAccountId ? 'UPDATE_GYM_ACCOUNT_PROFILE' : 'UPDATE_ACCOUNT_PROFILE';
+    const resourceId = identity.gymAccountId ?? identity.userId;
+    const digest = requestDigest({ displayName: parsed.data.displayName, expectedVersion: parsed.data.expectedVersion, gymAccountId: identity.gymAccountId ?? null });
     return this.database.master.$transaction(async tx => {
-      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${identity.userId} FOR UPDATE`;
+      if (identity.gymAccountId) await tx.$queryRaw`SELECT "id" FROM "GymAccount" WHERE "id" = ${identity.gymAccountId} AND "userId" = ${identity.userId} FOR UPDATE`;
+      else await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${identity.userId} FOR UPDATE`;
       const receipt = await tx.profileCommandReceipt.findUnique({ where: { actorIdentityId_commandKind_idempotencyKey: {
-        actorIdentityId: identity.userId, commandKind: 'UPDATE_ACCOUNT_PROFILE', idempotencyKey: parsed.data.idempotencyKey,
+        actorIdentityId: identity.userId, commandKind, idempotencyKey: parsed.data.idempotencyKey,
       } } });
       if (receipt) return replay({ requestDigest: receipt.requestDigest, resourceId: receipt.resourceId,
-        safeResult: { version: receipt.resultVersion, replayed: false } }, digest, identity.userId);
+        safeResult: { version: receipt.resultVersion, replayed: false } }, digest, resourceId);
+      if (identity.gymAccountId) {
+        const account = await tx.gymAccount.findFirst({ where: { id: identity.gymAccountId, userId: identity.userId, authVersion: identity.authVersion, status: 'ACTIVE', mustChangePassword: false },
+          select: { id: true, version: true } });
+        if (!account) throw new ForbiddenException('Gym account access changed; sign in again');
+        if (account.version !== parsed.data.expectedVersion) throw new ConflictException('Your gym account profile changed; reload before saving');
+        const changed = await tx.gymAccount.updateMany({ where: { id: account.id, version: account.version }, data: { displayName: parsed.data.displayName, version: { increment: 1 } } });
+        if (changed.count !== 1) throw new ConflictException('Your gym account profile changed; reload before saving');
+        const nextVersion = account.version + 1;
+        await tx.profileCommandReceipt.create({ data: { actorIdentityId: identity.userId, commandKind,
+          idempotencyKey: parsed.data.idempotencyKey, requestDigest: digest, resourceId, resultVersion: nextVersion } });
+        await appendMasterVersionAudit(tx, { actorIdentityId: identity.userId, eventCode: 'GYM_ACCOUNT_DISPLAY_NAME_UPDATED',
+          resourceType: 'GYM_ACCOUNT', resourceId, committedVersion: nextVersion, transition: { from: String(account.version), to: String(nextVersion), version: nextVersion } });
+        return profileCommandResultSchema.parse({ version: nextVersion, replayed: false });
+      }
       const user = await tx.user.findUnique({ where: { id: identity.userId }, select: { id: true, version: true, authVersion: true, mustChangePassword: true } });
       if (!user || user.authVersion !== identity.authVersion || user.mustChangePassword) throw new ForbiddenException('Account access changed; sign in again');
       if (user.version !== parsed.data.expectedVersion) throw new ConflictException('Your account profile changed; reload before saving');

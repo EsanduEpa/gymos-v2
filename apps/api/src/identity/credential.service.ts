@@ -154,6 +154,12 @@ export class CredentialService {
         },
       });
       if (changed.count !== 1) throw new ConflictException('Credential identity changed');
+      await tx.gymAccount.upsert({ where: { userId_gymId: { userId: user.id, gymId: input.gymId } },
+        create: { userId: user.id, gymId: input.gymId, username: user.email, passwordHash, status: 'ACTIVE',
+          displayName: user.displayName,
+          mustChangePassword: true, credentialExpiresAt: expiresAt, authVersion: nextAuthVersion },
+        update: { username: user.email, passwordHash, status: 'ACTIVE', mustChangePassword: true,
+          credentialExpiresAt: expiresAt, authVersion: { increment: 1 }, version: { increment: 1 } } });
       await tx.credentialDelivery.create({ data: {
         operationId: operation.id,
         identityId: user.id,
@@ -227,6 +233,12 @@ export class CredentialService {
         data: { passwordHash, credentialExpiresAt: expiresAt, authVersion: { increment: 1 } },
       });
       if (changed.count !== 1) throw new ConflictException('Credential identity changed');
+      await tx.gymAccount.upsert({ where: { userId_gymId: { userId: user.id, gymId: input.gymId } },
+        create: { userId: user.id, gymId: input.gymId, username: user.email, passwordHash, status: 'ACTIVE',
+          displayName: user.displayName,
+          mustChangePassword: true, credentialExpiresAt: expiresAt, authVersion: nextAuthVersion },
+        update: { passwordHash, status: 'ACTIVE', mustChangePassword: true, credentialExpiresAt: expiresAt,
+          authVersion: { increment: 1 }, version: { increment: 1 } } });
       const nextDeliveryVersion = delivery.version + 1;
       await tx.credentialDelivery.update({ where: { operationId: operation.id }, data: {
         authVersion: nextAuthVersion,
@@ -294,6 +306,7 @@ export class CredentialService {
   async changePassword(input: {
     identityId: string;
     authVersion: number;
+    gymAccountId?: string;
     currentPassword: string;
     newPassword: string;
   }) {
@@ -301,44 +314,48 @@ export class CredentialService {
       await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${input.identityId} FOR UPDATE`;
       const user = await tx.user.findUnique({ where: { id: input.identityId } });
       const now = await this.databaseNow(tx);
-      if (!user || user.authVersion !== input.authVersion) {
+      if (!user || (!input.gymAccountId && user.authVersion !== input.authVersion)) {
         throw new UnauthorizedException('Invalid or revoked token');
       }
-      if (user.credentialExpiresAt && user.credentialExpiresAt <= now) {
+      const account = input.gymAccountId ? await tx.gymAccount.findUnique({ where: { id: input.gymAccountId } }) : null;
+      if (input.gymAccountId && (!account || account.userId !== user.id || account.authVersion !== input.authVersion || account.status !== 'ACTIVE' || !account.passwordHash)) {
+        throw new UnauthorizedException('Gym account unavailable');
+      }
+      const credential = account ?? user;
+      if (credential.credentialExpiresAt && credential.credentialExpiresAt <= now) {
         throw new UnauthorizedException('Credential expired');
       }
-      if (!(await argon2.verify(user.passwordHash, input.currentPassword))) {
+      if (!(await argon2.verify(credential.passwordHash!, input.currentPassword))) {
         throw new BadRequestException('Current password is incorrect');
       }
-      if (user.passwordHash && await argon2.verify(user.passwordHash, input.newPassword)) {
+      if (credential.passwordHash && await argon2.verify(credential.passwordHash, input.newPassword)) {
         throw new BadRequestException('Choose a password different from your current one');
       }
 
       const passwordHash = await argon2.hash(input.newPassword, { type: argon2.argon2id });
-      const nextAuthVersion = user.authVersion + 1;
-      const changed = await tx.user.updateMany({
-        where: { id: user.id, authVersion: user.authVersion },
-        data: {
-          passwordHash,
-          mustChangePassword: false,
-          credentialExpiresAt: null,
-          passwordChangedAt: now,
-          authVersion: { increment: 1 },
-        },
-      });
-      if (changed.count !== 1) throw new ConflictException('Credential identity changed');
-      await tx.identitySession.updateMany({ where: { identityId: user.id, revokedAt: null },
+      const nextAuthVersion = account ? account.authVersion + 1 : user.authVersion + 1;
+      const syncLegacy = !account || await tx.gymAccess.count({ where: { userId: user.id } }) === 1;
+      if (account) await tx.gymAccount.update({ where: { id: account.id }, data: { passwordHash, mustChangePassword: false,
+        credentialExpiresAt: null, passwordChangedAt: now, authVersion: { increment: 1 }, version: { increment: 1 } } });
+      if (syncLegacy) {
+        const changed = await tx.user.updateMany({ where: { id: user.id, authVersion: user.authVersion }, data: {
+          passwordHash, mustChangePassword: false, credentialExpiresAt: null, passwordChangedAt: now, authVersion: { increment: 1 },
+        } });
+        if (changed.count !== 1) throw new ConflictException('Credential identity changed');
+      }
+      await tx.identitySession.updateMany({ where: { identityId: user.id, ...(syncLegacy ? {} : { gymAccountId: account!.id }), revokedAt: null },
         data: { revokedAt: now, revocationReason: 'PASSWORD_CHANGED' } });
-      await tx.recoveryCredential.updateMany({ where: { identityId: user.id, redeemedAt: null, revokedAt: null }, data: { revokedAt: now } });
-      await revokeSupportForActor(tx, user.id, 'CREDENTIAL_REVOKED');
-      await tx.identitySecurityEvent.create({ data: { identityId: user.id, event: 'PASSWORD_CHANGED', createdAt: now } });
+      await tx.recoveryCredential.updateMany({ where: { identityId: user.id, ...(syncLegacy ? {} : { gymId: account!.gymId }), redeemedAt: null, revokedAt: null }, data: { revokedAt: now } });
+      if (syncLegacy) await revokeSupportForActor(tx, user.id, 'CREDENTIAL_REVOKED');
+      await tx.identitySecurityEvent.create({ data: { identityId: user.id, gymAccountId: account?.id, event: 'PASSWORD_CHANGED', createdAt: now } });
       await appendMasterVersionAudit(tx, {
         actorIdentityId: user.id,
         eventCode: 'PASSWORD_CHANGED',
-        resourceType: 'IDENTITY',
-        resourceId: user.id,
-        committedVersion: nextAuthVersion,
-        transition: { from: String(user.authVersion), to: String(nextAuthVersion), version: nextAuthVersion },
+        resourceType: account && !syncLegacy ? 'GYM_ACCOUNT' : 'IDENTITY',
+        resourceId: account && !syncLegacy ? account.id : user.id,
+        committedVersion: account && !syncLegacy ? account.version + 1 : nextAuthVersion,
+        transition: account && !syncLegacy ? { from: String(account.version), to: String(account.version + 1), version: account.version + 1 }
+          : { from: String(user.authVersion), to: String(nextAuthVersion), version: nextAuthVersion },
       });
     });
     return { success: true as const };
@@ -375,13 +392,16 @@ export class CredentialService {
       await tx.$queryRaw`SELECT "id" FROM "Gym" WHERE "id" = ${input.gymId} FOR SHARE`;
       await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${input.actorIdentityId} FOR SHARE`;
       await tx.$queryRaw`SELECT "userId" FROM "GymAccess" WHERE "userId" = ${input.actorIdentityId} AND "gymId" = ${input.gymId} FOR SHARE`;
-      const [gym, owner, ownerAccess] = await Promise.all([
+      const [gym, owner, ownerAccess, ownerAccount] = await Promise.all([
         tx.gym.findUnique({ where: { id: input.gymId }, select: { status: true } }),
         tx.user.findUnique({ where: { id: input.actorIdentityId }, select: { globalRole: true, passwordHash: true, authVersion: true } }),
         tx.gymAccess.findUnique({ where: { userId_gymId: { userId: input.actorIdentityId, gymId: input.gymId } }, select: { role: true, linkStatus: true } }),
+        tx.gymAccount.findUnique({ where: { userId_gymId: { userId: input.actorIdentityId, gymId: input.gymId } }, select: { status: true, passwordHash: true } }),
       ]);
+      const ownerHash = ownerAccount?.status === 'ACTIVE' && ownerAccount.passwordHash ? ownerAccount.passwordHash : ownerAccount
+        ? null : owner?.passwordHash;
       if (gym?.status !== 'ACTIVE' || owner?.globalRole !== 'USER' || ownerAccess?.role !== 'OWNER' || ownerAccess.linkStatus !== 'ACTIVE'
-        || !owner || !(await argon2.verify(owner.passwordHash, input.currentPassword))) {
+        || !owner || !ownerHash || !(await argon2.verify(ownerHash, input.currentPassword))) {
         throw new ForbiddenException('Owner access required');
       }
       await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${input.identityId} FOR UPDATE`;
@@ -410,7 +430,7 @@ export class CredentialService {
     });
   }
 
-  async issueOperatorRecovery(input: { actorIdentityId: string; email: string; currentPassword: string;
+  async issueOperatorRecovery(input: { actorIdentityId: string; email: string; gymSlug?: string; currentPassword: string;
     verificationMethod: RecoveryVerificationMethod; reason: string }) {
     const secret = randomBytes(32).toString('base64url');
     return this.master.$transaction(async tx => {
@@ -423,16 +443,22 @@ export class CredentialService {
         id: true, email: true, displayName: true, globalRole: true, authVersion: true, mustChangePassword: true,
       } });
       if (!target || target.id === input.actorIdentityId || target.mustChangePassword) throw new ForbiddenException('Identity is not eligible for operator recovery');
+      const gym = input.gymSlug ? await tx.gym.findUnique({ where: { slug: input.gymSlug }, select: { id: true, status: true } }) : null;
+      if (input.gymSlug && (!gym || gym.status !== 'ACTIVE')) throw new ForbiddenException('Gym account is unavailable');
+      if (gym) {
+        const account = await tx.gymAccount.findUnique({ where: { userId_gymId: { userId: target.id, gymId: gym.id } }, select: { status: true } });
+        if (account?.status !== 'ACTIVE') throw new ForbiddenException('Gym account is unavailable');
+      }
       await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${target.id} FOR UPDATE`;
       const now = await this.databaseNow(tx);
-      await tx.recoveryCredential.updateMany({ where: { identityId: target.id, redeemedAt: null, revokedAt: null }, data: { revokedAt: now } });
+      await tx.recoveryCredential.updateMany({ where: { identityId: target.id, gymId: gym?.id ?? null, redeemedAt: null, revokedAt: null }, data: { revokedAt: now } });
       const expiresAt = new Date(now.getTime() + STAFF_RECOVERY_MS);
-      const credential = await tx.recoveryCredential.create({ data: { scope: 'OPERATOR', identityId: target.id, gymId: null,
+      const credential = await tx.recoveryCredential.create({ data: { scope: 'OPERATOR', identityId: target.id, gymId: gym?.id ?? null,
         issuedByIdentityId: input.actorIdentityId, secretHash: secretHash(secret), verificationMethod: input.verificationMethod,
         reason: input.reason, authVersion: target.authVersion, issuerAuthVersion: actor.authVersion, attempts: 0,
         maxAttempts: RECOVERY_MAX_ATTEMPTS, issuedAt: now, expiresAt } });
       await appendMasterVersionAudit(tx, { actorIdentityId: input.actorIdentityId, eventCode: 'OPERATOR_RECOVERY_CREDENTIAL_ISSUED',
-        resourceType: 'RECOVERY_CREDENTIAL', resourceId: credential.id, committedVersion: 1,
+        resourceType: 'RECOVERY_CREDENTIAL', resourceId: credential.id, committedVersion: 1, gymId: gym?.id,
         transition: { to: 'ISSUED', version: 1 } });
       return { credentialId: credential.id, secret, expiresAt: expiresAt.toISOString(),
         subjectLabel: target.displayName?.slice(0, 120) || target.email };
@@ -496,29 +522,42 @@ export class CredentialService {
         await tx.recoveryCredential.update({ where: { id: credential.id }, data: { revokedAt: now } });
         return { success: false as const };
       }
-      if (await argon2.verify(user.passwordHash, input.newPassword)) return { success: false as const };
+      const scopedOperatorAccount = credential.scope === 'OPERATOR' && credential.gymId
+        ? await tx.gymAccount.findUnique({ where: { userId_gymId: { userId: user.id, gymId: credential.gymId } } }) : null;
+      if (credential.scope === 'OPERATOR' && credential.gymId && (scopedOperatorAccount?.status !== 'ACTIVE' || !scopedOperatorAccount.passwordHash)) return { success: false as const };
+      if (await argon2.verify(scopedOperatorAccount?.passwordHash ?? user.passwordHash, input.newPassword)) return { success: false as const };
       const passwordHash = await argon2.hash(input.newPassword, { type: argon2.argon2id });
-      const updated = await tx.user.updateMany({ where: { id: user.id, authVersion: user.authVersion }, data: {
-        passwordHash, mustChangePassword: false, credentialExpiresAt: null, passwordChangedAt: now, authVersion: { increment: 1 },
-      } });
-      if (updated.count !== 1) throw new ConflictException('Credential identity changed');
+      const subjectAccount = credential.gymId ? await tx.gymAccount.findUnique({ where: { userId_gymId: { userId: user.id, gymId: credential.gymId } } }) : null;
+      if (subjectAccount?.status === 'ACTIVE') await tx.gymAccount.update({ where: { id: subjectAccount.id }, data: {
+        passwordHash, mustChangePassword: false, credentialExpiresAt: null, passwordChangedAt: now,
+        authVersion: { increment: 1 }, version: { increment: 1 } } });
+      if (!scopedOperatorAccount) {
+        const updated = await tx.user.updateMany({ where: { id: user.id, authVersion: user.authVersion }, data: {
+          passwordHash, mustChangePassword: false, credentialExpiresAt: null, passwordChangedAt: now, authVersion: { increment: 1 },
+        } });
+        if (updated.count !== 1) throw new ConflictException('Credential identity changed');
+      }
       await tx.recoveryCredential.update({ where: { id: credential.id }, data: { redeemedAt: now } });
-      await tx.recoveryCredential.updateMany({ where: { identityId: user.id, id: { not: credential.id }, redeemedAt: null, revokedAt: null }, data: { revokedAt: now } });
-      await tx.identitySession.updateMany({ where: { identityId: user.id, revokedAt: null }, data: { revokedAt: now, revocationReason: 'PASSWORD_CHANGED' } });
-      await revokeSupportForActor(tx, user.id, 'CREDENTIAL_REVOKED');
-      await tx.identitySecurityEvent.create({ data: { identityId: user.id, event: 'PASSWORD_RECOVERED', createdAt: now } });
+      await tx.recoveryCredential.updateMany({ where: { identityId: user.id, ...(scopedOperatorAccount ? { gymId: credential.gymId } : {}),
+        id: { not: credential.id }, redeemedAt: null, revokedAt: null }, data: { revokedAt: now } });
+      await tx.identitySession.updateMany({ where: { identityId: user.id, ...(scopedOperatorAccount ? { gymAccountId: scopedOperatorAccount.id } : {}), revokedAt: null },
+        data: { revokedAt: now, revocationReason: 'PASSWORD_CHANGED' } });
+      if (!scopedOperatorAccount) await revokeSupportForActor(tx, user.id, 'CREDENTIAL_REVOKED');
+      await tx.identitySecurityEvent.create({ data: { identityId: user.id, gymAccountId: subjectAccount?.id, event: 'PASSWORD_RECOVERED', createdAt: now } });
       const nextAuthVersion = user.authVersion + 1;
       await appendMasterVersionAudit(tx, { actorIdentityId: credential.issuedByIdentityId, eventCode: 'STAFF_PASSWORD_RECOVERED',
-        resourceType: 'IDENTITY', resourceId: user.id, committedVersion: nextAuthVersion, gymId: credential.gymId,
-        transition: { from: String(user.authVersion), to: String(nextAuthVersion), version: nextAuthVersion } });
+        resourceType: scopedOperatorAccount ? 'GYM_ACCOUNT' : 'IDENTITY', resourceId: scopedOperatorAccount?.id ?? user.id,
+        committedVersion: scopedOperatorAccount ? scopedOperatorAccount.version + 1 : nextAuthVersion, gymId: credential.gymId,
+        transition: scopedOperatorAccount ? { from: String(scopedOperatorAccount.version), to: String(scopedOperatorAccount.version + 1), version: scopedOperatorAccount.version + 1 }
+          : { from: String(user.authVersion), to: String(nextAuthVersion), version: nextAuthVersion } });
       return { success: true as const };
     });
     if (!result.success) throw new UnauthorizedException('Recovery credential is invalid, expired, already used, or the password could not be accepted');
     return result;
   }
 
-  async securityEvents(identityId: string) {
-    const rows = await this.master.identitySecurityEvent.findMany({ where: { identityId }, orderBy: { createdAt: 'desc' }, take: 50,
+  async securityEvents(identityId: string, gymAccountId?: string) {
+    const rows = await this.master.identitySecurityEvent.findMany({ where: { identityId, gymAccountId: gymAccountId ?? null }, orderBy: { createdAt: 'desc' }, take: 50,
       select: { event: true, createdAt: true } });
     return { items: rows.map(row => ({ event: row.event, createdAt: row.createdAt.toISOString() })) };
   }

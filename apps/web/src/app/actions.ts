@@ -75,8 +75,8 @@ export async function login(formData: FormData) {
   if (/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(applyGym)) redirect(`/gyms/${encodeURIComponent(applyGym)}/apply`);
 
   const firstGym = result.gyms[0];
-  redirect(result.globalRole === 'SUPER_ADMIN' ? '/admin' : firstGym === undefined ? '/no-access'
-    : result.gyms.length === 1 ? `/gyms/${encodeURIComponent(firstGym.slug)}/${gymRoleLandingPath(firstGym.role)}` : '/gyms/select');
+  redirect(result.globalRole === 'SUPER_ADMIN' ? '/admin' : result.gyms.length !== 1 || firstGym === undefined ? '/no-access'
+    : `/gyms/${encodeURIComponent(firstGym.slug)}/${gymRoleLandingPath(firstGym.role)}`);
 }
 
 async function endSession(scope: 'CURRENT' | 'ALL') {
@@ -187,6 +187,7 @@ export async function issueOperatorRecoveryAction(_previous: unknown, formData: 
   const token = await sessionToken();
   if (!token) redirect('/login');
   const parsed = operatorRecoveryIssueInputSchema.safeParse({ email: field(formData, 'email').toLowerCase(),
+    ...(field(formData, 'gymSlug') ? { gymSlug: field(formData, 'gymSlug') } : {}),
     verificationMethod: formData.get('verificationMethod'), reason: formData.get('reason'), currentPassword: formData.get('currentPassword') });
   if (!parsed.success) return { error: 'Enter the identity, verification method, attestation, and current password.' };
   let response: Response;

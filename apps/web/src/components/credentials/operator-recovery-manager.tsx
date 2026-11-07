@@ -14,6 +14,8 @@ export function OperatorRecoveryManager() {
     {state.recovery ? <Feedback tone="success"><strong>One-time credential for {state.recovery.subjectLabel}</strong><br/>Expires {new Date(state.recovery.expiresAt).toLocaleString('en', { timeZone: 'UTC', timeZoneName: 'short' })}. Show the link directly to the verified account holder; it is shown once.<br/><code className="recovery-handoff-link">{`/recover#${state.recovery.credentialId}.${state.recovery.secret}`}</code></Feedback> : null}
     <form action={action} className="stack-form">
       <Field label="Account email" name="email" type="email" autoComplete="off" required/>
+      <Field label="Gym address name (for one gym account)" name="gymSlug" type="text" autoComplete="off"/>
+      <p className="form-note">Enter the gym address name when recovering one gym password. Leave it blank only for an operator or pending account without a gym login.</p>
       <label className="ui-field"><span className="ui-field-label">Identity check</span><select name="verificationMethod" required defaultValue=""><option value="" disabled>Select verification method</option><option value="IN_PERSON">Verified in person</option><option value="KNOWN_CONTACT">Verified through a known contact</option></select></label>
       <label className="ui-field"><span className="ui-field-label">Operator attestation</span><textarea name="reason" minLength={8} maxLength={500} required placeholder="Record how the person was independently verified."></textarea><span className="ui-field-hint">Do not record identity document numbers or upload copies.</span></label>
       <PasswordInput label="Your current password" name="currentPassword" autoComplete="current-password" maxLength={1024}/>

@@ -24,6 +24,7 @@ export class CredentialsController {
     return this.credentials.changePassword({
       identityId: identity.userId,
       authVersion: identity.authVersion,
+      gymAccountId: identity.gymAccountId,
       currentPassword: parsed.data.currentPassword,
       newPassword: parsed.data.newPassword,
     });
@@ -32,7 +33,7 @@ export class CredentialsController {
   @Get('security-events')
   async securityEvents(@Req() request: Request) {
     const identity = await identityFromAuthorization(request.headers.authorization);
-    return identitySecurityEventListSchema.parse(await this.credentials.securityEvents(identity.userId));
+    return identitySecurityEventListSchema.parse(await this.credentials.securityEvents(identity.userId, identity.gymAccountId));
   }
 
   @Post('recovery/complete')

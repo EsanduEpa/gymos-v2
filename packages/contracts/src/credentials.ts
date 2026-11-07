@@ -16,6 +16,15 @@ export const changePasswordInputSchema = z.strictObject({
 
 export const changePasswordResultSchema = z.strictObject({ success: z.literal(true) });
 
+export const gymAccountSetupSchema = z.strictObject({
+  gymSlug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(100),
+  legacyEmail: z.email().max(254).transform(value => value.toLowerCase()),
+  legacyPassword: z.string().min(1).max(1024),
+  username: z.string().trim().toLowerCase().min(3).max(254).regex(/^[a-z0-9_.@+-]+$/),
+  newPassword: newPasswordSchema,
+}).refine(value => value.newPassword !== value.legacyPassword, { path: ['newPassword'], message: 'Choose a different password' });
+export const gymAccountSetupResultSchema = z.strictObject({ success: z.literal(true) });
+
 export const recoveryVerificationMethodSchema = z.enum(['IN_PERSON', 'KNOWN_CONTACT']);
 export const recoveryIssueInputSchema = z.strictObject({
   verificationMethod: recoveryVerificationMethodSchema,
@@ -24,6 +33,7 @@ export const recoveryIssueInputSchema = z.strictObject({
 });
 export const operatorRecoveryIssueInputSchema = z.strictObject({
   email: z.email(),
+  gymSlug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(100).optional(),
   verificationMethod: recoveryVerificationMethodSchema,
   reason: z.string().trim().min(8).max(500),
   currentPassword: z.string().min(1).max(1024),

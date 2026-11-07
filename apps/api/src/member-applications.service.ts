@@ -45,11 +45,20 @@ export class MemberApplicationsService {
     return { submitted: true as const };
   }
 
-  async authenticatedApply(slug: string, identityId: string, authVersion: number, input: { fullName: string; phone: string }) {
+  private async accountGymId(accountId?: string): Promise<string | undefined> {
+    if (!accountId) return undefined;
+    const account = await this.database.master.gymAccount.findUnique({ where: { id: accountId }, select: { gymId: true, status: true } });
+    if (!account || account.status !== 'ACTIVE') throw new ForbiddenException('Gym account unavailable');
+    return account.gymId;
+  }
+
+  async authenticatedApply(slug: string, identityId: string, authVersion: number, input: { fullName: string; phone: string }, accountId?: string) {
+    const scope = await this.accountGymId(accountId);
     try {
       await this.database.master.$transaction(async tx => {
         const gym = await tx.gym.findUnique({ where: { slug }, select: { id: true, status: true } });
         if (!gym || gym.status !== 'ACTIVE') throw new NotFoundException('Gym applications are unavailable');
+        if (scope && scope !== gym.id) throw new ForbiddenException('This gym account cannot apply to another gym');
         await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${`member-application:${gym.id}:${identityId}`}, 0))`;
         const [user, access, clock] = await Promise.all([
           tx.user.findUnique({ where: { id: identityId }, select: { globalRole: true, authVersion: true, mustChangePassword: true } }),
@@ -75,9 +84,10 @@ export class MemberApplicationsService {
     return { submitted: true as const };
   }
 
-  async ownApplications(identityId: string, authVersion: number) {
+  async ownApplications(identityId: string, authVersion: number, accountId?: string) {
     await this.assertIdentity(identityId, authVersion);
-    const rows = await this.database.master.memberApplication.findMany({ where: { identityId },
+    const gymId = await this.accountGymId(accountId);
+    const rows = await this.database.master.memberApplication.findMany({ where: { identityId, ...(gymId ? { gymId } : {}) },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 50,
       select: { id: true, fullName: true, state: true, createdAt: true, applicantReason: true, enrollmentOperationId: true,
         membershipPlanId: true, dateOfBirth: true, membershipPlanName: true, membershipPrice: true, membershipCurrency: true,
@@ -93,9 +103,10 @@ export class MemberApplicationsService {
       membershipPrice: row.membershipPrice, membershipCurrency: row.membershipCurrency, membershipDurationDays: row.membershipDurationDays }));
   }
 
-  async applicantNotices(identityId: string, authVersion: number) {
+  async applicantNotices(identityId: string, authVersion: number, accountId?: string) {
     await this.assertIdentity(identityId, authVersion);
-    return this.noticeList(await this.database.master.memberApplicationNotice.findMany({ where: { recipientId: identityId },
+    const gymId = await this.accountGymId(accountId);
+    return this.noticeList(await this.database.master.memberApplicationNotice.findMany({ where: { recipientId: identityId, ...(gymId ? { gymId } : {}) },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 50, include: { gym: { select: { slug: true } } } }));
   }
 
@@ -105,8 +116,11 @@ export class MemberApplicationsService {
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 50, include: { gym: { select: { slug: true } } } }));
   }
 
-  async markNoticeRead(identityId: string, authVersion: number, noticeId: string, gymId?: string) {
+  async markNoticeRead(identityId: string, authVersion: number, noticeId: string, gymId?: string, accountId?: string) {
     await this.assertIdentity(identityId, authVersion);
+    const accountGymId = await this.accountGymId(accountId);
+    if (gymId && accountGymId && gymId !== accountGymId) throw new ForbiddenException('Gym account access denied');
+    gymId ??= accountGymId;
     const [clock] = await this.database.master.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
     const now = clock!.now;
     const changed = await this.database.master.memberApplicationNotice.updateMany({ where: { id: noticeId, recipientId: identityId,
@@ -137,11 +151,12 @@ export class MemberApplicationsService {
     return { items, unreadCount: items.filter(item => !item.readAt).length };
   }
 
-  async withdraw(identityId: string, authVersion: number, applicationId: string) {
+  async withdraw(identityId: string, authVersion: number, applicationId: string, accountId?: string) {
     await this.assertIdentity(identityId, authVersion);
+    const gymId = await this.accountGymId(accountId);
     return this.database.master.$transaction(async tx => {
       await tx.$queryRaw`SELECT "id" FROM "MemberApplication" WHERE "id" = ${applicationId} AND "identityId" = ${identityId} FOR UPDATE`;
-      const application = await tx.memberApplication.findFirst({ where: { id: applicationId, identityId, state: 'PENDING' },
+      const application = await tx.memberApplication.findFirst({ where: { id: applicationId, identityId, ...(gymId ? { gymId } : {}), state: 'PENDING' },
         select: { id: true, gymId: true, version: true } });
       if (!application) throw new NotFoundException('Application is unavailable');
       const changed = await tx.memberApplication.updateMany({ where: { id: applicationId, identityId, state: 'PENDING', version: application.version },

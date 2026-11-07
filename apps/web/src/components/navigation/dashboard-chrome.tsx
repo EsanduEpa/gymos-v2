@@ -7,15 +7,15 @@ import { usePathname } from 'next/navigation';
 import { signOut } from '@/app/actions';
 import { exitSupport } from '@/app/platform-actions';
 import { gymRoleUrl, type GymAccessSummary } from '@/lib/gymos';
-import { Button, LoadingState } from '@/components/ui';
+import { Button } from '@/components/ui';
 import { NotificationsBell } from './notifications-bell';
 import { ThemeToggle } from './theme-toggle';
 import { sidebarIsCollapsed, subscribeAppearance, togglePlatformSidebar } from '@/lib/appearance';
-import { Building2, LayoutDashboard, Plus, ShieldCheck, PanelLeftClose, PanelLeftOpen, LogOut, Menu, X, Dumbbell, UsersRound, CalendarDays, Wallet, ChartNoAxesCombined, Settings2, ScrollText, CreditCard, ArrowLeftRight, ClipboardList, Utensils, House, ClipboardCheck } from 'lucide-react';
+import { Building2, LayoutDashboard, Plus, ShieldCheck, PanelLeftClose, PanelLeftOpen, LogOut, Menu, X, Dumbbell, UsersRound, CalendarDays, Wallet, ChartNoAxesCombined, Settings2, ScrollText, CreditCard, ClipboardList, Utensils, House, ClipboardCheck } from 'lucide-react';
 
 // Only implemented destinations belong here. Support uses its explicit read-only
 // context; notification/subscription navigation waits for its owning slices.
-export function DashboardChrome({ gym, gyms, displayName, identityId, style, children, support }: {
+export function DashboardChrome({ gym, displayName, identityId, style, children, support }: {
   identityId: string; gym?: GymAccessSummary; gyms: GymAccessSummary[]; displayName: string;
   style?: CSSProperties; children: ReactNode;
   support?: { id: string; expiresAt: string };
@@ -24,7 +24,6 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
   const drawer = useRef<HTMLDialogElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
-  const [switching, setSwitching] = useState(false);
   const collapsed = useSyncExternalStore(subscribeAppearance, sidebarIsCollapsed, () => false);
   const account = !gym && pathname.startsWith('/account/');
   const platform = (!gym && !account) || Boolean(support);
@@ -68,14 +67,13 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
       <a className="platform-brand workspace-brand" href={home} aria-label={`${gym.name} dashboard`}><span className="platform-brand-mark workspace-brand-mark" aria-hidden="true">{gym.name.slice(0, 2).toUpperCase()}</span><span className="platform-brand-copy"><strong title={gym.name}>{gym.name}</strong><small>{owner ? 'OWNER WORKSPACE' : trainer ? 'TRAINER WORKSPACE' : 'MEMBER WORKSPACE'}</small></span></a>
       <nav aria-label={mobile ? 'Mobile navigation' : 'Main navigation'}>
         {sections.map(section => <div className="workspace-nav-group" key={section.label}><span className="platform-nav-label">{section.label}</span>{section.items.map(({ label: itemLabel, path, icon: Icon }) => <a key={path} href={`${destination}${path}`} title={itemLabel} aria-label={itemLabel} aria-current={(path ? (pathname.startsWith(`${destination}${path}`) || bookingDetail && path === (trainer ? '/schedule' : '/sessions') || trainer && path === '/clients' && pathname.includes('/plans/')) : pathname === home || pathname === `/gyms/${gym.slug}`) ? 'page' : undefined} onClick={close}><Icon size={19}/><span>{itemLabel}</span></a>)}</div>)}
-        {gyms.length > 1 ? <a href="/gyms/select" title="Switch gym" aria-label="Switch gym" onClick={() => { close(); setSwitching(true); }}><ArrowLeftRight size={19}/><span>Switch gym</span></a> : null}
       </nav>
       <div className="shell-sidebar-footer"><div className="platform-sidebar-identity"><span className="shell-avatar" aria-hidden="true">{displayName.slice(0, 1).toUpperCase()}</span><div><strong>{displayName}</strong><small>{owner ? 'Gym owner' : trainer ? 'Personal trainer' : 'Member'}</small></div></div>
         <a className="ui-button ui-button-secondary" href="/security" aria-label="Security settings"><ShieldCheck size={16}/><span>Security</span></a>
         <form action={signOut} data-session-exit><Button type="submit" variant="secondary" aria-label="Sign out"><LogOut size={16}/><span>Sign out</span></Button></form></div>
     </>;
     if (account) return <>
-      <a className="platform-brand" href="/gyms/select" aria-label="GymOS account home"><span className="platform-brand-mark"><Dumbbell size={23}/></span><span className="platform-brand-copy"><strong>GymOS</strong><small>YOUR ACCOUNT</small></span></a>
+      <a className="platform-brand" href="/" aria-label="GymOS account home"><span className="platform-brand-mark"><Dumbbell size={23}/></span><span className="platform-brand-copy"><strong>GymOS</strong><small>YOUR ACCOUNT</small></span></a>
       {mobile ? <button className="platform-drawer-close" type="button" onClick={close} aria-label="Close navigation menu"><X size={20}/></button> : null}
       <nav aria-label={mobile ? 'Mobile navigation' : 'Main navigation'}>
         <span className="platform-nav-label">ACCOUNT</span>
@@ -84,7 +82,7 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
         <a href="/account/notifications" onClick={close}><ClipboardList size={19}/><span>Notifications</span></a>
         <a href="/security" onClick={close}><ShieldCheck size={19}/><span>Security</span></a>
         <a href="/help" onClick={close}><House size={19}/><span>Help</span></a>
-        <a href="/gyms/select" onClick={close}><ArrowLeftRight size={19}/><span>Choose a gym</span></a>
+        <a href="/" onClick={close}><House size={19}/><span>My gym</span></a>
       </nav>
       <div className="shell-sidebar-footer"><div className="platform-sidebar-identity"><span className="shell-avatar" aria-hidden="true">{displayName.slice(0, 1).toUpperCase()}</span><div><strong>{displayName}</strong><small>GymOS account</small></div></div><form action={signOut} data-session-exit><Button type="submit" variant="secondary" aria-label="Sign out"><LogOut size={16}/><span>Sign out</span></Button></form></div>
     </>;
@@ -139,7 +137,7 @@ export function DashboardChrome({ gym, gyms, displayName, identityId, style, chi
           </nav>
         </details>
       </header>
-      <main id="workspace-content" className="shell-content" tabIndex={-1}>{switching ? <LoadingState label="Loading your gyms…" /> : children}</main>
+      <main id="workspace-content" className="shell-content" tabIndex={-1}>{children}</main>
     </div>
     {member ? <nav className="member-bottom-nav" aria-label="Member shortcuts"><a href={destination} aria-current={pathname === destination ? 'page' : undefined}><House size={20}/><span>Home</span></a><a href={`${destination}/workout-plans`} aria-current={pathname.startsWith(`${destination}/workout-plans`) ? 'page' : undefined}><Dumbbell size={20}/><span>Workouts</span></a><a href={`${destination}/sessions`} aria-current={bookingDetail || pathname.startsWith(`${destination}/sessions`) ? 'page' : undefined}><CalendarDays size={20}/><span>Sessions</span></a><button type="button" aria-label="More navigation options" aria-controls="primary-navigation" aria-expanded={open} onClick={show}><Menu size={20}/><span>More</span></button></nav> : null}
   </div>;

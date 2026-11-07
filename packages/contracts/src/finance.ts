@@ -71,6 +71,8 @@ export const ownerDashboardSchema = z.strictObject({ gymSlug: slug, date: localD
   earningChart: z.array(z.strictObject({ startHour: z.number().int().min(6).max(20), endHour: z.number().int().min(8).max(22), amount: decimal, sourceCount: z.number().int().nonnegative() })).length(8),
   sessions: z.array(z.strictObject({ id, state: z.string().min(1).max(32), type: z.string().min(1).max(32), scheduledStartAt: instant,
     scheduledEndAt: instant, memberName: z.string().min(1).max(120), trainerName: z.string().min(1).max(120), currency, fee: decimal })).max(10),
+  activeSessionItems: z.array(z.strictObject({ id, startedAt: instant, scheduledStartAt: instant,
+    memberName: z.string().min(1).max(120), trainerName: z.string().min(1).max(120) })),
   trainerCards: z.array(z.strictObject({ id, name: z.string().min(1).max(120), scheduledToday: z.number().int().nonnegative(), activeToday: z.number().int().nonnegative() })).max(50),
 });
 export type OwnerDashboard = z.infer<typeof ownerDashboardSchema>;

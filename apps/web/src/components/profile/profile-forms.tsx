@@ -12,13 +12,14 @@ export function AccountProfileForm({ profile, requestKey }: { profile: AccountPr
   const [state, action, pending] = useActionState(updateAccountProfile, initialProfileActionState);
   const router = useRouter();
   useEffect(() => { if (state.status === 'success') router.refresh(); }, [state.status, router]);
-  return <Card><CardHeader eyebrow="ACCOUNT IDENTITY" title="Your GymOS account"/>
+  return <Card><CardHeader eyebrow="GYM ACCOUNT" title={profile.gymName ? `${profile.gymName} account` : 'Your GymOS account'}/>
     {state.message ? <div role="status"><Feedback tone={state.status === 'success' ? 'success' : 'error'}>{state.message}</Feedback></div> : null}
     <form action={action} className="profile-form">
-      <Field label="Account display name" name="displayName" defaultValue={profile.displayName ?? ''} maxLength={120} required error={state.fieldErrors?.displayName}
-        hint="This name appears across your GymOS account. It does not rename your official record in each gym."/>
-      <label className="ui-field"><span className="ui-field-label">Login email</span><input value={profile.email} readOnly aria-readonly="true"/><span className="ui-field-hint">Login email changes require separate staff review; this app does not verify a new mailbox.</span></label>
-      <p className="profile-email-help">Need to correct your login email? <Link href="/account/email-correction">Request staff help</Link></p>
+      {profile.username ? <label className="ui-field"><span className="ui-field-label">Username for this gym</span><input value={profile.username} readOnly aria-readonly="true"/></label> : null}
+      <Field label={profile.gymName ? 'Gym account display name' : 'Account display name'} name="displayName" defaultValue={profile.displayName ?? ''} maxLength={120} required error={state.fieldErrors?.displayName}
+        hint={profile.gymName ? 'This name appears only in this gym account.' : 'This name appears in your GymOS platform account.'}/>
+      <label className="ui-field"><span className="ui-field-label">Contact email</span><input value={profile.email} readOnly aria-readonly="true"/><span className="ui-field-hint">This contact email is separate from the username used to sign in to a gym.</span></label>
+      {!profile.gymName ? <p className="profile-email-help">Need to correct your contact email? <Link href="/account/email-correction">Request staff help</Link></p> : null}
       <input type="hidden" name="expectedVersion" value={profile.version}/><input type="hidden" name="idempotencyKey" value={requestKey}/>
       <Button type="submit" disabled={pending}>{pending ? 'Saving…' : 'Save account name'}</Button>
     </form>

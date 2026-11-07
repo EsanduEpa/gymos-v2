@@ -5,7 +5,7 @@ import { Button, Feedback, Field, LoadingState } from '@/components/ui';
 import { PasswordInput } from '@/components/auth/password-input';
 
 const messages: Record<string, string> = {
-  invalid: 'Check your email and password, then try again.',
+  invalid: 'Check your username and password, then try again.',
   rate: 'Too many attempts. Please wait a minute and try again.',
   unavailable: 'GymOS is temporarily unavailable. Please try again shortly.',
   expired: 'Your session has expired. Sign in again.',
@@ -40,13 +40,14 @@ async function LoginContent({
           <form action={login} className="stack-form">
             {applyGym && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(applyGym) ? <input type="hidden" name="applyGym" value={applyGym}/> : null}
             {returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//') && !returnTo.includes('\\') ? <input type="hidden" name="returnTo" value={returnTo}/> : null}
-            <Field label="Email address" type="email" name="email" autoComplete="email" required />
+            <Field label="Username or email address" type="text" name="email" autoComplete="username" required />
             <PasswordInput />
             <label className="ui-checkbox"><input type="checkbox" name="deviceClass" value="PERSONAL"/><span>This is my personal device. Keep me signed in between visits for up to 7 days of inactivity.</span></label>
             <p className="form-note">Shared devices stay signed in for up to 30 minutes of inactivity and 8 hours total. The shared-device setting is selected by default.</p>
             <Button fullWidth type="submit">Sign in <span>→</span></Button>
           </form>
           <p className="form-note"><Link href="/recover">Forgot your password? Get staff help</Link></p>
+          <p className="form-note"><Link href="/gym-account/setup">Set up a separate gym account from an existing shared login</Link></p>
           <p className="form-note"><Link href="/apply">Apply to join a gym</Link> · <Link href="/applications">Check application status</Link></p>
           <p className="form-note"><Link href="/help">Help and privacy information</Link></p>
         </div>

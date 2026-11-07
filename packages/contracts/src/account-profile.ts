@@ -9,6 +9,8 @@ const idempotencyKey = z.string().min(16).max(128).regex(/^[\x21-\x7e]+$/);
 export const accountProfileSchema = z.strictObject({
   identityId: idSchema,
   email: z.email().max(254),
+  username: z.string().min(3).max(254).nullable(),
+  gymName: z.string().min(1).max(200).nullable(),
   displayName: z.string().min(1).max(120).nullable(),
   globalRole: z.enum(['USER', 'SUPER_ADMIN']),
   version: versionSchema,

@@ -29,25 +29,25 @@ export class MemberApplicationsController {
     const identity = await identityFromAuthorization(request.headers.authorization);
     const parsed = memberApplicationInputSchema.safeParse(body);
     if (!parsed.success) invalid();
-    return memberApplicationSubmittedSchema.parse(await this.applications.authenticatedApply(slug, identity.userId, identity.authVersion, parsed.data));
+    return memberApplicationSubmittedSchema.parse(await this.applications.authenticatedApply(slug, identity.userId, identity.authVersion, parsed.data, identity.gymAccountId));
   }
 
   @Get('me/applications')
   async ownApplications(@Req() request: Request) {
     const identity = await identityFromAuthorization(request.headers.authorization);
-    return memberApplicationStatusSchema.array().max(50).parse(await this.applications.ownApplications(identity.userId, identity.authVersion));
+    return memberApplicationStatusSchema.array().max(50).parse(await this.applications.ownApplications(identity.userId, identity.authVersion, identity.gymAccountId));
   }
 
   @Get('me/application-notifications')
   async applicantNotices(@Req() request: Request) {
     const identity = await identityFromAuthorization(request.headers.authorization);
-    return memberApplicationNoticeListSchema.parse(await this.applications.applicantNotices(identity.userId, identity.authVersion));
+    return memberApplicationNoticeListSchema.parse(await this.applications.applicantNotices(identity.userId, identity.authVersion, identity.gymAccountId));
   }
 
   @Post('me/application-notifications/:noticeId/read')
   async readApplicantNotice(@Req() request: Request, @Param('noticeId') noticeId: string) {
     const identity = await identityFromAuthorization(request.headers.authorization);
-    const result = await this.applications.markNoticeRead(identity.userId, identity.authVersion, noticeId);
+    const result = await this.applications.markNoticeRead(identity.userId, identity.authVersion, noticeId, undefined, identity.gymAccountId);
     return memberApplicationNoticeReadSchema.parse(result);
   }
 
@@ -55,7 +55,7 @@ export class MemberApplicationsController {
   async withdraw(@Req() request: Request, @Param('applicationId') applicationId: string) {
     const identity = await identityFromAuthorization(request.headers.authorization);
     if (!/^[A-Za-z0-9_:-]{1,128}$/.test(applicationId)) throw new ForbiddenException('Application unavailable');
-    return this.applications.withdraw(identity.userId, identity.authVersion, applicationId);
+    return this.applications.withdraw(identity.userId, identity.authVersion, applicationId, identity.gymAccountId);
   }
 
   @Get(':slug/owner/applications')

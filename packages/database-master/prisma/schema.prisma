@@ -43,6 +43,12 @@ enum SessionDeviceClass {
   SHARED
 }
 
+enum GymAccountStatus {
+  ACTIVE
+  SETUP_REQUIRED
+  DISABLED
+}
+
 enum RecoveryVerificationMethod {
   IN_PERSON
   KNOWN_CONTACT
@@ -77,6 +83,7 @@ model User {
   passwordChangedAt         DateTime?                        @db.Timestamptz(3)
   credentialExpiresAt       DateTime?                        @db.Timestamptz(3)
   gymAccesses               GymAccess[]
+  gymAccounts               GymAccount[]
   enrollmentProofs          EnrollmentProof[]
   memberApplications        MemberApplication[]
   memberApplicationNotices  MemberApplicationNotice[]        @relation("MemberApplicationNoticeRecipient")
@@ -95,7 +102,9 @@ model User {
 model IdentitySession {
   id                        String             @id @default(cuid())
   identityId                String
+  gymAccountId              String?
   identity                  User               @relation(fields: [identityId], references: [id], onDelete: Restrict)
+  gymAccount                GymAccount?        @relation(fields: [gymAccountId], references: [id], onDelete: Restrict)
   authVersion               Int
   deviceClass               SessionDeviceClass
   deviceLabel               String
@@ -113,6 +122,33 @@ model IdentitySession {
   @@index([identityId, revokedAt, lastActivityAt])
   @@index([idleExpiresAt])
   @@index([absoluteExpiresAt])
+}
+
+// A gym user's credential belongs to exactly one existing access link.
+// Historical User IDs remain the subject of enrollment and audit records.
+model GymAccount {
+  id                  String           @id @default(cuid())
+  userId              String
+  gymId               String
+  username            String?          @unique
+  displayName         String?
+  passwordHash        String?
+  status              GymAccountStatus @default(SETUP_REQUIRED)
+  mustChangePassword  Boolean          @default(false)
+  credentialExpiresAt DateTime?        @db.Timestamptz(3)
+  passwordChangedAt   DateTime?        @db.Timestamptz(3)
+  authVersion         Int              @default(0)
+  version             Int              @default(0)
+  createdAt           DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime         @updatedAt @db.Timestamptz(3)
+  user                User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  gym                 Gym              @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  access              GymAccess        @relation(fields: [userId, gymId], references: [userId, gymId], onDelete: Restrict)
+  sessions            IdentitySession[]
+  securityEvents      IdentitySecurityEvent[]
+
+  @@unique([userId, gymId])
+  @@index([gymId, status])
 }
 
 model RecoveryCredential {
@@ -144,11 +180,14 @@ model IdentitySecurityEvent {
   readReceipt IdentitySecurityEventRead?
   id          String                     @id @default(cuid())
   identityId  String
+  gymAccountId String?
   identity    User                       @relation(fields: [identityId], references: [id], onDelete: Restrict)
+  gymAccount  GymAccount?                @relation(fields: [gymAccountId], references: [id], onDelete: Restrict)
   event       IdentitySecurityEventType
   createdAt   DateTime                   @default(now()) @db.Timestamptz(3)
 
   @@index([identityId, createdAt])
+  @@index([gymAccountId, createdAt])
 }
 
 model IdentitySecurityEventRead {
@@ -223,6 +262,7 @@ model Gym {
   expectedTenantSchemaVersion  String?
   expectedTenantManifestDigest String?
   gymAccesses                  GymAccess[]
+  gymAccounts                  GymAccount[]
   theme                        Theme?
   enrollmentProofs             EnrollmentProof[]
   credentialDeliveries         CredentialDelivery[]
@@ -309,6 +349,7 @@ model GymAccess {
   version               Int              @default(0)
   user                  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   gym                   Gym              @relation(fields: [gymId], references: [id], onDelete: Cascade)
+  account               GymAccount?
   createdAt             DateTime         @default(now())
 
   @@id([userId, gymId])
