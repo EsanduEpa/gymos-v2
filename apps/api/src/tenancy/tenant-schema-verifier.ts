@@ -94,6 +94,9 @@ export async function verifyInstalledTenant(
     JOIN pg_class rel ON rel.oid = con.conrelid
     JOIN pg_namespace n ON n.oid = rel.relnamespace
     WHERE n.nspname = 'public' AND rel.relname = ANY(${applicationTables})
+      -- PostgreSQL 18 catalogs table NOT NULL constraints here; the pinned
+      -- PostgreSQL 17 manifest predates those entries. Keep all other kinds exact.
+      AND con.contype <> 'n'
     ORDER BY con.conname
   `;
   const triggers = await client.$queryRaw<Array<{ name: string }>>`
