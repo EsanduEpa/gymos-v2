@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import { SignJWT } from 'jose';
@@ -13,8 +13,15 @@ let fixture: Awaited<ReturnType<typeof seedTwoGymFixture>>;
 let app: INestApplication;
 let base: string;
 const secret = randomBytes(32).toString('hex');
-async function bearer(identityId: string) {
-  return new SignJWT({ authVersion: 0 }).setProtectedHeader({ alg: 'HS256' }).setSubject(identityId)
+async function bearer(identityId: string, gymId = fixture.gyms[0]!.id) {
+  const account = await fixture.master.gymAccount.upsert({ where: { userId_gymId: { userId: identityId, gymId } },
+    create: { userId: identityId, gymId, username: `configuration-${identityId}-${gymId}`, passwordHash: 'fixture-not-a-login-hash', status: 'ACTIVE' },
+    update: { status: 'ACTIVE', mustChangePassword: false, credentialExpiresAt: null } });
+  const now = Date.now();
+  const session = await fixture.master.identitySession.create({ data: { identityId, gymAccountId: account.id, authVersion: account.authVersion,
+    deviceClass: 'SHARED', deviceLabel: 'Configuration integration test', refreshTokenHash: createHash('sha256').update(randomBytes(32)).digest('hex'),
+    idleExpiresAt: new Date(now + 600_000), absoluteExpiresAt: new Date(now + 900_000) } });
+  return new SignJWT({ authVersion: account.authVersion, sid: session.id, gaid: account.id }).setProtectedHeader({ alg: 'HS256' }).setSubject(identityId)
     .setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('15m').sign(new TextEncoder().encode(secret));
 }
 async function call(path: string, accessToken: string, body?: unknown, method?: string, headers: Record<string, string> = {}) {
@@ -40,7 +47,7 @@ afterAll(async () => {
 });
 
 it('isolates owner settings, preserves exact values, versions themes, and derives membership without read writes', async () => {
-  const ownerA = await bearer(fixture.users.ownerA.id); const ownerB = await bearer(fixture.users.ownerB.id);
+  const ownerA = await bearer(fixture.users.ownerA.id); const ownerB = await bearer(fixture.users.ownerB.id, fixture.gyms[1]!.id);
   const trainer = await bearer(fixture.users.trainerUser.id); const member = await bearer(fixture.users.memberUser.id);
   const slugA = fixture.gyms[0]!.slug; const slugB = fixture.gyms[1]!.slug;
 

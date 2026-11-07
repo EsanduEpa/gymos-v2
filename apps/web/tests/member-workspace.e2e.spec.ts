@@ -98,7 +98,7 @@ async function seedSessions() {
 
 }
 async function openAs(page: Page, userId: string, path: string) {
-  await installBrowserSession({ page, master: fixture.master, identityId: userId, jwtSecret, origin: webBase });
+  await installBrowserSession({ page, master: fixture.master, identityId: userId, gymId: fixture.gyms[0].id, jwtSecret, origin: webBase });
   await page.goto(`${webBase}${path}`);
 }
 

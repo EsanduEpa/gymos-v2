@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -19,7 +19,15 @@ let reservations:ProvisioningReservationService;
 const secret=randomBytes(32).toString('hex');
 const password=randomBytes(24).toString('base64url');
 async function token(id:string,authVersion=0){return new SignJWT({authVersion}).setProtectedHeader({alg:'HS256'}).setSubject(id).setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('15m').sign(new TextEncoder().encode(secret));}
-const call=(path:string,bearer:string,body?:unknown,key=randomUUID())=>fetch(`${base}${path}`,{method:body===undefined?'GET':'POST',headers:{authorization:`Bearer ${bearer}`,'content-type':'application/json','idempotency-key':key},...(body===undefined?{}:{body:JSON.stringify(body)})});
+async function scopedToken(identityId:string,gymId:string){
+ const account=await master.gymAccount.findUniqueOrThrow({where:{userId_gymId:{userId:identityId,gymId}}});
+ const now=Date.now();const session=await master.identitySession.create({data:{identityId,gymAccountId:account.id,authVersion:account.authVersion,
+  deviceClass:'SHARED',deviceLabel:'Owner integration test',refreshTokenHash:createHash('sha256').update(randomBytes(32)).digest('hex'),
+  idleExpiresAt:new Date(now+600_000),absoluteExpiresAt:new Date(now+900_000)}});
+ return new SignJWT({authVersion:account.authVersion,sid:session.id,gaid:account.id}).setProtectedHeader({alg:'HS256'}).setSubject(identityId)
+  .setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('15m').sign(new TextEncoder().encode(secret));
+}
+const call=(path:string,bearer:string,body?:unknown,key=randomUUID())=>fetch(`${base}${path}`,{method:body===undefined?'GET':'POST',headers:{...(bearer?{authorization:`Bearer ${bearer}`}:{ }),'content-type':'application/json','idempotency-key':key},...(body===undefined?{}:{body:JSON.stringify(body)})});
 const input=(slug:string,email=`${slug}@example.test`)=>({name:'Synthetic activation gym',slug,ownerEmail:email,currency:'LKR' as const,timezone:'Asia/Colombo'});
 const worker=(fault?:(point:string)=>Promise<void>)=>new ProvisioningWorker(database,physical,tenants,fault);
 const reserve=(slug:string,email?:string)=>reservations.reserve(actor,0,randomUUID(),input(slug,email));
@@ -61,9 +69,13 @@ it('rolls back partial Master finalization, resumes tenant success, and hands of
   const subject=await master.user.findUniqueOrThrow({where:{id:done.subjectIdentityId!}});
   expect(await argon2.verify(subject.passwordHash,issued.temporaryPassword)).toBe(true);
   expect(subject.mustChangePassword).toBe(true);expect(subject.authVersion).toBe(1);
-  expect((await call(`/gyms/${body.slug}/access`,await token(subject.id,1))).status).toBe(403);
-  const changed=await call('/auth/change-password',await token(subject.id,1),{currentPassword:issued.temporaryPassword,newPassword:password,confirmPassword:password});expect(changed.status).toBe(201);
-  expect((await call(`/gyms/${body.slug}/access`,await token(subject.id,2))).status).toBe(200);
+  const initialLogin=await call('/auth/login','',{email:subject.email,password:issued.temporaryPassword});expect(initialLogin.status).toBe(201);
+  const initialToken=(await initialLogin.json()).accessToken;
+  expect((await call(`/gyms/${body.slug}/access`,initialToken)).status).toBe(403);
+  const changed=await call('/auth/change-password',initialToken,{currentPassword:issued.temporaryPassword,newPassword:password,confirmPassword:password});expect(changed.status).toBe(201);
+  const account=await master.gymAccount.findUniqueOrThrow({where:{userId_gymId:{userId:subject.id,gymId:done.gymId!}}});
+  expect(await argon2.verify(account.passwordHash,password)).toBe(true);
+  expect((await call(`/gyms/${body.slug}/access`,await scopedToken(subject.id,done.gymId!))).status).toBe(200);
   const safe=JSON.stringify(done.safeResult);expect(/password|credential|token|database|email/i.test(safe)).toBe(false);
   const tenant=await run.connect(done.databaseName!);try{
    expect((await tenant.query('SELECT count(*)::int AS count FROM "CommandReceipt" WHERE "sourceMasterOperationId"=$1',[done.id])).rows[0].count).toBe(1);
@@ -85,12 +97,17 @@ it('requires private verified consent for an existing identity across two gyms a
   expect((await call(`/auth/provisioning/${gym.operationId}/owner-consent`,bearer,{currentPassword:password})).status).toBe(200);
   expect((await worker().runOnce(gym.operationId)).state).toBe('COMPLETE');
   expect((await call(`/admin/operations/${gym.operationId}/credentials/issue`,admin,{})).status).toBe(403);
-  expect((await call(`/gyms/${gym.gym.slug}/access`,bearer)).status).toBe(200);
+  expect((await call(`/gyms/${gym.gym.slug}/access`,bearer)).status).toBe(403);
+ }
+ for(const gym of gyms){
+  const username=`${gym.gym.slug}.owner@example.test`;
+  expect((await call('/auth/gym-account/setup','',{gymSlug:gym.gym.slug,legacyEmail:owner.email,legacyPassword:password,username,newPassword:`${password}-scoped`})).status).toBe(201);
+  const account=await master.gymAccount.findUniqueOrThrow({where:{userId_gymId:{userId:owner.id,gymId:gym.gym.id}}});
+  expect(account.username).toBe(username);expect(await argon2.verify(account.passwordHash,`${password}-scoped`)).toBe(true);
+  expect((await call(`/gyms/${gym.gym.slug}/access`,await scopedToken(owner.id,gym.gym.id))).status).toBe(200);
  }
  const after=await master.user.findUniqueOrThrow({where:{id:owner.id}});
- expect(after.passwordHash===owner.passwordHash&&after.authVersion===owner.authVersion).toBe(true);
- const login=await call('/auth/login','',{email:owner.email,password});expect(login.status).toBe(201);
- expect((await login.json()).gyms.map((gym:{slug:string})=>gym.slug).sort()).toEqual(['reused-a','reused-b']);
+ expect(after.passwordHash===owner.passwordHash).toBe(true);
  expect(await master.credentialDelivery.count({where:{identityId:owner.id}})).toBe(0);
 },90_000);
 it('refuses a conflicting same-gym role and an identity appearing after reservation without resetting or deleting either identity',async()=>{

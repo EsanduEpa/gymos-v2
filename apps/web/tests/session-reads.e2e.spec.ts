@@ -91,7 +91,9 @@ async function seedSessions() {
   persistedBefore = { sessions: await tenant.pTSession.count(), events: await tenant.sessionStateEvent.count(), movements: await tenant.packCreditMovement.count() };
 }
 async function openAs(page: Page, userId: string, path: string) {
-  await installBrowserSession({ page, master: fixture.master, identityId: userId, jwtSecret, origin: webBase });
+  const slug = path.match(/^\/gyms\/([^/?#]+)/)?.[1];
+  const gymId = fixture.gyms.find(gym => gym.slug === slug)?.id;
+  await installBrowserSession({ page, master: fixture.master, identityId: userId, ...(gymId ? { gymId } : {}), jwtSecret, origin: webBase });
   await page.goto(`${webBase}${path}`);
 }
 

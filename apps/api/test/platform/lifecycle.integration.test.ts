@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -17,6 +17,16 @@ let run:Awaited<ReturnType<typeof createDisposablePostgresRun>>;let master:Prism
 const secret=randomBytes(32).toString('hex');
 let releaseInFlight=()=>{};
 const token=async(id:string)=>new SignJWT({authVersion:0}).setProtectedHeader({alg:'HS256'}).setSubject(id).setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('15m').sign(new TextEncoder().encode(secret));
+async function ownerToken(identityId:string,gymId:string){
+ const account=await master.gymAccount.upsert({where:{userId_gymId:{userId:identityId,gymId}},
+  create:{userId:identityId,gymId,username:`lifecycle-${identityId}-${gymId}`,passwordHash:'fixture-not-a-login-hash',status:'ACTIVE'},
+  update:{status:'ACTIVE',mustChangePassword:false,credentialExpiresAt:null}});
+ const now=Date.now();const session=await master.identitySession.create({data:{identityId,gymAccountId:account.id,authVersion:account.authVersion,
+  deviceClass:'SHARED',deviceLabel:'Lifecycle integration test',refreshTokenHash:createHash('sha256').update(randomBytes(32)).digest('hex'),
+  idleExpiresAt:new Date(now+600_000),absoluteExpiresAt:new Date(now+900_000)}});
+ return new SignJWT({authVersion:account.authVersion,sid:session.id,gaid:account.id}).setProtectedHeader({alg:'HS256'}).setSubject(identityId)
+  .setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('15m').sign(new TextEncoder().encode(secret));
+}
 const call=(path:string,identity=admin,body?:unknown,key=randomUUID(),method=body===undefined?'GET':'POST')=>fetch(`${base}${path}`,{method,headers:{authorization:`Bearer ${identity}`,'content-type':'application/json','idempotency-key':key},...(body===undefined?{}:{body:JSON.stringify(body)})});
 const intent=async(target:'ACTIVE'|'SUSPENDED')=>({target,expectedVersion:(await master.gym.findUniqueOrThrow({where:{id:gymA.id}})).version,reason:'Synthetic lifecycle acceptance check'});
 async function waitBlocked(){for(let index=0;index<100;index++){if((await master.gym.findUniqueOrThrow({where:{id:gymA.id}})).status==='SUSPENDED')return;await new Promise(resolve=>setTimeout(resolve,10));}throw new Error('Suspension was not recorded');}
@@ -29,9 +39,9 @@ beforeAll(async()=>{
  for(const slug of ['lifecycle-a','lifecycle-b']){
   const reserved=await app.get(ProvisioningReservationService).reserve(actor,0,randomUUID(),{name:`Synthetic ${slug}`,slug,ownerEmail:`${slug}@example.test`,currency:'USD',timezone:'UTC'});
   expect((await new ProvisioningWorker(database,app.get(GymProvisioningService),tenants).runOnce(reserved.operationId)).state).toBe('COMPLETE');
-  const operation=await master.operation.findUniqueOrThrow({where:{id:reserved.operationId}});await run.registerProvisionedDatabase(operation);gyms.push(await master.gym.findUniqueOrThrow({where:{id:reserved.gym.id}}));owners.push(await token(operation.subjectIdentityId!));
+  const operation=await master.operation.findUniqueOrThrow({where:{id:reserved.operationId}});await run.registerProvisionedDatabase(operation);gyms.push(await master.gym.findUniqueOrThrow({where:{id:reserved.gym.id}}));owners.push(operation.subjectIdentityId!);
  }
- [gymA,gymB]=gyms;[ownerA,ownerB]=owners;
+ [gymA,gymB]=gyms;[ownerA,ownerB]=await Promise.all([ownerToken(owners[0],gymA.id),ownerToken(owners[1],gymB.id)]);
  await tenants.withDatabase(gymA.databaseName,tenant=>tenant.member.create({data:{fullName:'Synthetic retained member'}}));
 });
 afterAll(async()=>{releaseInFlight();await app?.close();await master?.$disconnect();if(run)console.info('[lifecycle-owned-cleanup]',JSON.stringify(await run.cleanup()));vi.unstubAllEnvs();});

@@ -84,6 +84,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm prepare:checks
       - run: pnpm --dir apps/web exec next typegen
+      # Web browser fixtures import API dist modules during TypeScript checking.
+      - run: pnpm --dir apps/api build
       - run: pnpm typecheck:workspace
 
   unit:

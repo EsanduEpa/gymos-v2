@@ -47,7 +47,7 @@ async function stop(processState: ProcessState | undefined) {
 }
 async function loginAsOwner(page: Page) {
   const owner = fixture.users.ownerA;
-  await installBrowserSession({ page, master: fixture.master, identityId: owner.id, jwtSecret, origin: webBase });
+  await installBrowserSession({ page, master: fixture.master, identityId: owner.id, gymId: fixture.gyms[0]!.id, jwtSecret, origin: webBase });
   await page.goto(`${webBase}/gyms/${fixture.gyms[0]!.slug}/owner/sessions/book`);
 }
 

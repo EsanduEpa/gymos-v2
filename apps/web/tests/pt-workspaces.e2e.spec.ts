@@ -65,7 +65,9 @@ async function startApi() {
 }
 async function loginAs(page: Page, role: 'MEMBER' | 'TRAINER' | 'OWNER', path: string) {
   const user = role === 'OWNER' ? fixture.users.ownerA : role === 'TRAINER' ? fixture.users.trainerUser : fixture.users.memberUser;
-  await installBrowserSession({ page, master: fixture.master, identityId: user.id, jwtSecret, origin: webBase });
+  const slug = path.match(/^\/gyms\/([^/?#]+)/)?.[1];
+  const gymId = fixture.gyms.find(gym => gym.slug === slug)?.id;
+  await installBrowserSession({ page, master: fixture.master, identityId: user.id, ...(gymId ? { gymId } : {}), jwtSecret, origin: webBase });
   await page.goto(`${webBase}${path}`);
 }
 

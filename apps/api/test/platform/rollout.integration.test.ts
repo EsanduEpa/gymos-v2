@@ -289,7 +289,7 @@ it('deploys/verifies the immutable Master chain only through the owned runner an
     'prefix needs evidence review',
   );
 });
-it('keeps supported mixed versions available, stops after the canary, and advances only an explicitly reviewed bounded batch', async () => {
+it('gates legacy versions, stops after the canary, and advances only an explicitly reviewed bounded batch', async () => {
   const a = await legacy('canary-a');
   const b = await legacy('canary-b');
   const beforeUsers = await master.user.count();
@@ -301,14 +301,14 @@ it('keeps supported mixed versions available, stops after the canary, and advanc
   await expect(
     service().reserve(actor, { ...body, batchSize: 2 }),
   ).rejects.toThrow('conflicts');
-  expect(await countThroughGate(a.id)).toBe(1);
-  expect(await countThroughGate(b.id)).toBe(1);
+  await expect(countThroughGate(a.id)).rejects.toThrow('temporarily unavailable');
+  await expect(countThroughGate(b.id)).rejects.toThrow('temporarily unavailable');
   const canary = await service().runNext(actor, reserved.rolloutId);
   expect(canary.state).toBe('CANARY_READY');
   expect(await migrationCount(a.databaseName)).toBe(TENANT_TEMPLATE_MANIFEST.migrations.length);
   expect(await migrationCount(b.databaseName)).toBe(4);
   expect(await countThroughGate(a.id)).toBe(1);
-  expect(await countThroughGate(b.id)).toBe(1);
+  await expect(countThroughGate(b.id)).rejects.toThrow('temporarily unavailable');
   expect((await service().runNext(actor, reserved.rolloutId)).state).toBe(
     'CANARY_READY',
   );
@@ -483,7 +483,7 @@ it('leaves unresolved migration history gated, stops the canary, and never chang
   await expect(countThroughGate(failed.id)).rejects.toThrow(
     'temporarily unavailable',
   );
-  expect(await countThroughGate(healthy.id)).toBe(1);
+  await expect(countThroughGate(healthy.id)).rejects.toThrow('temporarily unavailable');
   expect(await migrationCount(healthy.databaseName)).toBe(4);
   await expect(
     service().reviewTarget(
