@@ -8,7 +8,7 @@ Create/sign in to GitHub, Neon (https://console.neon.tech), Render (https://dash
 
 ## Free demo operating limits
 
-The API start command runs Node directly with a 256 MB old-generation heap cap, leaving headroom within the 512 MB Free instance for native allocations and avoiding an extra pnpm runtime process. This cap mitigates memory pressure; it is not a total process-memory limit or a guarantee against out-of-memory restarts. Apply this command manually under Render Settings → Build & Deploy for a manually created service. Builds retain their separate build-time memory budget.
+The API start command runs Node directly with a 256 MB old-generation heap cap and 16 MB semi-space cap (verified total V8 heap limit: 304 MB), leaving headroom within the 512 MB Free instance for native allocations and avoiding an extra pnpm runtime process. This cap mitigates memory pressure; it is not a total process-memory limit or a guarantee against out-of-memory restarts. Apply this command manually under Render Settings → Build & Deploy for a manually created service. Builds retain their separate build-time memory budget.
 
 Render Free sleeps after 15 minutes without inbound traffic and usually needs about a minute to wake. Provisioning, session expiry and reminders run only while the API is awake. Both workers remain enabled and sweep on startup; overdue work may require multiple batches. Do not promise timely reminders while asleep. No separate paid worker, Redis service or Render database is required.
 
@@ -106,7 +106,7 @@ For a beginner, GitHub Desktop is convenient: add the existing repository, revie
 | GYMOS_WEB_ORIGIN | `https://example.invalid` for the initial boot only |
 
 5. Blueprint supplies NODE_VERSION, NODE_ENV, both worker flags and generates JWT_SECRET. In Environment, replace the generated JWT_SECRET with the private stable value from `.env.deploy.neon`, then save/redeploy. Never put JWT_SECRET on Vercel.
-6. Apply/create the Blueprint after confirming no paid resources are selected. If Render asks for build/start settings, they are `corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm build:deploy:api` and `node --max-old-space-size=256 infrastructure/deployment/start-api.mjs`.
+6. Apply/create the Blueprint after confirming no paid resources are selected. If Render asks for build/start settings, they are `corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm build:deploy:api` and `node --max-old-space-size=256 --max-semi-space-size=16 infrastructure/deployment/start-api.mjs`.
 7. Watch Events/Logs until deployment succeeds. Copy the actual public `https://...onrender.com` address. Open it: the root response confirms the API process is listening, not complete database/worker readiness.
 8. Confirm logs include provisioning runner enabled and PT scheduled-work runner enabled. Zero gyms is expected before creating the first gym.
 

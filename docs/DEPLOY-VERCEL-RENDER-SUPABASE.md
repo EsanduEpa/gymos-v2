@@ -41,7 +41,7 @@ Keep Root Directory empty (repository root). The configured commands are:
 
 ```sh
 corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm build:deploy:api
-node --max-old-space-size=256 infrastructure/deployment/start-api.mjs
+node --max-old-space-size=256 --max-semi-space-size=16 infrastructure/deployment/start-api.mjs
 ```
 
 Set the prompted private environment values from `infrastructure/deployment/.env.example`. The Blueprint generates JWT_SECRET; retain it across normal redeploys and never copy it to Vercel. Use one stable Vercel HTTPS production URL for GYMOS_WEB_ORIGIN. It must have no trailing slash or path. If this URL is not known yet, reserve the Vercel project first, then return to Render.
