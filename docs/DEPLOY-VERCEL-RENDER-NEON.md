@@ -104,9 +104,11 @@ For a beginner, GitHub Desktop is convenient: add the existing repository, revie
 | GYMOS_WEB_ORIGIN | `https://example.invalid` for the initial boot only |
 
 5. Blueprint supplies NODE_VERSION, NODE_ENV, both worker flags and generates JWT_SECRET. In Environment, replace the generated JWT_SECRET with the private stable value from `.env.deploy.neon`, then save/redeploy. Never put JWT_SECRET on Vercel.
-6. Apply/create the Blueprint after confirming no paid resources are selected. If Render asks for build/start settings, they are `corepack enable && pnpm install --frozen-lockfile && pnpm build:deploy:api` and `pnpm start:deploy:api`.
+6. Apply/create the Blueprint after confirming no paid resources are selected. If Render asks for build/start settings, they are `corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm build:deploy:api` and `pnpm start:deploy:api`.
 7. Watch Events/Logs until deployment succeeds. Copy the actual public `https://...onrender.com` address. Open it: the root response confirms the API process is listening, not complete database/worker readiness.
 8. Confirm logs include provisioning runner enabled and PT scheduled-work runner enabled. Zero gyms is expected before creating the first gym.
+
+Build installation explicitly includes development dependencies (`--prod=false`) because Prisma, TypeScript and the Nest CLI are build tools. Keep NODE_ENV=production for runtime. When creating a Web Service manually, copy this same build command into Render Settings → Build & Deploy; changes to render.yaml do not update a manually configured service.
 
 PORT is provided by Render; do not copy local ports 3001/3003. Automatic redeploys are disabled in the Blueprint to allow coordinated API/schema/frontend updates.
 

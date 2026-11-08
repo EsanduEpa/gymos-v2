@@ -4,7 +4,7 @@ services:
     runtime: node
     # Synthetic demo: sleeps when idle; workers resume when the service wakes.
     plan: free
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build:deploy:api
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm build:deploy:api
     startCommand: pnpm start:deploy:api
     healthCheckPath: /
     autoDeployTrigger: 'off'
