@@ -5,7 +5,7 @@ services:
     # Synthetic demo: sleeps when idle; workers resume when the service wakes.
     plan: free
     buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm build:deploy:api
-    startCommand: pnpm start:deploy:api
+    startCommand: node --max-old-space-size=256 infrastructure/deployment/start-api.mjs
     healthCheckPath: /
     autoDeployTrigger: 'off'
     envVars:
