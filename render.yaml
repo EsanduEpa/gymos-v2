@@ -7,6 +7,9 @@ services:
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build:deploy:api
     startCommand: pnpm start:deploy:api
     healthCheckPath: /readyz
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm build:deploy:api
+    startCommand: node --max-old-space-size=256 --max-semi-space-size=16 infrastructure/deployment/start-api.mjs
+    healthCheckPath: /
     autoDeployTrigger: 'off'
     envVars:
       - key: NODE_VERSION

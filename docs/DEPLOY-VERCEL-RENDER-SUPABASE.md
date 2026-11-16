@@ -20,7 +20,7 @@ The supplied `postgres` role is not a true superuser. `deploy:database:check` ch
 
 Commit the current application changes and deployment files to the branch intended for the demo. Review the existing uncommitted fixes as part of that commit. Do not commit `.env`, `.env.manual-test.json`, account credentials, database dumps, backups, screenshots or test results. The existing `.gitignore` covers these private/generated files.
 
-Node is pinned to major 24 and pnpm to 9.15.0. The hosting services must install from the repository root using `pnpm install --frozen-lockfile`; do not deploy `apps/web` as an independent repository or generate a second lockfile.
+Node is pinned to major 24 and pnpm to 9.15.0. The hosting services must install from the repository root using `pnpm install --frozen-lockfile --prod=false`; do not deploy `apps/web` as an independent repository or generate a second lockfile.
 
 ## 2. Prepare a fresh dedicated Supabase target
 
@@ -40,8 +40,8 @@ The blueprint selects Free for a synthetic demo and disables automatic redeploys
 Keep Root Directory empty (repository root). The configured commands are:
 
 ```sh
-corepack enable && pnpm install --frozen-lockfile && pnpm build:deploy:api
-pnpm start:deploy:api
+corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm build:deploy:api
+node --max-old-space-size=256 --max-semi-space-size=16 infrastructure/deployment/start-api.mjs
 ```
 
 Set the prompted private environment values from `infrastructure/deployment/.env.example`. The Blueprint generates JWT_SECRET; retain it across normal redeploys and never copy it to Vercel. Use one stable Vercel HTTPS production URL for GYMOS_WEB_ORIGIN. It must have no trailing slash or path. If this URL is not known yet, reserve the Vercel project first, then return to Render.
