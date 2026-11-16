@@ -8,24 +8,19 @@ import { TenantSchemaGateService } from '../tenancy/tenant-schema-gate.service.j
 import { CommandReceiptFoundationService } from '../operations/receipt.service.js';
 import { OperationConflictError } from '../operations/primitives.js';
 import { allocateMembershipMinorUnits } from './finance-arithmetic.js';
-import { csvDocument } from './finance-csv.js';
+import { makeReportFile, reportContentTypes } from './report-file.js';
+import { resolvedStartSlots } from '../sessions/availability-policy.js';
 
 type Access = TenantGateContext & { identityId: string; role: string; slug: string; actor?: { kind: string; id: string } | null };
-function localParts(date: Date, zone: string, formatter?: Intl.DateTimeFormat) {
-  const parts = (formatter ?? new Intl.DateTimeFormat('en-GB', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })).formatToParts(date);
+function localParts(date: Date, zone: string) {
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date);
   return Object.fromEntries(parts.map(part => [part.type, part.value]));
 }
 function localMidnight(value: string, zone: string): Date {
-  const [year, month, day] = value.split('-').map(Number);
-  const naive = Date.UTC(year!, month! - 1, day!);
-  const formatter = new Intl.DateTimeFormat('en-GB', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
-  for (let offset = -14 * 60; offset <= 14 * 60; offset++) {
-    const candidate = new Date(naive - offset * 60_000);
-    const parts = localParts(candidate, zone, formatter);
-    if (Number(parts.year) === year && Number(parts.month) === month && Number(parts.day) === day
-      && Number(parts.hour) === 0 && Number(parts.minute) === 0) return candidate;
-  }
-  throw new UnprocessableEntityException('Finance date boundary cannot be resolved in gym timezone');
+  const matches = resolvedStartSlots(value, [0], zone);
+  if (!matches.length) throw new UnprocessableEntityException('Finance date boundary cannot be resolved in gym timezone');
+  // Preserve the established choice of the later instant at a repeated midnight.
+  return new Date(Math.max(...matches.map(match => match.start.getTime())));
 }
 function nextDate(value: string) {
   const date = new Date(`${value}T00:00:00.000Z`); date.setUTCDate(date.getUTCDate() + 1); return date.toISOString().slice(0, 10);
@@ -65,16 +60,16 @@ function money(value: bigint): string {
 export class FinanceService {
   constructor(private readonly database: DatabaseService, private readonly tenantGate: TenantSchemaGateService) {}
 
-  async exportCsv(access: Access, rawInput: unknown) {
+  async exportReport(access: Access, rawInput: unknown) {
     if (access.role !== 'OWNER') throw new ForbiddenException('Finance exports are owner-only');
     const parsed = financeExportInputSchema.safeParse(rawInput);
-    if (!parsed.success) throw new UnprocessableEntityException('Enter a valid bounded CSV scope');
+    if (!parsed.success) throw new UnprocessableEntityException('Enter a valid bounded report scope');
     const input = parsed.data;
     if (input.kind !== 'audit' && (!input.from || !input.to)) throw new UnprocessableEntityException('A date range is required');
     return this.tenantGate.withVerifiedTenant(access, async tenant => {
       const config = await tenant.gymConfiguration.findUnique({ where: { id: 'current' }, select: { currency: true, timezone: true, masterGymId: true } });
       if (!config?.currency || !config.timezone || config.masterGymId !== access.gymId) throw new NotFoundException('Finance export unavailable');
-      const currency = config.currency; const zone = config.timezone; let rows: unknown[][]; let headers: string[];
+      const currency = config.currency; const zone = config.timezone; let rows: (string | number | boolean | null)[][]; let headers: string[];
       const snapshot = await tenant.$transaction(async tx => {
         await tx.$executeRaw`SET TRANSACTION READ ONLY`;
         if (input.kind === 'revenue') {
@@ -133,13 +128,17 @@ export class FinanceService {
         if (rows.length > 5000) throw new UnprocessableEntityException('CSV source exceeds 5,000 rows');
         return { headers, rows };
       }, { isolationLevel: 'RepeatableRead', timeout: 15_000 });
+      const format = input.format.toUpperCase();
+      const scope = input.kind === 'audit' ? `Audit page ${input.page}` : `${input.from} to ${input.to} · ${currency}`;
+      const reportNames = { revenue: 'Revenue', expenses: 'Expenses', payroll: 'Payroll', audit: 'Audit log' };
+      const content = await makeReportFile(input.format, { title: `GymOS · ${reportNames[input.kind]}`, subtitle: `${access.slug} · ${scope} · ${zone}`, ...snapshot });
       await new CommandReceiptFoundationService(tenant).execute({ masterGymId: access.gymId, actorIdentityId: access.identityId,
-        commandKind: 'EXPORT_GYM_CSV', idempotencyKey: randomUUID(), normalizedIntent: { kind: input.kind, from: input.from ?? null, to: input.to ?? null, page: input.page, pageSize: input.pageSize, actionType: input.actionType ?? null } },
-        async () => ({ result: { resourceIds: [] }, resourceType: 'CSV_EXPORT', resourceId: input.kind,
-          audits: [{ actorIdentityId: access.identityId, eventCode: 'CSV_EXPORTED', resourceType: 'CSV_EXPORT', resourceId: input.kind,
+        commandKind: `EXPORT_GYM_${format}`, idempotencyKey: randomUUID(), normalizedIntent: { kind: input.kind, from: input.from ?? null, to: input.to ?? null, page: input.page, pageSize: input.pageSize, actionType: input.actionType ?? null } },
+        async () => ({ result: { resourceIds: [] }, resourceType: `${format}_EXPORT`, resourceId: input.kind,
+          audits: [{ actorIdentityId: access.identityId, eventCode: `${format}_EXPORTED`, resourceType: `${format}_EXPORT`, resourceId: input.kind,
             transition: { to: input.kind, version: 0 } }] }));
-      return { filename: `gymos-${access.slug}-${input.kind}-${input.from ?? 'current-page'}-${input.to ?? ''}.csv`.replace(/[^A-Za-z0-9_.-]/g, '_'),
-        content: csvDocument(snapshot.headers, snapshot.rows) };
+      return { filename: `gymos-${access.slug}-${input.kind}-${input.from ?? 'current-page'}-${input.to ?? ''}.${input.format}`.replace(/[^A-Za-z0-9_.-]/g, '_'),
+        content, contentType: reportContentTypes[input.format] };
     });
   }
 
@@ -170,7 +169,7 @@ export class FinanceService {
         if (terms.length > 5000) throw new UnprocessableEntityException('P&L membership source exceeds its bound');
         const asOf = clock[0]!.now;
         const today = dateAt(asOf, zone);
-        const afterToday = nextDate(today);
+        const windowEnd = nextDate(parsed.data.to);
         let membershipMinor = 0n;
         let projectedLines = 0;
         for (const term of terms) {
@@ -180,7 +179,7 @@ export class FinanceService {
           if (days < 1) continue;
           const recognizedThrough = today < termEnd ? today : termEnd;
           const first = termStart > parsed.data.from ? termStart : parsed.data.from;
-          const lastExclusive = recognizedThrough < afterToday ? recognizedThrough : afterToday;
+          const lastExclusive = recognizedThrough < windowEnd ? recognizedThrough : windowEnd;
           const count = Math.max(0, Math.round((Date.parse(`${lastExclusive}T00:00:00Z`) - Date.parse(`${first}T00:00:00Z`)) / 86_400_000));
           projectedLines += count;
           if (projectedLines > 5000) throw new UnprocessableEntityException('P&L membership projection exceeds its bound');
@@ -224,20 +223,17 @@ export class FinanceService {
       const endExclusive = localMidnight(nextDate(query.data.to), zone);
       return tenant.$transaction(async tx => {
         await tx.$executeRaw`SET TRANSACTION READ ONLY`;
-        const [clock, rows, grouped, terms] = await Promise.all([
+        const [clock, rows, terms] = await Promise.all([
           tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`,
           tx.revenueRecord.findMany({ where: { currency, session: { scheduledStartAt: { gte: start, lt: endExclusive } } },
             orderBy: [{ session: { scheduledStartAt: 'asc' } }, { id: 'asc' }], take: 5001,
             include: { session: { select: { trainerId: true, scheduledStartAt: true } } } }),
-          tx.revenueRecord.findMany({ where: { currency, session: { scheduledStartAt: { gte: start, lt: endExclusive } } }, take: 5001,
-            select: { category: true, amount: true } }),
           tx.membershipTerm.findMany({ where: { currency }, orderBy: [{ startDate: 'asc' }, { id: 'asc' }], take: 5001,
             select: { id: true, agreedPrice: true, currency: true, startDate: true, endDateExclusive: true } }),
         ]);
         if (rows.length > 5000 || terms.length > 5000) throw new UnprocessableEntityException('Finance projection exceeds its bounded source limit');
         const totals = { completedSession: 0n, missedLate: 0n, lateCancel: 0n, membership: 0n, expiredUnusedSeparate: 0n };
-        if (grouped.length > 5000) throw new UnprocessableEntityException('Finance earning source exceeds its bounded window limit');
-        for (const row of grouped) {
+        for (const row of rows) {
           const amount = micros(row.amount.toString());
           if (row.category === 'COMPLETED_SESSION') totals.completedSession += amount;
           else if (row.category === 'MISSED_LATE') totals.missedLate += amount;

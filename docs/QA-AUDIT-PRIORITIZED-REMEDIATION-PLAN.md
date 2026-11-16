@@ -616,6 +616,12 @@ Of the five requirements the PDF marked FAIL, AUTH-04 and WF-O2 have local one-t
 | NFR-02 and follow-up testing, pages 15 and 18 | Local provisioning, access restrictions, paid-pack earnings and encrypted restore have direct test evidence. The restore drill used a small synthetic dataset. The repository documents TLS and encrypted archives. It contains no evidence establishing AES-256 column-level encryption for member PII. | Verify actual hosted daily backups and point-in-time recovery, a representative restore within four hours, 500+ concurrent users, and 99.5% uptime. Confirm the PDF's column-level PII encryption requirement and establish its implementation and verification if retained. |
 | Scope sign-off, pages 17–18 | The product owner's exclusions are recorded in the [current scope](../README.md#current-scope). Body metrics and photos, plus the other unresolved feature groups, remain in the [future backlog](V2-FUTURE-CAPABILITIES.md). | Confirm formal stakeholder approval against the source requirements. Decide whether and when to deliver remaining capabilities, including body metrics and photos. The original companion requirements files were unavailable for this recheck. |
 
+### Local verification on 16 November 2026
+
+On the isolated synthetic environment with tenant schema `tenant-2026-11-16.1`, seven coaching and three finance integration tests passed. Six Chromium workflows passed on port 3002 for dietary notes, private progress, dated workouts and meals, finance downloads and trainer analytics. The [developer review guide](CLIENT-REVIEW.md) records the workflows and their remaining acceptance criteria.
+
+The revenue route returned identical data for a fixed 667-line report after the change. Across 12 measured local requests per version, p95 dropped from 301 ms to 77 ms. BUG-006 and the corresponding hosted performance and security checks remain pending. The temporary hosted rehearsal was stopped.
+
 ## 13. Release decision checklist
 
 - [x] BUG-001 credential handoff and BUG-003 owner recovery are verified end to end on port 3002.
@@ -630,6 +636,6 @@ Of the five requirements the PDF marked FAIL, AUTH-04 and WF-O2 have local one-t
 - [x] The audited local worktree passed the full browser suite in a single run. Match the hosted rehearsal to the tested revision.
 - [ ] Final sign-off records any remaining uncertainty and the accountable risk decision.
 
-**Release disposition:** Local evidence supports advancing to a restricted hosted rehearsal with synthetic data. Public or real-member use remains pending the hosted security, migration, monitoring, recovery and capacity checks in [Section 9](#9-verification-gaps-outside-the-13-defects). No risk exception has been approved.
+**Review disposition**
 
-**Next gate:** The product owner confirms the target and access restrictions. The release and database operators identify the revision, verify backups and grants, apply the reviewed trainer-pay tenant rollout on an owned canary, review the seeded defaults, and rehearse the published app using the deployment runbook. Record the hosted revision and acceptance results before approving real-member use.
+Implementation continues against the full PDF. The [developer review guide](CLIENT-REVIEW.md) tracks the open specification, implementation and test work before client handoff. Public or real-member use remains pending the hosted security, migration, monitoring, recovery and capacity checks in [Section 9](#9-verification-gaps-outside-the-13-defects).

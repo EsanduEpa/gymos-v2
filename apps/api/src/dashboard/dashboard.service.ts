@@ -26,8 +26,9 @@ export class DashboardService {
             (local_day + 1)::timestamp AT TIME ZONE ${zone} AS "end"
           FROM day`;
         const today = { scheduledStartAt: { gte: start, lt: end } };
+        const monthFrom = `${date.slice(0, 7)}-01`;
         const todaySessionStates = ['SCHEDULED', 'ACTIVE', 'COMPLETED', 'MISSED'] as const;
-        const [activeToday, activeSessions, scheduledToday, earningRows, pending, sessions, trainers, [memberships]] = await Promise.all([
+        const [activeToday, activeSessions, scheduledToday, earningRows, pending, sessions, trainers, [memberships], [monthEarning]] = await Promise.all([
           tx.pTSession.count({ where: { state: 'ACTIVE', scheduledStartAt: { gte: start, lt: end } } }),
           tx.pTSession.findMany({ where: { state: 'ACTIVE' }, orderBy: [{ startedAt: 'asc' }, { id: 'asc' }],
             include: { member: { select: { fullName: true } }, trainer: { select: { fullName: true } } } }),
@@ -66,6 +67,28 @@ export class DashboardService {
             SELECT (SELECT count(*)::int FROM active) AS "activeCount",
               (SELECT count(*)::int FROM expiring) AS "expiringCount",
               COALESCE((SELECT json_agg(preview ORDER BY "endDateExclusive", "memberId") FROM preview), '[]'::json) AS expiring`,
+          tx.$queryRaw<{ amount: string }[]>`
+            WITH membership_spans AS (
+              SELECT round("agreedPrice" * 100) AS cents, "endDateExclusive" - "startDate" AS days,
+                greatest("startDate", ${monthFrom}::date) - "startDate" AS first_day,
+                least("endDateExclusive", ${date}::date) - "startDate" AS end_day
+              FROM "MembershipTerm"
+              WHERE currency = ${currency} AND "startDate" < ${date}::date AND "endDateExclusive" > ${monthFrom}::date
+            ),
+            membership AS (
+              SELECT coalesce(sum(
+                floor(cents / days) * (end_day - first_day) + least(end_day, mod(cents, days)) - least(first_day, mod(cents, days))
+              ), 0) / 100 AS amount
+              FROM membership_spans
+            ),
+            pt AS (
+              SELECT coalesce(sum(r.amount), 0) AS amount
+              FROM "RevenueRecord" r JOIN "PTSession" s ON s.id = r."sessionId"
+              WHERE r.currency = ${currency} AND r.category <> 'EXPIRED_UNUSED'
+                AND s."scheduledStartAt" >= (${monthFrom}::date::timestamp AT TIME ZONE ${zone})
+                AND s."scheduledStartAt" < ${end}
+            )
+            SELECT round(membership.amount + pt.amount, 4)::text AS amount FROM membership CROSS JOIN pt`,
         ]);
         const trainerIds = new Set([...trainers.map(row => row.trainerId), ...activeSessions.map(row => row.trainerId)]);
         const floorTrainers = trainerIds.size ? await tx.trainer.findMany({ where: { id: { in: [...trainerIds] } }, select: { id: true, fullName: true } }) : [];
@@ -89,6 +112,7 @@ export class DashboardService {
             activeSessions: metric(activeSessions.length, 'Count of PT session records currently in ACTIVE state, across all scheduled dates.', activeSessions.length),
             trainersWithSessionsToday: metric(trainers.length, 'Distinct trainers with a scheduled, active, completed, or missed PT session during this gym-local day; this does not prove physical presence.', scheduledToday),
             todayOperationalEarning: { value: money(earning), definition: 'RevenueRecord operational earnings recognized during this gym-local day; excludes expired unused value and does not represent cash received.', numerator: money(earning), denominator: null, sourceCount: revenueSourceCount, currency },
+            monthOperationalEarning: { value: monthEarning!.amount, from: monthFrom, through: date },
             pendingRequests: metric(pending, 'Count of all PT session records currently awaiting confirmation.', pending),
           },
           memberships,

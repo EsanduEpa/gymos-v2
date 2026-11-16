@@ -66,11 +66,11 @@ export class FinanceController {
   }
 
   @Post('financials/export')
-  async exportCsv(@Req() request: GymRequest, @Body() body: unknown, @Res() response: Response) {
+  async exportReport(@Req() request: GymRequest, @Body() body: unknown, @Res() response: Response) {
     const access = request.gymAccess;
     if (!access || access.role !== 'OWNER') throw new ForbiddenException('Finance exports are owner-only');
-    const result = await this.finance.exportCsv(access, body ?? {});
-    response.status(200).set({ 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="${result.filename}"`,
+    const result = await this.finance.exportReport(access, body ?? {});
+    response.status(200).set({ 'content-type': result.contentType, 'content-disposition': `attachment; filename="${result.filename}"`,
       'cache-control': 'no-store, private', 'x-content-type-options': 'nosniff' }).send(result.content);
   }
 

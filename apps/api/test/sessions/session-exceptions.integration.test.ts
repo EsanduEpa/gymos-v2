@@ -292,8 +292,8 @@ it('pays the confirmed trainer amount for a free credit even after rates change'
   expect(earnings.lines.find(line => line.sessionId === ctx.booking.session.id)).toMatchObject({ amount: '20', currency: 'LKR' });
   const periods = await ctx.payroll.list(ctx.access);
   expect(periods.items.find(period => period.id === facts[0]!.correctionPeriodId)).toBeDefined();
-  const exportFile = await ctx.finance.exportCsv(ctx.access, { kind: 'payroll', from: day, to: day });
-  expect(exportFile.content.split('\r\n').find(line => line.includes(ctx.booking.session.id))).toContain('"20","LKR","CORRECTION"');
+  const exportFile = await ctx.finance.exportReport(ctx.access, { kind: 'payroll', from: day, to: day });
+  expect(exportFile.content.toString().split('\r\n').find(line => line.includes(ctx.booking.session.id))).toContain('"20","LKR","CORRECTION"');
   expect((await creditUnits(ctx.tenant,ctx.member.id)).find(row=>row.packId===ctx.pack.id)).toMatchObject({available:0,held:0,consumed:1,expired:0,valueMinorUnits:0n});
 });
 

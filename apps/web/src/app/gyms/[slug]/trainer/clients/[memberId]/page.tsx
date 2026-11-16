@@ -2,9 +2,10 @@ import { formatDisplayDate } from '@/lib/display-date';
 import type { CSSProperties } from 'react';
 import { notFound, redirect } from 'next/navigation';
 import { resolveGymBrandColors } from '@gymos/theme-tokens';
-import { trainerClientProfileSchema } from '@gymos/contracts';
+import { dietaryProfileSchema, trainerClientProfileSchema } from '@gymos/contracts';
 import { DashboardChrome } from '@/components/navigation/dashboard-chrome';
 import { Card, CardHeader, Feedback } from '@/components/ui';
+import { DietaryProfileForm } from '@/components/coaching/coaching-record-forms';
 import { apiUrl } from '@/lib/gymos';
 import { requireGymContext } from '@/lib/gym-context';
 import styles from '@/components/coaching/trainer-client-profile.module.css';
@@ -12,13 +13,19 @@ import styles from '@/components/coaching/trainer-client-profile.module.css';
 export default async function TrainerClientProfilePage({ params }: { params: Promise<{ slug: string; memberId: string }> }) {
   const { slug, memberId } = await params;
   const { token, session, gym, theme } = await requireGymContext(slug, 'TRAINER');
-  let response: Response;
-  try { response = await fetch(apiUrl(`/gyms/${encodeURIComponent(slug)}/me/clients/${encodeURIComponent(memberId)}`), {
+  const base = `/gyms/${encodeURIComponent(slug)}`;
+  const client = encodeURIComponent(memberId);
+  const read = (path: string) => fetch(apiUrl(path), {
     headers: { authorization: `Bearer ${token}` }, cache: 'no-store',
-  }); } catch { response = new Response(null, { status: 503 }); }
+  }).catch(() => new Response(null, { status: 503 }));
+  const [response, dietaryResponse] = await Promise.all([
+    read(`${base}/me/clients/${client}`),
+    read(`${base}/me/clients/${client}/dietary-profile`),
+  ]);
   if (response.status === 401) redirect('/login?error=expired');
   if (response.status === 403 || response.status === 404) notFound();
   const profile = response.ok ? trainerClientProfileSchema.safeParse(await response.json().catch(() => null)) : null;
+  const dietary = dietaryResponse.ok ? dietaryProfileSchema.safeParse(await dietaryResponse.json().catch(() => null)) : null;
   const brand = resolveGymBrandColors(theme.primaryColor);
   const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
   return <DashboardChrome identityId={session.identityId} key={`${session.identityId}:${gym.id}:${gym.role}`} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'} style={style}>
@@ -26,7 +33,7 @@ export default async function TrainerClientProfilePage({ params }: { params: Pro
       <p>Your client’s details, assigned plans and session history.</p></div><a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/trainer/clients`}>Back to clients</a></div>
     {!profile?.success ? <Card><Feedback tone="error">This client profile could not be loaded. Refresh to retry.</Feedback></Card> : <>
       <nav className={styles.tabs} aria-label="Client profile sections">
-        <a id="overview-tab" href="#overview" aria-controls="overview">Overview</a><a id="workouts-tab" href="#workouts" aria-controls="workouts">Workouts</a><a id="meals-tab" href="#meals" aria-controls="meals">Meal plans</a><a id="history-tab" href="#history" aria-controls="history">Session history</a>
+        <a id="overview-tab" href="#overview" aria-controls="overview">Overview</a><a id="workouts-tab" href="#workouts" aria-controls="workouts">Workouts</a><a id="meals-tab" href="#meals" aria-controls="meals">Meal plans</a><a id="history-tab" href="#history" aria-controls="history">Session history</a><a href={`${base}/trainer/clients/${client}/progress`}>Progress report</a>
       </nav>
       <section id="overview" aria-labelledby="overview-tab"><Card><CardHeader eyebrow="CLIENT OVERVIEW" title={profile.data.client.fullName}/>
         <dl className={styles.details}>
@@ -48,7 +55,11 @@ export default async function TrainerClientProfilePage({ params }: { params: Pro
             <a className="platform-text-link" href={`/gyms/${encodeURIComponent(slug)}/trainer/plans/workout/${encodeURIComponent(plan.id)}/edit?memberId=${encodeURIComponent(profile.data.client.id)}`}>Edit workout plan</a>
           </article>)}</div>}
         <a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/trainer/plans/workout/new?memberId=${encodeURIComponent(profile.data.client.id)}`}>Create workout plan</a>
-        {profile.data.workouts.hasMore ? <a className="platform-text-link" href={`/gyms/${encodeURIComponent(slug)}/trainer/clients/${encodeURIComponent(profile.data.client.id)}/plans/workout`}>View all workout plans</a> : null}
+        {profile.data.workouts.items.length > 0 ? <a className="platform-text-link" href={`/gyms/${encodeURIComponent(slug)}/trainer/clients/${encodeURIComponent(profile.data.client.id)}/plans/workout`}>View all workout plans</a> : null}
+      </Card></section>
+      <section aria-label="Dietary notes"><Card><CardHeader title="Dietary notes"/>
+        {dietary?.success ? <DietaryProfileForm slug={slug} memberId={memberId} initial={dietary.data}/> :
+          <Feedback tone="error">Dietary notes could not be loaded. Refresh to try again.</Feedback>}
       </Card></section>
       <section id="meals" aria-labelledby="meals-tab"><Card><CardHeader eyebrow="LATEST TWO" title="Meal plans"/>
         <p className={styles.hint}>Showing the two latest assigned meal plans. {profile.data.meals.hasMore ? `There are ${profile.data.meals.totalCount - profile.data.meals.items.length} older plans.` : 'No older meal plans.'}</p>

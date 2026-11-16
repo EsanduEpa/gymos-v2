@@ -1,5 +1,5 @@
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
+import { ConflictException, ForbiddenException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { PrismaClient as TenantClient } from '../../src/generated/tenant/client.js';
 import { DatabaseService } from '../../src/database.service.js';
 import { CoachingService } from '../../src/coaching/coaching.service.js';
@@ -308,4 +308,51 @@ it('preserves the meal date across reads and edits and uses the gym calendar wee
   });
   expect(updated.scheduledDate).toBeUndefined();
   expect(updated.entries[0]?.dayOfWeek).toBe(1);
+}, 60_000);
+
+it('keeps dietary notes and progress private, stores encrypted values, and rejects stale dietary edits', async () => {
+  vi.stubEnv('GYMOS_COACHING_DATA_KEY', randomBytes(32).toString('hex'));
+  try {
+    const trainer = await contextFor(0, 'TRAINER');
+    const member = await contextFor(0, 'MEMBER');
+    const otherOwner = await contextFor(1, 'OWNER');
+    const memberId = member.access.actor!.id;
+    await addSession({ memberId, trainerId: trainer.access.actor!.id, state: 'SCHEDULED', startAt: new Date(Date.now() + 16 * 86400000) });
+    const other = await createBoundMember(0, 'Unassigned Coaching Records Reviewer');
+    const otherAccess = { ...member.access, identityId: other.identity.id,
+      actor: { kind: 'MEMBER', id: other.member.id, registrationOperationId: other.member.enrollmentOperationId! } };
+
+    const dietary = { expectedVersion: null, allergies: ['Synthetic cashew allergy'], restrictions: ['Vegetarian'] };
+    const saved = await trainer.service.saveDietaryProfile(trainer.access, memberId, dietary);
+    expect(saved).toMatchObject({ version: 0, allergies: dietary.allergies, restrictions: dietary.restrictions });
+    expect(await trainer.service.saveDietaryProfile(trainer.access, memberId, dietary)).toEqual(saved);
+    expect(await member.service.memberDietaryProfile(member.access)).toEqual(saved);
+    expect(await member.service.memberDietaryProfile(otherAccess)).toMatchObject({ allergies: [], restrictions: [] });
+    await expect(trainer.service.trainerDietaryProfile(trainer.access, other.member.id)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(otherOwner.service.trainerDietaryProfile(otherOwner.access, memberId)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(trainer.service.saveDietaryProfile(trainer.access, memberId, { ...dietary, allergies: [] })).rejects.toBeInstanceOf(ConflictException);
+    const sealed = await member.tenant.memberDietaryProfile.findUniqueOrThrow({ where: { memberId } });
+    expect(sealed.encryptedData).toMatch(/^v1\./);
+    expect(sealed.encryptedData).not.toContain('cashew');
+    const audit = await member.tenant.auditLog.findFirstOrThrow({ where: { eventCode: 'DIETARY_PROFILE_UPDATED', resourceId: memberId } });
+    expect(JSON.stringify(audit)).not.toContain('cashew');
+
+    const today = gymLocalDate('Asia/Colombo');
+    const yesterday = addLocalDays(today, -1);
+    const reading = { measuredOn: yesterday, weightKg: '80.50', heightCm: '180', bodyFatPct: null };
+    expect(await member.service.saveBodyMeasurement(member.access, reading)).toMatchObject({ weightKg: '80.5', bmi: 24.8 });
+    expect(await member.service.saveBodyMeasurement(member.access, { ...reading, weightKg: null, heightCm: null, bodyFatPct: '21' }))
+      .toMatchObject({ weightKg: '80.5', bodyFatPct: '21' });
+    const report = await member.service.memberProgress(member.access, { through: yesterday });
+    expect(report.measurements).toEqual([{ measuredOn: yesterday, weightKg: '80.5', heightCm: '180', bodyFatPct: '21', bmi: 24.8 }]);
+    expect((await trainer.service.trainerProgress(trainer.access, memberId, { through: yesterday })).measurements).toEqual(report.measurements);
+    expect((await member.service.memberProgress(otherAccess, {})).measurements).toHaveLength(0);
+    await expect(trainer.service.trainerProgress(trainer.access, other.member.id, {})).rejects.toBeInstanceOf(NotFoundException);
+
+    await member.tenant.memberDietaryProfile.update({ where: { memberId }, data: { encryptedData: 'v1.invalid.invalid.invalid' } });
+    await expect(member.service.memberDietaryProfile(member.access)).rejects.toBeInstanceOf(ServiceUnavailableException);
+    await member.tenant.memberDietaryProfile.update({ where: { memberId }, data: { encryptedData: sealed.encryptedData } });
+    vi.stubEnv('GYMOS_COACHING_DATA_KEY', '');
+    await expect(member.service.memberProgress(member.access, {})).rejects.toBeInstanceOf(ServiceUnavailableException);
+  } finally { vi.unstubAllEnvs(); }
 }, 60_000);

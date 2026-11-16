@@ -15,7 +15,7 @@ describe('owner dashboard active sessions', () => {
       $executeRaw: vi.fn(async () => 0),
       $queryRaw: vi.fn().mockResolvedValueOnce([{ asOf: new Date('2026-11-06T08:00:00Z'), date: '2026-11-06',
         start: new Date('2026-11-05T18:30:00Z'), end: new Date('2026-11-06T18:30:00Z') }]).mockResolvedValueOnce([])
-        .mockResolvedValueOnce([{ activeCount: 0, expiringCount: 0, expiring: [] }]),
+        .mockResolvedValueOnce([{ activeCount: 0, expiringCount: 0, expiring: [] }]).mockResolvedValueOnce([{ amount: '0.0000' }]),
       pTSession: { count: vi.fn(async () => 0), findMany, groupBy: vi.fn(async () => []) },
       trainer: { findMany: vi.fn(async () => [{ id: 'trainer-1', fullName: 'Trainer One' }]) },
     };
