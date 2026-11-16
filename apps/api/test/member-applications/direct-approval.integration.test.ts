@@ -2,13 +2,13 @@ import { randomBytes } from 'node:crypto';
 import argon2 from 'argon2';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
-import { SignJWT } from 'jose';
 import { AppModule } from '../../src/app.module.js';
 import { DatabaseService } from '../../src/database.service.js';
 import { AuthController } from '../../src/auth.controller.js';
 import type { DatabaseService as DatabaseServiceType } from '../../src/database.service.js';
 import { createDisposableEnvironment } from '../support/disposable-environment.js';
 import { seedTwoGymFixture } from '../fixtures/two-gym-fixture.js';
+import { identityToken } from '../support/identity-token.js';
 
 let run: Awaited<ReturnType<typeof createDisposableEnvironment>>;
 let fixture: Awaited<ReturnType<typeof seedTwoGymFixture>>;
@@ -16,10 +16,6 @@ let app: INestApplication;
 let base: string;
 const secret = randomBytes(32).toString('hex');
 const password = 'Applicant-Owned-Password-2026!';
-async function token(identityId: string, authVersion = 0) {
-  return new SignJWT({ authVersion }).setProtectedHeader({ alg: 'HS256' }).setSubject(identityId)
-    .setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('15m').sign(new TextEncoder().encode(secret));
-}
 async function call(path: string, body: unknown, bearer?: string) {
   return fetch(`${base}${path}`, { method: 'POST', headers: { 'content-type': 'application/json', ...(bearer ? { authorization: `Bearer ${bearer}` } : {}) },
     body: JSON.stringify(body) });
@@ -75,7 +71,7 @@ it('activates a self-applicant only after owner approval reconciles, preserving 
     passwordHash: await argon2.hash(password, { type: argon2.argon2id }) } });
   const existingSubmission = await call(`/gyms/${gym.slug}/me/applications`, {
     fullName: 'Existing Applicant', phone: '+94770000001', consent: true,
-  }, await token(existing.id));
+  }, await identityToken(fixture.master, secret, existing.id));
   expect(existingSubmission.status).toBe(201);
   const existingQueue = await fetch(`${base}/gyms/${gym.slug}/owner/applications`, { headers: { authorization: `Bearer ${ownerToken}` } });
   const existingApplication = (await existingQueue.json()).items.find((item: { email: string }) => item.email === existingEmail);

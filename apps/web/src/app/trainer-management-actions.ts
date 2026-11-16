@@ -6,6 +6,7 @@ import { trainerLifecycleResultSchema, trainerShiftInputSchema, trainerShiftResu
 import { apiUrl, SESSION_COOKIE } from '@/lib/gymos';
 import { cookies } from 'next/headers';
 import { randomUUID } from 'node:crypto';
+import { trainerSessionPayInputSchema, trainerSessionPayResultSchema } from '@gymos/contracts';
 
 export type TrainerShiftActionState = { error?: string; success?: string };
 export type TrainerLifecycleActionState = { error?: string; success?: string; operation?: { operationId: string; state: string; targetStatus: string };
@@ -13,6 +14,27 @@ export type TrainerLifecycleActionState = { error?: string; success?: string; op
 
 function validRoute(slug: string, trainerId: string) {
   return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) && /^[A-Za-z0-9_:-]{1,128}$/.test(trainerId);
+}
+
+export async function saveTrainerSessionPay(slug: string, trainerId: string, amount: string | null, expectedVersion: number) {
+  const parsed = trainerSessionPayInputSchema.safeParse({ amount, expectedVersion });
+  if (!validRoute(slug, trainerId) || !parsed.success) return { fieldError: 'Enter an amount of zero or more with up to two decimal places, or leave it blank.' };
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token) redirect('/login');
+  let response: Response;
+  try {
+    response = await fetch(apiUrl(`/gyms/${encodeURIComponent(slug)}/trainers/${encodeURIComponent(trainerId)}/session-pay`), {
+      method: 'PUT', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify(parsed.data), cache: 'no-store',
+    });
+  } catch { return { error: 'Trainer pay could not be confirmed. Reload before retrying.' }; }
+  if (response.status === 401) redirect('/login?error=expired');
+  if (response.status === 409) return { error: 'The trainer profile changed. Reload before saving.' };
+  if (!response.ok) return { error: 'Trainer pay could not be saved. Check your gym access and try again.' };
+  const result = trainerSessionPayResultSchema.safeParse(await response.json().catch(() => null));
+  if (!result.success) return { error: 'Trainer pay could not be confirmed. Reload before retrying.' };
+  revalidatePath(`/gyms/${slug}/owner/trainers/${trainerId}`);
+  return { data: result.data };
 }
 
 export async function changeTrainerStatus(slug: string, trainerId: string, initialKey: string,

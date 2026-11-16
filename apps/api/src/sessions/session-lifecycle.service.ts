@@ -10,6 +10,7 @@ import { TenantSchemaGateService, type TenantGateContext } from '../tenancy/tena
 import { resolveSessionCreditHold } from './credit-holds.js';
 import { retrySessionTransaction } from './session-transactions.js';
 import { derivePackCreditBalance, transitionSession, minorUnitsDecimal } from './session-state.js';
+import { completedTrainerPayMinor } from './trainer-pay.js';
 import {
   sessionCancelInputSchema, sessionCancelResultSchema, sessionCompleteResultSchema, sessionLifecycleCommandInputSchema,
   sessionLifecycleQuoteSchema, sessionNoShowInputSchema, sessionNoShowResultSchema, sessionNotesInputSchema,
@@ -115,15 +116,6 @@ export function nextPeriod(info: PeriodInfo): PeriodInfo {
   return { ...info, start, end, utcStart: localMidnight(start, info.timezone), utcEnd: localMidnight(end, info.timezone) };
 }
 function dateValue(value: string) { return new Date(`${value}T00:00:00.000Z`); }
-function toDecimal(value: { toString(): string } | string) { return typeof value === 'string' ? value : value.toString(); }
-function rateMicro(value: string): bigint {
-  const [whole = '0', fraction = ''] = value.split('.');
-  return BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, '0') || '0');
-}
-export function payAmountMinor(creditMinor: bigint, rate: string) {
-  const product = creditMinor * rateMicro(rate);
-  return (product + 500_000n) / 1_000_000n;
-}
 function eventCodeFor(command: 'START' | 'COMPLETE' | 'UPDATE_NOTES') {
   return command === 'START' ? 'PT_SESSION_STARTED' : command === 'COMPLETE' ? 'PT_SESSION_COMPLETED' : 'PT_SESSION_NOTES_UPDATED';
 }
@@ -642,7 +634,7 @@ export class SessionLifecycleService {
               currency: session.currency, sourceReceiptId: receipt.id } });
             const revenue = await tx.revenueRecord.create({ data: { sessionId: session.id, category: 'COMPLETED_SESSION', amount, currency: session.currency,
               sourceKey: `pt-session:${access.gymId}:${session.id}:completed` } });
-            const payMinor = payAmountMinor(resolution.creditValueMinorUnits, toDecimal(session.confirmationRate));
+            const payMinor = completedTrainerPayMinor({ confirmedTrainerPay: session.confirmedTrainerPay, confirmationRate: session.confirmationRate }, resolution.creditValueMinorUnits);
             const pay = minorUnitsDecimal(payMinor, 2);
             let payId: string;
             if (period.id !== (await tx.trainerPayPeriod.findUnique({ where: { cadence_localStartDate: { cadence: originalInfo.cadence, localStartDate: dateValue(originalInfo.start) } }, select: { id: true } }))?.id) {

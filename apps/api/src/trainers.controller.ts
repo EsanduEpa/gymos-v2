@@ -1,4 +1,6 @@
 import { Body, ConflictException, Controller, ForbiddenException, Get, Headers, HttpCode, NotFoundException, Param, Post, Put, Query, Req, UnprocessableEntityException, UseGuards } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { trainerSessionPayInputSchema, trainerSessionPayResultSchema } from '@gymos/contracts';
 import type { Prisma, PrismaClient } from './generated/tenant/client.js';
 import { idempotencyKeySchema, trainerListQuerySchema, trainerListSchema, memberTrainerDirectorySchema, memberTrainerDirectoryQuerySchema, memberTrainerProfileSchema, trainerProfileSchema, trainerShiftInputSchema, trainerShiftResultSchema, trainerStatusInputSchema } from '@gymos/contracts';
 import { appendTenantAudit } from './operations/transaction-audit.js';
@@ -83,7 +85,7 @@ export class TrainersController {
       const bindings = await this.publishedTrainerBindings(tenant, access.gymId, false);
       if (!bindings.some(candidate => candidate.id === trainerId)) throw new NotFoundException('Trainer not found');
       const trainer = await tenant.trainer.findFirst({ where: { id: trainerId, registrationState: 'COMPLETE' },
-        select: { id: true, fullName: true, email: true, phone: true, level: true, specialisations: true, yearsExperience: true, shiftStart: true, shiftEnd: true, bio: true, status: true, registrationState: true, version: true, createdAt: true, identityId: true, enrollmentOperationId: true } });
+        select: { id: true, fullName: true, email: true, phone: true, level: true, specialisations: true, yearsExperience: true, shiftStart: true, shiftEnd: true, bio: true, status: true, registrationState: true, version: true, createdAt: true, identityId: true, enrollmentOperationId: true, sessionPayOverride: true } });
       if (!trainer) throw new NotFoundException('Trainer not found');
       if (!bindings.some(candidate => candidate.id === trainer.id && candidate.identityId === trainer.identityId && candidate.operationId === trainer.enrollmentOperationId)) throw new NotFoundException('Trainer not found');
       const [totalSessions, totalCompleted, relatedMembers, recentRows, configuration] = await Promise.all([
@@ -92,12 +94,14 @@ export class TrainersController {
         tenant.pTSession.groupBy({ by: ['memberId'], where: { trainerId, state: { in: ['SCHEDULED', 'ACTIVE', 'COMPLETED'] } } }),
         tenant.pTSession.findMany({ where: { trainerId }, orderBy: [{ scheduledStartAt: 'desc' }, { id: 'desc' }], take: 10,
           select: { id: true, state: true, type: true, scheduledStartAt: true, scheduledEndAt: true, createdAt: true } }),
-        tenant.gymConfiguration.findUnique({ where: { id: 'current' }, select: { timezone: true } }),
+        tenant.gymConfiguration.findUnique({ where: { id: 'current' }, select: { timezone: true, currency: true } }),
       ]);
       if (!configuration?.timezone) throw new NotFoundException('Gym time zone is unavailable');
       const recentSessions = recentRows.map(session => ({ ...session,
         scheduledStartAt: session.scheduledStartAt.toISOString(), scheduledEndAt: session.scheduledEndAt.toISOString(), createdAt: session.createdAt.toISOString() }));
-      return trainerProfileSchema.parse({ trainer: trainerDto(trainer as TrainerRow),
+      const { sessionPayOverride, ...profileTrainer } = trainer;
+      return trainerProfileSchema.parse({ trainer: trainerDto(profileTrainer),
+        ...(configuration.currency ? { compensation: { sessionPayOverride: sessionPayOverride?.toString() ?? null, currency: configuration.currency } } : {}),
         profile: { email: trainer.email, phone: trainer.phone, biography: trainer.bio, joinedAt: trainer.createdAt.toISOString() },
         gymTimeZone: configuration.timezone,
         recentSessions: { items: recentSessions, limit: 10, totalCount: totalSessions, hasMore: totalSessions > recentSessions.length },
@@ -190,6 +194,38 @@ export class TrainersController {
         eventCode: 'TRAINER_SHIFT_APPROVED', resourceType: 'TRAINER', resourceId: trainerId,
         transition: { from: String(trainer.version), to: String(updated.version), version: updated.version } });
       return result;
+      }));
+    });
+  }
+
+  @Put('trainers/:trainerId/session-pay')
+  async updateSessionPay(@Req() request: GymRequest, @Param('trainerId') trainerId: string, @Body() body: unknown) {
+    const access = request.gymAccess;
+    if (!access || access.role !== 'OWNER') throw new ForbiddenException('Only gym owners can set trainer pay');
+    const parsed = trainerSessionPayInputSchema.safeParse(body);
+    if (!parsed.success) invalid('Enter an amount of zero or more with up to two decimal places, or leave it blank');
+    const input = parsed.data;
+    return this.tenantGate.withVerifiedTenant(access, async tenant => {
+      const binding = (await this.publishedTrainerBindings(tenant, access.gymId, true)).find(item => item.id === trainerId);
+      if (!binding) throw new NotFoundException('Trainer not found');
+      return withGymAccessFence(this.database.master, [
+        { identityId: access.identityId, gymId: access.gymId, role: 'OWNER' },
+        { identityId: binding.identityId, gymId: access.gymId, role: 'TRAINER', tenantActorId: trainerId },
+      ], () => tenant.$transaction(async tx => {
+        await this.assertCurrentOwner(access);
+        await tx.$queryRaw`SELECT "id" FROM "Trainer" WHERE "id" = ${trainerId} FOR UPDATE`;
+        const trainer = await tx.trainer.findFirst({ where: { id: trainerId, identityId: binding.identityId,
+          enrollmentOperationId: binding.operationId, status: 'ACTIVE', registrationState: 'COMPLETE' } });
+        if (!trainer) throw new NotFoundException('Trainer not found');
+        if (trainer.version !== input.expectedVersion) throw new ConflictException('Trainer profile changed; reload before saving pay');
+        const updated = await tx.trainer.update({ where: { id: trainerId }, data: { sessionPayOverride: input.amount, version: { increment: 1 } } });
+        const result = trainerSessionPayResultSchema.parse({ amount: updated.sessionPayOverride?.toString() ?? null, version: updated.version });
+        const receipt = await tx.commandReceipt.create({ data: { actorIdentityId: access.identityId, commandKind: 'UPDATE_TRAINER_SESSION_PAY',
+          idempotencyKey: randomUUID(), requestDigest: requestDigest(input), resourceType: 'TRAINER', resourceId: trainerId,
+          state: 'COMMITTED', safeResult: result, committedAt: new Date() } });
+        await appendTenantAudit(tx, { masterGymId: access.gymId, receiptId: receipt.id, actorIdentityId: access.identityId,
+          eventCode: 'TRAINER_SESSION_PAY_UPDATED', resourceType: 'TRAINER', resourceId: trainerId, transition: { version: updated.version } });
+        return result;
       }));
     });
   }

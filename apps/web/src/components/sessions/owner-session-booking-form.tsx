@@ -16,7 +16,8 @@ export function OwnerSessionBookingForm({ slug, initialKey, options }: {
   const [slotResult, setSlotResult] = useState<Awaited<ReturnType<typeof loadSessionSlots>>>({ error: 'Choose a date to load times.' }); const [loadingSlots, startSlotLoad] = useTransition();
   useEffect(() => { if (!memberId || !trainerId || !draft.localDate) return; startSlotLoad(async () => { const result = await loadSessionSlots(slug, trainerId, draft.localDate, memberId); setSlotResult(result); setDraft(current => ({ ...current, localTime: '', offset: '' })); }); }, [slug, memberId, trainerId, draft.localDate]);
   const updateDraft = (field: keyof typeof draft, value: string) => setDraft(current => ({ ...current, [field]: value }));
-  const fee = options.trainers.items.find(item => item.trainerId === trainerId)?.level === 'LEVEL_2'
+  const trainer = options.trainers.items.find(item => item.trainerId === trainerId) ?? options.selectedTrainer;
+  const fee = trainer?.level === 'LEVEL_2'
     ? options.rateInfo.level2SessionFee ?? options.rateInfo.defaultSessionFee : options.rateInfo.defaultSessionFee;
   const activeKey = state.currentKey ?? state.nextKey ?? initialKey;
   const today = options.policy.localDate;
@@ -36,6 +37,7 @@ export function OwnerSessionBookingForm({ slug, initialKey, options }: {
     <input type="hidden" name="type" value="IN_PERSON"/><input type="hidden" name="durationMinutes" value="60"/><div className="ui-feedback">In-person PT · 60 minutes · 1 credit.</div>
     <label className="ui-field booking-field-full"><span className="ui-field-label">Session notes (optional)</span><textarea name="notes" maxLength={4000} rows={4} value={draft.notes} onChange={event => updateDraft('notes', event.target.value)}/></label>
     <div className="ui-feedback ui-feedback-success booking-field-full"><strong>Server pricing and policy</strong><p>Fee: {fee} {options.rateInfo.currency} · Service: in-person · 60 minutes · 1 credit · Cancellation window: {options.policy.cancellationWindowMinutes} minutes.</p><p>The booking command checks the exact slot, membership, trainer, pack and quote again before committing.</p></div>
+    <p className="ui-field-hint">{trainer?.baseSessionPay !== undefined ? `Trainer base pay on completion: ${options.rateInfo.currency} ${trainer.baseSessionPay}. An off-shift premium may apply. ` : ''}The agreed amount is saved at confirmation. Cancellations and no-shows earn no trainer pay.</p>
     {options.members.items.length === 0 || options.members.items.every(member => member.eligibility !== 'ELIGIBLE') ? <p role="status" className="ui-feedback">{options.noEligibleMembersReason === 'NO_ACTIVE_MEMBERSHIP_OR_CREDIT' ? 'No active member has an eligible membership and pack credit for this date.' : 'No eligible members are available.'}</p> : null}
     {state.error ? <p role="alert" className="ui-feedback ui-feedback-error">{state.error}</p> : null}
     {state.outcomeUnknown ? <p role="status">Retry to check the original booking safely. Keep this form open until its outcome is confirmed.</p> : null}

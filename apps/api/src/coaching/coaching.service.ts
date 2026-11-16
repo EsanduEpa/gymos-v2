@@ -1,5 +1,6 @@
 import { creditTotals } from '../sessions/credit-unit-projection.js';
 import { ConflictException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import type { Prisma } from '../generated/tenant/client.js';
 import {
   trainerClientPageSchema,
@@ -14,6 +15,8 @@ import {
   memberMealPlanPageSchema,
   memberWorkoutPlanPageSchema,
   memberWorkoutPlansQuerySchema,
+  memberWorkoutScheduleQuerySchema,
+  workoutCompletionInputSchema,
   type TrainerClientQuery,
   type WorkoutPlanCreate,
   workoutPlanUpdateSchema,
@@ -21,12 +24,22 @@ import {
   type MealPlanCreate,
   mealPlanUpdateSchema,
   type MealPlanUpdate,
+  bodyMeasurementInputSchema,
+  bodyMeasurementSchema,
+  bodyReadingSchema,
+  dietaryDetailsSchema,
+  dietaryProfileSchema,
+  dietaryProfileUpdateSchema,
+  progressReportQuerySchema,
+  progressReportSchema,
 } from '@gymos/contracts';
 import { DatabaseService } from '../database.service.js';
 import { withGymAccessFence } from '../identity/gym-access-fence.js';
 import { TenantSchemaGateService, type TenantGateContext } from '../tenancy/tenant-schema-gate.service.js';
 import { appendTenantAudit } from '../operations/transaction-audit.js';
 import { requestDigest } from '../operations/primitives.js';
+import { addLocalDays, asDate, dateString, gymLocalDate } from '../membership-rules.js';
+import { openCoachingRecord, sealCoachingRecord } from './coaching-records-crypto.js';
 
 type Access = TenantGateContext & { identityId: string; role: string; actor?: { kind: string; id: string; registrationOperationId?: string } | null };
 type MemberBinding = { id: string; identityId: string; operationId: string };
@@ -36,6 +49,45 @@ type WorkoutPlanWithExercises = Prisma.WorkoutPlanGetPayload<{ include: { exerci
 type MealPlanWithEntries = Prisma.MealPlanGetPayload<{ include: { entries: true } }>;
 
 function invalid(message: string): never { throw new UnprocessableEntityException(message); }
+
+function dietaryProfile(gymId: string, memberId: string, row: { encryptedData: string; version: number; updatedAt: Date } | null) {
+  return row ? dietaryProfileSchema.parse({
+    ...openCoachingRecord(row.encryptedData, ['dietary', gymId, memberId], dietaryDetailsSchema),
+    version: row.version,
+    updatedAt: row.updatedAt.toISOString(),
+  }) : { allergies: [], restrictions: [], version: null, updatedAt: null };
+}
+
+function measurement(gymId: string, memberId: string, row: { measuredOn: Date; encryptedData: string }) {
+  const measuredOn = dateString(row.measuredOn);
+  const reading = openCoachingRecord(row.encryptedData, ['measurement', gymId, memberId, measuredOn], bodyReadingSchema);
+  const calculated = reading.weightKg && reading.heightCm ? Number(reading.weightKg) / (Number(reading.heightCm) / 100) ** 2 : null;
+  const bmi = calculated === null ? null : Number(calculated.toPrecision(3));
+  return bodyMeasurementSchema.parse({ ...reading, measuredOn, bmi });
+}
+
+async function progressReport(tx: Prisma.TransactionClient, gymId: string, memberId: string, timeZone: string, now: Date, requested: string | undefined) {
+  const today = gymLocalDate(timeZone, now);
+  const through = requested ?? today;
+  if (through > today) invalid('The report end date cannot be in the future');
+  const from = through < '0001-03-31' ? '0001-01-01' : addLocalDays(through, -89);
+  const after = addLocalDays(through, 1);
+  const [rows, [sessions]] = await Promise.all([
+    tx.memberBodyMeasurement.findMany({
+      where: { memberId, measuredOn: { gte: asDate(from), lte: asDate(through) } },
+      orderBy: { measuredOn: 'asc' },
+    }),
+    tx.$queryRaw<{ count: number }[]>`
+      SELECT count(*)::int AS count FROM "PTSession"
+      WHERE "memberId" = ${memberId} AND state = 'COMPLETED'
+        AND "endedAt" >= (${from}::date::timestamp AT TIME ZONE ${timeZone})
+        AND "endedAt" < (${after}::date::timestamp AT TIME ZONE ${timeZone})`,
+  ]);
+  return progressReportSchema.parse({
+    from, through, today, timeZone, completedSessions: sessions!.count,
+    measurements: rows.map(row => measurement(gymId, memberId, row)),
+  });
+}
 
 function relationPredicate(trainerId: string, now: Date): Prisma.PTSessionWhereInput {
   return {
@@ -61,16 +113,32 @@ function relationshipWhere(trainerId: string, now: Date, q?: string): MemberWher
   };
 }
 
+function workoutSchedule(schedule: WorkoutPlanCreate['schedule']) {
+  return {
+    scheduledDate: schedule?.kind === 'DATE' ? asDate(schedule.date) : null,
+    scheduledWeekdays: schedule?.kind === 'WEEKLY' ? schedule.weekdays : [],
+  };
+}
+
+function scheduledWorkoutOn(day: string): Prisma.WorkoutPlanWhereInput {
+  const date = asDate(day);
+  return { OR: [{ scheduledDate: date }, { scheduledWeekdays: { has: date.getUTCDay() || 7 } }] };
+}
+
 function workoutPlanDto(plan: WorkoutPlanWithExercises) {
   const exercises = [...plan.exercises].sort((a, b) => a.sortOrder - b.sortOrder).map(exercise => ({
     name: exercise.name, sets: exercise.sets, reps: exercise.reps,
     weightKg: exercise.weightKg?.toString() ?? null, durationMinutes: exercise.durationMinutes, notes: exercise.notes,
+    ...(exercise.restSeconds !== null ? { restSeconds: exercise.restSeconds } : {}),
   }));
+  const scheduledDate = plan.scheduledDate ? dateString(plan.scheduledDate) : null;
+  const schedule = scheduledDate ? { scheduledDate } : plan.scheduledWeekdays.length ? { scheduledWeekdays: plan.scheduledWeekdays } : {};
   return { id: plan.id, name: plan.name, description: plan.description, createdAt: plan.createdAt.toISOString(),
-    revision: requestDigest({ name: plan.name, description: plan.description, exercises }),
-    exercises: plan.exercises.sort((a, b) => a.sortOrder - b.sortOrder).map(exercise => ({
+    revision: requestDigest({ name: plan.name, description: plan.description, ...schedule, exercises }),
+    ...schedule,
+    exercises: [...plan.exercises].sort((a, b) => a.sortOrder - b.sortOrder).map(exercise => ({
       id: exercise.id, order: exercise.sortOrder, name: exercise.name, sets: exercise.sets, reps: exercise.reps,
-      weightKg: exercise.weightKg?.toString() ?? null, durationMinutes: exercise.durationMinutes, notes: exercise.notes,
+      weightKg: exercise.weightKg?.toString() ?? null, durationMinutes: exercise.durationMinutes, notes: exercise.notes, restSeconds: exercise.restSeconds,
     })) };
 }
 
@@ -95,10 +163,11 @@ function mealPlanDto(plan: MealPlanWithEntries) {
     const fats = decimalHundredths(entry.fatsGrams); if (fats !== null) { totals.fatsGrams += fats; fatsHasValue = true; }
   }
   if (!Number.isSafeInteger(totals.calories) || totals.calories > 10_000_000) invalid('Meal plan calorie total exceeds the safe range');
-  const revision = requestDigest({ name: plan.name, entries: entries.map(entry => ({ dayOfWeek: entry.dayOfWeek, mealType: entry.mealType,
+  const schedule = plan.scheduledDate ? { scheduledDate: dateString(plan.scheduledDate) } : {};
+  const revision = requestDigest({ name: plan.name, ...schedule, entries: entries.map(entry => ({ dayOfWeek: entry.dayOfWeek, mealType: entry.mealType,
     foodItem: entry.foodItem, calories: entry.calories, proteinGrams: entry.proteinGrams?.toString() ?? null,
     carbsGrams: entry.carbsGrams?.toString() ?? null, fatsGrams: entry.fatsGrams?.toString() ?? null })) });
-  return mealPlanViewSchema.parse({ id: plan.id, revision, name: plan.name, createdAt: plan.createdAt.toISOString(),
+  return mealPlanViewSchema.parse({ id: plan.id, revision, name: plan.name, createdAt: plan.createdAt.toISOString(), ...schedule,
     entries: entries.map(entry => ({ id: entry.id, dayOfWeek: entry.dayOfWeek, mealType: entry.mealType, foodItem: entry.foodItem,
       calories: entry.calories, proteinGrams: entry.proteinGrams?.toString() ?? null,
       carbsGrams: entry.carbsGrams?.toString() ?? null, fatsGrams: entry.fatsGrams?.toString() ?? null })),
@@ -109,6 +178,76 @@ function mealPlanDto(plan: MealPlanWithEntries) {
 @Injectable()
 export class CoachingService {
   constructor(private readonly database: DatabaseService, private readonly tenantGate: TenantSchemaGateService) {}
+
+  async memberProgress(access: Access, query: unknown) {
+    const input = progressReportQuerySchema.parse(query);
+    return this.withOwnMember(access, (tx, memberId, now, timeZone) => progressReport(tx, access.gymId, memberId, timeZone, now, input.through));
+  }
+
+  async trainerProgress(access: Access, memberId: string, query: unknown) {
+    const input = progressReportQuerySchema.parse(query);
+    return this.withRelatedMember(access, memberId, (tx, member, _trainer, now, timeZone) =>
+      progressReport(tx, access.gymId, member.id, timeZone, now, input.through));
+  }
+
+  async saveBodyMeasurement(access: Access, input: unknown) {
+    const { measuredOn, ...reading } = bodyMeasurementInputSchema.parse(input);
+    return this.withOwnMember(access, async (tx, memberId, now, timeZone) => {
+      if (measuredOn > gymLocalDate(timeZone, now)) invalid('The measurement date cannot be in the future');
+      const key = { memberId, measuredOn: asDate(measuredOn) };
+      const binding = ['measurement', access.gymId, memberId, measuredOn];
+      await tx.$queryRaw`SELECT id FROM "Member" WHERE id = ${memberId} FOR UPDATE`;
+      const current = await tx.memberBodyMeasurement.findUnique({ where: { memberId_measuredOn: key } });
+      const prior = current ? openCoachingRecord(current.encryptedData, binding, bodyReadingSchema) : null;
+      const merged = {
+        weightKg: reading.weightKg ?? prior?.weightKg ?? null,
+        heightCm: reading.heightCm ?? prior?.heightCm ?? null,
+        bodyFatPct: reading.bodyFatPct ?? prior?.bodyFatPct ?? null,
+      };
+      if (current && prior && prior.weightKg === merged.weightKg && prior.heightCm === merged.heightCm && prior.bodyFatPct === merged.bodyFatPct) {
+        return measurement(access.gymId, memberId, current);
+      }
+      const encryptedData = sealCoachingRecord(merged, binding);
+      const saved = await tx.memberBodyMeasurement.upsert({ where: { memberId_measuredOn: key }, create: { ...key, encryptedData }, update: { encryptedData } });
+      return measurement(access.gymId, memberId, saved);
+    }, true);
+  }
+
+  async memberDietaryProfile(access: Access) {
+    return this.withOwnMember(access, async (tx, memberId) =>
+      dietaryProfile(access.gymId, memberId, await tx.memberDietaryProfile.findUnique({ where: { memberId } })));
+  }
+
+  async trainerDietaryProfile(access: Access, memberId: string) {
+    return this.withRelatedMember(access, memberId, async (tx, member) =>
+      dietaryProfile(access.gymId, member.id, await tx.memberDietaryProfile.findUnique({ where: { memberId: member.id } })));
+  }
+
+  async saveDietaryProfile(access: Access, memberId: string, input: unknown) {
+    const { expectedVersion, ...details } = dietaryProfileUpdateSchema.parse(input);
+    return this.withRelatedMember(access, memberId, async (tx, member, _trainer, now) => {
+      await tx.$queryRaw`SELECT id FROM "Member" WHERE id = ${member.id} FOR UPDATE`;
+      const current = await tx.memberDietaryProfile.findUnique({ where: { memberId: member.id } });
+      const prior = dietaryProfile(access.gymId, member.id, current);
+      if (current && requestDigest({ allergies: prior.allergies, restrictions: prior.restrictions }) === requestDigest(details)) return prior;
+      if ((current?.version ?? null) !== expectedVersion) throw new ConflictException('The dietary profile changed. Load it again before saving.');
+      const encryptedData = sealCoachingRecord(details, ['dietary', access.gymId, member.id]);
+      const saved = await tx.memberDietaryProfile.upsert({ where: { memberId: member.id }, create: { memberId: member.id, encryptedData },
+        update: { encryptedData, version: { increment: 1 } } });
+      const receipt = await tx.commandReceipt.create({ data: {
+        actorIdentityId: access.identityId, commandKind: 'UPDATE_DIETARY_PROFILE', idempotencyKey: randomUUID(),
+        requestDigest: requestDigest({ memberId: member.id, version: saved.version }),
+        resourceType: 'DIETARY_PROFILE', resourceId: member.id, state: 'COMMITTED', committedAt: now,
+        safeResult: { version: saved.version },
+      } });
+      await appendTenantAudit(tx, {
+        masterGymId: access.gymId, receiptId: receipt.id, actorIdentityId: access.identityId,
+        eventCode: 'DIETARY_PROFILE_UPDATED', resourceType: 'DIETARY_PROFILE', resourceId: member.id,
+        transition: { version: saved.version },
+      });
+      return dietaryProfile(access.gymId, member.id, saved);
+    }, true);
+  }
 
   async listClients(access: Access, queryInput: unknown) {
     if (access.role !== 'TRAINER' || access.actor?.kind !== 'TRAINER') throw new ForbiddenException('Trainer access is required');
@@ -269,8 +408,10 @@ export class CoachingService {
             return workoutPlanCreateResultSchema.parse({ ...result.data, replayed: true });
           }
           const plan = await tx.workoutPlan.create({ data: { memberId, trainerId: trainer.id, name: body.name, description: body.description ?? null,
+            ...workoutSchedule(body.schedule),
             exercises: { create: body.exercises.map((exercise, sortOrder) => ({ sortOrder, name: exercise.name, sets: exercise.sets,
-              reps: exercise.reps ?? null, weightKg: exercise.weightKg ?? null, durationMinutes: exercise.durationMinutes ?? null, notes: exercise.notes ?? null })) } },
+              reps: exercise.reps ?? null, weightKg: exercise.weightKg ?? null, durationMinutes: exercise.durationMinutes ?? null,
+              restSeconds: exercise.restSeconds ?? null, notes: exercise.notes ?? null })) } },
             include: { exercises: { orderBy: { sortOrder: 'asc' } } } });
           const result = workoutPlanCreateResultSchema.parse({ plan: workoutPlanDto(plan), replayed: false });
           const receipt = await tx.commandReceipt.create({ data: { actorIdentityId: access.identityId, commandKind: 'ASSIGN_WORKOUT_PLAN', idempotencyKey,
@@ -327,11 +468,14 @@ export class CoachingService {
           const current = await tx.workoutPlan.findFirst({ where: { id: planId, memberId, trainerId: trainer.id }, include: { exercises: { orderBy: { sortOrder: 'asc' } } } });
           if (!current) throw new NotFoundException('Workout plan not found');
           if (workoutPlanDto(current).revision !== body.expectedRevision) throw new ConflictException('Workout plan changed; reload before editing');
-          const updated = await tx.workoutPlan.update({ where: { id: planId }, data: { name: body.name, description: body.description ?? null } });
+          const updated = await tx.workoutPlan.update({ where: { id: planId }, data: { name: body.name, description: body.description ?? null,
+            ...(body.schedule ? workoutSchedule(body.schedule) : {}) } });
           await tx.workoutExercise.deleteMany({ where: { planId } });
           await tx.workoutExercise.createMany({ data: body.exercises.map((exercise, sortOrder) => ({ planId, sortOrder, name: exercise.name,
             sets: exercise.sets, reps: exercise.reps ?? null, weightKg: exercise.weightKg ?? null,
-            durationMinutes: exercise.durationMinutes ?? null, notes: exercise.notes ?? null })) });
+            durationMinutes: exercise.durationMinutes ?? null, restSeconds: exercise.restSeconds === undefined
+              && current.exercises[sortOrder]?.name === exercise.name ? current.exercises[sortOrder]?.restSeconds : exercise.restSeconds,
+            notes: exercise.notes ?? null })) });
           const plan = await tx.workoutPlan.findUniqueOrThrow({ where: { id: updated.id }, include: { exercises: { orderBy: { sortOrder: 'asc' } } } });
           const result = workoutPlanCreateResultSchema.parse({ plan: workoutPlanDto(plan), replayed: false });
           const receipt = await tx.commandReceipt.create({ data: { actorIdentityId: access.identityId, commandKind: 'UPDATE_WORKOUT_PLAN', idempotencyKey,
@@ -348,7 +492,7 @@ export class CoachingService {
 
   async memberWorkoutPlans(access: Access, queryInput: unknown) {
     if (access.role !== 'MEMBER' || access.actor?.kind !== 'MEMBER') throw new ForbiddenException('Member access is required');
-    const parsed = memberWorkoutPlansQuerySchema.safeParse(queryInput ?? {});
+    const parsed = memberWorkoutScheduleQuerySchema.safeParse(queryInput ?? {});
     if (!parsed.success) invalid('Enter valid workout plan page details');
     return this.tenantGate.withVerifiedTenant(access, async tenant => {
       const configuration = await tenant.gymConfiguration.findUnique({ where: { id: 'current' }, select: { timezone: true, masterGymId: true } });
@@ -366,18 +510,57 @@ export class CoachingService {
           const current = await tx.member.findFirst({ where: { id: member.id, identityId: access.identityId,
             enrollmentOperationId: access.actor!.registrationOperationId, registrationState: 'COMPLETE', status: 'ACTIVE' }, select: { id: true } });
           if (!current) throw new ForbiddenException('Member workout plan access is unavailable');
-          const where = { memberId: current.id };
+          const today = gymLocalDate(configuration.timezone!, now);
+          const requested = parsed.data.on === 'today' ? today : parsed.data.on;
+          const where = { memberId: current.id, ...(requested ? scheduledWorkoutOn(requested) : {}) };
           const [totalCount, plans] = await Promise.all([
             tx.workoutPlan.count({ where }),
             tx.workoutPlan.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (parsed.data.page - 1) * parsed.data.pageSize,
-              take: parsed.data.pageSize, include: { exercises: { orderBy: { sortOrder: 'asc' } } } }),
+              take: parsed.data.pageSize, include: { exercises: { orderBy: { sortOrder: 'asc' } },
+                completions: requested ? { where: { localDate: asDate(requested) } } : false } }),
           ]);
-          return memberWorkoutPlanPageSchema.parse({ items: plans.map(workoutPlanDto), page: parsed.data.page, pageSize: parsed.data.pageSize,
+          const items = plans.map(plan => {
+            const dto = workoutPlanDto(plan);
+            return requested ? { ...dto, completedExerciseOrders: plan.completions.filter(row => row.planRevision === dto.revision).map(row => row.sortOrder) } : dto;
+          });
+          return memberWorkoutPlanPageSchema.parse({ items, page: parsed.data.page, pageSize: parsed.data.pageSize,
             totalCount, totalPages: Math.ceil(totalCount / parsed.data.pageSize), hasMore: parsed.data.page * parsed.data.pageSize < totalCount,
-            asOf: now.toISOString(), timeZone: configuration.timezone });
+            asOf: now.toISOString(), timeZone: configuration.timezone,
+            ...(requested ? { scheduledFor: requested, canRecordCompletion: requested === today } : {}) });
         });
       }, { isolationLevel: 'RepeatableRead' });
     });
+  }
+
+  async recordWorkoutCompletion(access: Access, planId: string, input: unknown) {
+    if (access.role !== 'MEMBER' || access.actor?.kind !== 'MEMBER') throw new ForbiddenException('Member access is required');
+    const change = workoutCompletionInputSchema.parse(input);
+    return this.tenantGate.withVerifiedTenant(access, tenant => tenant.$transaction(async tx => {
+      const actor = access.actor!;
+      return withGymAccessFence(this.database.master, [
+        { identityId: access.identityId, gymId: access.gymId, role: 'MEMBER', tenantActorId: actor.id },
+      ], async () => {
+        const [config, member, [clock]] = await Promise.all([
+          tx.gymConfiguration.findUnique({ where: { id: 'current' }, select: { timezone: true, masterGymId: true } }),
+          tx.member.findFirst({ where: { id: actor.id, identityId: access.identityId, enrollmentOperationId: actor.registrationOperationId,
+            registrationState: 'COMPLETE', status: 'ACTIVE' }, select: { id: true } }),
+          tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`,
+        ]);
+        if (!member || !config?.timezone || config.masterGymId !== access.gymId) throw new NotFoundException('Workout plan not found');
+        if (change.date !== gymLocalDate(config.timezone, clock!.now)) throw new ConflictException('Exercise completion is available for today’s workout');
+        // Coordinate with plan edits through the row the trainer updates.
+        await tx.$queryRaw`SELECT id FROM "WorkoutPlan" WHERE id = ${planId} AND "memberId" = ${member.id} FOR UPDATE`;
+        const plan = await tx.workoutPlan.findFirst({ where: { id: planId, memberId: member.id, ...scheduledWorkoutOn(change.date) }, include: { exercises: true } });
+        if (!plan) throw new NotFoundException('Workout plan not found');
+        if (workoutPlanDto(plan).revision !== change.planRevision || !plan.exercises.some(exercise => exercise.sortOrder === change.sortOrder)) {
+          throw new ConflictException('Workout plan changed; reload before marking completion');
+        }
+        const key = { planId, localDate: asDate(change.date), planRevision: change.planRevision, sortOrder: change.sortOrder };
+        if (change.completed) await tx.workoutExerciseCompletion.upsert({ where: { planId_localDate_planRevision_sortOrder: key }, create: key, update: {} });
+        else await tx.workoutExerciseCompletion.deleteMany({ where: key });
+        return { completed: change.completed };
+      });
+    }));
   }
 
   async trainerWorkoutPlans(access: Access, memberId: string, queryInput: unknown) {
@@ -469,8 +652,10 @@ export class CoachingService {
             if (!result.success || result.data.plan.id !== previous.resourceId) throw new Error('Stored meal plan receipt failed integrity verification');
             return mealPlanCreateResultSchema.parse({ ...result.data, replayed: true });
           }
-          const plan = await tx.mealPlan.create({ data: { memberId, trainerId: trainer.id, name: body.name,
-            entries: { create: body.entries.map((entry, sortOrder) => ({ sortOrder, dayOfWeek: entry.dayOfWeek, mealType: entry.mealType,
+          const date = body.scheduledDate ? asDate(body.scheduledDate) : null;
+          const weekday = date ? (date.getUTCDay() || 7) : null;
+          const plan = await tx.mealPlan.create({ data: { memberId, trainerId: trainer.id, name: body.name, scheduledDate: date,
+            entries: { create: body.entries.map((entry, sortOrder) => ({ sortOrder, dayOfWeek: weekday ?? entry.dayOfWeek, mealType: entry.mealType,
               foodItem: entry.foodItem, calories: entry.calories ?? null, proteinGrams: entry.proteinGrams ?? null,
               carbsGrams: entry.carbsGrams ?? null, fatsGrams: entry.fatsGrams ?? null })) } },
             include: { entries: { orderBy: { sortOrder: 'asc' } } } });
@@ -530,9 +715,11 @@ export class CoachingService {
           const current = await tx.mealPlan.findFirst({ where: { id: planId, memberId, trainerId: trainer.id }, include: { entries: { orderBy: { sortOrder: 'asc' } } } });
           if (!current) throw new NotFoundException('Meal plan not found');
           if (mealPlanDto(current).revision !== body.expectedRevision) throw new ConflictException('Meal plan changed; reload before editing');
-          await tx.mealPlan.update({ where: { id: planId }, data: { name: body.name } });
+          const date = body.scheduledDate === undefined ? current.scheduledDate : body.scheduledDate ? asDate(body.scheduledDate) : null;
+          const weekday = date ? (date.getUTCDay() || 7) : null;
+          await tx.mealPlan.update({ where: { id: planId }, data: { name: body.name, scheduledDate: date } });
           await tx.mealPlanEntry.deleteMany({ where: { planId } });
-          await tx.mealPlanEntry.createMany({ data: body.entries.map((entry, sortOrder) => ({ planId, sortOrder, dayOfWeek: entry.dayOfWeek,
+          await tx.mealPlanEntry.createMany({ data: body.entries.map((entry, sortOrder) => ({ planId, sortOrder, dayOfWeek: weekday ?? entry.dayOfWeek,
             mealType: entry.mealType, foodItem: entry.foodItem, calories: entry.calories ?? null,
             proteinGrams: entry.proteinGrams ?? null, carbsGrams: entry.carbsGrams ?? null, fatsGrams: entry.fatsGrams ?? null })) });
           const plan = await tx.mealPlan.findUniqueOrThrow({ where: { id: planId }, include: { entries: { orderBy: { sortOrder: 'asc' } } } });
@@ -591,13 +778,14 @@ export class CoachingService {
   }
 
   private async withRelatedMember<Result>(access: Access, memberId: string,
-    work: (tx: Prisma.TransactionClient, member: { id: string }, trainer: { id: string }, now: Date, timeZone: string) => Promise<Result>): Promise<Result> {
+    work: (tx: Prisma.TransactionClient, member: { id: string }, trainer: { id: string }, now: Date, timeZone: string) => Promise<Result>,
+    writable = false): Promise<Result> {
     if (access.role !== 'TRAINER' || access.actor?.kind !== 'TRAINER') throw new ForbiddenException('Trainer access is required');
     return this.tenantGate.withVerifiedTenant(access, async tenant => {
       const configuration = await tenant.gymConfiguration.findUnique({ where: { id: 'current' }, select: { timezone: true, masterGymId: true } });
       if (!configuration?.timezone || configuration.masterGymId !== access.gymId) throw new NotFoundException('Client not found');
       return tenant.$transaction(async tx => {
-        await tx.$executeRaw`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`;
+        if (!writable) await tx.$executeRaw`SET TRANSACTION READ ONLY`;
         const [clock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
         const targetActor = await tx.member.findFirst({ where: { id: memberId, registrationState: 'COMPLETE', status: 'ACTIVE' },
           select: { id: true, identityId: true, enrollmentOperationId: true } });
@@ -617,8 +805,29 @@ export class CoachingService {
           if (!member) throw new NotFoundException('Client not found');
           return work(tx, member, trainer, clock!.now, configuration.timezone!);
         });
-      }, { isolationLevel: 'RepeatableRead' });
+      }, { isolationLevel: writable ? 'ReadCommitted' : 'RepeatableRead' });
     });
+  }
+
+  private async withOwnMember<Result>(access: Access,
+    work: (tx: Prisma.TransactionClient, memberId: string, now: Date, timeZone: string) => Promise<Result>, writable = false): Promise<Result> {
+    if (access.role !== 'MEMBER' || access.actor?.kind !== 'MEMBER') throw new ForbiddenException('Member access is required');
+    const actor = access.actor;
+    return this.tenantGate.withVerifiedTenant(access, tenant => tenant.$transaction(async tx => {
+      if (!writable) await tx.$executeRaw`SET TRANSACTION READ ONLY`;
+      return withGymAccessFence(this.database.master, [
+        { identityId: access.identityId, gymId: access.gymId, role: 'MEMBER', tenantActorId: actor.id },
+      ], async () => {
+        const [config, member, [clock]] = await Promise.all([
+          tx.gymConfiguration.findUnique({ where: { id: 'current' }, select: { timezone: true, masterGymId: true } }),
+          tx.member.findFirst({ where: { id: actor.id, identityId: access.identityId, enrollmentOperationId: actor.registrationOperationId,
+            registrationState: 'COMPLETE', status: 'ACTIVE' }, select: { id: true } }),
+          tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`,
+        ]);
+        if (!member || !config?.timezone || config.masterGymId !== access.gymId) throw new NotFoundException('Coaching records unavailable');
+        return work(tx, member.id, clock!.now, config.timezone);
+      });
+    }, { isolationLevel: writable ? 'ReadCommitted' : 'RepeatableRead' }));
   }
 
   private async notifyPlan(tx: Prisma.TransactionClient, input: { receiptId: string; recipientIdentityId: string; planId: string; type: 'WORKOUT' | 'MEAL'; updated: boolean }) {

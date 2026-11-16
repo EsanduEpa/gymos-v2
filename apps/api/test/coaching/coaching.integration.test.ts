@@ -6,6 +6,7 @@ import { CoachingService } from '../../src/coaching/coaching.service.js';
 import { TenantSchemaGateService } from '../../src/tenancy/tenant-schema-gate.service.js';
 import { createDisposableEnvironment } from '../support/disposable-environment.js';
 import { seedTwoGymFixture } from '../fixtures/two-gym-fixture.js';
+import { addLocalDays, asDate, gymLocalDate } from '../../src/membership-rules.js';
 
 let run: Awaited<ReturnType<typeof createDisposableEnvironment>>;
 let fixture: Awaited<ReturnType<typeof seedTwoGymFixture>>;
@@ -247,4 +248,64 @@ it('assigns meal entries once with server-computed totals and only exposes each 
   expect(await trainerContext.tenant.notification.count()).toBe(before.notifications + 2);
   await expect(trainerContext.service.createMealPlan(trainerContext.access, member.id, randomUUID(), { ...body, totalCalories: 500 })).rejects.toThrow();
   await expect(trainerContext.service.memberMealPlans({ ...memberContext.access, role: 'TRAINER' }, {})).rejects.toBeInstanceOf(ForbiddenException);
+}, 60_000);
+
+it('filters dated and weekly workouts and records completion only for the assigned member and revision', async () => {
+  const trainer = await contextFor(0, 'TRAINER');
+  const member = await contextFor(0, 'MEMBER');
+  const assignedMember = await member.tenant.member.findUniqueOrThrow({ where: { id: member.access.actor!.id } });
+  await addSession({ memberId: assignedMember.id, trainerId: trainer.access.actor!.id, state: 'SCHEDULED', startAt: new Date(Date.now() + 14 * 86400000) });
+  const today = gymLocalDate('Asia/Colombo');
+  const weekday = asDate(today).getUTCDay() || 7;
+  const exercises = [{ name: 'Squat', sets: 3, restSeconds: 45 }];
+  const { plan } = await trainer.service.createWorkoutPlan(trainer.access, assignedMember.id, randomUUID(), {
+    name: 'Today’s workout', schedule: { kind: 'DATE', date: today }, exercises,
+  });
+  const { plan: recurring } = await trainer.service.createWorkoutPlan(trainer.access, assignedMember.id, randomUUID(), {
+    name: 'Weekly workout', schedule: { kind: 'WEEKLY', weekdays: [weekday] }, exercises,
+  });
+  expect((await member.service.memberWorkoutPlans(member.access, { on: 'today' })).items.map(item => item.id))
+    .toEqual(expect.arrayContaining([plan.id, recurring.id]));
+  const nextWeek = await member.service.memberWorkoutPlans(member.access, { on: addLocalDays(today, 7) });
+  expect(nextWeek.items.map(item => item.id)).toEqual([recurring.id]);
+  expect(nextWeek.canRecordCompletion).toBe(false);
+  expect(plan.exercises[0]?.restSeconds).toBe(45);
+
+  const change = { date: today, planRevision: plan.revision, sortOrder: 0, completed: true };
+  const other = await createBoundMember(0, 'Unassigned Workout Reviewer');
+  const otherAccess = { ...member.access, identityId: other.identity.id,
+    actor: { kind: 'MEMBER', id: other.member.id, registrationOperationId: other.member.enrollmentOperationId! } };
+  await expect(member.service.recordWorkoutCompletion(otherAccess, plan.id, change)).rejects.toBeInstanceOf(NotFoundException);
+  await expect(member.service.recordWorkoutCompletion(member.access, plan.id, { ...change, date: addLocalDays(today, 1) }))
+    .rejects.toBeInstanceOf(ConflictException);
+  await member.service.recordWorkoutCompletion(member.access, plan.id, change);
+  await member.service.recordWorkoutCompletion(member.access, plan.id, change);
+  expect(await member.tenant.workoutExerciseCompletion.count({ where: { planId: plan.id } })).toBe(1);
+  const scheduled = await member.service.memberWorkoutPlans(member.access, { on: 'today' });
+  expect(scheduled.items.find(item => item.id === plan.id)?.completedExerciseOrders).toEqual([0]);
+  await member.service.recordWorkoutCompletion(member.access, plan.id, { ...change, completed: false });
+  expect(await member.tenant.workoutExerciseCompletion.count({ where: { planId: plan.id } })).toBe(0);
+  await trainer.service.updateWorkoutPlan(trainer.access, assignedMember.id, plan.id, randomUUID(), {
+    name: 'Updated workout', expectedRevision: plan.revision, exercises,
+  });
+  await expect(member.service.recordWorkoutCompletion(member.access, plan.id, change)).rejects.toBeInstanceOf(ConflictException);
+}, 60_000);
+
+it('preserves the meal date across reads and edits and uses the gym calendar weekday', async () => {
+  const trainer = await contextFor(0, 'TRAINER');
+  const member = await contextFor(0, 'MEMBER');
+  const memberId = member.access.actor!.id;
+  await addSession({ memberId, trainerId: trainer.access.actor!.id, state: 'SCHEDULED', startAt: new Date(Date.now() + 15 * 86400000) });
+  const entries = [{ dayOfWeek: 1, mealType: 'Breakfast', foodItem: 'Test meal', calories: 350 }];
+  const date = '2026-11-15';
+  const { plan } = await trainer.service.createMealPlan(trainer.access, memberId, randomUUID(), {
+    name: 'Dated meals', scheduledDate: date, entries,
+  });
+  expect(plan).toMatchObject({ scheduledDate: date, entries: [{ dayOfWeek: 7, foodItem: 'Test meal' }] });
+  expect((await member.service.memberMealPlans(member.access, {})).items).toContainEqual(plan);
+  const { plan: updated } = await trainer.service.updateMealPlan(trainer.access, memberId, plan.id, randomUUID(), {
+    name: 'Dated meals revised', scheduledDate: null, expectedRevision: plan.revision, entries,
+  });
+  expect(updated.scheduledDate).toBeUndefined();
+  expect(updated.entries[0]?.dayOfWeek).toBe(1);
 }, 60_000);

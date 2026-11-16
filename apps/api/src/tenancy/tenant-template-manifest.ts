@@ -277,12 +277,70 @@ export const TENANT_TEMPLATE_V10: TenantTemplateManifest = Object.freeze({
   migrations: [...TENANT_TEMPLATE_V9.migrations, { name: '20261106120000_member_profile_notifications', checksum: 'afc031dfbdc3068a060e9757c97b105ba5fd4d7741427012024d4c2ef51ad144' }],
   postconditions: TENANT_TEMPLATE_V9.postconditions,
 });
-export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
+export const TENANT_TEMPLATE_V11: TenantTemplateManifest = Object.freeze({
   ...TENANT_TEMPLATE_V10,
   version: 'tenant-2026-11-07.1',
   migrations: [...TENANT_TEMPLATE_V10.migrations, { name: '20261107010000_plan_notifications', checksum: '1da5d1f127f63dca18386277998e3f59e5a52181228ce99ef566aed802b2b3bc' }],
 });
-export const TENANT_MANIFESTS: readonly TenantTemplateManifest[] = [TENANT_TEMPLATE_V1, TENANT_TEMPLATE_V2, TENANT_TEMPLATE_V3, TENANT_TEMPLATE_V4, TENANT_TEMPLATE_V5, TENANT_TEMPLATE_V6, TENANT_TEMPLATE_V7, TENANT_TEMPLATE_V8, TENANT_TEMPLATE_V9, TENANT_TEMPLATE_V10, TENANT_TEMPLATE_MANIFEST];
+export const TENANT_TEMPLATE_V12: TenantTemplateManifest = Object.freeze({
+  ...TENANT_TEMPLATE_V11,
+  version: 'tenant-2026-11-14.1',
+  migrations: [...TENANT_TEMPLATE_V11.migrations, { name: '20261114090000_trainer_session_pay', checksum: 'c3a56af5a44f5dc9b0ac270a3f8fd01ce9ed2a6fed0537a6367f9ca8cad3b97b' }],
+  postconditions: {
+    ...TENANT_TEMPLATE_V11.postconditions,
+    constraints: [...TENANT_TEMPLATE_V11.postconditions.constraints, 'GymConfiguration_trainer_session_pay_check', 'Trainer_session_pay_override_check', 'PTSession_confirmed_trainer_pay_check'],
+    columns: { ...TENANT_TEMPLATE_V11.postconditions.columns,
+      GymConfiguration: [...TENANT_TEMPLATE_V11.postconditions.columns.GymConfiguration, 'level1SessionPay', 'level2SessionPay'],
+      Trainer: [...TENANT_TEMPLATE_V11.postconditions.columns.Trainer, 'sessionPayOverride'],
+      PTSession: [...TENANT_TEMPLATE_V11.postconditions.columns.PTSession, 'confirmedTrainerPay'],
+    },
+  },
+});
+export const TENANT_TEMPLATE_V13: TenantTemplateManifest = Object.freeze({
+  ...TENANT_TEMPLATE_V12,
+  version: 'tenant-2026-11-15.1',
+  migrations: [...TENANT_TEMPLATE_V12.migrations, { name: '20261115100000_workout_scheduling', checksum: '350e5431fa64992bb56c30dfd26d04814e50d6b153f1650cfcd957901e5ab56d' }],
+  postconditions: {
+    ...TENANT_TEMPLATE_V12.postconditions,
+    tables: [...TENANT_TEMPLATE_V12.postconditions.tables, 'WorkoutExerciseCompletion'],
+    indexes: [...TENANT_TEMPLATE_V12.postconditions.indexes, 'WorkoutExerciseCompletion_pkey'],
+    constraints: [...TENANT_TEMPLATE_V12.postconditions.constraints, 'WorkoutPlan_schedule_check', 'WorkoutExercise_restSeconds_check',
+      'WorkoutExerciseCompletion_pkey', 'WorkoutExerciseCompletion_planId_fkey', 'WorkoutExerciseCompletion_shape_check'],
+    columns: {
+      ...TENANT_TEMPLATE_V12.postconditions.columns,
+      WorkoutPlan: [...TENANT_TEMPLATE_V12.postconditions.columns.WorkoutPlan, 'scheduledDate', 'scheduledWeekdays'],
+      WorkoutExercise: [...TENANT_TEMPLATE_V12.postconditions.columns.WorkoutExercise, 'restSeconds'],
+      WorkoutExerciseCompletion: ['planId', 'localDate', 'planRevision', 'sortOrder', 'completedAt'],
+    },
+  },
+});
+export const TENANT_TEMPLATE_V14: TenantTemplateManifest = Object.freeze({
+  ...TENANT_TEMPLATE_V13,
+  version: 'tenant-2026-11-15.2',
+  migrations: [...TENANT_TEMPLATE_V13.migrations, { name: '20261115103000_dated_meal_plans', checksum: 'ae3aff483e110f8334010262eb698e150a58dcd88fdf09bd39992fdd21f6083a' }],
+  postconditions: {
+    ...TENANT_TEMPLATE_V13.postconditions,
+    columns: { ...TENANT_TEMPLATE_V13.postconditions.columns, MealPlan: [...TENANT_TEMPLATE_V13.postconditions.columns.MealPlan, 'scheduledDate'] },
+  },
+});
+export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
+  ...TENANT_TEMPLATE_V14,
+  version: 'tenant-2026-11-16.1',
+  migrations: [...TENANT_TEMPLATE_V14.migrations, { name: '20261116100000_member_coaching_records', checksum: 'c3c7f2991204cb9dd1aff46404868c9376c519299ba949c7b3014e1078302632' }],
+  postconditions: {
+    ...TENANT_TEMPLATE_V14.postconditions,
+    tables: [...TENANT_TEMPLATE_V14.postconditions.tables, 'MemberBodyMeasurement', 'MemberDietaryProfile'],
+    indexes: [...TENANT_TEMPLATE_V14.postconditions.indexes, 'MemberBodyMeasurement_pkey', 'MemberDietaryProfile_pkey'],
+    constraints: [...TENANT_TEMPLATE_V14.postconditions.constraints, 'MemberBodyMeasurement_pkey', 'MemberBodyMeasurement_memberId_fkey',
+      'MemberDietaryProfile_pkey', 'MemberDietaryProfile_memberId_fkey', 'MemberDietaryProfile_version_check'],
+    columns: {
+      ...TENANT_TEMPLATE_V14.postconditions.columns,
+      MemberBodyMeasurement: ['memberId', 'measuredOn', 'encryptedData', 'updatedAt'],
+      MemberDietaryProfile: ['memberId', 'encryptedData', 'version', 'updatedAt'],
+    },
+  },
+});
+export const TENANT_MANIFESTS: readonly TenantTemplateManifest[] = [TENANT_TEMPLATE_V1, TENANT_TEMPLATE_V2, TENANT_TEMPLATE_V3, TENANT_TEMPLATE_V4, TENANT_TEMPLATE_V5, TENANT_TEMPLATE_V6, TENANT_TEMPLATE_V7, TENANT_TEMPLATE_V8, TENANT_TEMPLATE_V9, TENANT_TEMPLATE_V10, TENANT_TEMPLATE_V11, TENANT_TEMPLATE_V12, TENANT_TEMPLATE_V13, TENANT_TEMPLATE_V14, TENANT_TEMPLATE_MANIFEST];
 export function reviewedTenantManifest(version: string | null, digest: string | null) {
   return TENANT_MANIFESTS.find(manifest => manifest.version === version && tenantManifestDigest(manifest) === digest);
 }

@@ -36,6 +36,7 @@ test('owner dashboard requires a local window and bounded honest metrics', () =>
     rangeEndExclusive: '2026-11-04T18:30:00Z', asOf: '2026-11-04T10:00:00Z', currency: 'LKR',
     metrics: { activeSessionsToday: metric, activeSessions: metric, trainersWithSessionsToday: metric,
       todayOperationalEarning: { value: '0.0000', definition: 'Operational earning; not cash received', numerator: '0.0000', denominator: null, sourceCount: 0, currency: 'LKR' }, pendingRequests: metric },
+    memberships: { activeCount: 0, expiringCount: 0, expiring: [] },
     earningChart: Array.from({ length: 8 }, (_, i) => ({ startHour: 6 + i * 2, endHour: 8 + i * 2, amount: '0.0000', sourceCount: 0 })), sessions: [], activeSessionItems: [], trainerCards: [] };
   assert.equal(ownerDashboardSchema.safeParse(base).success, true);
   assert.equal(ownerDashboardSchema.safeParse({ ...base, activeSessionItems: [{ id: 'session-1', startedAt: '2026-11-03T12:00:00Z', scheduledStartAt: '2026-11-03T11:00:00Z', memberName: 'Member One', trainerName: 'Trainer One' }] }).success, true);

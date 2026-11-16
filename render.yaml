@@ -6,7 +6,7 @@ services:
     plan: free
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build:deploy:api
     startCommand: pnpm start:deploy:api
-    healthCheckPath: /
+    healthCheckPath: /readyz
     autoDeployTrigger: 'off'
     envVars:
       - key: NODE_VERSION

@@ -15,9 +15,8 @@
 .auth-shell .auth-footnote { color: #c3d9f4; }
 .auth-shell .brand-mark { background: var(--primary); color: var(--primary-foreground); }
 .auth-shell .auth-form-wrap { min-width: 0; background: var(--background); }
+.auth-shell > .auth-form-wrap:only-child { grid-column: 1 / -1; }
 .auth-shell .auth-card { color: var(--foreground); }
-.auth-shell .muted,
-.auth-shell .form-note,
 .auth-shell .stack-form small,
 .auth-shell .stack-form .optional { color: var(--muted-foreground); }
 .auth-shell .eyebrow.dark { color: var(--accent-foreground); }
@@ -81,8 +80,7 @@
   margin: 0 auto;
   padding: clamp(20px, 4vw, 48px);
 }
-body:has(> .standalone-page) { background: #f3f6fa; }
-html[data-appearance="dark"] body:has(> .standalone-page) { background: #0a1528; }
+html:not([data-appearance="dark"]) body:has(> .standalone-page) { background: #f3f6fa; }
 @media (max-width: 560px) {
   .auth-shell .auth-form-wrap { padding: 24px 16px; }
   .auth-shell .auth-illustration { min-height: 220px; padding: 24px; }

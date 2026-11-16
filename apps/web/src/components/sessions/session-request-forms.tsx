@@ -51,6 +51,7 @@ export function SessionRequestDecisionForm({ slug, sessionId, expectedVersion, a
     });
   }}>
     <input type="hidden" name="idempotencyKey" value={state.currentKey ?? state.nextKey ?? requestKey}/>
+    {action === 'ACCEPT' ? <p className="ui-field-hint">Your agreed pay is set when you accept. Cancellations and no-shows earn no trainer pay.</p> : null}
     {action === 'DECLINE' ? <details className="session-request-message"><summary>Add optional message for member</summary><label className="ui-field"><span className="ui-field-label">Message for member</span><textarea name="reason" maxLength={500} rows={2}/></label></details> : null}
     {state.error ? <p role="alert" className="ui-feedback ui-feedback-error">{state.error}</p> : null}
     {state.success ? <p role="status" className="ui-feedback ui-feedback-success">{state.success}</p> : null}

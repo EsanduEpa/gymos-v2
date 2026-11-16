@@ -54,12 +54,21 @@ const profileSessionSchema = z.strictObject({
   notes: z.string().max(4000).nullable(),
 });
 
+const workoutRevisionSchema = z.string().regex(/^d1:[a-f0-9]{64}$/);
+const workoutWeekdaysSchema = z.array(z.number().int().min(1).max(7)).max(7)
+  .refine(days => new Set(days).size === days.length)
+  .transform(days => [...days].sort((a, b) => a - b));
+const restSecondsSchema = z.number().int().min(0).max(3600);
+
 export const workoutPlanViewSchema = z.strictObject({
   id: idSchema,
-  revision: z.string().regex(/^d1:[a-f0-9]{64}$/),
+  revision: workoutRevisionSchema,
   name: z.string().min(1).max(120),
   description: z.string().max(4000).nullable(),
   createdAt: instantSchema,
+  scheduledDate: z.iso.date().nullable().optional(),
+  scheduledWeekdays: workoutWeekdaysSchema.optional(),
+  completedExerciseOrders: z.array(z.number().int().min(0).max(99)).max(100).optional(),
   exercises: z.array(z.strictObject({
     id: idSchema,
     order: z.number().int().min(0).max(99),
@@ -68,6 +77,7 @@ export const workoutPlanViewSchema = z.strictObject({
     reps: z.number().int().min(1).max(1000).nullable(),
     weightKg: decimalString(1000, 3).nullable(),
     durationMinutes: z.number().int().min(1).max(1440).nullable(),
+    restSeconds: restSecondsSchema.nullable().optional(),
     notes: z.string().max(4000).nullable(),
   })).max(100),
 });
@@ -82,6 +92,7 @@ export const mealPlanViewSchema = z.strictObject({
   revision: z.string().regex(/^d1:[a-f0-9]{64}$/),
   name: z.string().min(1).max(120),
   createdAt: instantSchema,
+  scheduledDate: z.iso.date().nullable().optional(),
   entries: z.array(z.strictObject({
     id: idSchema,
     dayOfWeek: z.number().int().min(1).max(7),
@@ -105,6 +116,7 @@ const mealPlanEntryCreateSchema = z.strictObject({
 });
 export const mealPlanCreateSchema = z.strictObject({
   name: z.string().trim().min(1).max(120),
+  scheduledDate: z.iso.date().nullable().optional(),
   entries: z.array(mealPlanEntryCreateSchema).min(1).max(100),
 });
 export const mealPlanUpdateSchema = mealPlanCreateSchema.extend({ expectedRevision: z.string().regex(/^d1:[a-f0-9]{64}$/) });
@@ -128,21 +140,36 @@ const workoutExerciseCreateSchema = z.strictObject({
   reps: z.number().int().min(1).max(1000).nullable().optional(),
   weightKg: decimalString(1000, 3).nullable().optional(),
   durationMinutes: z.number().int().min(1).max(1440).nullable().optional(),
+  restSeconds: restSecondsSchema.nullable().optional(),
   notes: z.string().nullable().optional().refine(value => value === undefined || value === null || Array.from(value).length <= 4000),
 });
 export const workoutPlanCreateSchema = z.strictObject({
   name: z.string().trim().min(1).max(120),
   description: z.string().nullable().optional().refine(value => value === undefined || value === null || Array.from(value).length <= 4000),
+  schedule: z.discriminatedUnion('kind', [
+    z.strictObject({ kind: z.literal('UNSCHEDULED') }),
+    z.strictObject({ kind: z.literal('DATE'), date: z.iso.date() }),
+    z.strictObject({ kind: z.literal('WEEKLY'), weekdays: workoutWeekdaysSchema.refine(days => days.length > 0) }),
+  ]).optional(),
   exercises: z.array(workoutExerciseCreateSchema).min(1).max(100),
 });
-export const workoutPlanUpdateSchema = workoutPlanCreateSchema.extend({ expectedRevision: z.string().regex(/^d1:[a-f0-9]{64}$/) });
+export const workoutPlanUpdateSchema = workoutPlanCreateSchema.extend({ expectedRevision: workoutRevisionSchema });
 
 export const memberWorkoutPlansQuerySchema = z.strictObject({ page: pageNumberSchema.default(1), pageSize: pageSizeSchema.default(25) });
+export const memberWorkoutScheduleQuerySchema = memberWorkoutPlansQuerySchema.extend({ on: z.union([z.literal('today'), z.iso.date()]).optional() });
+export const workoutCompletionInputSchema = z.strictObject({
+  date: z.iso.date(),
+  planRevision: workoutRevisionSchema,
+  sortOrder: z.number().int().min(0).max(99),
+  completed: z.boolean(),
+});
 export const memberWorkoutPlanPageSchema = z.strictObject({
   items: z.array(workoutPlanViewSchema).max(100),
   page: z.number().int().min(1), pageSize: z.number().int().min(1).max(100),
   totalCount: z.number().int().nonnegative(), totalPages: z.number().int().nonnegative(), hasMore: z.boolean(),
   asOf: instantSchema, timeZone: z.string().min(1).max(100),
+  scheduledFor: z.iso.date().optional(),
+  canRecordCompletion: z.boolean().optional(),
 });
 export const workoutPlanCreateResultSchema = z.strictObject({ plan: workoutPlanViewSchema, replayed: z.boolean() });
 

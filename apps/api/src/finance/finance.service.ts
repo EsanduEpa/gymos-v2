@@ -264,6 +264,7 @@ export class FinanceService {
         const projectedCount = termRows.reduce((sum, row) => sum + row.lineCount, 0);
         if (projectedCount > 5000) throw new UnprocessableEntityException('Membership earning projection exceeds its bounded window limit');
         const membershipLineRows: Array<{ id: string; sourceId: string; sourceType: 'MEMBERSHIP_TERM'; category: string; occurredAt: string; amount: string; currency: string; trainerId: null }> = [];
+        const midnightByDate = new Map<string, string>();
         let membershipTotal = 0n;
         let membershipUnrecognized = 0n;
         for (const item of termRows) {
@@ -273,8 +274,13 @@ export class FinanceService {
             const index = (Date.parse(`${date}T00:00:00Z`) - Date.parse(`${item.termStart}T00:00:00Z`)) / 86_400_000;
             const amount = allocateMembershipMinorUnits(item.totalMinor, item.duration, index);
             const sourceId = `membership-term:${item.term.id}:${date}`;
+            let occurredAt = midnightByDate.get(date);
+            if (occurredAt === undefined) {
+              occurredAt = localMidnight(date, zone).toISOString();
+              midnightByDate.set(date, occurredAt);
+            }
             const line = { id: sourceId, sourceId, sourceType: 'MEMBERSHIP_TERM' as const, category: 'MEMBERSHIP_DAILY',
-              occurredAt: localMidnight(date, zone).toISOString(), amount: minorUnits2(amount), currency: item.term.currency, trainerId: null };
+              occurredAt, amount: minorUnits2(amount), currency: item.term.currency, trainerId: null };
             membershipLineRows.push(line);
             membershipTotal += amount * 100n;
           }

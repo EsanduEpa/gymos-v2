@@ -1,7 +1,7 @@
 'use server';
 
 import {
-  configurationReadSchema, createdMembershipPlanSchema, createMembershipPlanSchema, gymConfigurationSchema, gymPublicProfileSchema, gymThemeSettingsSchema,
+  configurationReadSchema, createdMembershipPlanSchema, createMembershipPlanSchema, gymConfigurationSchema, gymPublicProfileSchema, gymThemeSettingsSchema, managedMembershipPlanSchema, manageMembershipPlanSchema,
   updateConfigurationSchema, updateGymPublicProfileSchema, updateGymThemeSchema,
 } from '@gymos/contracts';
 import { revalidatePath } from 'next/cache';
@@ -17,7 +17,7 @@ function safeError(status: number) {
   if (status === 422 || status === 400) return 'Check the highlighted values and try again.';
   return 'GymOS could not save this change. Your edits are still here; try again.';
 }
-async function send<T>(slug: string, path: string, method: string, body: unknown, schema: { safeParse(value: unknown): { success: boolean; data?: T } }) {
+async function send<T>(slug: string, path: string, method: string, body: unknown, schema: { safeParse(value: unknown): { success: boolean; data?: T } }, conflictMessage?: string) {
   const accessToken = await token();
   if (!accessToken) redirect('/login');
   let response: Response;
@@ -29,7 +29,7 @@ async function send<T>(slug: string, path: string, method: string, body: unknown
   } catch { return { ok: false as const, error: 'GymOS is unavailable. Your draft is still here; try again.' }; }
   if (response.status === 401) redirect('/login?error=expired');
   if (response.status === 403 || response.status === 404) notFound();
-  if (!response.ok) return { ok: false as const, error: safeError(response.status) };
+  if (!response.ok) return { ok: false as const, error: response.status === 409 && conflictMessage ? conflictMessage : safeError(response.status) };
   const parsed = schema.safeParse(await response.json().catch(() => null));
   if (!parsed.success) return { ok: false as const, error: 'GymOS returned a response we could not confirm. Reload before retrying.' };
   revalidatePath(`/gyms/${slug}/owner/gym-config`);
@@ -66,10 +66,29 @@ export async function saveOperationalConfiguration(slug: string, body: unknown) 
   if (!parsed.success) return { ok: false as const, error: parsed.error.issues[0]?.message ?? 'Check the configuration fields.' };
   return send(slug, 'configuration', 'POST', parsed.data, gymConfigurationSchema);
 }
+export async function saveTrainerPaySettings(slug: string, body: unknown) {
+  const parsed = updateConfigurationSchema.safeParse(body);
+  if (!parsed.success) {
+    const fields = parsed.error.flatten().fieldErrors;
+    return { ok: false as const, fieldErrors: {
+      level1SessionPay: fields.level1SessionPay?.[0],
+      level2SessionPay: fields.level2SessionPay?.[0],
+      offShiftPremium: fields.offShiftPremium?.[0],
+    }, error: 'Check the trainer pay fields and try again.' };
+  }
+  return send(slug, 'configuration', 'POST', parsed.data, gymConfigurationSchema);
+}
 export async function saveMembershipPlan(slug: string, body: unknown) {
   const parsed = createMembershipPlanSchema.safeParse(body);
   if (!parsed.success) return { ok: false as const, error: parsed.error.issues[0]?.message ?? 'Check the plan fields.' };
   return send(slug, 'membership-plans', 'POST', parsed.data, createdMembershipPlanSchema);
+}
+export async function manageMembershipPlan(slug: string, planId: string, body: unknown) {
+  const parsed = manageMembershipPlanSchema.safeParse(body);
+  if (!parsed.success || !/^[A-Za-z0-9_:-]{1,128}$/.test(planId)) return { ok: false as const, error: 'Check the plan details and try again.' };
+  return send(slug, `membership-plans/${encodeURIComponent(planId)}`, 'POST', parsed.data, managedMembershipPlanSchema,
+    parsed.data.action === 'DELETE' ? 'Only archived plans with no membership or application history can be deleted. Reload if the plan recently changed.'
+      : 'Reload to check for newer settings. Finish any applications that are still being processed with this plan before changing it.');
 }
 export async function savePublicProfile(slug: string, body: unknown) {
   const parsed = updateGymPublicProfileSchema.safeParse(body);

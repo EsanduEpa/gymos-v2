@@ -23,7 +23,7 @@ export default async function MemberMealPlansPage({ params, searchParams }: { pa
   const brand = resolveGymBrandColors(theme.primaryColor);
   const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
   return <DashboardChrome identityId={session.identityId} key={session.identityId + ':' + gym.id + ':' + gym.role} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'} style={style}>
-    <div className="gym-banner"><div><span className="eyebrow">YOUR NUTRITION</span><h1>Meal plans</h1><p>Your trainer’s weekly meal guidance, organised by day.</p></div></div>
+    <div className="gym-banner"><div><span className="eyebrow">YOUR NUTRITION</span><h1>Meal plans</h1><p>Dated and weekly meals assigned by your trainer.</p></div></div>
     {!plans?.success ? <Card><p role="alert">Meal plans could not be loaded. Refresh to retry.</p><a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/member/meal-plans`}>Retry meal plans</a></Card> : <Card><CardHeader eyebrow="ASSIGNED TO YOU" title={`${plans.data.totalCount} meal plan${plans.data.totalCount === 1 ? '' : 's'}`}/>
       {plans.data.items.length === 0 ? <div className="ui-empty-state"><h2>No meal plans yet</h2><p>Plans assigned by your trainer will appear here.</p></div> :
         <div className="member-plan-list">{plans.data.items.map(plan => <AssignedMealPlan key={plan.id} plan={plan} timeZone={plans.data.timeZone}/>)}</div>}

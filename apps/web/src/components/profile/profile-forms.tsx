@@ -1,5 +1,6 @@
 'use client';
 
+import { formatDisplayDate } from '@/lib/display-date';
 import { useActionState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -35,7 +36,7 @@ export function GymSelfProfileForm({ slug, role, profile, requestKey }: { slug: 
   return <Card><CardHeader eyebrow="GYM PROFILE" title={`${slug} official ${role === 'MEMBER' ? 'member' : 'trainer'} record`}/>
     <p className="muted">This is the name and profile held by this gym. Changing your GymOS account display name does not change it.</p>
     <div className="profile-readonly"><strong>Official gym name</strong><span>{profile.fullName}</span></div>
-    {role === 'MEMBER' && member.dateOfBirth ? <div className="profile-readonly"><strong>Date of birth</strong><span>{member.dateOfBirth}</span><small>Ask the gym owner to correct this record.</small></div> : null}
+    {role === 'MEMBER' && member.dateOfBirth ? <div className="profile-readonly"><strong>Date of birth</strong><time dateTime={member.dateOfBirth}>{formatDisplayDate(member.dateOfBirth)}</time><small>Ask the gym owner to correct this record.</small></div> : null}
     {state.message ? <div role="status"><Feedback tone={state.status === 'success' ? 'success' : 'error'}>{state.message}</Feedback></div> : null}
     <form action={action} className="profile-form">
       <Field label="Phone" name="phone" type="tel" autoComplete="tel" maxLength={40} defaultValue={profile.phone ?? ''} optional error={state.fieldErrors?.phone}/>

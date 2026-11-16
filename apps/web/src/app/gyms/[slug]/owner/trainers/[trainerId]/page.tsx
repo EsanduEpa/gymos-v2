@@ -6,16 +6,13 @@ import { availabilitySchema } from '@gymos/contracts';
 import { Card, CardHeader, Feedback, StatusBadge } from '@/components/ui';
 import { DashboardChrome } from '@/components/navigation/dashboard-chrome';
 import { TrainerShiftForm } from '@/components/trainers/trainer-shift-form';
+import { TrainerSessionPayForm } from '@/components/trainers/trainer-session-pay-form';
 import { TrainerLifecycleForm } from '@/components/trainers/trainer-lifecycle-form';
 import { AvailabilityEditor } from '@/components/sessions/availability-editor';
+import { formatDisplayDateTime } from '@/lib/display-date';
 import { apiUrl } from '@/lib/gymos';
 import { requireGymContext } from '@/lib/gym-context';
 import { randomUUID } from 'node:crypto';
-
-function formatSessionStart(value: string, timeZone: string) {
-  return new Intl.DateTimeFormat('en', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-    timeZone, timeZoneName: 'short' }).format(new Date(value));
-}
 
 export default async function OwnerTrainerProfilePage({ params }: { params: Promise<{ slug: string; trainerId: string }> }) {
   const { slug, trainerId } = await params;
@@ -40,6 +37,9 @@ export default async function OwnerTrainerProfilePage({ params }: { params: Prom
       <div className="dashboard-grid">
         <Card><CardHeader eyebrow="PROFILE" title="Trainer details" action={<StatusBadge status={result.data.trainer.status}/>}/><dl className="trainer-profile-summary"><dt>Level</dt><dd>{result.data.trainer.level?.replace('_', ' ') ?? 'Not set'}</dd><dt>Experience</dt><dd>{result.data.trainer.yearsExperience === null ? 'Not provided' : `${result.data.trainer.yearsExperience} years`}</dd><dt>Specialisations</dt><dd>{result.data.trainer.specialisations.join(', ') || 'None listed'}</dd><dt>Joined</dt><dd>{new Date(result.data.profile.joinedAt).toLocaleDateString('en', { timeZone: 'UTC' })}</dd><dt>Biography</dt><dd>{result.data.profile.biography || 'No biography provided'}</dd></dl></Card>
         <TrainerLifecycleForm slug={slug} trainerId={trainerId} status={result.data.trainer.status} version={result.data.trainer.version} initialRequestKey={randomUUID()}/>
+        {result.data.compensation && result.data.trainer.status === 'ACTIVE' ? <Card><CardHeader eyebrow="COMPENSATION" title="Trainer session pay"/>
+          <TrainerSessionPayForm slug={slug} trainerId={trainerId} version={result.data.trainer.version} amount={result.data.compensation.sessionPayOverride} currency={result.data.compensation.currency}/>
+        </Card> : null}
         <Card><CardHeader eyebrow="SCHEDULE" title="Approve recurring shift"/><TrainerShiftForm slug={slug} trainerId={trainerId} version={result.data.trainer.version} shiftStart={result.data.trainer.shiftStart} shiftEnd={result.data.trainer.shiftEnd}/><p>Current shift: {result.data.trainer.shiftStart && result.data.trainer.shiftEnd ? `${result.data.trainer.shiftStart}–${result.data.trainer.shiftEnd}` : 'No approved shift'}</p></Card>
         <Card><CardHeader eyebrow="BOOKABLE PT AVAILABILITY" title="Manage session windows"/>{availability?.success ? <AvailabilityEditor slug={slug} trainerId={trainerId} initialKey={randomUUID()} data={availability.data} canEditClosures closureFrom={today} closureThrough={through.toISOString().slice(0, 10)}/> : <Feedback tone="error">Bookable availability is unavailable. No changes were made.</Feedback>}</Card>
         <Card><CardHeader eyebrow="SESSION HISTORY" title="Performance summary"/>
@@ -53,7 +53,7 @@ export default async function OwnerTrainerProfilePage({ params }: { params: Prom
             ? <Feedback tone="info">No sessions recorded yet.</Feedback>
             : <ul className="trainer-profile-sessions">{result.data.recentSessions.items.map(item => <li key={item.id}>
               <div><a className="platform-text-link" href={`/gyms/${encodeURIComponent(slug)}/sessions/${encodeURIComponent(item.id)}`}>{item.state.replaceAll('_', ' ')}</a><span>{item.type.replaceAll('_', ' ').toLowerCase()}</span></div>
-              <time dateTime={item.scheduledStartAt}>{formatSessionStart(item.scheduledStartAt, result.data.gymTimeZone)}</time>
+              <time dateTime={item.scheduledStartAt}>{formatDisplayDateTime(item.scheduledStartAt, result.data.gymTimeZone, true)}</time>
             </li>)}</ul>}
           {result.data.recentSessions.totalCount > 0 && <p className="trainer-profile-session-total">Showing {result.data.recentSessions.items.length} of {result.data.recentSessions.totalCount} sessions{result.data.recentSessions.hasMore ? ' · latest ten shown' : ''}.</p>}
           <p>Ratings are unavailable until members submit ratings.</p>

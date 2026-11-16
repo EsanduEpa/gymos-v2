@@ -1,11 +1,11 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import argon2 from 'argon2';
 import { ServiceUnavailableException } from '@nestjs/common';
-import { SignJWT } from 'jose';
 import { PrismaClient as MasterClient } from '../../src/generated/master/client.js';
 import { MemberApplicationsService } from '../../src/member-applications.service.js';
 import { GymAccessGuard } from '../../src/gym-access.guard.js';
 import { createDisposablePostgresRun } from '../support/disposable-postgres.js';
+import { identityToken } from '../support/identity-token.js';
 
 let run: Awaited<ReturnType<typeof createDisposablePostgresRun>>;
 let master: MasterClient;
@@ -40,7 +40,8 @@ it('preserves self-created credentials, normalizes duplicate submissions, scopes
     durationDays: 30, status: 'ACTIVE', version: 3 };
   const tenant = { gymConfiguration: { findUnique: async () => ({ currency: 'LKR', timezone: 'Asia/Colombo' }) },
     membershipPlan: { findUnique: async () => plan }, $queryRaw: async () => [{ now: new Date('2026-11-06T00:00:00.000Z') }] };
-  const tenantGate = { withVerifiedTenant: async (_access: unknown, work: (value: typeof tenant) => unknown) => work(tenant) };
+  const tenantGate = { withVerifiedTenant: async (_access: unknown, work: (value: typeof tenant & { $transaction: (callback: (value: typeof tenant) => unknown) => unknown }) => unknown) =>
+    work({ ...tenant, $transaction: callback => callback(tenant) }) };
   let enrollmentCalls = 0;
   const enrollment = { enroll: async (_access: unknown, _input: unknown, applicationId: string) => {
     enrollmentCalls++;
@@ -62,9 +63,7 @@ it('preserves self-created credentials, normalizes duplicate submissions, scopes
   const identity = await master.user.findUniqueOrThrow({ where: { email: 'applicant-'+run.runId+'@example.test' } });
   expect(await argon2.verify(identity.passwordHash, password)).toBe(true);
   expect(await master.gymAccess.count({ where: { userId: identity.id, gymId: gym.id } })).toBe(0);
-  const token = await new SignJWT({ authVersion: identity.authVersion }).setProtectedHeader({ alg: 'HS256' })
-    .setSubject(identity.id).setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('5m')
-    .sign(new TextEncoder().encode(jwtSecret));
+  const token = await identityToken(master, jwtSecret, identity.id, identity.authVersion);
   const guard = new GymAccessGuard({ master } as never, {} as never);
   const requestContext = { switchToHttp: () => ({ getRequest: () => ({ headers: { authorization: `Bearer ${token}` }, params: { slug: gym.slug } }) }) };
   await expect(guard.canActivate(requestContext as never)).rejects.toMatchObject({ status: 403 });

@@ -24,7 +24,7 @@ export default async function MemberCalendarPage({ params, searchParams }: {
   const { token, session, gym, theme } = await requireGymContext(slug, 'MEMBER');
   const fetchPage = async (query: string) => {
     try {
-      const response = await fetch(apiUrl(`/gyms/${encodeURIComponent(slug)}/me/sessions?${query}`), { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' });
+      const response = await fetch(apiUrl(`/gyms/${encodeURIComponent(slug)}/me/sessions?${query}&excludeDeclined=true`), { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' });
       if (response.status === 401) redirect('/login?error=expired');
       if (response.status === 403 || response.status === 404) notFound();
       return response.ok ? sessionReadPageSchema.safeParse(await response.json().catch(() => null)) : null;
@@ -57,7 +57,7 @@ export default async function MemberCalendarPage({ params, searchParams }: {
   const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
 
   return <DashboardChrome identityId={session.identityId} key={`${session.identityId}:${gym.id}:${gym.role}`} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'} style={style}>
-    <div className="gym-banner"><div><span className="eyebrow">YOUR SCHEDULE</span><h1>Calendar</h1><p>See your PT sessions and weekly meal plan activities by gym-local day.</p></div>
+    <div className="gym-banner"><div><span className="eyebrow">YOUR SCHEDULE</span><h1>Calendar</h1><p>See your PT sessions and meal plans by gym-local day.</p></div>
       <a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/member/sessions`}>My PT Sessions</a></div>
     <Card><CardHeader eyebrow="MEMBER CALENDAR" title={parsed ? `${parsed.totalCount} session${parsed.totalCount === 1 ? '' : 's'} this month` : 'Your schedule'}/>
       {parsed ? <MemberSessionCalendar slug={slug} month={month} today={today} timeZone={parsed.timeZone} sessions={parsed.items} totalCount={parsed.totalCount} mealPlans={mealPlans?.items ?? []} mealPlansTruncated={Boolean(mealPlans?.hasMore)}/> : <div className="ui-empty-state" role="alert"><h2>Calendar could not be loaded</h2><p>Your session records were not changed. Refresh to try again.</p></div>}

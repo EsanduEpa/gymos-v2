@@ -5,10 +5,10 @@ try {
     throw new Error('configuration');
   }
   console.log('Waiting up to two minutes for the demo API to wake…');
-  const response = await fetch(url, { signal: AbortSignal.timeout(120_000), redirect: 'error' });
-  if (!response.ok || (await response.text()).trim() !== 'Hello World!') throw new Error('response');
-  console.log('API is responding. Sign in through Vercel and verify scheduled-work health before the demo.');
+  const response = await fetch(new URL('/readyz', url), { signal: AbortSignal.timeout(120_000), redirect: 'error' });
+  if (!response.ok || (await response.json()).status !== 'ok') throw new Error('response');
+  console.log('API and master database are responding. Sign in through Vercel and verify scheduled-work health before the demo.');
 } catch {
-  console.error('Could not confirm the API response. Set GYMOS_API_URL to the public HTTPS API origin and check Render logs. No database readiness is implied.');
+  console.error('Could not confirm API readiness. Set GYMOS_API_URL to the public HTTPS API origin and check Render and database availability.');
   process.exitCode = 1;
 }

@@ -28,7 +28,7 @@ export const sessionBookingOptionsQuerySchema = z.strictObject({
 const memberOptionSchema = z.strictObject({ memberId: id, name: z.string().min(2).max(120), availableCredits: z.number().int().nonnegative(),
   eligibility: z.enum(['ELIGIBLE', 'NO_ACTIVE_MEMBERSHIP', 'NO_CREDIT']) });
 const trainerOptionSchema = z.strictObject({ trainerId: id, name: z.string().min(2).max(120), level: level,
-  shiftStart: time.nullable(), shiftEnd: time.nullable() });
+  shiftStart: time.nullable(), shiftEnd: time.nullable(), baseSessionPay: amount.optional() });
 export const sessionBookingOptionsSchema = z.strictObject({
   members: pageSchema(memberOptionSchema), trainers: pageSchema(trainerOptionSchema),
   selectedMember: memberOptionSchema.nullable(), selectedTrainer: trainerOptionSchema.nullable(),
@@ -36,7 +36,7 @@ export const sessionBookingOptionsSchema = z.strictObject({
     maximumDurationMinutes: z.literal(60), scheduleHorizonDays: z.literal(14), configurationVersion: z.number().int().nonnegative(),
     cancellationWindowMinutes: z.number().int().min(0).max(10080) }),
   rateInfo: z.strictObject({ currency, defaultSessionFee: amount, level2SessionFee: amount.nullable(), introSessionFee: amount.nullable(),
-    level1BaseRate: amount, level2BaseRate: amount, offShiftPremium: amount }),
+    level1BaseRate: z.string().regex(/^\d(?:\.\d{1,6})?$/), level2BaseRate: z.string().regex(/^\d(?:\.\d{1,6})?$/), offShiftPremium: z.string().regex(/^\d(?:\.\d{1,6})?$/) }),
   noEligibleMembersReason: z.enum(['NO_ACTIVE_MEMBERSHIP_OR_CREDIT']).nullable(), asOf: z.iso.datetime({ offset: true }),
 });
 

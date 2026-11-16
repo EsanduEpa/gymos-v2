@@ -10,9 +10,10 @@ import { CommandReceiptFoundationService } from '../operations/receipt.service.j
 import { appendTenantNotification } from '../notifications.service.js';
 import { creditUnits, eligibleUnits, type CreditUnit } from './credit-unit-projection.js';
 import { resolveSessionCreditHold } from './credit-holds.js';
-import { SessionBookingService, resolveSessionLocalTime, withinShift, decimalSum } from './booking.service.js';
+import { SessionBookingService, resolveSessionLocalTime, withinShift } from './booking.service.js';
+import { completedTrainerPayMinor, trainerPayForConfirmation } from './trainer-pay.js';
 import { allowedStartMinutes, type AvailabilityRule } from './availability-policy.js';
-import { cancellationConsequence, confirmedCancellationPolicy, localDateAt, periodFor, nextPeriod, payAmountMinor } from './session-lifecycle.service.js';
+import { cancellationConsequence, confirmedCancellationPolicy, localDateAt, periodFor, nextPeriod } from './session-lifecycle.service.js';
 import { retrySessionTransaction } from './session-transactions.js';
 
 type Access = TenantGateContext & { identityId: string; identityVersion: number; accessVersion: number; role: string; slug: string };
@@ -76,7 +77,7 @@ export class SessionExceptionsService {
     let desiredRevenue = netRevenue; let desiredPay = netPay;
     let replacement: { start: Date; end: Date; localDate: string; localTime: string; offset: string; timeZone: string } | null = null;
     let destination: CreditUnit | null = null;
-    let replacementTerms: { fee: string; currency: string; rate: string; version: number; trainerVersion: number } | null = null;
+    let replacementTerms: { fee: string; currency: string; trainerPay: string; version: number; trainerVersion: number } | null = null;
     let newExpiry: string | null = null;
     let consequence = '';
     if (intent.kind === 'REMEDY') {
@@ -112,9 +113,8 @@ export class SessionExceptionsService {
       destination = eligibleUnits(simulated.filter(unit => unit.currency === config.currency).sort((a,b) => a.effectiveEndDateExclusive.getTime()-b.effectiveEndDateExclusive.getTime() || a.packCreatedAt.getTime()-b.packCreatedAt.getTime() || a.packId.localeCompare(b.packId) || a.creditOrdinal-b.creditOrdinal), intent.localDate)[0] ?? null;
       if (!destination) throw new ConflictException(consume ? 'Late member rescheduling needs a separate eligible credit. The original booking remains unchanged.' : 'No eligible replacement credit. For a gym-side change, explicitly approve a source-credit expiry remedy if needed.');
       replacement = { start: resolved.instant, end, localDate: intent.localDate, localTime: intent.localTime, offset: resolved.offset, timeZone: config.timezone };
-      const baseRate = session.trainer.level === 'LEVEL_2' ? config.level2BaseRate : config.level1BaseRate;
       replacementTerms = { fee: (session.trainer.level === 'LEVEL_2' ? config.level2SessionFee ?? config.defaultSessionFee : config.defaultSessionFee).toString(), currency: config.currency,
-        rate: withinShift(resolved.instant, end, config.timezone, session.trainer.shiftStart, session.trainer.shiftEnd) ? baseRate.toString() : decimalSum(baseRate.toString(), config.offShiftPremium.toString()), version: config.version, trainerVersion: session.trainer.version };
+        trainerPay: trainerPayForConfirmation(config, session.trainer, withinShift(resolved.instant, end, config.timezone, session.trainer.shiftStart, session.trainer.shiftEnd)), version: config.version, trainerVersion: session.trainer.version };
       target = 'CANCELLED'; settlement = consume ? 'LATE_CANCELLED' : 'FREE_CANCELLED';
       desiredRevenue = consume ? hold.creditValueMinorUnits * 100n : 0n; desiredPay = 0n;
       consequence = consume ? 'The original late cancellation consumes one credit; the replacement reserves a separate credit.' : 'The source reservation is released and one eligible credit is reserved for the replacement.';
@@ -138,7 +138,7 @@ export class SessionExceptionsService {
       if (consume && hold.state === 'RELEASED' && !source.available && !source.expired) throw new ConflictException('The source unit has been allocated elsewhere. Resolve that booking before correcting the charge.');
       desiredRevenue = consume ? hold.creditValueMinorUnits * 100n : 0n;
       if (intent.target === 'COMPLETED' && (!session.confirmationRate || !session.confirmationLevel)) throw new ConflictException('The original trainer-pay snapshot is unavailable');
-      desiredPay = intent.target === 'COMPLETED' ? payAmountMinor(hold.creditValueMinorUnits, session.confirmationRate!.toString()) * 100n : 0n;
+      desiredPay = intent.target === 'COMPLETED' ? completedTrainerPayMinor({ confirmedTrainerPay: session.confirmedTrainerPay, confirmationRate: session.confirmationRate! }, hold.creditValueMinorUnits) * 100n : 0n;
       consequence = consume ? 'Record the corrected outcome using the original credit value and trainer-pay snapshot.' : 'Reverse the mistaken charge; expired restored value will await an owner expiry remedy.';
     }
     const originalPeriod = session.payRecord?.period ?? session.payCorrections[0]?.originalPeriod ?? await tx.trainerPayPeriod.findUnique({ where: { cadence_localStartDate: { cadence: policy.payPeriod, localStartDate: new Date(`${periodFor(session.scheduledStartAt, policy.payPeriod, session.gymTimezone).start}T00:00:00Z`) } } });
@@ -159,7 +159,7 @@ export class SessionExceptionsService {
       oldStartAt: session.scheduledStartAt.toISOString(), oldEndAt: session.scheduledEndAt.toISOString(), replacementStartAt: replacement?.start.toISOString() ?? null, replacementEndAt: replacement?.end.toISOString() ?? null, replacementTimeZone: replacement?.timeZone ?? null,
       sourcePackId: hold.packId, sourceCreditOrdinal: hold.creditOrdinal, sourceValue: amount(hold.creditValueMinorUnits * 100n), sourceExpiry: date(source.effectiveEndDateExclusive), proposedExpiry: newExpiry,
       destinationPackId: destination?.packId ?? null, destinationCreditOrdinal: destination?.creditOrdinal ?? null, destinationValue: destination ? amount(destination.valueMinorUnits * 100n) : null,
-      replacementFee: replacementTerms?.fee ?? null, replacementCurrency: replacementTerms?.currency ?? null, replacementPayRate: replacementTerms?.rate ?? null, replacementPolicyVersion: replacementTerms?.version ?? null,
+      replacementFee: replacementTerms?.fee ?? null, replacementCurrency: replacementTerms?.currency ?? null, replacementPayRate: null, replacementTrainerPay: replacementTerms?.trainerPay ?? null, replacementPolicyVersion: replacementTerms?.version ?? null,
       sourceCreditConsumed: consume, replacementCreditRequired: intent.kind === 'RESCHEDULE', operationalDelta: amount(desiredRevenue - netRevenue), trainerPayDelta: amount(desiredPay - netPay),
       payAdjustmentPeriodStart: payDestination?.start ?? null, payAdjustmentPeriodEndExclusive: payDestination?.end ?? null,
       payPeriodState: originalPeriod?.state ?? null, payResolution: originalPeriod && originalPeriod.state !== 'OPEN' ? 'The original closed/approved pay facts stay unchanged. A signed adjustment goes to an open correction period; no payment is recorded.' : 'Any signed trainer-pay adjustment is recorded in the open period; no payment is recorded.', consequence };
@@ -233,6 +233,8 @@ export class SessionExceptionsService {
             newId = outcome.resourceId; bookingAudits = outcome.audits;
             const held = await tx.sessionCreditHold.findUniqueOrThrow({ where: { sessionId: newId } });
             if (held.packId !== plan.destination!.packId || held.creditOrdinal !== plan.destination!.creditOrdinal) throw new ConflictException('Replacement allocation changed; review a fresh quote');
+            const replacement = await tx.pTSession.findUniqueOrThrow({ where: { id: newId }, select: { confirmedTrainerPay: true, configurationVersion: true } });
+            if (replacement.confirmedTrainerPay?.toString() !== plan.preview.replacementTrainerPay || replacement.configurationVersion !== plan.preview.replacementPolicyVersion) throw new ConflictException('Replacement trainer pay changed; review a fresh quote');
           }
           await creditUnits(tx, plan.session.memberId);
           const eventCode = input.intent.kind === 'REMEDY' ? 'PT_CREDIT_REMEDY_APPROVED' : input.intent.kind === 'RESCHEDULE' ? 'PT_SESSION_RESCHEDULED' : input.intent.kind === 'CANCEL' ? 'PT_SESSION_CANCELLED' : 'PT_SESSION_CORRECTED';

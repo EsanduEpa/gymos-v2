@@ -615,6 +615,7 @@ it('issues one-use staff recovery to an ordinary member, serializes redemption a
     verificationMethod: 'IN_PERSON', reason: 'Owner identity verified in person.', currentPassword: password })).rejects.toThrow('not eligible');
   const input = { actorIdentityId: owner.id, gymId: gym.id, identityId: subject.id,
     verificationMethod: 'KNOWN_CONTACT' as const, reason: 'Known contact confirmed against the enrollment record.', currentPassword: password };
+  await expect(credentials.issueRecovery({ ...input, currentPassword: 'incorrect-password' })).rejects.toThrow('Owner access required');
   const issued = await credentials.issueRecovery(input);
   const firstRow = await master.recoveryCredential.findUniqueOrThrow({ where: { id: issued.credentialId } });
   expect(firstRow.secretHash).not.toContain(issued.secret);
@@ -631,6 +632,7 @@ it('issues one-use staff recovery to an ordinary member, serializes redemption a
     newPassword: 'Recovery-password-44' })).rejects.toThrow('invalid');
   const redeemInput = { credentialId: replacement.credentialId, secret: replacement.secret, newPassword: 'Recovery-password-44' };
   expect(await Promise.all([credentials.completeRecovery(redeemInput), credentials.completeRecovery(redeemInput)])).toEqual([{ success: true }, { success: true }]);
+  await expect(credentials.completeRecovery({ ...redeemInput, newPassword: 'Different-recovery-password-44' })).rejects.toThrow('already used');
   expect((await master.user.findUniqueOrThrow({ where: { id: subject.id } })).authVersion).toBe(subject.authVersion + 1);
   expect(await master.identitySecurityEvent.count({ where: { identityId: subject.id, event: 'PASSWORD_RECOVERED' } })).toBe(1);
   expect(await master.identitySession.count({ where: { identityId: subject.id, revokedAt: null } })).toBe(0);

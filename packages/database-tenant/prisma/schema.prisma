@@ -55,8 +55,28 @@ model Member {
   sessionsAsMember      PTSession[]             @relation("SessionMember")
   workoutPlans          WorkoutPlan[]            @relation("WorkoutPlanMember")
   mealPlans             MealPlan[]               @relation("MealPlanMember")
+  dietaryProfile        MemberDietaryProfile?
+  bodyMeasurements      MemberBodyMeasurement[]
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
+}
+
+model MemberDietaryProfile {
+  memberId        String   @id
+  member          Member   @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  encryptedData   String
+  version         Int      @default(0)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model MemberBodyMeasurement {
+  memberId    String
+  member      Member   @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  measuredOn  DateTime @db.Date
+  encryptedData String
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  @@id([memberId, measuredOn])
 }
 
 enum SessionPackStatus {
@@ -105,6 +125,7 @@ model Trainer {
   shiftStart            String?
   shiftEnd              String?
   bio                   String?
+  sessionPayOverride    Decimal?                 @db.Decimal(19, 2)
   identityId            String?                  @unique
   registrationState     TrainerRegistrationState @default(PENDING)
   enrollmentOperationId String?                  @unique
@@ -126,8 +147,11 @@ model WorkoutPlan {
   trainer     Trainer           @relation("WorkoutPlanTrainer", fields: [trainerId], references: [id], onDelete: Restrict)
   name        String
   description String?
+  scheduledDate DateTime? @db.Date
+  scheduledWeekdays Int[] @default([])
   createdAt   DateTime          @default(now()) @db.Timestamptz(3)
   exercises   WorkoutExercise[]
+  completions WorkoutExerciseCompletion[]
 
   @@index([memberId, createdAt(sort: Desc), id(sort: Desc)])
   @@index([trainerId, createdAt(sort: Desc), id(sort: Desc)])
@@ -143,10 +167,22 @@ model WorkoutExercise {
   reps            Int?
   weightKg        Decimal?    @db.Decimal(7, 3)
   durationMinutes Int?
+  restSeconds     Int?
   notes           String?
 
   @@unique([planId, sortOrder])
   @@index([planId, sortOrder])
+}
+
+model WorkoutExerciseCompletion {
+  planId       String
+  plan         WorkoutPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  localDate    DateTime    @db.Date
+  planRevision String
+  sortOrder    Int
+  completedAt  DateTime    @default(now()) @db.Timestamptz(3)
+
+  @@id([planId, localDate, planRevision, sortOrder])
 }
 
 model MealPlan {
@@ -156,6 +192,7 @@ model MealPlan {
   trainerId String
   trainer   Trainer         @relation("MealPlanTrainer", fields: [trainerId], references: [id], onDelete: Restrict)
   name      String
+  scheduledDate DateTime? @db.Date
   createdAt DateTime        @default(now()) @db.Timestamptz(3)
   entries   MealPlanEntry[]
 
@@ -276,6 +313,7 @@ model PTSession {
   fee                   Decimal         @db.Decimal(19, 4)
   currency              String
   confirmationRate      Decimal?        @db.Decimal(9, 6)
+  confirmedTrainerPay   Decimal?        @db.Decimal(19, 2)
   confirmationLevel     TrainerLevel?
   confirmationShiftStart String?
   confirmationShiftEnd String?
@@ -573,6 +611,8 @@ model GymConfiguration {
   level1BaseRate Decimal @default(0.4) @db.Decimal(9, 6)
   level2BaseRate Decimal @default(0.5) @db.Decimal(9, 6)
   offShiftPremium Decimal @default(0.1) @db.Decimal(9, 6)
+  level1SessionPay Decimal @default(20) @db.Decimal(19, 2)
+  level2SessionPay Decimal @default(25) @db.Decimal(19, 2)
   cancellationWindowMinutes Int @default(1440)
   lateCancelDeduction Boolean @default(true)
   minimumSessionDurationMinutes Int @default(20)

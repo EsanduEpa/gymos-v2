@@ -27,7 +27,7 @@ export async function saveMealPlan(slug: string, initialKey: string, _state: Mea
     return { dayOfWeek: Number(field('dayOfWeek')), mealType: text(field('mealType')), foodItem: text(field('foodItem')),
       calories: integer(field('calories')), proteinGrams: decimal(field('proteinGrams')), carbsGrams: decimal(field('carbsGrams')), fatsGrams: decimal(field('fatsGrams')) };
   });
-  const raw = { name: formData.get('name'), entries };
+  const raw = { name: formData.get('name'), scheduledDate: String(formData.get('scheduledDate') ?? '') || null, entries };
   const parsed = planId ? mealPlanUpdateSchema.safeParse({ ...raw, expectedRevision }) : mealPlanCreateSchema.safeParse(raw);
   if (!parsed.success) return { error: 'Check the title, day, meal type and nonnegative nutrition fields.', nextKey: randomUUID() };
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
@@ -46,6 +46,7 @@ export async function saveMealPlan(slug: string, initialKey: string, _state: Mea
   if (!response.ok || !result.success) return { error: response.status === 422 ? 'The meal plan did not pass server validation.' : 'The save outcome is unknown. Retry with this same key to resolve it.',
     currentKey: idempotencyKey, outcomeUnknown: response.status >= 500 || response.ok };
   revalidatePath(`/gyms/${encodeURIComponent(slug)}/trainer/clients/${encodeURIComponent(memberId)}`);
+  revalidatePath(`/gyms/${encodeURIComponent(slug)}/member/calendar`);
   revalidatePath(`/gyms/${encodeURIComponent(slug)}/member/meal-plans`);
   return { success: result.data.replayed ? 'This meal plan change was already saved.' : planId ? 'Meal plan changes saved.' : 'Meal plan assigned to this client.', planId: result.data.plan.id, nextKey: randomUUID() };
 }

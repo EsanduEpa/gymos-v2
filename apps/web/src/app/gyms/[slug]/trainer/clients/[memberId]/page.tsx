@@ -1,3 +1,4 @@
+import { formatDisplayDate } from '@/lib/display-date';
 import type { CSSProperties } from 'react';
 import { notFound, redirect } from 'next/navigation';
 import { resolveGymBrandColors } from '@gymos/theme-tokens';
@@ -31,7 +32,7 @@ export default async function TrainerClientProfilePage({ params }: { params: Pro
         <dl className={styles.details}>
           <div><dt>Email</dt><dd>{profile.data.client.email ?? 'Not provided'}</dd></div>
           <div><dt>Phone</dt><dd>{profile.data.client.phone ?? 'Not provided'}</dd></div>
-          <div><dt>Date of birth</dt><dd>{profile.data.client.dateOfBirth ?? 'Not provided'}</dd></div>
+          <div><dt>Date of birth</dt><dd>{profile.data.client.dateOfBirth ? <time dateTime={profile.data.client.dateOfBirth}>{formatDisplayDate(profile.data.client.dateOfBirth)}</time> : 'Not provided'}</dd></div>
           <div><dt>Emergency contact</dt><dd>{profile.data.client.emergencyContact ?? 'Not provided'}</dd></div>
           <div><dt>Member status</dt><dd>{profile.data.client.status.toLowerCase()}</dd></div>
           <div><dt>Pack balance</dt><dd>{profile.data.packSummary.available} available · {profile.data.packSummary.held} held · {profile.data.packSummary.consumed} used · {profile.data.packSummary.expired} expired</dd></div>

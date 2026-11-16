@@ -198,7 +198,7 @@ it('records missing delivery from actual evidence and reverses a mistaken comple
   const common=await source(ctx);
   await expect(ctx.exceptions.quote(ctx.access,ctx.booking.session.id,{...common,kind:'CORRECTION',target:'COMPLETED'})).rejects.toThrow(/actual training/);
   const delivered=await confirm(ctx,{...common,kind:'CORRECTION',target:'COMPLETED',actualStartedAt:start.toISOString(),actualEndedAt:end.toISOString()});
-  expect(delivered.quote).toMatchObject({operationalDelta:'100.0000',trainerPayDelta:'40.0000'});
+  expect(delivered.quote).toMatchObject({operationalDelta:'100.0000',trainerPayDelta:'20.0000'});
   const originalSettlement=await ctx.tenant.sessionSettlement.findUniqueOrThrow({where:{sessionId:ctx.booking.session.id}});
   const pay=await ctx.tenant.trainerPayCorrection.findFirstOrThrow({where:{sessionId:ctx.booking.session.id}});
   let period=await ctx.tenant.trainerPayPeriod.findUniqueOrThrow({where:{id:pay.correctionPeriodId}});
@@ -207,7 +207,7 @@ it('records missing delivery from actual evidence and reverses a mistaken comple
   await ctx.payroll.approve(ctx.access,period.id,{expectedVersion:period.version,expectedTotal:period.calculatedTotal.toString(),idempotencyKey:key()});
   const approved=await ctx.tenant.trainerPayPeriod.findUniqueOrThrow({where:{id:period.id}});
   const reversed=await confirm(ctx,{...await source(ctx),kind:'CORRECTION',target:'FREE_CANCELLED'});
-  expect(reversed.quote).toMatchObject({trainerPayDelta:'-40.0000',operationalDelta:'-100.0000',payPeriodState:'APPROVED'});
+  expect(reversed.quote).toMatchObject({trainerPayDelta:'-20.0000',operationalDelta:'-100.0000',payPeriodState:'APPROVED'});
   expect(await ctx.tenant.trainerPayPeriod.findUniqueOrThrow({where:{id:period.id}})).toEqual(approved);
   expect(await ctx.tenant.sessionSettlement.findUniqueOrThrow({where:{sessionId:ctx.booking.session.id}})).toEqual(originalSettlement);
   expect((await ctx.tenant.revenueRecord.aggregate({where:{sessionId:ctx.booking.session.id},_sum:{amount:true}}))._sum.amount?.toString()).toBe('0');
@@ -215,7 +215,7 @@ it('records missing delivery from actual evidence and reverses a mistaken comple
   expect(await ctx.reads.detail(ctx.access,ctx.booking.session.id)).toMatchObject({settlement:'FREE_CANCELLED',creditConsumed:false,reservation:'RELEASED',session:{state:'CANCELLED'}});
   const negative=await ctx.tenant.trainerPayCorrection.findFirstOrThrow({where:{sessionId:ctx.booking.session.id,amount:{lt:0}}});
   expect(negative.correctionPeriodId).not.toBe(approved.id);
-  expect((await ctx.tenant.trainerPayPeriod.findUniqueOrThrow({where:{id:negative.correctionPeriodId}})).calculatedTotal.toString()).toBe('-40');
+  expect((await ctx.tenant.trainerPayPeriod.findUniqueOrThrow({where:{id:negative.correctionPeriodId}})).calculatedTotal.toString()).toBe('-20');
   await expect(ctx.tenant.sessionSettlement.update({where:{id:originalSettlement.id},data:{creditConsumed:false}})).rejects.toThrow();
 });
 
@@ -274,17 +274,26 @@ it('restores an expired named unit and compensates a recorded expiry earning wit
 });
 
 
-it('records an exact zero-value delivered correction as a real pay fact without minting value under replay',async()=>{
+it('pays the confirmed trainer amount for a free credit even after rates change',async()=>{
   const ctx=await prepare(13,1,0n);
   expect(ctx.booking.creditReservation.packId).toBe(ctx.pack.id);
   expect(ctx.booking.creditReservation.creditValue).toBe('0.00');
+  expect((await ctx.tenant.pTSession.findUniqueOrThrow({where:{id:ctx.booking.session.id}})).confirmedTrainerPay?.toString()).toBe('20');
+  await ctx.tenant.gymConfiguration.update({where:{id:'current'},data:{level1SessionPay:'90',version:{increment:1}}});
   const start=new Date(Date.now()-6*3600000);const end=new Date(start.getTime()+3600000);
   await ctx.tenant.pTSession.update({where:{id:ctx.booking.session.id},data:{scheduledStartAt:start,scheduledEndAt:end}});
   const saved=await confirm(ctx,{...await source(ctx),kind:'CORRECTION',target:'COMPLETED',actualStartedAt:start.toISOString(),actualEndedAt:end.toISOString()});
-  expect(saved.quote).toMatchObject({sourceValue:'0.0000',trainerPayDelta:'0.0000',operationalDelta:'0.0000'});
+  expect(saved.quote).toMatchObject({sourceValue:'0.0000',trainerPayDelta:'20.0000',operationalDelta:'0.0000'});
   expect((await ctx.exceptions.commit(ctx.access,ctx.booking.session.id,saved.payload)).replayed).toBe(true);
   const facts=await ctx.tenant.trainerPayCorrection.findMany({where:{sessionId:ctx.booking.session.id}});
-  expect(facts).toHaveLength(1);expect(facts[0]!.amount.toString()).toBe('0');
+  expect(facts).toHaveLength(1);expect(facts[0]!.amount.toString()).toBe('20');
+  const day = localDate(start);
+  const earnings = await ctx.finance.myEarnings(ctx.trainerAccess, { from: day, to: day });
+  expect(earnings.lines.find(line => line.sessionId === ctx.booking.session.id)).toMatchObject({ amount: '20', currency: 'LKR' });
+  const periods = await ctx.payroll.list(ctx.access);
+  expect(periods.items.find(period => period.id === facts[0]!.correctionPeriodId)).toBeDefined();
+  const exportFile = await ctx.finance.exportCsv(ctx.access, { kind: 'payroll', from: day, to: day });
+  expect(exportFile.content.split('\r\n').find(line => line.includes(ctx.booking.session.id))).toContain('"20","LKR","CORRECTION"');
   expect((await creditUnits(ctx.tenant,ctx.member.id)).find(row=>row.packId===ctx.pack.id)).toMatchObject({available:0,held:0,consumed:1,expired:0,valueMinorUnits:0n});
 });
 

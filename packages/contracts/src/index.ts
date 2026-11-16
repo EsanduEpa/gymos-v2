@@ -1,3 +1,4 @@
+import './zod-browser.js';
 import { z } from 'zod';
 export * from './configuration.js';
 export * from './members.js';
@@ -11,6 +12,7 @@ export * from './session-availability.js';
 export * from './session-lifecycle.js';
 export * from './member-lifecycle.js';
 export * from './coaching.js';
+export * from './coaching-records.js';
 export * from './finance.js';
 export * from './analytics.js';
 export * from './request-safety.js';

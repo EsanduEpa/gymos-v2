@@ -17,6 +17,7 @@ export function MealPlanBuilder({ slug, memberId, memberName, initialKey, initia
     mealType: entry.mealType, foodItem: entry.foodItem, calories: entry.calories === null ? '' : String(entry.calories),
     proteinGrams: entry.proteinGrams ?? '', carbsGrams: entry.carbsGrams ?? '', fatsGrams: entry.fatsGrams ?? '' })) ?? [newRow()]);
   const [name, setName] = useState(initialPlan?.name ?? '');
+  const [date, setDate] = useState(initialPlan?.scheduledDate ?? '');
   const action = saveMealPlan.bind(null, slug, initialKey);
   const [state, formAction, pending] = useActionState(action, initialState);
   const currentKey = state.currentKey ?? state.nextKey ?? initialKey;
@@ -32,6 +33,8 @@ export function MealPlanBuilder({ slug, memberId, memberName, initialKey, initia
     {initialPlan ? <><input type="hidden" name="planId" value={initialPlan.id}/><input type="hidden" name="expectedRevision" value={initialPlan.revision}/></> : null}
     <input type="hidden" name="idempotencyKey" value={currentKey}/>
     <label className={styles.title}>Plan title<input name="name" value={name} onChange={event => setName(event.currentTarget.value)} required maxLength={120}/></label>
+    <label className={styles.title}>Meal date (optional)<input type="date" name="scheduledDate" value={date} onChange={event => setDate(event.currentTarget.value)}/>
+      <small>Leave blank for a weekly meal plan.</small></label>
     <p className={styles.assigned}>Client: <strong>{memberName}</strong>. {initialPlan ? 'Saving updates this assigned plan.' : 'Saving explicitly assigns this meal plan.'}</p>
     <section className={styles.totals} aria-live="polite" aria-label="Live nutrition totals"><h2>Live totals</h2>
       <dl><div><dt>Calories</dt><dd>{totals.calories}</dd></div><div><dt>Protein</dt><dd>{totals.proteinGrams.toFixed(2)} g</dd></div>
@@ -41,7 +44,8 @@ export function MealPlanBuilder({ slug, memberId, memberName, initialKey, initia
       <button type="button" className="ui-button ui-button-secondary" disabled={pending || rows.length >= 100} onClick={() => setRows(current => [...current, newRow()])}>Add meal</button></div>
     <div className={styles.rows}>{rows.map((row, index) => <fieldset className={styles.row} key={row.id} disabled={pending}><legend>Meal {index + 1}</legend>
       <div className={styles.fields}>
-        <label>Day<select value={row.dayOfWeek} name={`entry-${index}-dayOfWeek`} onChange={event => update(index, { dayOfWeek: event.currentTarget.value })}>{days.map((day, dayIndex) => <option value={dayIndex + 1} key={day}>{day}</option>)}</select></label>
+        {date ? <input type="hidden" name={`entry-${index}-dayOfWeek`} value={row.dayOfWeek}/> :
+          <label>Day<select value={row.dayOfWeek} name={`entry-${index}-dayOfWeek`} onChange={event => update(index, { dayOfWeek: event.currentTarget.value })}>{days.map((day, dayIndex) => <option value={dayIndex + 1} key={day}>{day}</option>)}</select></label>}
         <label>Meal type<select value={row.mealType} name={`entry-${index}-mealType`} onChange={event => update(index, { mealType: event.currentTarget.value })}>{mealTypes.map(type => <option key={type}>{type}</option>)}</select></label>
         <label className={styles.wide}>Food item<input value={row.foodItem} name={`entry-${index}-foodItem`} onChange={event => update(index, { foodItem: event.currentTarget.value })} required maxLength={500}/></label>
         <label>Calories<input type="number" min={0} max={100000} step={1} value={row.calories} name={`entry-${index}-calories`} onChange={event => update(index, { calories: event.currentTarget.value })}/></label>

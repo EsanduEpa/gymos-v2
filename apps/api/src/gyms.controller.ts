@@ -299,6 +299,11 @@ export class GymsController {
         take: parsedPage.data.pageSize,
         select: { id: true, planNameSnapshot: true, startDate: true, endDateExclusive: true, agreedPrice: true, currency: true } });
       const units = await creditUnits(tenant, member.id);
+      const recentSessions = await tenant.pTSession.findMany({
+        where: { memberId: member.id, state: { in: ['SCHEDULED', 'ACTIVE', 'COMPLETED', 'MISSED', 'CANCELLED'] } },
+        orderBy: [{ scheduledStartAt: 'desc' }, { id: 'desc' }], take: 5,
+        select: { id: true, scheduledStartAt: true, state: true },
+      });
       return memberDetailSchema.parse({
         accountState: member.registrationState === 'BASIC' ? 'BASIC' : activeLink && member.status === 'ACTIVE' ? 'OPERATIONAL' : 'HISTORICAL',
         gymCurrency: config.currency,
@@ -323,7 +328,8 @@ export class GymsController {
             heldCredits: balance.held, consumedCredits: balance.consumed, expiredCredits: balance.expired,
             validityDays: pack.validityDays, price: pack.price.toString(), currency: pack.currency,
             startDate: pack.startDate.toISOString().slice(0, 10), endDateExclusive: pack.endDateExclusive.toISOString().slice(0, 10), status };
-        }), recentSessions: [], asOf: asOf.toISOString(),
+        }), recentSessions: recentSessions.map(({ id, scheduledStartAt, state }) => ({ id, scheduledStart: scheduledStartAt.toISOString(), state })),
+        timeZone: config.timezone, asOf: asOf.toISOString(),
       });
     });
   }

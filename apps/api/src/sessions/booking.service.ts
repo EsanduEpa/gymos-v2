@@ -11,6 +11,7 @@ import { TenantSchemaGateService, type TenantGateContext } from '../tenancy/tena
 import { reserveSessionCredit } from './credit-holds.js';
 import { allowedStartMinutes, type AvailabilityRule } from './availability-policy.js';
 import { retrySessionTransaction } from './session-transactions.js';
+import { trainerPayForConfirmation } from './trainer-pay.js';
 import {
   sessionBookingInputSchema, sessionBookingOptionsSchema, sessionBookingResultSchema,
   type SessionBookingOptionsQuery,
@@ -59,14 +60,6 @@ function addDays(date: string, days: number) {
 }
 function decimal(value: { toString(): string } | string | null | undefined) { return value == null ? null : typeof value === 'string' ? value : value.toString(); }
 function minorUnitsAmount(value: bigint) { return `${value / 100n}.${(value % 100n).toString().padStart(2, '0')}`; }
-export function decimalSum(a: string, b: string) {
-  const [aw = '0', af = ''] = a.split('.'); const [bw = '0', bf = ''] = b.split('.');
-  const scale = Math.max(af.length, bf.length); const factor = 10n ** BigInt(scale);
-  const left = BigInt(aw) * factor + BigInt((af + '0'.repeat(scale)).slice(0, scale) || '0');
-  const right = BigInt(bw) * factor + BigInt((bf + '0'.repeat(scale)).slice(0, scale) || '0');
-  const result = left + right; const whole = result / factor; const fraction = (result % factor).toString().padStart(scale, '0').replace(/0+$/, '');
-  return fraction ? `${whole}.${fraction}` : whole.toString();
-}
 function totalPages(total: number, size: number) { return Math.ceil(total / size); }
 export function withinShift(start: Date, end: Date, timeZone: string, shiftStart: string | null, shiftEnd: string | null) {
   if (!shiftStart || !shiftEnd) return true;
@@ -142,7 +135,7 @@ export class SessionBookingService {
         const membersAll = await tenant.member.findMany({ where: { id: { in: memberBindingIds }, status: 'ACTIVE', registrationState: 'COMPLETE', ...(query.qMembers ? { fullName: { contains: query.qMembers, mode: 'insensitive' } } : {}) },
           orderBy: [{ fullName: 'asc' }, { id: 'asc' }], select: { id: true, fullName: true } });
         const trainersAll = await tenant.trainer.findMany({ where: { id: { in: trainerBindingIds }, status: 'ACTIVE', registrationState: 'COMPLETE', level: { not: null }, ...(query.qTrainers ? { fullName: { contains: query.qTrainers, mode: 'insensitive' } } : {}) },
-          orderBy: [{ fullName: 'asc' }, { id: 'asc' }], select: { id: true, fullName: true, level: true, shiftStart: true, shiftEnd: true } });
+          orderBy: [{ fullName: 'asc' }, { id: 'asc' }], select: { id: true, fullName: true, level: true, shiftStart: true, shiftEnd: true, sessionPayOverride: true } });
         const memberPageRows = membersAll.slice((query.memberPage - 1) * query.memberPageSize, query.memberPage * query.memberPageSize);
         const trainerPageRows = trainersAll.slice((query.trainerPage - 1) * query.trainerPageSize, query.trainerPage * query.trainerPageSize);
         const makeMemberOption = async (member: { id: string; fullName: string }) => {
@@ -152,16 +145,18 @@ export class SessionBookingService {
             eligibility: termCount === 0 ? 'NO_ACTIVE_MEMBERSHIP' as const : availableCredits === 0 ? 'NO_CREDIT' as const : 'ELIGIBLE' as const };
         };
         const members = await Promise.all(memberPageRows.map(makeMemberOption));
-        const trainers = trainerPageRows.map(trainer => ({ trainerId: trainer.id, name: trainer.fullName, level: trainer.level!, shiftStart: trainer.shiftStart, shiftEnd: trainer.shiftEnd }));
+        const trainerOption = (trainer: typeof trainersAll[number]) => ({ trainerId: trainer.id, name: trainer.fullName, level: trainer.level!,
+          shiftStart: trainer.shiftStart, shiftEnd: trainer.shiftEnd, baseSessionPay: trainerPayForConfirmation(config, trainer, true) });
+        const trainers = trainerPageRows.map(trainerOption);
         const selectedMember = query.selectedMemberId ? await (async () => {
           const member = await tenant.member.findFirst({ where: { id: { equals: query.selectedMemberId, in: memberBindingIds }, status: 'ACTIVE', registrationState: 'COMPLETE' }, select: { id: true, fullName: true } });
           return member ? makeMemberOption(member) : null;
         })() : null;
-        const selectedTrainerRow = query.selectedTrainerId ? await tenant.trainer.findFirst({ where: { id: { equals: query.selectedTrainerId, in: trainerBindingIds }, status: 'ACTIVE', registrationState: 'COMPLETE', level: { not: null } }, select: { id: true, fullName: true, level: true, shiftStart: true, shiftEnd: true } }) : null;
+        const selectedTrainerRow = query.selectedTrainerId ? await tenant.trainer.findFirst({ where: { id: { equals: query.selectedTrainerId, in: trainerBindingIds }, status: 'ACTIVE', registrationState: 'COMPLETE', level: { not: null } }, select: { id: true, fullName: true, level: true, shiftStart: true, shiftEnd: true, sessionPayOverride: true } }) : null;
         const result = {
           members: { items: members, page: query.memberPage, pageSize: query.memberPageSize, totalCount: membersAll.length, totalPages: totalPages(membersAll.length, query.memberPageSize), asOf: now.toISOString() },
           trainers: { items: trainers, page: query.trainerPage, pageSize: query.trainerPageSize, totalCount: trainersAll.length, totalPages: totalPages(trainersAll.length, query.trainerPageSize), asOf: now.toISOString() },
-          selectedMember, selectedTrainer: selectedTrainerRow ? { trainerId: selectedTrainerRow.id, name: selectedTrainerRow.fullName, level: selectedTrainerRow.level!, shiftStart: selectedTrainerRow.shiftStart, shiftEnd: selectedTrainerRow.shiftEnd } : null,
+          selectedMember, selectedTrainer: selectedTrainerRow ? trainerOption(selectedTrainerRow) : null,
           policy: { timeZone, localDate, minimumDurationMinutes: 60 as const, maximumDurationMinutes: 60 as const,
             scheduleHorizonDays: 14 as const, configurationVersion: config.version, cancellationWindowMinutes: config.cancellationWindowMinutes },
           rateInfo: { currency, defaultSessionFee: config.defaultSessionFee.toString(), level2SessionFee: decimal(config.level2SessionFee), introSessionFee: decimal(config.introSessionFee),
@@ -192,7 +187,7 @@ export class SessionBookingService {
               tx.member.findFirst({ where: { id: input.memberId, identityId: memberBinding.identityId, enrollmentOperationId: memberBinding.operationId,
                 registrationState: 'COMPLETE', status: 'ACTIVE' }, select: { id: true, fullName: true, identityId: true } }),
               tx.trainer.findFirst({ where: { id: input.trainerId, identityId: trainerBinding.identityId, enrollmentOperationId: trainerBinding.operationId,
-                registrationState: 'COMPLETE', status: 'ACTIVE', level: { not: null } }, select: { id: true, fullName: true, identityId: true, level: true, shiftStart: true, shiftEnd: true } }),
+                registrationState: 'COMPLETE', status: 'ACTIVE', level: { not: null } }, select: { id: true, fullName: true, identityId: true, level: true, shiftStart: true, shiftEnd: true, sessionPayOverride: true } }),
             ]);
             if (!member || !trainer) throw new UnprocessableEntityException('Member and trainer must be active and published in this gym');
             const availability = await tx.pTAvailabilityRule.findMany({ where: { OR: [{ trainerId: trainer.id }, { kind: 'GYM_CLOSURE', localDate: new Date(`${input.localDate}T00:00:00.000Z`) }] } });
@@ -212,12 +207,11 @@ export class SessionBookingService {
             }
             const fee = trainer.level === 'LEVEL_2' ? config.level2SessionFee ?? config.defaultSessionFee : config.defaultSessionFee;
             const coveredByShift = withinShift(start.instant, end, config.timezone, trainer.shiftStart, trainer.shiftEnd);
-            const rate = trainer.level === 'LEVEL_2' ? config.level2BaseRate : config.level1BaseRate;
-            const confirmationRate = coveredByShift ? rate : decimalSum(rate.toString(), config.offShiftPremium.toString());
+            const confirmedTrainerPay = trainerPayForConfirmation(config, trainer, coveredByShift);
             const sessionId = forcedSessionId ?? randomUUID();
             const session = await tx.pTSession.create({ data: { id: sessionId, memberId: member.id, trainerId: trainer.id, state: 'SCHEDULED',
               type: input.type, scheduledStartAt: start.instant, scheduledEndAt: end, gymTimezone: config.timezone,
-              fee: fee.toString(), currency: config.currency, confirmationRate, confirmationLevel: trainer.level!,
+              fee: fee.toString(), currency: config.currency, confirmationRate: '0', confirmedTrainerPay, confirmationLevel: trainer.level!,
               confirmationShiftStart: trainer.shiftStart, confirmationShiftEnd: trainer.shiftEnd, configurationVersion: config.version,
               confirmedAt: clock!.now, availabilityVersion: (await tx.trainer.findUniqueOrThrow({ where: { id: trainer.id }, select: { version: true } })).version, notes: (input.notes ?? '').replace(/\r\n?/g, '\n') || null, createdByIdentityId: access.identityId } });
             await reserveSessionCredit(tx, { masterGymId: access.gymId, sessionId: session.id, memberId: member.id, trainerId: trainer.id,

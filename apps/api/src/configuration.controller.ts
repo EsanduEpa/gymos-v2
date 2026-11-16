@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { appendTenantAudit } from './operations/transaction-audit.js';
 import { requestDigest } from './operations/primitives.js';
-import { configurationReadSchema, createMembershipPlanSchema, membershipEligibilitySchema, renewalResultSchema, renewMembershipSchema, updateConfigurationSchema } from '@gymos/contracts';
+import { configurationReadSchema, createMembershipPlanSchema, managedMembershipPlanSchema, manageMembershipPlanSchema, membershipEligibilitySchema, renewalResultSchema, renewMembershipSchema, updateConfigurationSchema } from '@gymos/contracts';
 import { GymAccessGuard, type GymRequest } from './gym-access.guard.js';
 import { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js';
 import { DatabaseService } from './database.service.js';
@@ -25,6 +25,7 @@ function configurationDto(row: {
   payPeriod: string; defaultSessionFee: { toString(): string }; level2SessionFee: { toString(): string } | null;
   introSessionFee: { toString(): string } | null; level1BaseRate: { toString(): string }; level2BaseRate: { toString(): string };
   offShiftPremium: { toString(): string }; cancellationWindowMinutes: number; lateCancelDeduction: boolean;
+  level1SessionPay: { toString(): string }; level2SessionPay: { toString(): string };
   minimumSessionDurationMinutes: number; version: number;
 }) {
   if (!row.currency || !row.timezone) throw new ConflictException('Gym configuration requires currency and timezone setup');
@@ -35,6 +36,7 @@ function configurationDto(row: {
     introSessionFee: row.introSessionFee?.toString() ?? null,
     level1BaseRate: row.level1BaseRate.toString(), level2BaseRate: row.level2BaseRate.toString(),
     offShiftPremium: row.offShiftPremium.toString(), cancellationWindowMinutes: row.cancellationWindowMinutes,
+    level1SessionPay: row.level1SessionPay.toString(), level2SessionPay: row.level2SessionPay.toString(),
     lateCancelDeduction: row.lateCancelDeduction, minimumSessionDurationMinutes: row.minimumSessionDurationMinutes,
   };
 }
@@ -146,6 +148,57 @@ export class ConfigurationController {
     }));
   }
 
+  @Post('membership-plans/:planId')
+  async managePlan(@Req() request: GymRequest, @Param('planId') planId: string, @Body() body: unknown) {
+    const access = this.owner(request);
+    const parsed = manageMembershipPlanSchema.safeParse(body);
+    if (!parsed.success) throw new UnprocessableEntityException('Check the plan fields');
+    const input = parsed.data;
+    return this.tenantGate.withVerifiedTenant(access, tenant => tenant.$transaction(async tx => {
+      await this.assertCurrentOwner(access);
+      await tx.$queryRaw`SELECT "id" FROM "GymConfiguration" WHERE "id" = 'current' FOR UPDATE`;
+      const configuration = await tx.gymConfiguration.findUnique({ where: { id: 'current' } });
+      if (!configuration?.currency || configuration.version !== input.expectedVersion) throw new ConflictException('Configuration changed; reload before saving');
+      await tx.$queryRaw`SELECT "id" FROM "MembershipPlan" WHERE "id" = ${planId} FOR UPDATE`;
+      const current = await tx.membershipPlan.findUnique({ where: { id: planId } });
+      if (!current) throw new NotFoundException('Membership plan not found');
+      if (current.version !== input.expectedPlanVersion) throw new ConflictException('Plan changed; reload before saving');
+      const application = await this.database.master.memberApplication.findFirst({
+        where: { gymId: access.gymId, membershipPlanId: planId, ...(input.action === 'DELETE' ? {} : { state: 'PROCESSING' }) },
+        select: { id: true },
+      });
+
+      let plan = null;
+      if (input.action === 'DELETE') {
+        const term = await tx.membershipTerm.findFirst({ where: { planId }, select: { id: true } });
+        if (current.status !== 'INACTIVE' || term || application) throw new ConflictException('Only archived plans without membership or application history can be deleted');
+        await tx.membershipPlan.delete({ where: { id: planId } });
+      } else {
+        if (application) throw new ConflictException('Finish processing applications that use this plan before changing it');
+        if (current.status !== 'ACTIVE') throw new ConflictException('This plan is already archived');
+        if (input.action === 'EDIT' && !validMoney(input.price, current.currency)) throw new UnprocessableEntityException('Price must have at most two decimal places');
+        plan = await tx.membershipPlan.update({ where: { id: planId }, data: {
+          ...(input.action === 'EDIT' ? { name: input.name, description: input.description || null, price: input.price, durationDays: input.durationDays } : { status: 'INACTIVE' }),
+          version: { increment: 1 },
+        } });
+      }
+      const version = configuration.version + 1;
+      await tx.gymConfiguration.update({ where: { id: 'current' }, data: { version } });
+      const event = { EDIT: 'EDITED', ARCHIVE: 'ARCHIVED', DELETE: 'DELETED' }[input.action];
+      const receiptId = randomUUID();
+      await tx.commandReceipt.create({ data: { id: receiptId, actorIdentityId: access.identityId,
+        commandKind: `${input.action}_MEMBERSHIP_PLAN`, idempotencyKey: randomUUID(), requestDigest: requestDigest({ planId, ...input }),
+        state: 'COMMITTED', resourceType: 'MEMBERSHIP_PLAN', resourceId: planId, safeResult: { id: planId, version }, committedAt: new Date() } });
+      await appendTenantAudit(tx, { masterGymId: access.gymId, receiptId, actorIdentityId: access.identityId,
+        eventCode: `MEMBERSHIP_PLAN_${event}`, resourceType: 'MEMBERSHIP_PLAN', resourceId: planId,
+        transition: { from: current.status, to: plan?.status ?? 'DELETED', version: current.version + 1 } });
+      return managedMembershipPlanSchema.parse({ id: planId, configurationVersion: version, plan: plan ? {
+        id: plan.id, name: plan.name, description: plan.description, price: plan.price.toString(), currency: plan.currency,
+        durationDays: plan.durationDays, status: plan.status, version: plan.version, createdAt: plan.createdAt.toISOString(),
+      } : null });
+    }));
+  }
+
   @Get('members/:memberId/membership-eligibility')
   async eligibility(@Req() request: GymRequest, @Param('memberId') memberId: string) {
     const access = this.access(request);
@@ -173,6 +226,7 @@ export class ConfigurationController {
     try {
       return await this.tenantGate.withVerifiedTenant(access, tenant => tenant.$transaction(async tx => {
         await this.assertCurrentOwner(access);
+        await tx.$queryRaw`SELECT "id" FROM "GymConfiguration" WHERE "id" = 'current' FOR SHARE`;
         await tx.$queryRaw`SELECT "id" FROM "Member" WHERE "id" = ${memberId} FOR UPDATE`;
         const member = await tx.member.findUnique({ where: { id: memberId }, select: { id: true, status: true, version: true } });
         if (!member) throw new NotFoundException('Member not found');
@@ -185,6 +239,7 @@ export class ConfigurationController {
         }
         if (member.version !== parsed.data.expectedMemberVersion) throw new ConflictException('Member changed; reload before renewing');
         if (member.status !== 'ACTIVE') throw new ConflictException('Only active members can renew a membership');
+        await tx.$queryRaw`SELECT "id" FROM "MembershipPlan" WHERE "id" = ${parsed.data.planId} FOR SHARE`;
         const [plan, config, terms] = await Promise.all([
           tx.membershipPlan.findUnique({ where: { id: parsed.data.planId } }),
           tx.gymConfiguration.findUnique({ where: { id: 'current' } }),

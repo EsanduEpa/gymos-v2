@@ -19,6 +19,7 @@ export const sessionExceptionQuoteSchema = z.strictObject({
   sourceExpiry: z.iso.date(), proposedExpiry: z.iso.date().nullable(),
   destinationPackId: id.nullable(), destinationCreditOrdinal: z.number().int().positive().nullable(), destinationValue: money.nullable(),
   replacementFee: money.nullable(), replacementCurrency: z.string().nullable(), replacementPayRate: money.nullable(), replacementPolicyVersion: z.number().int().nonnegative().nullable(),
+  replacementTrainerPay: money.nullable().optional(),
   sourceCreditConsumed: z.boolean(), replacementCreditRequired: z.boolean(),
   operationalDelta: money, trainerPayDelta: money, payPeriodState: z.enum(['OPEN','CLOSED','APPROVED']).nullable(),
   payAdjustmentPeriodStart: z.iso.date().nullable(), payAdjustmentPeriodEndExclusive: z.iso.date().nullable(),

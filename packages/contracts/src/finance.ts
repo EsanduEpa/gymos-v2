@@ -68,6 +68,11 @@ export const ownerDashboardSchema = z.strictObject({ gymSlug: slug, date: localD
     todayOperationalEarning: z.strictObject({ value: decimal, definition: z.string(), numerator: decimal, denominator: z.null(), sourceCount: z.number().int().nonnegative(), currency }),
     pendingRequests: z.strictObject({ value: z.number().int().nonnegative(), definition: z.string(), numerator: z.number().int().nonnegative(), denominator: z.null(), sourceCount: z.number().int().nonnegative() }),
   }),
+  memberships: z.strictObject({
+    activeCount: z.number().int().nonnegative(),
+    expiringCount: z.number().int().nonnegative(),
+    expiring: z.array(z.strictObject({ memberId: id, memberName: z.string().min(1).max(120), endDateExclusive: localDate })).max(10),
+  }),
   earningChart: z.array(z.strictObject({ startHour: z.number().int().min(6).max(20), endHour: z.number().int().min(8).max(22), amount: decimal, sourceCount: z.number().int().nonnegative() })).length(8),
   sessions: z.array(z.strictObject({ id, state: z.string().min(1).max(32), type: z.string().min(1).max(32), scheduledStartAt: instant,
     scheduledEndAt: instant, memberName: z.string().min(1).max(120), trainerName: z.string().min(1).max(120), currency, fee: decimal })).max(10),

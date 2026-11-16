@@ -18,14 +18,15 @@ export async function requireGymContext(slug: string, expectedRole?: GymRole) {
   const gym = session.gyms.find(candidate => candidate.slug === slug);
   if (!gym) notFound();
   if (expectedRole && gym.role !== expectedRole) redirect(gymRoleUrl(gym));
-  const access = await fetch(apiUrl(`/gyms/${slug}/access`), { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' });
+  const [access, themeResponse] = await Promise.all([
+    fetch(apiUrl(`/gyms/${slug}/access`), { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' }),
+    fetch(apiUrl(`/gyms/${slug}/theme`), { cache: 'no-store' }).catch(() => undefined),
+  ]);
   if (access.status === 401) redirect('/login');
   if (access.status === 403 || access.status === 404) notFound();
   if (!access.ok) throw new Error('Gym unavailable');
   const checked = existingEndpointContracts.E06.response.parse(await access.json());
   if (checked.slug !== slug || checked.role !== gym.role || checked.gymId !== gym.id) notFound();
-  let themeResponse: Response | undefined;
-  try { themeResponse = await fetch(apiUrl(`/gyms/${slug}/theme`), { cache: 'no-store' }); } catch { /* Classic fallback */ }
   if (themeResponse?.status === 404) notFound();
   const theme = existingEndpointContracts.E04.response.safeParse(await themeResponse?.json().catch(() => null));
   return { token, session, gym, theme: themeResponse?.ok && theme.success && theme.data.slug === slug ? theme.data.theme : { primaryColor: '#007A35', logoUrl: null } };

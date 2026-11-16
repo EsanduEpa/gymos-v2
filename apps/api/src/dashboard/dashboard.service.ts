@@ -4,18 +4,6 @@ import { DatabaseService } from '../database.service.js';
 import { TenantSchemaGateService, type TenantGateContext } from '../tenancy/tenant-schema-gate.service.js';
 
 type Access = TenantGateContext & { role: string; slug: string };
-function localDate(date: Date, zone: string) {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
-}
-function boundary(date: string, zone: string) {
-  const [y, m, d] = date.split('-').map(Number);
-  const guess = Date.UTC(y!, m! - 1, d!);
-  for (let offset = -14 * 60; offset <= 14 * 60; offset++) {
-    const candidate = new Date(guess - offset * 60_000);
-    if (localDate(candidate, zone) === date && new Intl.DateTimeFormat('en-GB', { timeZone: zone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(candidate) === '00:00') return candidate;
-  }
-  throw new Error('Gym local midnight unavailable');
-}
 
 @Injectable()
 export class DashboardService {
@@ -30,14 +18,16 @@ export class DashboardService {
       const currency = config.currency;
       return tenant.$transaction(async tx => {
         await tx.$executeRaw`SET TRANSACTION READ ONLY`;
-        const [clock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
-        const asOf = clock!.now;
-        const date = localDate(asOf, zone);
-        const start = boundary(date, zone);
-        const end = boundary(new Date(Date.parse(`${date}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10), zone);
+        const [{ asOf, date, start, end }] = await tx.$queryRaw<{ asOf: Date; date: string; start: Date; end: Date }[]>`
+          WITH clock AS (SELECT clock_timestamp() AS now),
+          day AS (SELECT now, (now AT TIME ZONE ${zone})::date AS local_day FROM clock)
+          SELECT now AS "asOf", to_char(local_day, 'YYYY-MM-DD') AS date,
+            local_day::timestamp AT TIME ZONE ${zone} AS start,
+            (local_day + 1)::timestamp AT TIME ZONE ${zone} AS "end"
+          FROM day`;
         const today = { scheduledStartAt: { gte: start, lt: end } };
         const todaySessionStates = ['SCHEDULED', 'ACTIVE', 'COMPLETED', 'MISSED'] as const;
-        const [activeToday, activeSessions, scheduledToday, earningRows, pending, sessions, trainers] = await Promise.all([
+        const [activeToday, activeSessions, scheduledToday, earningRows, pending, sessions, trainers, [memberships]] = await Promise.all([
           tx.pTSession.count({ where: { state: 'ACTIVE', scheduledStartAt: { gte: start, lt: end } } }),
           tx.pTSession.findMany({ where: { state: 'ACTIVE' }, orderBy: [{ startedAt: 'asc' }, { id: 'asc' }],
             include: { member: { select: { fullName: true } }, trainer: { select: { fullName: true } } } }),
@@ -53,6 +43,29 @@ export class DashboardService {
           tx.pTSession.findMany({ where: { ...today, state: { in: [...todaySessionStates] } }, orderBy: [{ scheduledStartAt: 'asc' }, { id: 'asc' }], take: 10,
             include: { member: { select: { fullName: true } }, trainer: { select: { fullName: true } } } }),
           tx.pTSession.groupBy({ by: ['trainerId'], where: { ...today, state: { in: [...todaySessionStates] } }, _count: { _all: true } }),
+          tx.$queryRaw<{ activeCount: number; expiringCount: number; expiring: { memberId: string; memberName: string; endDateExclusive: string }[] }[]>`
+            WITH boundaries AS (SELECT ${date}::date AS today, ${date}::date + 30 AS cutoff),
+            coverage AS (
+              SELECT m.id, m."fullName", range_agg(daterange(t."startDate", t."endDateExclusive")) AS terms
+              FROM "Member" m
+              JOIN "MembershipTerm" t ON t."memberId" = m.id
+              CROSS JOIN boundaries
+              WHERE m.status = 'ACTIVE' AND t."endDateExclusive" > today AND t."startDate" < cutoff
+              GROUP BY m.id, m."fullName"
+            ),
+            active AS (
+              SELECT id AS "memberId", "fullName" AS "memberName", upper(period.term) AS expiry
+              FROM coverage CROSS JOIN boundaries CROSS JOIN LATERAL unnest(terms) AS period(term)
+              WHERE period.term @> today
+            ),
+            expiring AS (SELECT * FROM active CROSS JOIN boundaries WHERE expiry < cutoff),
+            preview AS (
+              SELECT "memberId", "memberName", to_char(expiry, 'YYYY-MM-DD') AS "endDateExclusive"
+              FROM expiring ORDER BY expiry, "memberId" LIMIT 10
+            )
+            SELECT (SELECT count(*)::int FROM active) AS "activeCount",
+              (SELECT count(*)::int FROM expiring) AS "expiringCount",
+              COALESCE((SELECT json_agg(preview ORDER BY "endDateExclusive", "memberId") FROM preview), '[]'::json) AS expiring`,
         ]);
         const trainerIds = new Set([...trainers.map(row => row.trainerId), ...activeSessions.map(row => row.trainerId)]);
         const floorTrainers = trainerIds.size ? await tx.trainer.findMany({ where: { id: { in: [...trainerIds] } }, select: { id: true, fullName: true } }) : [];
@@ -78,6 +91,7 @@ export class DashboardService {
             todayOperationalEarning: { value: money(earning), definition: 'RevenueRecord operational earnings recognized during this gym-local day; excludes expired unused value and does not represent cash received.', numerator: money(earning), denominator: null, sourceCount: revenueSourceCount, currency },
             pendingRequests: metric(pending, 'Count of all PT session records currently awaiting confirmation.', pending),
           },
+          memberships,
           earningChart: buckets.map(bucket => ({ startHour: bucket.startHour, endHour: bucket.endHour, amount: money(bucket.amount), sourceCount: bucket.sourceCount })),
           sessions: sessions.map(row => ({ id: row.id, state: row.state, type: row.type, scheduledStartAt: row.scheduledStartAt.toISOString(), scheduledEndAt: row.scheduledEndAt.toISOString(), memberName: row.member.fullName, trainerName: row.trainer.fullName, currency: row.currency, fee: row.fee.toString() })),
           activeSessionItems: activeSessions.map(row => ({ id: row.id, startedAt: row.startedAt!.toISOString(), scheduledStartAt: row.scheduledStartAt.toISOString(), memberName: row.member.fullName, trainerName: row.trainer.fullName })),

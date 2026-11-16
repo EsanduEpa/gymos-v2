@@ -215,19 +215,7 @@ export class MemberApplicationsService {
         }
       }
     }
-    const selectedOffer = input.decision === 'APPROVE' ? await this.tenantGate.withVerifiedTenant(access, async tenant => {
-      const [configuration, plan, clock] = await Promise.all([
-        tenant.gymConfiguration.findUnique({ where: { id: 'current' }, select: { currency: true, timezone: true } }),
-        tenant.membershipPlan.findUnique({ where: { id: input.membershipPlanId } }),
-        tenant.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`,
-      ]);
-      if (!configuration?.currency || !configuration.timezone || !plan || plan.status !== 'ACTIVE' || plan.currency !== configuration.currency) {
-        throw new UnprocessableEntityException('Choose an active membership plan for this gym currency');
-      }
-      if (input.dateOfBirth > gymLocalDate(configuration.timezone, clock[0]!.now)) throw new UnprocessableEntityException('Date of birth cannot be in the future');
-      return { name: plan.name, price: plan.price.toString(), currency: plan.currency, durationDays: plan.durationDays, version: plan.version };
-    }) : null;
-    return this.database.master.$transaction(async tx => {
+    const saveDecision = (selectedOffer: { name: string; price: string; currency: string; durationDays: number; version: number } | null) => this.database.master.$transaction(async tx => {
       await tx.$queryRaw`SELECT "id" FROM "MemberApplication" WHERE "id" = ${applicationId} AND "gymId" = ${access.gymId} FOR UPDATE`;
       const application = await tx.memberApplication.findFirst({ where: { id: applicationId, gymId: access.gymId } });
       if (!application) throw new NotFoundException('Application not found');
@@ -277,7 +265,23 @@ export class MemberApplicationsService {
         membershipPlanName: selectedOffer?.name ?? application.membershipPlanName, membershipPrice: selectedOffer?.price ?? application.membershipPrice,
         membershipCurrency: selectedOffer?.currency ?? application.membershipCurrency, membershipDurationDays: selectedOffer?.durationDays ?? application.membershipDurationDays,
         membershipPlanVersion: application.membershipPlanVersion };
-    }).then(async application => {
+    });
+    const decision = input.decision === 'APPROVE' ? this.tenantGate.withVerifiedTenant(access, tenant => tenant.$transaction(async tx => {
+      // Keep the plan stable until the application offer is stored. Plan management
+      // uses the same lock and checks for offers that are still being processed.
+      await tx.$queryRaw`SELECT "id" FROM "GymConfiguration" WHERE "id" = 'current' FOR SHARE`;
+      const [configuration, plan, clock] = await Promise.all([
+        tx.gymConfiguration.findUnique({ where: { id: 'current' }, select: { currency: true, timezone: true } }),
+        tx.membershipPlan.findUnique({ where: { id: input.membershipPlanId } }),
+        tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`,
+      ]);
+      if (!configuration?.currency || !configuration.timezone || !plan || plan.status !== 'ACTIVE' || plan.currency !== configuration.currency) {
+        throw new UnprocessableEntityException('Choose an active membership plan for this gym currency');
+      }
+      if (input.dateOfBirth > gymLocalDate(configuration.timezone, clock[0]!.now)) throw new UnprocessableEntityException('Date of birth cannot be in the future');
+      return saveDecision({ name: plan.name, price: plan.price.toString(), currency: plan.currency, durationDays: plan.durationDays, version: plan.version });
+    })) : saveDecision(null);
+    return decision.then(async application => {
       if (!('identityId' in application) || typeof application.identityId !== 'string') return application;
       const result = memberRegistrationResultSchema.parse(await this.enrollment.enroll(access, {
         fullName: application.fullName!, email: application.email!, phone: application.phone!, dateOfBirth: application.dateOfBirth!,

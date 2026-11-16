@@ -45,6 +45,8 @@ it('returns actual bounded read-model counts and pagination without opening tena
  const spy=vi.spyOn(tenants,'withAdministrativeRead');const response=await call('/admin/gyms');expect(response.status).toBe(200);const page=await response.json();
  expect(spy).not.toHaveBeenCalled();spy.mockRestore();
  const row=page.items.find((item:{id:string})=>item.id===gymA.id);expect(row.memberCount).toBe(2);expect(row.trainerCount).toBe(1);expect(row.observedAt).not.toBeNull();
+ expect(row.ownerName).toBe('support-a@example.test');
+ expect(page.items.find((item:{id:string})=>item.id===pending.id).ownerName).toBeNull();
  const unavailable=vi.spyOn(tenants,'withAdministrativeRead').mockRejectedValueOnce(new Error('Synthetic dependency unavailable'));
  await registry.refreshOne(gymA.id,actor);unavailable.mockRestore();
  const stale=(await registry.page(actor)).items.find(item=>item.id===gymA.id)!;
