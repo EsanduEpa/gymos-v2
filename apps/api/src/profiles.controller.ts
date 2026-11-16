@@ -1,4 +1,5 @@
-import { Body, ConflictException, Controller, ForbiddenException, Get, Headers, NotFoundException, Param, Patch, Req, ServiceUnavailableException, UnprocessableEntityException, UseGuards } from '@nestjs/common';
+import { Body, ConflictException, Controller, Delete, ForbiddenException, Get, Header, Headers, NotFoundException, Param, Patch, Put, Query, Req, ServiceUnavailableException, UnprocessableEntityException, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { createHmac } from 'node:crypto';
 import type { Request } from 'express';
 import type { PrismaClient } from './generated/tenant/client.js';
@@ -12,8 +13,15 @@ import { protectedIntentFingerprint, requestDigest } from './operations/primitiv
 import { GymAccessGuard, type GymRequest } from './gym-access.guard.js';
 import { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js';
 import { withGymAccessFence } from './identity/gym-access-fence.js';
+import { MAX_PROFILE_PHOTO_BYTES, prepareProfilePhoto, sealProfilePhoto, streamProfilePhoto } from './profile-photo.js';
+import { pendingTrainerShift } from './trainer-shift-request.js';
 
 function invalid(): never { throw new UnprocessableEntityException('Enter valid profile fields and the current profile version'); }
+function profileFingerprint(value: string, binding: string, scope: string) {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.length < 32) throw new ServiceUnavailableException('Profile updates are unavailable');
+  return protectedIntentFingerprint(value, binding, createHmac('sha256', secret).update(scope).digest());
+}
 function replay(receipt: { requestDigest: string; resourceId: string | null; safeResult: unknown }, digest: string, resourceId: string) {
   if (receipt.requestDigest !== digest || receipt.resourceId !== resourceId) throw new ConflictException('This profile save key was already used for different changes');
   const parsed = profileCommandResultSchema.safeParse(receipt.safeResult);
@@ -110,17 +118,21 @@ export class GymProfileController {
     return this.selfProfileTenant(access, async tenant => {
       if (access.role === 'MEMBER' && access.actor?.kind === 'MEMBER') {
         const row = await tenant.member.findFirst({ where: { id: access.actor.id, identityId: access.identityId, registrationState: 'COMPLETE' },
-          select: { id: true, fullName: true, phone: true, emergencyContact: true, dateOfBirth: true, version: true } });
+          select: { id: true, fullName: true, phone: true, emergencyContact: true, dateOfBirth: true, healthNotes: true, version: true,
+            profilePhoto: { select: { id: true } } } });
         if (!row) throw new NotFoundException('Member profile not found');
         return selfMemberProfileSchema.parse({ memberId: row.id, fullName: row.fullName, phone: row.phone,
-          emergencyContact: row.emergencyContact, dateOfBirth: row.dateOfBirth?.toISOString().slice(0, 10) ?? null, version: row.version });
+          emergencyContact: row.emergencyContact, dateOfBirth: row.dateOfBirth?.toISOString().slice(0, 10) ?? null, version: row.version,
+          healthNotes: row.healthNotes, hasPhoto: row.profilePhoto !== null });
       }
       if (access.role === 'TRAINER' && access.actor?.kind === 'TRAINER') {
         const row = await tenant.trainer.findFirst({ where: { id: access.actor.id, identityId: access.identityId, registrationState: 'COMPLETE' },
-          select: { id: true, fullName: true, phone: true, bio: true, specialisations: true, yearsExperience: true, version: true } });
+          select: { id: true, fullName: true, phone: true, bio: true, specialisations: true, yearsExperience: true, version: true,
+            shiftStart: true, shiftEnd: true, shiftRequest: true, profilePhoto: { select: { id: true } } } });
         if (!row) throw new NotFoundException('Trainer profile not found');
         return selfTrainerProfileSchema.parse({ trainerId: row.id, fullName: row.fullName, phone: row.phone,
-          biography: row.bio, specialisations: row.specialisations, yearsExperience: row.yearsExperience, version: row.version });
+          biography: row.bio, specialisations: row.specialisations, yearsExperience: row.yearsExperience, version: row.version,
+          shiftStart: row.shiftStart, shiftEnd: row.shiftEnd, pendingShift: pendingTrainerShift(row.shiftRequest), hasPhoto: row.profilePhoto !== null });
       }
       throw new ForbiddenException('Profile role does not match gym access');
     });
@@ -137,7 +149,9 @@ export class GymProfileController {
         const parsed = updateSelfMemberProfileSchema.safeParse({ ...(typeof body === 'object' && body !== null ? body : {}), idempotencyKey: headerKey.data });
         if (!parsed.success) invalid();
         const memberId = access.actor.id;
-        const digest = requestDigest({ phone: parsed.data.phone, emergencyContact: parsed.data.emergencyContact, expectedVersion: parsed.data.expectedVersion });
+        const protectedNotes = parsed.data.healthNotes === undefined ? undefined : profileFingerprint(JSON.stringify(parsed.data.healthNotes),
+          `self-member-note:${access.gymId}:${access.identityId}:${memberId}:${headerKey.data}`, 'gymos-member-profile-note-fingerprint-v1');
+        const digest = requestDigest({ phone: parsed.data.phone, emergencyContact: parsed.data.emergencyContact, expectedVersion: parsed.data.expectedVersion }, protectedNotes);
         return tenant.$transaction(async tx => {
           const prior = await tx.commandReceipt.findUnique({ where: { actorIdentityId_commandKind_idempotencyKey: {
             actorIdentityId: access.identityId, commandKind: 'UPDATE_SELF_MEMBER_PROFILE', idempotencyKey: parsed.data.idempotencyKey,
@@ -147,7 +161,7 @@ export class GymProfileController {
           if (!member) throw new NotFoundException('Member profile not found');
           if (member.version !== parsed.data.expectedVersion) throw new ConflictException('Your gym profile changed; reload before saving');
           const update = await tx.member.updateMany({ where: { id: member.id, identityId: access.identityId, version: member.version },
-            data: { phone: parsed.data.phone, emergencyContact: parsed.data.emergencyContact, version: { increment: 1 } } });
+            data: { phone: parsed.data.phone, emergencyContact: parsed.data.emergencyContact, healthNotes: parsed.data.healthNotes, version: { increment: 1 } } });
           if (update.count !== 1) throw new ConflictException('Your gym profile changed; reload before saving');
           const version = member.version + 1;
           const receipt = await tx.commandReceipt.create({ data: { actorIdentityId: access.identityId, commandKind: 'UPDATE_SELF_MEMBER_PROFILE',
@@ -191,6 +205,72 @@ export class GymProfileController {
     });
   }
 
+  @Get('me/profile/photo')
+  @Header('Cache-Control', 'private, no-store')
+  @Header('X-Content-Type-Options', 'nosniff')
+  async ownPhoto(@Req() request: GymRequest) {
+    const access = request.gymAccess;
+    if (!access?.actor || !['MEMBER', 'TRAINER'].includes(access.role)) throw new ForbiddenException('Member or trainer access is required');
+    const id = access.actor.id;
+    const actor = access.role === 'MEMBER' ? { memberId: id } : { trainerId: id };
+    return this.selfProfileTenant(access, async tenant => {
+      const photo = await tenant.profilePhoto.findUnique({ where: actor, select: { encryptedData: true } });
+      if (!photo) throw new NotFoundException('Profile photo not found');
+      return streamProfilePhoto(photo.encryptedData, access.gymId, access.role, id);
+    });
+  }
+
+  @Put('me/profile/photo')
+  @UseInterceptors(FileInterceptor('photo', { limits: { files: 1, fields: 0, fileSize: MAX_PROFILE_PHOTO_BYTES } }))
+  async uploadPhoto(@Req() request: GymRequest, @Headers('idempotency-key') key: unknown, @Query('version') version: string,
+    @UploadedFile() file?: { buffer: Buffer }) {
+    if (!file) throw new UnprocessableEntityException('Choose a profile photo');
+    return this.changePhoto(request, key, version, file.buffer);
+  }
+
+  @Delete('me/profile/photo')
+  removePhoto(@Req() request: GymRequest, @Headers('idempotency-key') key: unknown, @Query('version') version: string) {
+    return this.changePhoto(request, key, version, null);
+  }
+
+  private async changePhoto(request: GymRequest, key: unknown, rawVersion: string, upload: Buffer | null) {
+    const access = request.gymAccess;
+    if (!access?.actor || !['MEMBER', 'TRAINER'].includes(access.role)) throw new ForbiddenException('Member or trainer access is required');
+    const parsed = idempotencyKeySchema.safeParse(key);
+    const version = Number(rawVersion);
+    if (!parsed.success || typeof rawVersion !== 'string' || !/^\d+$/.test(rawVersion) || !Number.isSafeInteger(version) || version >= 2147483647) invalid();
+    const id = access.actor.id;
+    const isMember = access.role === 'MEMBER';
+    const actor = isMember ? { memberId: id } : { trainerId: id };
+    const photo = upload ? await prepareProfilePhoto(upload) : null;
+    const fingerprint = photo ? profileFingerprint(photo.toString('base64'), `profile-photo:${access.gymId}:${access.role}:${id}:${parsed.data}`,
+      'gymos-profile-photo-fingerprint-v1') : undefined;
+    const digest = requestDigest({ version, id, role: access.role, remove: photo === null }, fingerprint);
+    const receiptKey = { actorIdentityId: access.identityId, commandKind: 'UPDATE_PROFILE_PHOTO', idempotencyKey: parsed.data };
+    return this.selfProfileTenant(access, tenant => tenant.$transaction(async tx => {
+      if (isMember) await tx.$queryRaw`SELECT id FROM "Member" WHERE id = ${id} FOR UPDATE`;
+      else await tx.$queryRaw`SELECT id FROM "Trainer" WHERE id = ${id} FOR UPDATE`;
+      const prior = await tx.commandReceipt.findUnique({ where: { actorIdentityId_commandKind_idempotencyKey: receiptKey } });
+      if (prior) return replay(prior, digest, id);
+      const where = { id, identityId: access.identityId, registrationState: 'COMPLETE' as const, version };
+      const data = { version: { increment: 1 } };
+      const changed = isMember ? await tx.member.updateMany({ where, data }) : await tx.trainer.updateMany({ where, data });
+      if (changed.count !== 1) throw new ConflictException('Your profile changed; reload before editing the photo');
+      if (photo) {
+        const encryptedData = sealProfilePhoto(photo, access.gymId, access.role, id);
+        await tx.profilePhoto.upsert({ where: actor, create: { ...actor, encryptedData }, update: { encryptedData } });
+      } else await tx.profilePhoto.deleteMany({ where: actor });
+      const result = { version: version + 1, replayed: false };
+      const resourceType = isMember ? 'MEMBER_PROFILE' : 'TRAINER_PROFILE';
+      const receipt = await tx.commandReceipt.create({ data: { ...receiptKey, requestDigest: digest, resourceType, resourceId: id,
+        state: 'COMMITTED', safeResult: result, committedAt: new Date() } });
+      await appendTenantAudit(tx, { masterGymId: access.gymId, receiptId: receipt.id, actorIdentityId: access.identityId,
+        eventCode: photo ? 'PROFILE_PHOTO_UPDATED' : 'PROFILE_PHOTO_REMOVED', resourceType, resourceId: id,
+        transition: { version: result.version } });
+      return result;
+    }));
+  }
+
   private async publishedMember(tenant: PrismaClient, gymId: string, memberId: string): Promise<MemberLink> {
     const link = await this.database.master.gymAccess.findFirst({ where: { gymId, role: 'MEMBER', actorKind: 'MEMBER',
       linkStatus: { in: ['ACTIVE', 'REVOKED'] }, tenantActorId: memberId, enrollmentOperationId: { not: null } },
@@ -216,12 +296,10 @@ export class GymProfileController {
     return this.tenantGate.withVerifiedTenant(access, async tenant => {
       const binding = await this.publishedMember(tenant, access.gymId, memberId);
       return withGymAccessFence(this.database.master, [{ identityId: access.identityId, gymId: access.gymId, role: 'OWNER' }], async () => {
-        const fingerprintKey = process.env.JWT_SECRET;
-        if (!fingerprintKey || fingerprintKey.length < 32) throw new ServiceUnavailableException('Member profile updates are unavailable');
-        const protectedHealthNotes = protectedIntentFingerprint(JSON.stringify(parsed.data.healthNotes === undefined ? ['absent']
+        const protectedHealthNotes = profileFingerprint(JSON.stringify(parsed.data.healthNotes === undefined ? ['absent']
           : parsed.data.healthNotes === null ? ['null'] : ['value', parsed.data.healthNotes]),
         `member-profile-note:${access.gymId}:${access.identityId}:${memberId}:${parsed.data.idempotencyKey}`,
-        createHmac('sha256', fingerprintKey).update('gymos-member-profile-note-fingerprint-v1').digest());
+        'gymos-member-profile-note-fingerprint-v1');
         const digest = requestDigest({ fullName: parsed.data.fullName, dateOfBirth: parsed.data.dateOfBirth, phone: parsed.data.phone,
           emergencyContact: parsed.data.emergencyContact, expectedVersion: parsed.data.expectedVersion, reason: parsed.data.reason }, protectedHealthNotes);
         return tenant.$transaction(async tx => {

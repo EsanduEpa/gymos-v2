@@ -40,8 +40,14 @@ export function GymSelfProfileForm({ slug, role, profile, requestKey }: { slug: 
     {state.message ? <div role="status"><Feedback tone={state.status === 'success' ? 'success' : 'error'}>{state.message}</Feedback></div> : null}
     <form action={action} className="profile-form">
       <Field label="Phone" name="phone" type="tel" autoComplete="tel" maxLength={40} defaultValue={profile.phone ?? ''} optional error={state.fieldErrors?.phone}/>
-      {role === 'MEMBER' ? <Field label="Emergency contact" name="emergencyContact" maxLength={240} defaultValue={member.emergencyContact ?? ''} optional error={state.fieldErrors?.emergencyContact}
-        hint="Only your gym’s authorized staff can see this contact."/> : <>
+      {role === 'MEMBER' ? <>
+        <Field label="Emergency contact" name="emergencyContact" maxLength={240} defaultValue={member.emergencyContact ?? ''} optional error={state.fieldErrors?.emergencyContact}
+          hint="Only your gym’s authorized staff can see this contact."/>
+        <label className="ui-field"><span className="ui-field-label">Health notes <span>optional</span></span>
+          <textarea name="healthNotes" rows={4} maxLength={4000} defaultValue={member.healthNotes ?? ''} aria-invalid={state.fieldErrors?.healthNotes ? true : undefined}/>
+          <span className={state.fieldErrors?.healthNotes ? 'ui-field-error' : 'ui-field-hint'}>{state.fieldErrors?.healthNotes ?? 'Visible to your gym owner and confirmed trainer.'}</span>
+        </label>
+      </> : <>
         <label className="ui-field"><span className="ui-field-label">Professional biography <span>optional</span></span><textarea name="biography" rows={5} maxLength={2000} defaultValue={trainer.biography ?? ''} aria-invalid={state.fieldErrors?.biography ? true : undefined}/>{state.fieldErrors?.biography ? <span className="ui-field-error">{state.fieldErrors.biography}</span> : null}</label>
         <label className="ui-field"><span className="ui-field-label">Specialisations <span>optional</span></span><textarea name="specialisations" rows={4} maxLength={1220} defaultValue={trainer.specialisations.join('\n')} aria-invalid={state.fieldErrors?.specialisations ? true : undefined}/>{state.fieldErrors?.specialisations ? <span className="ui-field-error">{state.fieldErrors.specialisations}</span> : <span className="ui-field-hint">One specialisation per line, up to 20.</span>}</label>
         <Field label="Years of experience" name="yearsExperience" type="number" min={0} max={80} defaultValue={trainer.yearsExperience ?? ''} optional error={state.fieldErrors?.yearsExperience}/>

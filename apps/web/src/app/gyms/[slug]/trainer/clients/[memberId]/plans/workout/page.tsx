@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { memberWorkoutPlanPageSchema, memberWorkoutPlansQuerySchema } from '@gymos/contracts';
 import { DashboardChrome } from '@/components/navigation/dashboard-chrome';
 import { Card } from '@/components/ui';
+import { SaveWorkoutTemplate } from '@/components/coaching/save-workout-template';
 import { requireGymContext } from '@/lib/gym-context';
 import { apiUrl } from '@/lib/gymos';
 
@@ -26,6 +27,7 @@ export default async function TrainerWorkoutPlansPage({ params, searchParams }: 
           <ol>{plan.exercises.map(row => <li key={row.id}>{row.name} · {row.sets} sets{row.reps !== null ? ` × ${row.reps} reps` : ''}{row.weightKg !== null ? ` · ${row.weightKg} kg` : ''}{row.notes ? ` · ${row.notes}` : ''}</li>)}</ol>
           <a className="platform-text-link" href={`/gyms/${encodeURIComponent(slug)}/trainer/plans/workout/${encodeURIComponent(plan.id)}/edit?memberId=${encodeURIComponent(memberId)}`}>Edit workout plan</a>
           {' '}<a className="platform-text-link" href={`/gyms/${encodeURIComponent(slug)}/trainer/plans/workout/new?${new URLSearchParams({ memberId, copyFrom: plan.id })}`}>Copy workout plan</a>
+          <SaveWorkoutTemplate slug={slug} memberId={memberId} planId={plan.id}/>
         </Card>)}</div>
         <nav className="trainer-plan-pagination" aria-label="Workout plan pages">{page.data.page > 1 ? <a href={`?page=${page.data.page - 1}`}>Previous plans</a> : null}
           <span>Page {page.data.page} of {Math.max(1, page.data.totalPages)}</span>{page.data.hasMore ? <a href={`?page=${page.data.page + 1}`}>More plans</a> : null}</nav>

@@ -154,6 +154,12 @@ export const workoutPlanCreateSchema = z.strictObject({
   exercises: z.array(workoutExerciseCreateSchema).min(1).max(100),
 });
 export const workoutPlanUpdateSchema = workoutPlanCreateSchema.extend({ expectedRevision: workoutRevisionSchema });
+export const workoutTemplateContentSchema = workoutPlanCreateSchema.omit({ schedule: true });
+export const workoutTemplateSchema = workoutTemplateContentSchema.extend({ id: idSchema });
+export const workoutTemplatePageSchema = z.strictObject({
+  items: z.array(z.strictObject({ id: idSchema, name: z.string().min(1).max(120) })).max(100),
+  hasMore: z.boolean(),
+});
 
 export const memberWorkoutPlansQuerySchema = z.strictObject({ page: pageNumberSchema.default(1), pageSize: pageSizeSchema.default(25) });
 export const memberWorkoutScheduleQuerySchema = memberWorkoutPlansQuerySchema.extend({ on: z.union([z.literal('today'), z.iso.date()]).optional() });
@@ -198,6 +204,7 @@ export type TrainerClientProfile = z.infer<typeof trainerClientProfileSchema>;
 export type WorkoutPlanCreate = z.infer<typeof workoutPlanCreateSchema>;
 export type WorkoutPlanUpdate = z.infer<typeof workoutPlanUpdateSchema>;
 export type WorkoutPlanView = z.infer<typeof workoutPlanViewSchema>;
+export type WorkoutTemplate = z.infer<typeof workoutTemplateSchema>;
 export type MemberWorkoutPlansQuery = z.infer<typeof memberWorkoutPlansQuerySchema>;
 export type MemberWorkoutPlanPage = z.infer<typeof memberWorkoutPlanPageSchema>;
 export type MealPlanCreate = z.infer<typeof mealPlanCreateSchema>;

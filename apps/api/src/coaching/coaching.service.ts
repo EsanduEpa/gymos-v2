@@ -9,6 +9,9 @@ import {
   workoutPlanCreateSchema,
   workoutPlanCreateResultSchema,
   workoutPlanViewSchema,
+  workoutTemplateContentSchema,
+  workoutTemplatePageSchema,
+  workoutTemplateSchema,
   mealPlanCreateSchema,
   mealPlanCreateResultSchema,
   mealPlanViewSchema,
@@ -40,6 +43,7 @@ import { appendTenantAudit } from '../operations/transaction-audit.js';
 import { requestDigest } from '../operations/primitives.js';
 import { addLocalDays, asDate, dateString, gymLocalDate } from '../membership-rules.js';
 import { openCoachingRecord, sealCoachingRecord } from './coaching-records-crypto.js';
+import { readJournal, writeJournal } from './training-journal.js';
 
 type Access = TenantGateContext & { identityId: string; role: string; actor?: { kind: string; id: string; registrationOperationId?: string } | null };
 type MemberBinding = { id: string; identityId: string; operationId: string };
@@ -426,6 +430,62 @@ export class CoachingService {
     });
   }
 
+  trainingJournal(access: Access, query: unknown) {
+    return this.withOwnMember(access, (tx, memberId, now, timeZone) =>
+      readJournal(tx, access.gymId, memberId, gymLocalDate(timeZone, now), timeZone, query));
+  }
+
+  saveTrainingJournal(access: Access, input: unknown) {
+    return this.withOwnMember(access, (tx, memberId, now, timeZone) =>
+      writeJournal(tx, access.gymId, memberId, gymLocalDate(timeZone, now), input), true);
+  }
+
+  async saveWorkoutTemplate(access: Access, memberId: string, planId: string) {
+    return this.withRelatedMember(access, memberId, async (tx, member, trainer) => {
+      const plan = await tx.workoutPlan.findFirst({
+        where: { id: planId, memberId: member.id, trainerId: trainer.id },
+        include: { exercises: { orderBy: { sortOrder: 'asc' } } },
+      });
+      if (!plan) throw new NotFoundException('Workout plan not found');
+      const snapshot = workoutPlanDto(plan);
+      const parsed = workoutTemplateContentSchema.safeParse({
+        name: snapshot.name,
+        description: snapshot.description,
+        exercises: snapshot.exercises.map(({ id: _id, order: _order, ...exercise }) => exercise),
+      });
+      if (!parsed.success) invalid('This plan needs valid exercises before it can be saved as a template');
+      const content = parsed.data;
+      const source = { trainerId: trainer.id, sourcePlanId: plan.id, sourceRevision: snapshot.revision };
+      const saved = await tx.workoutTemplate.upsert({
+        where: { trainerId_sourcePlanId_sourceRevision: source },
+        create: { ...source, name: content.name, content },
+        update: {},
+      });
+      return workoutTemplateSchema.parse({ ...content, id: saved.id });
+    }, true);
+  }
+
+  async workoutTemplates(access: Access, query: unknown) {
+    const parsed = memberWorkoutPlansQuerySchema.safeParse(query);
+    if (!parsed.success) invalid('Enter valid template page details');
+    const { page, pageSize } = parsed.data;
+    return this.withOwnTrainer(access, async (tx, trainerId) => {
+      const rows = await tx.workoutTemplate.findMany({
+        where: { trainerId }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (page - 1) * pageSize, take: pageSize + 1, select: { id: true, name: true },
+      });
+      return workoutTemplatePageSchema.parse({ items: rows.slice(0, pageSize), hasMore: rows.length > pageSize });
+    });
+  }
+
+  async workoutTemplate(access: Access, id: string) {
+    return this.withOwnTrainer(access, async (tx, trainerId) => {
+      const row = await tx.workoutTemplate.findFirst({ where: { id, trainerId }, select: { id: true, content: true } });
+      if (!row) throw new NotFoundException('Workout template not found');
+      return workoutTemplateSchema.parse({ ...workoutTemplateContentSchema.parse(row.content), id: row.id });
+    });
+  }
+
   async updateWorkoutPlan(access: Access, memberId: string, planId: string, idempotencyKey: string, input: unknown) {
     if (access.role !== 'TRAINER' || access.actor?.kind !== 'TRAINER') throw new ForbiddenException('Trainer access is required');
     const parsed = workoutPlanUpdateSchema.safeParse(input);
@@ -807,6 +867,16 @@ export class CoachingService {
         });
       }, { isolationLevel: writable ? 'ReadCommitted' : 'RepeatableRead' });
     });
+  }
+
+  private async withOwnTrainer<Result>(access: Access,
+    work: (tx: Prisma.TransactionClient, trainerId: string) => Promise<Result>): Promise<Result> {
+    if (access.role !== 'TRAINER' || access.actor?.kind !== 'TRAINER') throw new ForbiddenException('Trainer access is required');
+    return this.tenantGate.withVerifiedTenant(access, tenant => this.withTrainerFence(access, () => tenant.$transaction(async tx => {
+      await tx.$executeRaw`SET TRANSACTION READ ONLY`;
+      const trainer = await this.verifiedTrainer(tx, access);
+      return work(tx, trainer.id);
+    })));
   }
 
   private async withOwnMember<Result>(access: Access,

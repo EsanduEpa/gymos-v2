@@ -9,6 +9,7 @@ Use synthetic data for this review. Record the commit or build identifier, tenan
 | Original audit defects | The earlier local build passed 40 browser regression tests. The local header and health fixes and trainer-pay migration have separate evidence in the [remediation record](QA-AUDIT-PRIORITIZED-REMEDIATION-PLAN.md#12-evidence-and-completion-record). | Repeat the critical workflows on the review build. Record deployed headers, health and latency when a hosted target is available. |
 | Membership dashboard | A local browser test verified the expiry warning, including an already-renewed membership and the 30-day boundary. The finance test reconciles the new month-to-date dashboard total with the revenue report. | Reconcile counts and month-to-date totals against the review fixture. |
 | Workout scheduling and completion | Local database tests passed for dated and weekly assignment, rest times, completion and authorization. Chromium verified dated assignment, completion after refresh, and same-client copying. | Repeat the workflows on the review build. |
+| Templates, training journal and profiles | Chromium verified template reuse and independent assignment edits, journal persistence and goal progress, profile edits and photos, and owner approval of a pending shift. Nine coaching and four trainer integration tests passed. | Repeat on the review build with separate Trainer, Member and Owner accounts. |
 | Dated meals | A database test verified a dated meal, its weekday, and editing it back to a weekly plan. Chromium verified that the assignment appeared only on the selected calendar date. | Repeat the workflows on the review build. |
 | Dietary notes and progress | Database tests cover saved allergies, restrictions, measurements and BMI, trainer and member access, encrypted storage and tamper rejection. Chromium verified trainer entry, member access, and private progress views. | The review API needs its own coaching-record encryption key if hosted. |
 | Downloads and analytics | PDF and Excel support revenue, expenses, payroll and audit. Chromium verified the owner download links and trainer performance table. The finance tests opened the workbook and checked financial values, row counts and text that resembles a formula. The 34-page sample revenue PDF had a title and column headers on every page. | Repeat on the review build. PDF rendering was verified with English sample data. Sinhala and Tamil PDF text still needs font support and verification. |
@@ -18,7 +19,7 @@ The local source contains the changes. A release commit or source bundle for the
 
 ## Start the review
 
-1. Obtain the exact review commit or source bundle from the project owner. It must include the trainer-pay, workout-scheduling, dated-meal and coaching-record migrations. The current tenant manifest is `tenant-2026-11-16.1`.
+1. Obtain the exact review commit or source bundle from the project owner. It must include the trainer-pay, workout-scheduling, dated-meal, coaching-record, workout-template, training-journal and profile/shift migrations. The current tenant manifest is `tenant-2026-11-16.4`.
 2. For a local review, use Node.js 24, pnpm and Docker. Follow the [manual testing guide](manual-testing.md#start-or-resume) to build the API and web app and create or update the dedicated synthetic databases. A fresh checkout needs the synthetic setup; an existing fixture needs a sync. Open `http://localhost:3002/login` on the machine running the test app.
 3. For a remote review, obtain the restricted HTTPS address and test sign-ins privately. The hosting operator verifies the deployment matches the review commit and confirms anonymous access is blocked before sharing the address.
 4. Use separate Chrome profiles for the Owner, Trainer, and Member so their sessions stay separate. Use an equivalent account in a second gym for isolation checks. Never include passwords or access tokens in a test result.
@@ -32,6 +33,9 @@ The local source contains the changes. A release commit or source bundle for the
 | WRK-01, WRK-02, WRK-04 | As the trainer, open a confirmed client and assign a workout. Enter a rest time for an exercise and choose **Specific date** for today. As the member, open the home page and then **Workout plans → Today’s workouts**. | The assignment shows on the member’s home and in the date filter. The exercise shows its rest time in seconds. |
 | WRK-02, WRK-05 | Assign another plan using **Repeat weekly** and select today’s weekday. As the member, check today, the same weekday next week, and a different weekday using the date filter. Mark an exercise complete, refresh, then clear it. | Weekly workouts appear on the chosen weekdays. Completion persists for the current day following a refresh. Future occurrences have their own completion state. |
 | WRK-03 | On the confirmed client’s full workout history, choose **Copy workout plan**, review the populated fields, and save it with a new title and schedule. | A separate assignment is created. The source plan and its completion records are preserved. |
+| WRK-03 | From a confirmed client’s workout history, choose **Save as template**. Open **Assign workout plan** for two confirmed clients and choose the template. Edit one resulting plan. | Both clients receive separate assignments. Editing one preserves the other and the template. Templates are available only to their trainer in the selected gym. |
+| FR-005, FR-023–024 | As member, open **Training Journal**. Set a strength goal, log a solo workout with the matching exercise and a weight, and log a day’s calories and macros. Refresh and open the nutrition date again. | The goal shows actual versus target, the workout remains visible, and the day’s nutrition can be updated. Other accounts cannot read the journal. |
+| FR-003, FR-034, FR-060 | As member and trainer, open **Profile** from the account menu. Edit member health notes and trainer biography, specialisations and experience. Upload and remove a photo. As trainer, request shift hours. As owner, filter the trainer roster to pending approval and approve or decline the request. | The profile updates persist. Photos are served only to authorized accounts. Shift hours only change after approval. Previously confirmed sessions retain their agreed terms. |
 | MEL-02 | As trainer, assign a meal plan for a specific date. As member, open **Meal plans** and select that date in **Calendar**. Check the same weekday a week later. | The meal plan shows its date. Its meals appear only on that date. A meal plan saved with the date field blank continues to repeat weekly. |
 | MEL-04 | On the trainer’s confirmed client profile, enter a synthetic food allergy and dietary restriction. Sign in as that member and open **Meal plans**. Try the same view as a different member or a trainer without a confirmed relationship. | The saved lists appear to the client and confirmed trainer. Unrelated accounts receive no dietary notes. |
 | PRG-01–06, RPT-06 | As a synthetic member, record two dated weights and enter height and body fat for one date. Review **Progress** and change the report end date. Open the report as the confirmed trainer. | BMI uses weight and height recorded together. Charts and the history table follow the selected time window, and the report counts completed PT sessions. The report currently covers measurements and session totals. |
@@ -48,15 +52,17 @@ The local source contains the changes. A release commit or source bundle for the
 
 ## Work still open
 
+The [confirmed development checklist](AUDIT-REMAINING-CHECKLIST.md) records the current scope and acceptance details from the original requirements. Use it to plan the remaining work.
+
 ### 1. Core application features
 
 | PDF reference | Development work | Developer acceptance |
 | --- | --- | --- |
 | PRG-01–06, RPT-06 | Add private progress photo upload, signed access, comparison and photos in the report. | Photo access is limited to authorized users, expires as designed and respects the agreed retention policy. |
-| WRK-03–04, D1-1.1, D1-1.4 | Add reusable workout templates across clients, member goals and solo workout logs. Connect workouts to physical check-in after door attendance exists. | A trainer can assign a template independently to two eligible clients. Editing one assignment preserves the other. Goal and solo log entries are private to the defined roles. |
-| RPT-01, RPT-04–05, D1-3.5–3.6 | Add physical visit counts, member funnel and churn metrics, revenue by plan tier and first term versus renewal, and PDF/Excel exports for additional reports. Define cash projections and support text rendering in the required PDF languages. | Screen totals and exports reconcile against dated source records, including renewals, empty ranges and month boundaries. |
+| WRK-04 | Connect the day’s workout to physical check-in after door attendance exists. | A successful check-in surfaces the workout scheduled for that gym date. |
+| RPT-01, RPT-04–05, D1-3.5–3.6 | Add physical visit counts, member funnel and churn metrics, revenue by plan tier and first term versus renewal, and PDF/Excel exports for additional reports. Define cash projections. | Screen totals and exports reconcile against dated source records, including renewals, empty ranges and month boundaries. |
 | D1-1.6–1.7, D1-2.1–2.6, WF-O4 | Build member–trainer messaging, verified-session ratings, additional trainer profile and marketplace controls, virtual-session rules, challenges, streaks and re-engagement. | Eligible users can complete each flow. Unrelated users and the second gym cannot see private content or submit ratings for someone else’s session. |
-| D3-1.3, D1-3.9 | Define Manager and Front Desk permissions and implement the agreed roles and subscription lifecycle. | Test an action-by-action role matrix in two gyms. Test subscription transitions against the agreed definition of what is billed. |
+| FR-079, D1-3.9 | Implement the Owner's GymOS subscription lifecycle. Confirm the tier catalogue and post-grace restrictions. | Verify plan changes, payment failure notices, the seven-day grace period and recovery in two synthetic gyms. |
 
 ### 2. Integrations and expanded scope
 
@@ -65,7 +71,7 @@ The local source contains the changes. A release commit or source bundle for the
 | AUTH-03, MEM-02–08, D1-1.9, D1-2.7 | Choose a payment sandbox and external delivery providers. Confirm receipt, retry, refund, reconciliation, email OTP and notification rules. | Exercise synthetic checkout, failed payment, duplicate webhook, manual cash, receipt, recovery and notification opt-out paths. |
 | BIO-01–07, D1-1.3, D1-2.2, D1-3.8 | Obtain the selected ZKTeco device or simulator and define fingerprint enrollment, QR fallback, manual attendance, and the proposed PT timer changes. | Time valid scans, verify denial and fallback, reconcile entry/exit records, and check that proposed PT timing does not double-spend credits. |
 | D1-1.5, D1-2.3, D1-3.5, D1-3.7 | Define consent and provider test access for AI, wearables and accounting exports to Xero or QuickBooks. Use free test resources where available. | Verify data permissions, authorized imports and exports, failure handling, and review of flagged AI interactions. |
-| NFR-06 | Obtain the detailed requirements for POS, equipment maintenance, multi-branch support, native/white-label apps, and Sinhala and Tamil. | Validate each agreed workflow and its permissions against the signed-off specification. |
+| SRS §§5, 22.1 | Complete the standard member and trainer mobile workflows. Phase 3 includes wearables and AI. | Validate the required workflows and permissions on the agreed devices and provider test environments. |
 
 ### 3. Hosted technical verification
 
@@ -75,7 +81,7 @@ The local source contains the changes. A release commit or source bundle for the
 | NFR-02 | Verify backup schedule and retention, point-in-time recovery, database and PII encryption and key handling. Rehearse restore to an isolated target and time recovery. Measure scheduled-work recovery, uptime, and stability under the agreed 500+ user workload. |
 | BUG-007, platform provisioning | Provision a synthetic gym, observe the worker complete it, and validate the owner credential handoff. Verify the installed migrations, seeded trainer-pay defaults and confirmed amounts before exercising payroll. |
 
-The full requirements baseline depends on the original documents and traceability file referenced by the PDF. Keep items with unresolved behavior or absent test infrastructure marked as pending until the specification or environment is available.
+The [requirements review](GYMOS-REQUIREMENTS-REVIEW.md) maps all 81 SRS functional requirements. The standalone Scope & Workflow Map and audit traceability file are still unavailable. Keep unresolved behavior and checks that require further test infrastructure marked as pending.
 
 ## Report a result
 

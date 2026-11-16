@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from 'react';
 import { saveWorkoutPlan, type WorkoutPlanActionState } from '@/app/workout-plan-actions';
-import type { WorkoutPlanView } from '@gymos/contracts';
+import type { WorkoutPlanView, WorkoutTemplate } from '@gymos/contracts';
 import styles from './workout-plan-builder.module.css';
 
 type Row = { id: string; name: string; sets: string; reps: string; weightKg: string; durationMinutes: string; restSeconds: string; notes: string };
@@ -10,14 +10,15 @@ const newRow = (): Row => ({ id: globalThis.crypto.randomUUID(), name: '', sets:
 const initialState: WorkoutPlanActionState = {};
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-export function WorkoutPlanBuilder({ slug, memberId, memberName, initialKey, initialPlan, copy = false }: { slug: string; memberId: string; memberName: string; initialKey: string; initialPlan?: WorkoutPlanView; copy?: boolean }) {
+export function WorkoutPlanBuilder({ slug, memberId, memberName, initialKey, initialPlan, initialTemplate, copy = false }: { slug: string; memberId: string; memberName: string; initialKey: string; initialPlan?: WorkoutPlanView; initialTemplate?: WorkoutTemplate; copy?: boolean }) {
   const editing = initialPlan && !copy;
-  const [rows, setRows] = useState<Row[]>(() => initialPlan?.exercises.map(exercise => ({ id: globalThis.crypto.randomUUID(), name: exercise.name,
-    sets: String(exercise.sets), reps: exercise.reps === null ? '' : String(exercise.reps), weightKg: exercise.weightKg ?? '',
-    durationMinutes: exercise.durationMinutes === null ? '' : String(exercise.durationMinutes),
+  const source = initialPlan ?? initialTemplate;
+  const [rows, setRows] = useState<Row[]>(() => source?.exercises.map(exercise => ({ id: globalThis.crypto.randomUUID(), name: exercise.name,
+    sets: String(exercise.sets), reps: exercise.reps == null ? '' : String(exercise.reps), weightKg: exercise.weightKg ?? '',
+    durationMinutes: exercise.durationMinutes == null ? '' : String(exercise.durationMinutes),
     restSeconds: exercise.restSeconds == null ? '' : String(exercise.restSeconds), notes: exercise.notes ?? '' })) ?? [newRow()]);
-  const [name, setName] = useState(copy && initialPlan ? `${initialPlan.name.slice(0, 113)} (copy)` : initialPlan?.name ?? '');
-  const [description, setDescription] = useState(initialPlan?.description ?? '');
+  const [name, setName] = useState(copy && initialPlan ? `${initialPlan.name.slice(0, 113)} (copy)` : source?.name ?? '');
+  const [description, setDescription] = useState(source?.description ?? '');
   const [date, setDate] = useState(editing ? initialPlan.scheduledDate ?? '' : '');
   const [weekdays, setWeekdays] = useState(editing ? initialPlan.scheduledWeekdays ?? [] : []);
   const [schedule, setSchedule] = useState(date ? 'DATE' : weekdays.length ? 'WEEKLY' : 'UNSCHEDULED');

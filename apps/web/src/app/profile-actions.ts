@@ -1,7 +1,7 @@
 'use server';
 
 import { profileCommandResultSchema, updateAccountProfileSchema, updateSelfMemberProfileSchema,
-  updateSelfTrainerProfileSchema, ownerMemberProfileCorrectionSchema } from '@gymos/contracts';
+  updateSelfTrainerProfileSchema, ownerMemberProfileCorrectionSchema, trainerShiftProposalInputSchema, idempotencyKeySchema } from '@gymos/contracts';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
@@ -51,11 +51,13 @@ export async function updateGymSelfProfile(slug: string, role: 'MEMBER' | 'TRAIN
   const idempotencyKey = value(formData, 'idempotencyKey');
   if (role === 'MEMBER') {
     const body = { expectedVersion, phone: value(formData, 'phone').trim() || null,
-      emergencyContact: value(formData, 'emergencyContact').trim() || null };
+      emergencyContact: value(formData, 'emergencyContact').trim() || null,
+      healthNotes: formData.has('healthNotes') ? value(formData, 'healthNotes').trim() || null : undefined };
     const parsed = updateSelfMemberProfileSchema.safeParse({ ...body, idempotencyKey });
     if (!parsed.success) return { status: 'error', message: 'Correct the highlighted fields and save again.', fieldErrors: errors(parsed.error) };
     const result = await save(`/gyms/${encodeURIComponent(slug)}/me/profile`, {
-      phone: parsed.data.phone, emergencyContact: parsed.data.emergencyContact, expectedVersion: parsed.data.expectedVersion,
+      phone: parsed.data.phone, emergencyContact: parsed.data.emergencyContact, healthNotes: parsed.data.healthNotes,
+      expectedVersion: parsed.data.expectedVersion,
     }, parsed.data.idempotencyKey);
     if (result.status === 'success') revalidatePath(`/gyms/${encodeURIComponent(slug)}`, 'layout');
     return result;
@@ -75,6 +77,58 @@ export async function updateGymSelfProfile(slug: string, role: 'MEMBER' | 'TRAIN
     if (result.status === 'success') revalidatePath(`/gyms/${encodeURIComponent(slug)}`, 'layout');
     return result;
   }
+}
+
+export async function changeProfilePhoto(slug: string, expectedVersion: number, key: string,
+  _previous: ProfileActionState, form: FormData): Promise<ProfileActionState> {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || !idempotencyKeySchema.safeParse(key).success) return { status: 'error', message: 'Reload your profile before changing the photo.' };
+  if (await currentSupportCookie()) return { status: 'error', message: 'Photo changes require access to your gym profile.' };
+  const access = await token();
+  if (!access) redirect('/login');
+  const remove = form.get('operation') === 'remove';
+  const photo = form.get('photo');
+  let body: FormData | undefined;
+  if (!remove) {
+    if (!(photo instanceof File) || !photo.size || photo.size > 768 * 1024) {
+      return { status: 'error', message: 'Choose a JPEG, PNG, or WebP photo under 768 KB.' };
+    }
+    body = new FormData();
+    body.set('photo', photo, 'profile-photo');
+  }
+  const response = await fetch(apiUrl(`/gyms/${slug}/me/profile/photo?version=${expectedVersion}`), {
+    method: remove ? 'DELETE' : 'PUT', headers: { authorization: `Bearer ${access}`, 'idempotency-key': key },
+    body, cache: 'no-store', signal: AbortSignal.timeout(8000),
+  }).catch(() => new Response(null, { status: 503 }));
+  if (response.status === 401) redirect('/login?error=expired');
+  if (response.status === 409) return { status: 'error', message: 'Your profile changed. Reload before changing the photo.' };
+  if (response.status === 413 || response.status === 422) return { status: 'error', message: 'Choose a JPEG, PNG, or WebP photo under 768 KB and 16 megapixels.' };
+  const result = response.ok ? profileCommandResultSchema.safeParse(await response.json().catch(() => null)) : null;
+  if (!result?.success) return { status: 'error', message: 'The photo change could not be confirmed. Refresh your profile and try again.' };
+  revalidatePath(`/gyms/${slug}`, 'layout');
+  return { status: 'success', message: remove ? 'Profile photo removed.' : 'Profile photo saved.', version: result.data.version };
+}
+
+export async function requestTrainerShift(slug: string, expectedVersion: number, requestId: string,
+  _previous: ProfileActionState, form: FormData): Promise<ProfileActionState> {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return { status: 'error', message: 'Reload your trainer profile and try again.' };
+  if (await currentSupportCookie()) return { status: 'error', message: 'Sign in as the trainer to request a shift.' };
+  const access = await token();
+  if (!access) redirect('/login');
+  const start = value(form, 'start');
+  const end = value(form, 'end');
+  const parsed = trainerShiftProposalInputSchema.safeParse({ requestId, expectedVersion, start, end, overnight: end <= start });
+  if (!parsed.success) return { status: 'error', message: 'Enter the shift start and end times.' };
+  const response = await fetch(apiUrl(`/gyms/${slug}/me/shift-request`), {
+    method: 'PUT', headers: { authorization: `Bearer ${access}`, 'content-type': 'application/json' },
+    body: JSON.stringify(parsed.data), cache: 'no-store',
+  }).catch(() => new Response(null, { status: 503 }));
+  if (response.status === 401) redirect('/login?error=expired');
+  if (response.status === 422) return { status: 'error', message: 'Choose a recurring shift between 15 minutes and 16 hours.' };
+  if (response.status === 409) return { status: 'error', message: 'Your profile or shift request changed. Reload before submitting.' };
+  const result = response.ok ? profileCommandResultSchema.safeParse(await response.json().catch(() => null)) : null;
+  if (!result?.success) return { status: 'error', message: 'The shift request could not be confirmed. Reload and try again.' };
+  revalidatePath(`/gyms/${slug}`, 'layout');
+  return { status: 'success', message: 'Shift request sent to your gym owner.', version: result.data.version };
 }
 
 export async function correctMemberProfile(slug: string, memberId: string, _previous: ProfileActionState, formData: FormData): Promise<ProfileActionState> {

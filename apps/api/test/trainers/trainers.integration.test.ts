@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import { SignJWT } from 'jose';
@@ -13,9 +13,19 @@ let fixture: Awaited<ReturnType<typeof seedTwoGymFixture>>;
 let app: INestApplication;
 let base: string;
 const secret = randomBytes(32).toString('hex');
-async function bearer(identityId: string) {
-  return new SignJWT({ authVersion: 0 }).setProtectedHeader({ alg: 'HS256' }).setSubject(identityId)
-    .setIssuer('gymos-v2').setAudience('gymos-api').setExpirationTime('15m').sign(new TextEncoder().encode(secret));
+async function bearer(identityId: string, gymId = fixture.gyms[0]!.id) {
+  const account = await fixture.master.gymAccount.upsert({
+    where: { userId_gymId: { userId: identityId, gymId } },
+    create: { userId: identityId, gymId, username: `trainer-test-${identityId}-${gymId}`, passwordHash: 'fixture-not-a-login-hash', status: 'ACTIVE' },
+    update: { status: 'ACTIVE', mustChangePassword: false, credentialExpiresAt: null },
+  });
+  const session = await fixture.master.identitySession.create({
+    data: { identityId, gymAccountId: account.id, authVersion: account.authVersion, deviceClass: 'SHARED', deviceLabel: 'Trainer integration test',
+      refreshTokenHash: createHash('sha256').update(randomBytes(32)).digest('hex'),
+      idleExpiresAt: new Date(Date.now() + 600_000), absoluteExpiresAt: new Date(Date.now() + 900_000) },
+  });
+  return new SignJWT({ authVersion: account.authVersion, sid: session.id, gaid: account.id }).setProtectedHeader({ alg: 'HS256' }).setSubject(identityId)
+    .setIssuer('gymos-v2').setAudience('gymos-api').setIssuedAt().setExpirationTime('15m').sign(new TextEncoder().encode(secret));
 }
 async function call(path: string, accessToken: string, body?: unknown, method?: string) {
   return fetch(`${base}${path}`, { method: method ?? (body === undefined ? 'GET' : 'POST'), headers: {
@@ -41,7 +51,7 @@ afterAll(async () => {
 
 it('serves role-safe, Master-published trainer pages and versioned/audited shift approvals', async () => {
   const owner = await bearer(fixture.users.ownerA.id);
-  const ownerB = await bearer(fixture.users.ownerB.id);
+  const ownerB = await bearer(fixture.users.ownerB.id, fixture.gyms[1]!.id);
   const trainerIdentity = await bearer(fixture.users.trainerUser.id);
   const member = await bearer(fixture.users.memberUser.id);
   const gymA = fixture.gyms[0]!; const gymB = fixture.gyms[1]!;
@@ -194,4 +204,92 @@ it('serves role-safe, Master-published trainer pages and versioned/audited shift
   expect(await fixture.tenants[0]!.pTSession.findUniqueOrThrow({ where: { id: `profile_session_0_${run.runId}` },
     select: { confirmationShiftStart: true, confirmationShiftEnd: true } })).toEqual({ confirmationShiftStart: '06:00', confirmationShiftEnd: '14:00' });
   expect(existingAccess.linkStatus).toBe('ACTIVE');
+});
+
+it('keeps submitted trainer hours pending until the same gym owner approves them', async () => {
+  const owner = await bearer(fixture.users.ownerA.id);
+  const otherOwner = await bearer(fixture.users.ownerB.id, fixture.gyms[1]!.id);
+  const trainerToken = await bearer(fixture.users.trainerUser.id);
+  const tenant = fixture.tenants[0]!;
+  const trainer = await tenant.trainer.findFirstOrThrow({ where: { identityId: fixture.users.trainerUser.id } });
+  const path = `/gyms/${fixture.gyms[0]!.slug}`;
+  const submit = { start: '08:15', end: '16:15', overnight: false, expectedVersion: trainer.version, requestId: randomUUID() };
+  expect((await call(`${path}/me/shift-request`, trainerToken, submit, 'PUT')).status).toBe(200);
+  expect(await (await call(`${path}/me/shift-request`, trainerToken, submit, 'PUT')).json()).toMatchObject({ replayed: true });
+  const view = await (await call(`${path}/me/profile`, trainerToken)).json();
+  expect(view).toMatchObject({ shiftStart: trainer.shiftStart, shiftEnd: trainer.shiftEnd,
+    pendingShift: { id: submit.requestId, start: submit.start, end: submit.end } });
+  expect(await (await call(`${path}/trainers?shift=pending`, owner)).json()).toMatchObject({
+    items: [expect.objectContaining({ id: trainer.id, hasPendingShift: true })], totalCount: 1,
+  });
+  const ownerPath = `${path}/trainers/${trainer.id}/shift`;
+  const replace = { ...submit, start: '09:00', end: '17:00', requestId: randomUUID(), expectedVersion: view.version };
+  expect((await call(`${path}/me/shift-request`, trainerToken, replace, 'PUT')).status).toBe(200);
+  const approve = { requestId: submit.requestId, expectedVersion: view.version + 1, decision: 'APPROVE' };
+  expect((await call(ownerPath, owner, approve, 'PUT')).status).toBe(409);
+  approve.requestId = replace.requestId;
+  expect((await call(ownerPath, trainerToken, approve, 'PUT')).status).toBe(403);
+  expect((await call(ownerPath, otherOwner, approve, 'PUT')).status).toBe(403);
+  expect((await call(ownerPath, owner, approve, 'PUT')).status).toBe(200);
+  expect((await call(ownerPath, owner, approve, 'PUT')).status).toBe(200);
+  expect(await (await call(`${path}/me/profile`, trainerToken)).json()).toMatchObject({
+    shiftStart: '09:00', shiftEnd: '17:00', pendingShift: null, version: view.version + 2,
+  });
+  const decline = { ...submit, requestId: randomUUID(), expectedVersion: view.version + 2 };
+  expect((await call(`${path}/me/shift-request`, trainerToken, decline, 'PUT')).status).toBe(200);
+  expect((await call(ownerPath, owner, { requestId: decline.requestId, expectedVersion: view.version + 3, decision: 'DECLINE' }, 'PUT')).status).toBe(200);
+  expect(await (await call(`${path}/me/profile`, trainerToken)).json()).toMatchObject({
+    shiftStart: '09:00', shiftEnd: '17:00', pendingShift: null,
+  });
+});
+
+it('allows profile edits and serves normalized photos only in the allowed gym context', async () => {
+  vi.stubEnv('GYMOS_COACHING_DATA_KEY', randomBytes(32).toString('hex'));
+  const trainerToken = await bearer(fixture.users.trainerUser.id);
+  const memberToken = await bearer(fixture.users.memberUser.id);
+  const ownerToken = await bearer(fixture.users.ownerA.id);
+  const tenant = fixture.tenants[0]!;
+  const path = `/gyms/${fixture.gyms[0]!.slug}/me`;
+  const member = await (await call(`${path}/profile`, memberToken)).json();
+  const notes = 'Synthetic member health note';
+  const edit = await fetch(`${base}${path}/profile`, {
+    method: 'PATCH',
+    headers: { authorization: `Bearer ${memberToken}`, 'content-type': 'application/json', 'idempotency-key': randomUUID() },
+    body: JSON.stringify({ expectedVersion: member.version, phone: member.phone, emergencyContact: member.emergencyContact, healthNotes: notes }),
+  });
+  expect(edit.status).toBe(200);
+  expect(await (await call(`${path}/profile`, memberToken)).json()).toMatchObject({ healthNotes: notes });
+  const latest = await tenant.commandReceipt.findFirstOrThrow({ where: { commandKind: 'UPDATE_SELF_MEMBER_PROFILE', resourceId: member.memberId } });
+  expect(JSON.stringify(latest)).not.toContain(notes);
+
+  const trainer = await (await call(`${path}/profile`, trainerToken)).json();
+  const { default: sharp } = await import('sharp');
+  const png = await sharp({ create: { width: 4, height: 4, channels: 3, background: '#008875' } }).png().toBuffer();
+  const upload = (accessToken: string, version: number, data: Buffer, requestKey = randomUUID()) => {
+    const form = new FormData();
+    form.set('photo', new Blob([new Uint8Array(data)], { type: 'image/png' }), 'photo.png');
+    return fetch(`${base}${path}/profile/photo?version=${version}`, {
+      method: 'PUT', headers: { authorization: `Bearer ${accessToken}`, 'idempotency-key': requestKey }, body: form,
+    });
+  };
+  const key = randomUUID();
+  expect((await upload(trainerToken, trainer.version, Buffer.from('<svg/>'))).status).toBe(422);
+  expect((await upload(trainerToken, trainer.version, png, key)).status).toBe(200);
+  expect(await (await upload(trainerToken, trainer.version, png, key)).json()).toMatchObject({ replayed: true });
+  expect((await upload(memberToken, member.version + 1, png)).status).toBe(200);
+  expect(await (await call(`${path}/profile`, trainerToken)).json()).toMatchObject({ hasPhoto: true });
+  expect((await call(`${path}/profile/photo`, ownerToken)).status).toBe(403);
+  const read = await call(`${path}/trainers/${trainer.trainerId}/photo`, memberToken);
+  expect(read.status).toBe(200);
+  expect(read.headers.get('content-type')).toBe('image/webp');
+  expect(read.headers.get('cache-control')).toContain('no-store');
+  expect((await sharp(Buffer.from(await read.arrayBuffer())).metadata()).format).toBe('webp');
+  expect((await call(`/gyms/${fixture.gyms[1]!.slug}/me/trainers/${trainer.trainerId}/photo`, memberToken)).status).not.toBe(200);
+  const encrypted = await tenant.profilePhoto.findUniqueOrThrow({ where: { trainerId: trainer.trainerId } });
+  expect(encrypted.encryptedData).toMatch(/^v1\./);
+  const removed = await fetch(`${base}${path}/profile/photo?version=${trainer.version + 1}`, {
+    method: 'DELETE', headers: { authorization: `Bearer ${trainerToken}`, 'idempotency-key': randomUUID() },
+  });
+  expect(removed.status).toBe(200);
+  expect((await call(`${path}/trainers/${trainer.trainerId}/photo`, memberToken)).status).toBe(404);
 });
