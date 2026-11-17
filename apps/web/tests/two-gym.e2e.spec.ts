@@ -959,7 +959,7 @@ test('trainer roster/profile and member directory are usable at mobile width wit
 
   await trainerProfileLink.click();
   await expect(page.getByRole('heading', { name: 'Trainer Alpha', level: 1 })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Approve recurring shift' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Approve shift', exact: true })).toBeVisible();
   await expect(page.locator('.trainer-profile-session-metrics')).toContainText(/Related clients\s*1/);
   const completed = await tenant.pTSession.count({ where: { trainerId, state: 'COMPLETED' } });
   const latest = await tenant.pTSession.findMany({ where: { trainerId }, orderBy: [{ scheduledStartAt: 'desc' }, { id: 'desc' }], take: 10 });
