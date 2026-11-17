@@ -41,20 +41,26 @@ export function SessionLifecycle() {
     const check = async (foreground = false) => {
       if (!privatePage || disposed || exiting || navigating) return;
       try {
-        const supportId = document.querySelector<HTMLElement>('[data-support-session]')?.dataset.supportSession;
+        const shell = document.querySelector<HTMLElement>('[data-session-identity]')?.dataset;
+        const expectedIdentity = shell?.sessionIdentity;
+        const supportId = shell?.supportSession;
         const parts = pathname.split('/');
         const response = await fetch(`/api/session${supportId ? `?support=${encodeURIComponent(parts[2] ?? '')}` : ''}`, { cache: 'no-store', signal: controller.signal });
         if (disposed || exiting || navigating) return;
         if (response.status === 401) {
           if (document.visibilityState === 'hidden') return;
-          if (foreground && await renew(true)) return void check(false);
+          // An anonymous navigation already goes through server-side renewal.
+          if (foreground && (expectedIdentity || identity) && await renew(true)) return void check(false);
           return leave('/login');
         }
         if (response.status === 403 && pathname !== '/change-password') return leave('/change-password');
         if (!response.ok) return;
         const session = await response.json() as { identityId: string; expiresAt: number; refreshExpiresAt: number; gyms: { slug: string; role: string }[]; support?: { id: string; slug: string; expiresAt: number } | null };
         if (disposed || exiting || navigating) return;
-        const expectedIdentity = document.querySelector<HTMLElement>('[data-session-identity]')?.dataset.sessionIdentity;
+        // A streamed shell can render while the status request is in flight.
+        // Check the new context before acting on a response for the old one.
+        const rendered = document.querySelector<HTMLElement>('[data-session-identity]')?.dataset;
+        if (rendered?.sessionIdentity !== expectedIdentity || rendered?.supportSession !== supportId) return void check(foreground);
         if ((expectedIdentity && expectedIdentity !== session.identityId) || (identity && identity !== session.identityId)) return leave('/');
         identity = session.identityId;
         if (supportId && (session.support?.id !== supportId || session.support.slug !== parts[2])) return leave('/admin');

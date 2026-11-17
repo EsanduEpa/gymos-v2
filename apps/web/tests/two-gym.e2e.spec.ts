@@ -78,10 +78,12 @@ async function login(page: Page, email: string): Promise<void> {
   await loginWithPassword(page, email, fixture.password);
 }
 
-async function waitForSessionLifecycle(page: Page): Promise<void> {
+async function waitForSessionLifecycle(page: Page, supportSlug?: string): Promise<void> {
   // Server-rendered shell text can be visible before the client listeners mount.
   // A real focus-triggered/initial BFF response proves the listener is active.
-  const ready=page.waitForResponse(response=>response.url()===`${webBase}/api/session`&&response.request().method()==='GET'&&response.ok());
+  const url = new URL('/api/session', webBase);
+  if (supportSlug) url.searchParams.set('support', supportSlug);
+  const ready = page.waitForResponse(response => response.url() === url.href && response.request().method() === 'GET' && response.ok());
   await page.bringToFront();
   await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
   await ready;
@@ -1506,11 +1508,31 @@ test('platform registry supports audited read-only gym selection, switching, exi
   const reason=page.getByRole('textbox',{name:/^Support reason/});await reason.fill('Synthetic owner-summary diagnosis');
   await page.getByRole('button',{name:'Enter support',exact:true}).click();
   await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/owner$`));
-  // The server action can change the URL before the streamed owner shell has
-  // rendered its selected gym. Read support context from a fresh document.
-  await page.goto('about:blank');
-  await page.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/owner`);
-  await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/owner$`));
+  await expect(page.locator('[data-support-session] .support-banner')).toContainText('Viewing Test Gym Alpha');
+  await page.reload();
+  await expect(page.locator('[data-support-session] .support-banner')).toContainText('Viewing Test Gym Alpha');
+  const alphaSlug = fixture.gyms[0].slug;
+  await waitForSessionLifecycle(page, alphaSlug);
+  // Recreate the streamed-shell race by restoring its markers while an
+  // unscoped session request is in flight. The browser must check again.
+  const shell = page.locator('.application-shell');
+  const markers = await shell.evaluate(element => ({
+    identity: element.getAttribute('data-session-identity')!, support: element.getAttribute('data-support-session')!,
+  }));
+  await page.route(`${webBase}/api/session`, async route => {
+    await shell.evaluate((element, saved) => {
+      element.setAttribute('data-session-identity', saved.identity);
+      element.setAttribute('data-support-session', saved.support);
+    }, markers);
+    await route.continue();
+  }, { times: 1 });
+  const rechecked = page.waitForResponse(`${webBase}/api/session?support=${alphaSlug}`, { timeout: 5_000 });
+  await shell.evaluate(element => {
+    element.removeAttribute('data-session-identity');
+    element.removeAttribute('data-support-session');
+    window.dispatchEvent(new Event('focus'));
+  });
+  expect((await rechecked).ok()).toBe(true);
   await expect(page.locator('[data-support-session] .support-banner')).toContainText('Viewing Test Gym Alpha');
   await expect(page.getByRole('main').getByRole('heading',{name:'Test Gym Alpha',exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'Add member'})).toHaveCount(0);
@@ -1530,12 +1552,6 @@ test('platform registry supports audited read-only gym selection, switching, exi
   await beta.getByRole('button',{name:'Open support'}).click();
   await page.getByRole('textbox',{name:/^Support reason/}).fill('Synthetic second-gym diagnosis');
   await page.getByRole('button',{name:'Enter support',exact:true}).click();
-  await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[1].slug}/owner$`));
-  // A support-context broadcast can redirect an older Alpha document while
-  // the Beta navigation is still streaming. Read the new context from a fresh
-  // document so no stale shell state can satisfy the Beta assertions.
-  await page.goto('about:blank');
-  await page.goto(`${webBase}/gyms/${fixture.gyms[1].slug}/owner`);
   await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[1].slug}/owner$`));
   await expect(page.locator('[data-support-session] .support-banner')).toContainText('Viewing Test Gym Beta');
   await expect(page.getByRole('main').getByRole('heading',{name:'Test Gym Beta',exact:true})).toBeVisible();
@@ -1631,11 +1647,14 @@ test('logout clears the browser even when API revocation is unavailable', async 
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(page).toHaveURL(/\/login\?error=logout-uncertain(?:&|$)/);
   await expect(page.locator('.ui-feedback[role="alert"]')).toContainText('server could not confirm session revocation');
-  expect((await page.context().cookies()).some(item => item.name === 'gymos_access_token')).toBe(false);
+  const cookieNames = (await page.context().cookies()).map(cookie => cookie.name);
+  expect(cookieNames).not.toContain('gymos_access_token');
+  expect(cookieNames).not.toContain('gymos_refresh_token');
   expect((await fixture.master.user.findUniqueOrThrow({ where: { id: fixture.users.ownerB.id } })).authVersion).toBe(before);
   await page.screenshot({ path: join(webDirectory, 'test-results/migration-evidence/GYMOS-MIG-020/backend-unavailable.png'), animations: 'disabled' });
   await page.goto(`${webBase}/gyms/${fixture.gyms[1].slug}/owner`);
   await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
 });
 
 test('browser recovers an unpublished tenant commit after Master activation fails without duplicate effects', async ({ page, browser, request }) => {
