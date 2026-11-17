@@ -1,0 +1,14 @@
+diff --git a/lib/parse.js b/lib/parse.js
+index caa2b86aa5a567df33cef4bda3c7a97794f439f8..d7b4272d5ed03b76ddfccdec872216e71fa22367 100644
+--- a/lib/parse.js
++++ b/lib/parse.js
+@@ -313,7 +313,8 @@ const analyzeRepeatedExtglob = (body, options) => {
+     }
+   }
+ 
+-  return { risky: false };
++  // Prevent nested wildcard quantifiers in repeated extglobs (CVE-2026-112366).
++  return { risky: branches.some(branch => branch.includes('*')) };
+ };
+ 
+ /**
