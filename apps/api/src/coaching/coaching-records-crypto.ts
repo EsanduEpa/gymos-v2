@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHmac, randomBytes } from 'node:crypto';
 import { ServiceUnavailableException } from '@nestjs/common';
 import type { z } from 'zod';
 
@@ -6,6 +6,10 @@ function key() {
   const encoded = process.env.GYMOS_COACHING_DATA_KEY;
   if (!encoded || !/^[a-f0-9]{64}$/i.test(encoded)) throw new ServiceUnavailableException('Coaching records are temporarily unavailable');
   return Buffer.from(encoded, 'hex');
+}
+
+export function signCoachingLink(fields: string[]) {
+  return createHmac('sha256', key()).update(JSON.stringify(['coaching-link-v1', ...fields])).digest('hex');
 }
 
 export function sealCoachingRecord(value: unknown, binding: string[]) {

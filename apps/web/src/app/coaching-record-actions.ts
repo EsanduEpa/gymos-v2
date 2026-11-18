@@ -22,18 +22,30 @@ async function save(path: string, method: 'POST' | 'PATCH', body: unknown) {
   return response;
 }
 
-export async function saveBodyReading(slug: string, _previous: ActionResult, form: FormData): Promise<ActionResult> {
+export async function saveBodyReading(slug: string, memberId: string | null, _previous: ActionResult, form: FormData): Promise<ActionResult> {
   const field = (name: string) => String(form.get(name) ?? '').trim() || null;
   const input = bodyMeasurementInputSchema.safeParse({
-    measuredOn: field('measuredOn'), weightKg: field('weightKg'), heightCm: field('heightCm'), bodyFatPct: field('bodyFatPct'),
+    measuredOn: field('measuredOn'),
+    weightKg: field('weightKg'),
+    heightCm: field('heightCm'),
+    bodyFatPct: field('bodyFatPct'),
+    chestCm: field('chestCm'),
+    waistCm: field('waistCm'),
+    armCm: field('armCm'),
   });
   if (!validSlug(slug) || !input.success) return { error: 'Enter a date and at least one measurement within the shown range.' };
+  if (memberId !== null && !validMemberId(memberId)) return { error: 'This client is unavailable to your trainer account.' };
   const base = `/gyms/${encodeURIComponent(slug)}`;
-  const response = await save(`${base}/me/progress/measurements`, 'POST', input.data);
+  const client = memberId === null ? null : encodeURIComponent(memberId);
+  const path = client === null ? `${base}/me/progress` : `${base}/me/clients/${client}/progress`;
+  const response = await save(`${path}/measurements`, 'POST', input.data);
   if (response.status === 422) return { error: 'Use today’s date or an earlier date for the measurement.' };
-  if (response.status === 403 || response.status === 404) return { error: 'This account cannot save progress measurements.' };
+  if (response.status === 403 || response.status === 404) {
+    return { error: client === null ? 'This account cannot save progress measurements.' : 'This client is unavailable to your trainer account.' };
+  }
   if (!response.ok) return { error: 'The measurement could not be saved. Try again.' };
   revalidatePath(`${base}/member/progress`);
+  if (client !== null) revalidatePath(`${base}/trainer/clients/${client}/progress`);
   return { success: 'Measurement saved.' };
 }
 

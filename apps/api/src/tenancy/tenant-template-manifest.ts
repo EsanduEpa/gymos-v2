@@ -365,7 +365,7 @@ const TENANT_TEMPLATE_V17: TenantTemplateManifest = Object.freeze({
     columns: { ...TENANT_TEMPLATE_V16.postconditions.columns, MemberJournalEntry: ['memberId', 'kind', 'entryKey', 'recordedOn', 'encryptedData', 'version'] },
   },
 });
-export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
+const TENANT_TEMPLATE_V18: TenantTemplateManifest = Object.freeze({
   ...TENANT_TEMPLATE_V17,
   version: 'tenant-2026-11-16.4',
   migrations: [...TENANT_TEMPLATE_V17.migrations, { name: '20261116130000_profile_photos_and_shift_requests', checksum: 'b702adaaa2577b554d79f5954c9917037c206b3fbc98c60634550bcfd634856c' }],
@@ -383,7 +383,69 @@ export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
     },
   },
 });
-export const TENANT_MANIFESTS: readonly TenantTemplateManifest[] = [TENANT_TEMPLATE_V1, TENANT_TEMPLATE_V2, TENANT_TEMPLATE_V3, TENANT_TEMPLATE_V4, TENANT_TEMPLATE_V5, TENANT_TEMPLATE_V6, TENANT_TEMPLATE_V7, TENANT_TEMPLATE_V8, TENANT_TEMPLATE_V9, TENANT_TEMPLATE_V10, TENANT_TEMPLATE_V11, TENANT_TEMPLATE_V12, TENANT_TEMPLATE_V13, TENANT_TEMPLATE_V14, TENANT_TEMPLATE_V15, TENANT_TEMPLATE_V16, TENANT_TEMPLATE_V17, TENANT_TEMPLATE_MANIFEST];
+const TENANT_TEMPLATE_V19: TenantTemplateManifest = Object.freeze({
+  ...TENANT_TEMPLATE_V18,
+  version: 'tenant-2026-11-18.1',
+  migrations: [...TENANT_TEMPLATE_V18.migrations, { name: '20261118121000_member_progress_photos', checksum: 'd4869c3e42a3751e26c96d6561c7b67d42d75660bd3474c82cfe3c4054d41168' }],
+  postconditions: {
+    ...TENANT_TEMPLATE_V18.postconditions,
+    tables: [...TENANT_TEMPLATE_V18.postconditions.tables, 'MemberProgressPhoto'],
+    indexes: [...TENANT_TEMPLATE_V18.postconditions.indexes, 'MemberProgressPhoto_pkey', 'MemberProgressPhoto_timeline_idx'],
+    constraints: [...TENANT_TEMPLATE_V18.postconditions.constraints, 'MemberProgressPhoto_pkey', 'MemberProgressPhoto_memberId_fkey'],
+    columns: {
+      ...TENANT_TEMPLATE_V18.postconditions.columns,
+      MemberProgressPhoto: ['id', 'memberId', 'takenOn', 'uploadedAt', 'encryptedData'],
+    },
+  },
+});
+const TENANT_TEMPLATE_V20: TenantTemplateManifest = Object.freeze({
+  ...TENANT_TEMPLATE_V19,
+  version: 'tenant-2026-11-18.2',
+  migrations: [...TENANT_TEMPLATE_V19.migrations, { name: '20261118122000_membership_pt_allowance', checksum: '531c79c68de2feb0ce10724e4f377d5b76174b4b49b903508e5322793d810766' }],
+  postconditions: {
+    ...TENANT_TEMPLATE_V19.postconditions,
+    indexes: [...TENANT_TEMPLATE_V19.postconditions.indexes, 'SessionPack_membershipTermId_key'],
+    constraints: [...TENANT_TEMPLATE_V19.postconditions.constraints, 'MembershipPlan_includedPtCredits_check',
+      'MembershipTerm_includedPtCredits_check', 'SessionPack_membershipTermId_fkey', 'SessionPack_membership_allowance_value_check'],
+    columns: {
+      ...TENANT_TEMPLATE_V19.postconditions.columns,
+      MembershipPlan: [...TENANT_TEMPLATE_V19.postconditions.columns.MembershipPlan, 'includedPtCredits'],
+      MembershipTerm: [...TENANT_TEMPLATE_V19.postconditions.columns.MembershipTerm, 'includedPtCredits'],
+      SessionPack: [...TENANT_TEMPLATE_V19.postconditions.columns.SessionPack, 'membershipTermId'],
+    },
+  },
+});
+const TENANT_TEMPLATE_V21: TenantTemplateManifest = Object.freeze({
+  ...TENANT_TEMPLATE_V20,
+  version: 'tenant-2026-11-18.3',
+  migrations: [...TENANT_TEMPLATE_V20.migrations, { name: '20261118123000_member_payment_orders', checksum: '7d92d31cbefebc3e951b891fffc09e490bce62dbc3de7f7a1a61de069ae63c70' }],
+  postconditions: {
+    ...TENANT_TEMPLATE_V20.postconditions,
+    types: [...TENANT_TEMPLATE_V20.postconditions.types, 'MemberPaymentKind', 'MemberPaymentOrderStatus', 'PtPackOfferStatus'],
+    tables: [...TENANT_TEMPLATE_V20.postconditions.tables, 'MemberPaymentOrder', 'PtPackOffer'],
+    indexes: [...TENANT_TEMPLATE_V20.postconditions.indexes, 'PtPackOffer_pkey', 'MemberPaymentOrder_pkey', 'MemberPaymentOrder_identityId_idempotencyKey_key',
+      'MemberPaymentOrder_planId_idx', 'MemberPaymentOrder_offerId_idx', 'MemberPaymentOrder_memberId_createdAt_id_idx',
+      'MemberPaymentOrder_termId_key', 'MemberPaymentOrder_packId_key'],
+    constraints: [...TENANT_TEMPLATE_V20.postconditions.constraints, 'PtPackOffer_pkey', 'PtPackOffer_terms_check',
+      'MemberPaymentOrder_pkey', 'MemberPaymentOrder_memberId_fkey', 'MemberPaymentOrder_planId_fkey', 'MemberPaymentOrder_offerId_fkey',
+      'MemberPaymentOrder_termId_fkey', 'MemberPaymentOrder_packId_fkey', 'MemberPaymentOrder_terms_check',
+      'MemberPaymentOrder_kind_check', 'MemberPaymentOrder_confirmation_check'],
+    triggers: [...TENANT_TEMPLATE_V20.postconditions.triggers, 'MemberPaymentOrder_immutable_intent'],
+    columns: {
+      ...TENANT_TEMPLATE_V20.postconditions.columns,
+      PtPackOffer: ['id', 'name', 'credits', 'price', 'currency', 'validityDays', 'status', 'version', 'createdAt'],
+      MemberPaymentOrder: ['id', 'memberId', 'identityId', 'enrollmentOperationId', 'idempotencyKey', 'kind', 'planId', 'offerId',
+        'itemName', 'durationDays', 'credits', 'amount', 'currency', 'configurationVersion', 'timeZone', 'merchantId', 'status',
+        'createdAt', 'expiresAt', 'confirmedAt', 'termId', 'packId'],
+    },
+  },
+});
+export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
+  ...TENANT_TEMPLATE_V21,
+  version: 'tenant-2026-11-18.4',
+  migrations: [...TENANT_TEMPLATE_V21.migrations, { name: '20261118124000_owner_subscription_notice', checksum: '99e6f8c3f06b140421b1e3fc3b34ee59f4ecb24fea6fa2eb7e46bb7f1e9d29fb' }],
+});
+export const TENANT_MANIFESTS: readonly TenantTemplateManifest[] = [TENANT_TEMPLATE_V1, TENANT_TEMPLATE_V2, TENANT_TEMPLATE_V3, TENANT_TEMPLATE_V4, TENANT_TEMPLATE_V5, TENANT_TEMPLATE_V6, TENANT_TEMPLATE_V7, TENANT_TEMPLATE_V8, TENANT_TEMPLATE_V9, TENANT_TEMPLATE_V10, TENANT_TEMPLATE_V11, TENANT_TEMPLATE_V12, TENANT_TEMPLATE_V13, TENANT_TEMPLATE_V14, TENANT_TEMPLATE_V15, TENANT_TEMPLATE_V16, TENANT_TEMPLATE_V17, TENANT_TEMPLATE_V18, TENANT_TEMPLATE_V19, TENANT_TEMPLATE_V20, TENANT_TEMPLATE_V21, TENANT_TEMPLATE_MANIFEST];
 export function reviewedTenantManifest(version: string | null, digest: string | null) {
   return TENANT_MANIFESTS.find(manifest => manifest.version === version && tenantManifestDigest(manifest) === digest);
 }

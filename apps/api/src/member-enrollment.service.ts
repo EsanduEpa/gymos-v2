@@ -10,6 +10,7 @@ import { OperationFoundationService, createLeaseHeartbeat } from './operations/o
 import { appendMasterAudit } from './operations/transaction-audit.js';
 import { OperationConflictError, OperationIntegrityError, protectedIntentFingerprint, type CompletedSteps } from './operations/primitives.js';
 import { addLocalDays, asDate, dateString, gymLocalDate } from './membership-rules.js';
+import { issueMembershipPtAllowance } from './membership-pt-allowance.js';
 import { CredentialService } from './identity/credential.service.js';
 import type { GymRequest } from './gym-access.guard.js';
 import { normalizeIdentityEmail } from './identity/email.js';
@@ -263,12 +264,14 @@ export class MemberEnrollmentService {
           }
           const term = await tx.membershipTerm.create({ data: { memberId: member.id, planId: plan.id, startDate: asDate(start),
             endDateExclusive: asDate(end), agreedPrice: plan.price, currency: plan.currency, planNameSnapshot: plan.name,
-            configurationVersion: configuration.version, actorIdentityId: access.identityId, idempotencyKey: operationId,
+            includedPtCredits: plan.includedPtCredits, configurationVersion: configuration.version,
+            actorIdentityId: access.identityId, idempotencyKey: operationId,
             requestDigest: receipt.requestDigest } });
+          const allowanceAudit = await issueMembershipPtAllowance(tx, term, receipt.id);
           return { result: { operationId, resourceIds: [member.id, term.id], publicationState: 'PENDING', retryable: false,
             refreshScopes: [`people:${member.id}`] }, resourceType: 'MEMBER', resourceId: member.id,
             audits: [{ actorIdentityId: access.identityId, eventCode: 'MEMBER_REGISTERED', resourceType: 'MEMBER', resourceId: member.id,
-              transition: { to: 'COMPLETE', version: member.version } }] };
+              transition: { to: 'COMPLETE', version: member.version } }, ...(allowanceAudit ? [allowanceAudit] : [])] };
         }));
         memberId = result.result.resourceIds?.[0] ?? null; termId = result.result.resourceIds?.[1] ?? null; receiptId = result.receiptId;
         if (!memberId || !termId) throw new OperationIntegrityError('Member registration receipt is incomplete');

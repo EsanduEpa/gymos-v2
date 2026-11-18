@@ -1,0 +1,45 @@
+.page {
+  width: min(calc(100% - 2rem), 44rem);
+  margin: 2rem auto;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  margin-bottom: 1rem;
+}
+
+.details {
+  display: grid;
+  grid-template-columns: minmax(6rem, 1fr) minmax(0, 2fr);
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.notice {
+  font-weight: 600;
+}
+
+@media print {
+  .page {
+    width: 100%;
+    margin: 0;
+  }
+
+  .controls {
+    display: none;
+  }
+
+  .receipt {
+    color: #000;
+    background: #fff;
+    border: 0;
+    box-shadow: none;
+  }
+}

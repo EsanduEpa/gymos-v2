@@ -63,19 +63,27 @@ import { SessionAvailabilityService } from './sessions/availability.service.js';
 import { SessionExpiryRunner } from './sessions/session-expiry-runner.js';
 import { MemberApplicationsController } from './member-applications.controller.js';
 import { MemberApplicationsService } from './member-applications.service.js';
+import { MembershipCheckoutController, PayHereMembershipNotificationController } from './payments/membership-checkout.controller.js';
+import { MembershipCheckoutService } from './payments/membership-checkout.service.js';
+import { PtPackOffersController } from './payments/pt-pack-offers.controller.js';
+import { MemberPaymentHistoryController } from './payments/member-payment-history.controller.js';
 import { AuthSessionService } from './identity/auth-session.service.js';
 import { AuthSessionGuard } from './identity/auth-session.guard.js';
+import { GymosSubscriptionController, PayHereSubscriptionNotificationController } from './payments/gymos-subscription.controller.js';
+import { GymosSubscriptionService } from './payments/gymos-subscription.service.js';
 
 @Module({
   imports: [
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
   ],
-  controllers: [SessionExceptionsController, AppController, AdminController, AuthController, AccountProfileController, GymProfileController, EmailCorrectionController, AdminEmailCorrectionController, AccountNotificationsController, CredentialsController, CredentialReissueController, AccountRecoveryController, OperatorRecoveryController, GymsController, MemberApplicationsController, TrainersController, PacksController, NotificationsController, ConfigurationController, ProvisioningOwnerController, SupportSessionController, GymLifecycleController, SessionBookingController, SessionReadsController, SessionRequestsController, MemberSessionOverviewController, CoachingController, MemberLifecycleController, SessionLifecycleController, FinanceController, DashboardController, AnalyticsController, SessionAvailabilityController],
+  controllers: [SessionExceptionsController, AppController, AdminController, AuthController, AccountProfileController, GymProfileController, EmailCorrectionController, AdminEmailCorrectionController, AccountNotificationsController, CredentialsController, CredentialReissueController, AccountRecoveryController, OperatorRecoveryController, GymsController, MemberApplicationsController, MembershipCheckoutController, PayHereMembershipNotificationController, PtPackOffersController, MemberPaymentHistoryController, TrainersController, PacksController, NotificationsController, ConfigurationController, ProvisioningOwnerController, SupportSessionController, GymLifecycleController, SessionBookingController, SessionReadsController, SessionRequestsController, MemberSessionOverviewController, CoachingController, MemberLifecycleController, SessionLifecycleController, FinanceController, DashboardController, AnalyticsController, SessionAvailabilityController, GymosSubscriptionController, PayHereSubscriptionNotificationController],
   providers: [SessionExceptionsService,
     AppService,
     DatabaseService,
     MemberEnrollmentService,
     MemberApplicationsService,
+    MembershipCheckoutService,
+    GymosSubscriptionService,
     AuthSessionService,
     AuthSessionGuard,
     TrainerEnrollmentService,

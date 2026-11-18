@@ -19,9 +19,11 @@ export const gymConfigurationSchema = z.strictObject({
   cancellationWindowMinutes: z.number().int().min(0).max(10080), lateCancelDeduction: z.boolean(),
   minimumSessionDurationMinutes: z.number().int().min(15).max(480),
 });
+const includedPtCreditsSchema = z.number().int().min(0).max(1000);
 export const membershipPlanSchema = z.strictObject({
   id: idSchema, name: z.string().min(1).max(80), description: z.string().max(500).nullable(),
   price: moneyAmountSchema, currency: z.enum(['LKR', 'USD']), durationDays: z.number().int().min(1).max(3650),
+  includedPtCredits: includedPtCreditsSchema.default(0),
   status: z.enum(['ACTIVE', 'INACTIVE']), version: versionSchema, createdAt: z.iso.datetime({ offset: true }),
 });
 export const createdMembershipPlanSchema = membershipPlanSchema.extend({ configurationVersion: versionSchema });
@@ -32,6 +34,7 @@ export const createMembershipPlanSchema = z.strictObject({
   expectedVersion: versionSchema,
   name: z.string().trim().min(1).max(80), description: z.string().trim().max(500).nullable().optional(),
   price: decimalStringSchema, durationDays: z.number().int().min(1).max(3650),
+  includedPtCredits: includedPtCreditsSchema.optional(),
 });
 export const manageMembershipPlanSchema = z.discriminatedUnion('action', [
   createMembershipPlanSchema.extend({ action: z.literal('EDIT'), expectedPlanVersion: versionSchema }),
@@ -52,11 +55,25 @@ export const updateConfigurationSchema = z.strictObject({
   minimumSessionDurationMinutes: z.number().int().min(15).max(480).optional(),
 }).refine(({ expectedVersion: _version, ...changes }) => Object.keys(changes).length > 0);
 
+const membershipTermSummarySchema = z.strictObject({
+  id: idSchema, startDate: z.iso.date(), endDateExclusive: z.iso.date(),
+  agreedPrice: decimalStringSchema, currency: z.enum(['LKR', 'USD']), planName: z.string().max(80),
+});
 export const membershipEligibilitySchema = z.strictObject({
   memberId: idSchema, status: z.enum(['ACTIVE', 'SUSPENDED', 'INACTIVE', 'EXPIRED', 'NOT_STARTED', 'NONE']),
   eligible: z.boolean(), reason: z.enum(['ACTIVE_TERM', 'MEMBER_SUSPENDED', 'MEMBER_INACTIVE', 'EXPIRED_TERM', 'FUTURE_TERM', 'NO_TERM']),
-  asOfLocalDate: z.iso.date(), term: z.strictObject({ id: idSchema, startDate: z.iso.date(), endDateExclusive: z.iso.date(),
-    agreedPrice: decimalStringSchema, currency: z.enum(['LKR', 'USD']), planName: z.string().max(80) }).nullable(), version: versionSchema,
+  asOfLocalDate: z.iso.date(), term: membershipTermSummarySchema.nullable(), version: versionSchema,
+});
+const memberOverviewTermSchema = membershipTermSummarySchema.extend({ includedPtCredits: includedPtCreditsSchema.default(0) });
+const membershipPlanOfferSchema = membershipPlanSchema.pick({ id: true, name: true, price: true,
+  currency: true, durationDays: true, includedPtCredits: true });
+export const memberMembershipOverviewSchema = z.strictObject({
+  asOfLocalDate: z.iso.date(),
+  active: z.array(memberOverviewTermSchema.extend({ renewalStartsOn: z.iso.date().nullable() })),
+  upcoming: z.array(memberOverviewTermSchema),
+  latestExpired: memberOverviewTermSchema.nullable(),
+  credits: z.strictObject({ available: versionSchema, held: versionSchema }),
+  availablePlans: z.array(membershipPlanOfferSchema).default([]),
 });
 export const renewMembershipSchema = z.strictObject({
   planId: idSchema, expectedMemberVersion: versionSchema, idempotencyKey: z.string().min(16).max(128).regex(/^[\x21-\x7e]+$/),

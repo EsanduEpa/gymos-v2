@@ -6,6 +6,14 @@ import { openCoachingRecord, sealCoachingRecord } from './coaching/coaching-reco
 export const MAX_PROFILE_PHOTO_BYTES = 768 * 1024;
 
 export async function prepareProfilePhoto(upload: Buffer) {
+  return preparePhoto(upload, 384, 'cover');
+}
+
+export async function prepareProgressPhoto(upload: Buffer) {
+  return preparePhoto(upload, 1600, 'inside');
+}
+
+async function preparePhoto(upload: Buffer, size: number, fit: 'cover' | 'inside') {
   try {
     if (!upload.length || upload.length > MAX_PROFILE_PHOTO_BYTES) throw new Error('Photo size');
     const photo = sharp(upload, { limitInputPixels: 16_000_000, failOn: 'warning' });
@@ -13,7 +21,7 @@ export async function prepareProfilePhoto(upload: Buffer) {
     if (!['jpeg', 'png', 'webp'].includes(metadata.format ?? '') || (metadata.pages ?? 1) !== 1) {
       throw new Error('Unsupported photo');
     }
-    return await photo.rotate().resize(384, 384, { fit: 'cover', withoutEnlargement: true }).webp({ quality: 80 }).toBuffer();
+    return await photo.rotate().resize(size, size, { fit, withoutEnlargement: true }).webp({ quality: 80 }).toBuffer();
   } catch {
     throw new UnprocessableEntityException('Choose a JPEG, PNG, or WebP photo under 768 KB and 16 megapixels');
   }

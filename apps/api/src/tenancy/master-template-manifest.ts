@@ -1,7 +1,7 @@
 import { contentDigest } from '../operations/primitives.js';
 // Immutable reviewed chain; schema deployment is an explicit owned runner command.
 export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
-  version: 'master-2026-11-06.11',
+  version: 'master-2026-11-18.1',
   migrations: [
     {
       name: '20261021100256_init_master',
@@ -96,6 +96,10 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       name: '20261106150000_scoped_security_events',
       checksum: 'ea906388fe35846659b8ff05ae42ea780b609c750f6eea59a846b79a91a008c9',
     },
+    {
+      name: '20261118120000_gymos_subscriptions',
+      checksum: '69a2d98fc417a93a4bf2d98a89f7c07d4fd4df920b8c8f493871e045f154e5fc',
+    },
   ],
   postconditions: {
     tables: [
@@ -109,6 +113,8 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       'IdentitySecurityEvent',
       'GymLifecycleIntent',
       'GymRegistrySummary',
+      'GymosSubscriptionOrder',
+      'GymosSubscriptionPayment',
       'MasterSchemaDeployment',
       'MasterSchemaState',
       'MemberLifecycleIntent',
@@ -216,6 +222,9 @@ export const MASTER_TEMPLATE_MANIFEST = Object.freeze({
       IdentityEmailCorrectionRequest: ['id', 'identityId', 'requestedEmail', 'state', 'resolution', 'version', 'idempotencyKey', 'requestDigest', 'submittedAt', 'resolvedAt', 'resolvedByIdentityId'],
       IdentitySecurityEventRead: ['id', 'securityEventId', 'identityId', 'readAt'],
       GymAccount: ['id', 'userId', 'gymId', 'username', 'displayName', 'passwordHash', 'status', 'mustChangePassword', 'credentialExpiresAt', 'passwordChangedAt', 'authVersion', 'version', 'createdAt', 'updatedAt'],
+      GymosSubscriptionOrder: ['id', 'gymId', 'ownerIdentityId', 'idempotencyKey', 'tier', 'amount', 'merchantId',
+        'providerSubscriptionId', 'paidThrough', 'stoppedAt', 'createdAt'],
+      GymosSubscriptionPayment: ['paymentId', 'orderId', 'verifiedAt'],
     },
   },
 } as const);

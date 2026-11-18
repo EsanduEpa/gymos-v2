@@ -16,6 +16,10 @@ const AVAILABLE_ACTION_TYPES = [
 ] as const;
 
 function invalid(message: string): never { throw new UnprocessableEntityException(message); }
+function recipientScope(access: NonNullable<GymRequest['gymAccess']>): Prisma.NotificationWhereInput {
+  return { recipientIdentityId: access.identityId,
+    ...(access.role !== 'OWNER' ? { linkKind: { not: 'OWNER_SUBSCRIPTION' } } : {}) };
+}
 function safeTransition(value: Prisma.JsonValue) {
   if (!value || Array.isArray(value) || typeof value !== 'object') return {};
   const result: { from?: string; to?: string; version?: number } = {};
@@ -38,11 +42,11 @@ export class NotificationsController {
     if (!parsed.success) invalid('Enter a valid notification limit');
     return this.tenantGate.withVerifiedTenant(access, async tenant => tenant.$transaction(async tx => {
       await tx.$executeRaw`SET TRANSACTION READ ONLY`;
-      const recipientIdentityId = access.identityId;
+      const recipient = recipientScope(access);
       const [items, unreadCount, clock] = await Promise.all([
-        tx.notification.findMany({ where: { recipientIdentityId, supersededAt: null }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: parsed.data.limit,
+        tx.notification.findMany({ where: { ...recipient, supersededAt: null }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: parsed.data.limit,
           select: { id: true, eventCode: true, title: true, message: true, linkKind: true, resourceId: true, readAt: true, createdAt: true } }),
-        tx.notification.count({ where: { recipientIdentityId, readAt: null, supersededAt: null } }),
+        tx.notification.count({ where: { ...recipient, readAt: null, supersededAt: null } }),
         tx.$queryRaw<{ asOf: Date }[]>`SELECT clock_timestamp() AS "asOf"`,
       ]);
       return notificationListSchema.parse({ items: items.map(item => ({ ...item, readAt: item.readAt?.toISOString() ?? null, createdAt: item.createdAt.toISOString() })),
@@ -70,13 +74,14 @@ export class NotificationsController {
       await tx.$executeRaw`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`;
       const [clock] = cursor ? [null] : await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
       const asOf = cursor?.asOf ?? clock!.now;
-      const where = { recipientIdentityId: access.identityId, supersededAt: null, createdAt: { lte: asOf },
+      const recipient = recipientScope(access);
+      const where = { ...recipient, supersededAt: null, createdAt: { lte: asOf },
         ...(parsed.data.filter === 'UNREAD' ? { readAt: null } : {}),
         ...(cursor ? { OR: [{ createdAt: { lt: cursor.createdAt } }, { createdAt: cursor.createdAt, id: { lt: cursor.id } }] } : {}) };
       const [rows, unreadCount] = await Promise.all([
         tx.notification.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: parsed.data.pageSize + 1,
           select: { id: true, eventCode: true, title: true, message: true, linkKind: true, resourceId: true, readAt: true, createdAt: true } }),
-        tx.notification.count({ where: { recipientIdentityId: access.identityId, readAt: null, supersededAt: null } }),
+        tx.notification.count({ where: { ...recipient, readAt: null, supersededAt: null } }),
       ]);
       const hasMore = rows.length > parsed.data.pageSize;
       const items = rows.slice(0, parsed.data.pageSize);
@@ -94,10 +99,11 @@ export class NotificationsController {
     if (!access) throw new ForbiddenException('Gym access is required');
     return this.tenantGate.withVerifiedTenant(access, async tenant => tenant.$transaction(async tx => {
       const [clock] = await tx.$queryRaw<{ asOf: Date }[]>`SELECT clock_timestamp() AS "asOf"`;
-      await tx.notification.updateMany({ where: { id: notificationId, recipientIdentityId: access.identityId, readAt: null, supersededAt: null }, data: { readAt: clock!.asOf } });
-      const owned = await tx.notification.findFirst({ where: { id: notificationId, recipientIdentityId: access.identityId }, select: { id: true } });
+      const recipient = recipientScope(access);
+      await tx.notification.updateMany({ where: { ...recipient, id: notificationId, readAt: null, supersededAt: null }, data: { readAt: clock!.asOf } });
+      const owned = await tx.notification.findFirst({ where: { ...recipient, id: notificationId }, select: { id: true } });
       if (!owned) throw new NotFoundException('Notification not found');
-      const unreadCount = await tx.notification.count({ where: { recipientIdentityId: access.identityId, readAt: null, supersededAt: null } });
+      const unreadCount = await tx.notification.count({ where: { ...recipient, readAt: null, supersededAt: null } });
       return notificationReadSchema.parse({ notificationId: owned.id, isRead: true, unreadCount, asOf: clock!.asOf.toISOString() });
     }));
   }
@@ -112,8 +118,9 @@ export class NotificationsController {
       const [clock] = await tx.$queryRaw<{ asOf: Date }[]>`SELECT clock_timestamp() AS "asOf"`;
       const through = parsed.data.through ? new Date(parsed.data.through) : clock!.asOf;
       if (through > clock!.asOf) invalid('Read-through instant cannot be in the future');
-      const changed = await tx.notification.updateMany({ where: { recipientIdentityId: access.identityId, readAt: null, supersededAt: null, createdAt: { lte: through } }, data: { readAt: clock!.asOf } });
-      const unreadCount = await tx.notification.count({ where: { recipientIdentityId: access.identityId, readAt: null, supersededAt: null } });
+      const recipient = recipientScope(access);
+      const changed = await tx.notification.updateMany({ where: { ...recipient, readAt: null, supersededAt: null, createdAt: { lte: through } }, data: { readAt: clock!.asOf } });
+      const unreadCount = await tx.notification.count({ where: { ...recipient, readAt: null, supersededAt: null } });
       return notificationReadAllSchema.parse({ changedCount: changed.count, unreadCount, asOf: clock!.asOf.toISOString(), through: through.toISOString() });
     }));
   }

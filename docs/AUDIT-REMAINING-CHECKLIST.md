@@ -18,24 +18,26 @@ The local build already covers the original registration and recovery fixes, mem
 | GymOS subscription | The Owner manages their gym's software subscription separately from member payments. Show the current tier and billing status, allow upgrades/downgrades and billing-method updates, notify the Owner of a failed payment and allow seven days to resolve it. |
 | Hosting and providers | Keep the hosted rehearsal paused. Use free test environments and synthetic data for development. |
 
-Open decisions apply to their respective tasks. These include subscription tiers/prices and post-grace restrictions, biometric hardware and access fallback, privacy permissions and retention, and provider choices for payments, notifications, storage and wearables. [Decision details](GYMOS-REQUIREMENTS-REVIEW.md#decisions-to-resolve)
+Open decisions apply to their respective tasks. The November 18 follow-up records progress privacy, membership renewal and PT allowances, PayHere Sandbox, provisional subscription tiers and the deferral of gym entry and attendance. [Decision details](GYMOS-REQUIREMENTS-REVIEW.md#local-build-decisions-from-18-november-2026)
 
 ## 2. Finish member and trainer features
 
 - [x] **2. Add reusable workout templates across members.** Chromium verified two independent assignments from one template. Editing one assignment preserved the other and the template. The coaching integration tests checked access and duplicate saves. (WRK-03)
 - [x] **3. Add goals, solo workouts and daily food logs.** Members can compare weight, strength and weekly sessions against targets, log solo exercise and save daily calories and macros. Chromium verified progress and persistence. The coaching integration tests checked privacy, encryption and stale updates. (FR-005, FR-023–024)
 - [x] **4. Complete member and trainer profiles.** Members can edit health notes and profile photos. Trainers can edit photos, biography, specialties and experience. Chromium verified profile changes and Owner shift approval. The trainer integration tests covered declining, replacing and retrying shift requests and checked that another gym cannot approve them. (FR-003, FR-034, FR-055, FR-060)
-- [ ] **5. Finish body measurements and progress reports.** Add chest, waist and arm measurements and allow assigned trainers to record dated measurements. Verify member and assigned-trainer access and agree which progress data Owners may see. (FR-008, PRG-01–02, PRG-05, RPT-06)
-- [ ] **6. Add private progress photos and comparison.** Allow authorized uploads to a dated timeline, show first/latest side by side and include the timeline in the progress report. Verify private, expiring access and the agreed deletion and retention behavior. (FR-007, PRG-03–06, RPT-06)
+- [x] **5. Finish body measurements and progress reports.** Chromium verified member and assigned-trainer entry. The coaching suite verified older encrypted records, same-date edits and access boundaries. The product owner approved access for the member and assigned trainers. (FR-008, PRG-01–02, PRG-05, RPT-06)
+- [x] **6. Add private progress photos and comparison.** Chromium verified member upload, dated history, first/latest comparison, assigned-trainer viewing, Owner denial and deletion. The coaching suite verified encrypted storage, viewer scope and one-hour expiry under the agreed synthetic retention policy. (FR-007, PRG-03–06, RPT-06)
 
 ## 3. Build payments and the GymOS subscription
 
-- [ ] **7. Complete membership plans and renewals.** Verify plans can include the agreed PT allowance and support concurrent active plans. Show term and renewal status and pack balances to members. (FR-004, FR-050)
-- [ ] **8. Add online membership and PT-pack purchases.** Show price and available plans/packs before checkout. Verify one paid transaction creates or renews one entitlement, failed payments leave entitlements unchanged, and retries or repeated callbacks never double-credit a member. (FR-018–019)
-- [ ] **9. Add payment history, methods and receipts.** Show member and authorized Owner history, issue payment confirmations and receipts, and decide the cash/bank transfer, refund and reconciliation rules. Activate paid staff-assisted enrollments only after payment is confirmed and trigger onboarding. (FR-001, FR-020, MEM-06–08)
-- [ ] **10. Build the Owner's GymOS subscription page.** Agree the tier catalogue and what happens after the grace period. Test plan changes, failed payment and recovery inside seven days on a synthetic gym. (FR-079, BR-087, UC-15)
+- [x] **7. Complete membership plans and renewals.** Integration tests verified overlapping plans, same-plan renewal dates, historical terms and exactly one PT allowance per term. Chromium verified the membership view and pack balances. (FR-004, FR-050)
+- [ ] **8. Add online membership and PT-pack purchases.** Local integration verified prices, one entitlement per confirmed synthetic order, failure and concurrent callback replay. PayHere-delivered callbacks remain to be verified against the selected Sandbox merchant. (FR-018–019)
+- [ ] **9. Add payment history, methods and receipts.** Member and authorized Owner history and printable PayHere receipts are implemented and locally verified. Paid staff-assisted activation, its onboarding trigger and external payment confirmations remain. Cash, bank transfers and refunds are deferred. (FR-001, FR-020, MEM-06–08)
+- [ ] **10. Build the Owner's GymOS subscription page.** The synthetic tests verified checkout, stop and replacement, seven-day grace, recovery and Owner notices. Real Sandbox recurring callbacks and approval of the provisional pricing and post-grace restrictions remain. (FR-079, BR-087, UC-15)
 
 ## 4. Complete gym entry and PT operations
+
+The product owner deferred items 11–12 until the entry and attendance workflow has been discussed. The PT tasks below can be scheduled independently.
 
 - [ ] **11. Build biometric enrollment and gym entry.** Confirm fingerprint/face support and device choice. Log granted and denied scans, check for a match plus active membership and suspension, prompt renewal for expired members, and alert the Owner. Verify three failed scans trigger the five-minute lockout. (FR-010, FR-012, FR-077–078)
 - [ ] **12. Add Owner access overrides and attendance.** Record manual grants/denials with actor, member, time and reason. Settle the QR/offline fallback design and checkout rules. Show personal check-in history, live occupancy, today's visits, monthly attendance and today's workout after check-in. (FR-011, FR-013, FR-058, FR-071, FR-077, BIO-05–07, WRK-04, RPT-02)

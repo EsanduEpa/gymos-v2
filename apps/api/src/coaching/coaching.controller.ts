@@ -1,8 +1,10 @@
-import { Body, Controller, ForbiddenException, Get, Headers, Param, Patch, Post, Query, Req, UnprocessableEntityException, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, Header, Headers, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, Req, UnprocessableEntityException, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { idempotencyKeySchema, mealPlanCreateSchema, mealPlanUpdateSchema, memberWorkoutPlansQuerySchema, memberWorkoutScheduleQuerySchema, trainerClientQuerySchema, workoutCompletionInputSchema, workoutPlanCreateSchema, workoutPlanUpdateSchema } from '@gymos/contracts';
-import { bodyMeasurementInputSchema, dietaryProfileUpdateSchema, progressReportQuerySchema } from '@gymos/contracts';
+import { bodyMeasurementInputSchema, dietaryProfileUpdateSchema, progressPhotoDateSchema, progressPhotoLinkQuerySchema, progressReportQuerySchema } from '@gymos/contracts';
 import { GymAccessGuard, type GymRequest } from '../gym-access.guard.js';
 import { CoachingService } from './coaching.service.js';
+import { MAX_PROFILE_PHOTO_BYTES } from '../profile-photo.js';
 
 @Controller('gyms/:slug/me')
 @UseGuards(GymAccessGuard)
@@ -24,6 +26,7 @@ export class CoachingController {
   }
 
   @Get('progress')
+  @Header('Cache-Control', 'private, no-store')
   memberProgress(@Req() request: GymRequest, @Query() query: unknown) {
     const access = request.gymAccess;
     if (!access || access.role !== 'MEMBER') throw new ForbiddenException('Member access is required');
@@ -42,12 +45,62 @@ export class CoachingController {
   }
 
   @Get('clients/:memberId/progress')
+  @Header('Cache-Control', 'private, no-store')
   trainerProgress(@Req() request: GymRequest, @Param('memberId') memberId: string, @Query() query: unknown) {
     const access = request.gymAccess;
     if (!access || access.role !== 'TRAINER') throw new ForbiddenException('Trainer access is required');
     const parsed = progressReportQuerySchema.safeParse(query);
     if (!parsed.success) throw new UnprocessableEntityException('Enter a valid report date');
     return this.coaching.trainerProgress(access, memberId, parsed.data);
+  }
+
+  @Post('clients/:memberId/progress/measurements')
+  saveClientMeasurement(@Req() request: GymRequest, @Param('memberId') memberId: string, @Body() body: unknown) {
+    const access = request.gymAccess;
+    if (!access || access.role !== 'TRAINER') throw new ForbiddenException('Trainer access is required');
+    const parsed = bodyMeasurementInputSchema.safeParse(body);
+    if (!parsed.success) throw new UnprocessableEntityException('Provide a date and at least one valid measurement');
+    return this.coaching.saveClientBodyMeasurement(access, memberId, parsed.data);
+  }
+
+  @Post('progress/photos')
+  @HttpCode(204)
+  @UseInterceptors(FileInterceptor('photo', { limits: { files: 1, fields: 1, fieldSize: 32, fileSize: MAX_PROFILE_PHOTO_BYTES } }))
+  uploadProgressPhoto(@Req() request: GymRequest, @Body('takenOn') value: unknown, @UploadedFile() file?: { buffer: Buffer }) {
+    const access = request.gymAccess;
+    if (!access || access.role !== 'MEMBER') throw new ForbiddenException('Member access is required');
+    const takenOn = progressPhotoDateSchema.safeParse(value);
+    if (!takenOn.success || !file) throw new UnprocessableEntityException('Choose a photo and enter its date');
+    return this.coaching.addProgressPhoto(access, takenOn.data, file.buffer);
+  }
+
+  @Delete('progress/photos/:photoId')
+  @HttpCode(204)
+  deleteProgressPhoto(@Req() request: GymRequest, @Param('photoId', ParseUUIDPipe) photoId: string) {
+    const access = request.gymAccess;
+    if (!access || access.role !== 'MEMBER') throw new ForbiddenException('Member access is required');
+    return this.coaching.deleteProgressPhoto(access, photoId);
+  }
+
+  @Get('progress/photos/:photoId')
+  @Header('Cache-Control', 'private, no-store')
+  memberProgressPhoto(@Req() request: GymRequest, @Param('photoId', ParseUUIDPipe) photoId: string, @Query() query: unknown) {
+    const access = request.gymAccess;
+    if (!access || access.role !== 'MEMBER') throw new ForbiddenException('Member access is required');
+    const link = progressPhotoLinkQuerySchema.safeParse(query);
+    if (!link.success) throw new UnprocessableEntityException('Use a valid progress photo link');
+    return this.coaching.memberProgressPhoto(access, photoId, link.data);
+  }
+
+  @Get('clients/:memberId/progress/photos/:photoId')
+  @Header('Cache-Control', 'private, no-store')
+  trainerProgressPhoto(@Req() request: GymRequest, @Param('memberId') memberId: string,
+    @Param('photoId', ParseUUIDPipe) photoId: string, @Query() query: unknown) {
+    const access = request.gymAccess;
+    if (!access || access.role !== 'TRAINER') throw new ForbiddenException('Trainer access is required');
+    const link = progressPhotoLinkQuerySchema.safeParse(query);
+    if (!link.success) throw new UnprocessableEntityException('Use a valid progress photo link');
+    return this.coaching.trainerProgressPhoto(access, memberId, photoId, link.data);
   }
 
   @Get('dietary-profile')

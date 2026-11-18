@@ -366,12 +366,18 @@ async function start() {
   const apiPort = 3003;
   const webPort = 3002;
   if (!await portFree(apiPort) || !await portFree(webPort)) throw new Error('Sandbox ports are occupied');
+  const payHereEnabled = process.env.GYMOS_PAYHERE_CHECKOUT_ENABLED === '1';
+  const payHereConfig = Object.fromEntries([
+    'GYMOS_PAYHERE_SANDBOX_MERCHANT_ID', 'GYMOS_PAYHERE_SANDBOX_MERCHANT_SECRET', 'GYMOS_PAYHERE_SANDBOX_API_ORIGIN',
+    'GYMOS_PAYHERE_SANDBOX_APP_ID', 'GYMOS_PAYHERE_SANDBOX_APP_SECRET',
+  ].filter(key => payHereEnabled && process.env[key]).map(key => [key, process.env[key]]));
   const apiEnv = { ...cleanEnv, PORT: String(apiPort), MASTER_DATABASE_URL: state.masterUrl, TENANT_DATABASE_URL: state.masterUrl,
     PROVISION_DATABASE_URL: state.provisionUrl, PROVISIONING_RUNNER_ENABLED: 'true', JWT_SECRET: state.jwtSecret,
+    ...payHereConfig, ...(payHereEnabled ? { GYMOS_PAYHERE_SANDBOX_WEB_ORIGIN: `http://localhost:${webPort}` } : {}),
     GYMOS_COACHING_DATA_KEY: createHash('sha256').update('gymos-manual-coaching-data\0').update(state.jwtSecret).digest('hex') };
   const api = spawn(process.execPath, ['dist/main.js'], { cwd: `${root}apps/api`, env: apiEnv, stdio: 'inherit' });
   const web = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '-H', '127.0.0.1', '-p', String(webPort)], {
-    cwd: `${root}apps/web`, env: { ...cleanEnv, NODE_ENV: 'production', GYMOS_API_URL: `http://127.0.0.1:${apiPort}`, GYMOS_WEB_ORIGIN: `http://localhost:${webPort}`, GYMOS_COOKIE_SUFFIX: '_test' }, stdio: 'inherit' });
+    cwd: `${root}apps/web`, env: { ...cleanEnv, NODE_ENV: 'production', GYMOS_API_URL: `http://127.0.0.1:${apiPort}`, GYMOS_WEB_ORIGIN: `http://localhost:${webPort}`, GYMOS_COOKIE_SUFFIX: '_test', GYMOS_PAYHERE_CHECKOUT_ENABLED: payHereEnabled ? '1' : '0' }, stdio: 'inherit' });
   const stop = () => { api.kill('SIGTERM'); web?.kill('SIGTERM'); };
   process.on('SIGINT', stop); process.on('SIGTERM', stop);
   api.on('exit', () => web?.kill('SIGTERM')); web?.on('exit', () => api.kill('SIGTERM'));

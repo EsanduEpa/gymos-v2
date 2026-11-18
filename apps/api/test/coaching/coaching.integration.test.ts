@@ -1,8 +1,11 @@
-import { ConflictException, ForbiddenException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException, ServiceUnavailableException, UnprocessableEntityException } from '@nestjs/common';
+import { bodyMeasurementInputSchema, bodyReadingSchema } from '@gymos/contracts';
 import { randomBytes, randomUUID } from 'node:crypto';
+import sharp from 'sharp';
 import { PrismaClient as TenantClient } from '../../src/generated/tenant/client.js';
 import { DatabaseService } from '../../src/database.service.js';
 import { CoachingService } from '../../src/coaching/coaching.service.js';
+import { openCoachingRecord, sealCoachingRecord, signCoachingLink } from '../../src/coaching/coaching-records-crypto.js';
 import { TenantSchemaGateService } from '../../src/tenancy/tenant-schema-gate.service.js';
 import { createDisposableEnvironment } from '../support/disposable-environment.js';
 import { seedTwoGymFixture } from '../fixtures/two-gym-fixture.js';
@@ -10,6 +13,7 @@ import { addLocalDays, asDate, gymLocalDate } from '../../src/membership-rules.j
 
 let run: Awaited<ReturnType<typeof createDisposableEnvironment>>;
 let fixture: Awaited<ReturnType<typeof seedTwoGymFixture>>;
+const progressDataKey = randomBytes(32).toString('hex');
 
 beforeAll(async () => { run = await createDisposableEnvironment(); fixture = await seedTwoGymFixture(run); }, 120_000);
 afterAll(async () => { await fixture?.close(); if (run) console.info('[coaching-owned-cleanup]', JSON.stringify(await run.cleanup())); }, 120_000);
@@ -311,7 +315,7 @@ it('preserves the meal date across reads and edits and uses the gym calendar wee
 }, 60_000);
 
 it('keeps dietary notes and progress private, stores encrypted values, and rejects stale dietary edits', async () => {
-  vi.stubEnv('GYMOS_COACHING_DATA_KEY', randomBytes(32).toString('hex'));
+  vi.stubEnv('GYMOS_COACHING_DATA_KEY', progressDataKey);
   try {
     const trainer = await contextFor(0, 'TRAINER');
     const member = await contextFor(0, 'MEMBER');
@@ -339,12 +343,39 @@ it('keeps dietary notes and progress private, stores encrypted values, and rejec
 
     const today = gymLocalDate('Asia/Colombo');
     const yesterday = addLocalDays(today, -1);
-    const reading = { measuredOn: yesterday, weightKg: '80.50', heightCm: '180', bodyFatPct: null };
-    expect(await member.service.saveBodyMeasurement(member.access, reading)).toMatchObject({ weightKg: '80.5', bmi: 24.8 });
-    expect(await member.service.saveBodyMeasurement(member.access, { ...reading, weightKg: null, heightCm: null, bodyFatPct: '21' }))
-      .toMatchObject({ weightKg: '80.5', bodyFatPct: '21' });
+    const key = { memberId, measuredOn: asDate(yesterday) };
+    const binding = ['measurement', member.gym.id, memberId, yesterday];
+    const legacyReading = { weightKg: '80.5', heightCm: '180', bodyFatPct: '21' };
+    await member.tenant.memberBodyMeasurement.create({ data: { ...key, encryptedData: sealCoachingRecord(legacyReading, binding) } });
+    const legacyReport = await member.service.memberProgress(member.access, { through: yesterday });
+    expect(legacyReport.measurements).toEqual([
+      { measuredOn: yesterday, ...legacyReading, chestCm: null, waistCm: null, armCm: null, bmi: 24.8 },
+    ]);
+
+    const emptyReading = { measuredOn: yesterday, weightKg: null, heightCm: null, bodyFatPct: null };
+    expect(bodyMeasurementInputSchema.safeParse(emptyReading).success).toBe(false);
+    for (const chestCm of ['0', '1000', '95.555']) {
+      expect(bodyMeasurementInputSchema.safeParse({ ...emptyReading, chestCm }).success).toBe(false);
+    }
+    const reading = { ...emptyReading, chestCm: '95.50', waistCm: '82.25', armCm: '32' };
+    await member.service.saveBodyMeasurement(member.access, reading);
+    await trainer.service.saveClientBodyMeasurement(trainer.access, memberId, { ...emptyReading, waistCm: '81' });
+    await expect(trainer.service.saveClientBodyMeasurement(trainer.access, other.member.id, reading)).rejects.toBeInstanceOf(NotFoundException);
+    const foreignMember = await fixture.tenants[1]!.member.findFirstOrThrow();
+    await expect(trainer.service.saveClientBodyMeasurement(trainer.access, foreignMember.id, reading)).rejects.toBeInstanceOf(NotFoundException);
+    const owner = await contextFor(0, 'OWNER');
+    await expect(owner.service.saveClientBodyMeasurement(owner.access, memberId, reading)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(owner.service.trainerProgress(owner.access, memberId, {})).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(trainer.service.saveClientBodyMeasurement(trainer.access, memberId, { ...reading, measuredOn: addLocalDays(today, 1) }))
+      .rejects.toBeInstanceOf(UnprocessableEntityException);
     const report = await member.service.memberProgress(member.access, { through: yesterday });
-    expect(report.measurements).toEqual([{ measuredOn: yesterday, weightKg: '80.5', heightCm: '180', bodyFatPct: '21', bmi: 24.8 }]);
+    const savedReading = { ...legacyReading, chestCm: '95.5', waistCm: '81', armCm: '32' };
+    expect(report.measurements).toEqual([{ measuredOn: yesterday, ...savedReading, bmi: 24.8 }]);
+    const savedMeasurement = await member.tenant.memberBodyMeasurement.findUniqueOrThrow({ where: { memberId_measuredOn: key } });
+    expect(savedMeasurement.encryptedData).toMatch(/^v1\./);
+    expect(openCoachingRecord(savedMeasurement.encryptedData, binding, bodyReadingSchema)).toEqual(savedReading);
+    await member.service.saveBodyMeasurement(member.access, { ...emptyReading, waistCm: '81' });
+    expect(await member.tenant.memberBodyMeasurement.findUniqueOrThrow({ where: { memberId_measuredOn: key } })).toEqual(savedMeasurement);
     expect((await trainer.service.trainerProgress(trainer.access, memberId, { through: yesterday })).measurements).toEqual(report.measurements);
     expect((await member.service.memberProgress(otherAccess, {})).measurements).toHaveLength(0);
     await expect(trainer.service.trainerProgress(trainer.access, other.member.id, {})).rejects.toBeInstanceOf(NotFoundException);
@@ -354,6 +385,37 @@ it('keeps dietary notes and progress private, stores encrypted values, and rejec
     await member.tenant.memberDietaryProfile.update({ where: { memberId }, data: { encryptedData: sealed.encryptedData } });
     vi.stubEnv('GYMOS_COACHING_DATA_KEY', '');
     await expect(member.service.memberProgress(member.access, {})).rejects.toBeInstanceOf(ServiceUnavailableException);
+  } finally { vi.unstubAllEnvs(); }
+}, 60_000);
+
+it('opens progress photos only for the signed viewer during the one-hour window and removes them on member deletion', async () => {
+  vi.stubEnv('GYMOS_COACHING_DATA_KEY', progressDataKey);
+  try {
+    const member = await contextFor(0, 'MEMBER');
+    const trainer = await contextFor(0, 'TRAINER');
+    const memberId = member.access.actor!.id;
+    const foreignMember = await fixture.tenants[1]!.member.findFirstOrThrow();
+    const takenOn = gymLocalDate('Asia/Colombo');
+    const image = await sharp({ create: { width: 3, height: 3, channels: 3, background: '#37655d' } }).png().toBuffer();
+    await member.service.addProgressPhoto(member.access, takenOn, image);
+    const [photo] = (await member.service.memberProgress(member.access, {})).photos;
+    expect(photo).toMatchObject({ takenOn });
+    const { id, expiresAt, signature } = photo!;
+    expect(Date.parse(expiresAt) - Date.now()).toBeGreaterThan(59 * 60_000);
+    const stored = await member.tenant.memberProgressPhoto.findUniqueOrThrow({ where: { id } });
+    expect(stored.encryptedData).toMatch(/^v1\./);
+    expect(stored.encryptedData).not.toContain(image.toString('base64'));
+    const memberLink = { expiresAt, signature };
+    expect((await member.service.memberProgressPhoto(member.access, id, memberLink)).getHeaders().type).toBe('image/webp');
+    await expect(trainer.service.trainerProgressPhoto(trainer.access, memberId, id, memberLink)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(trainer.service.trainerProgressPhoto(trainer.access, foreignMember.id, id, memberLink)).rejects.toBeInstanceOf(NotFoundException);
+    const expiredAt = new Date(Date.now() - 1000).toISOString();
+    const expiredSignature = signCoachingLink(['progress-photo', member.gym.id, member.access.identityId, 'MEMBER', memberId, id, expiredAt]);
+    await expect(member.service.memberProgressPhoto(member.access, id, { expiresAt: expiredAt, signature: expiredSignature }))
+      .rejects.toBeInstanceOf(NotFoundException);
+    await member.service.deleteProgressPhoto(member.access, id);
+    expect((await member.service.memberProgress(member.access, {})).photos).toEqual([]);
+    await expect(member.service.memberProgressPhoto(member.access, id, memberLink)).rejects.toBeInstanceOf(NotFoundException);
   } finally { vi.unstubAllEnvs(); }
 }, 60_000);
 

@@ -33,3 +33,25 @@
 
 .chartScale { display: flex; gap: .5rem; justify-content: space-between; }
 .filters { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem; }
+
+.photos { margin-block-start: 1.5rem; }
+.comparison, .timeline { display: grid; gap: .75rem; }
+.comparison { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 49rem; }
+.timeline {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 9rem), 1fr));
+  padding: 0;
+  list-style: none;
+}
+
+.photos figure { margin: 0; }
+.photos img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border-radius: .5rem;
+  background: var(--classic-surface-muted);
+}
+.photos figcaption { margin-block: .25rem .5rem; }
+.timeline summary { cursor: pointer; }

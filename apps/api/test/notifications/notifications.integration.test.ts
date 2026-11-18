@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
+import { notificationHref, notificationListSchema } from '@gymos/contracts';
 import { SignJWT } from 'jose';
 import { AppModule } from '../../src/app.module.js';
 import { DatabaseService } from '../../src/database.service.js';
@@ -8,6 +9,7 @@ import type { DatabaseService as DatabaseServiceType } from '../../src/database.
 import { appendTenantAudit } from '../../src/operations/transaction-audit.js';
 import { requestDigest } from '../../src/operations/primitives.js';
 import { appendTenantNotification, notificationSourceEventKey } from '../../src/notifications.service.js';
+import { sweepGymosSubscriptionNotice } from '../../src/payments/gymos-subscription-notices.js';
 import { recordInitialSession } from '../../src/sessions/session-commands.js';
 import { createDisposableEnvironment } from '../support/disposable-environment.js';
 import { seedTwoGymFixture } from '../fixtures/two-gym-fixture.js';
@@ -236,4 +238,64 @@ it('exposes scheduled-work health only to the selected gym owner', async () => {
   expect((await call(path, await bearer(fixture.users.memberUser.id))).status).toBe(403);
   expect((await call(path, await bearer(fixture.users.trainerUser.id))).status).toBe(403);
   expect((await call(path, await bearer(fixture.users.ownerB.id, fixture.gyms[1]!.id))).status).toBe(403);
+});
+
+it('notifies only current owners once for each verified GymOS paid-through boundary', async () => {
+  const gym = fixture.gyms[0]!;
+  const tenant = fixture.tenants[0]!;
+  const currentOwner = fixture.users.ownerA.id;
+  const originalOrderOwner = fixture.users.ownerB.id;
+  const memberId = fixture.users.memberUser.id;
+  const firstDue = new Date(Date.now() - 86_400_000);
+  const order = await fixture.master.gymosSubscriptionOrder.create({ data: {
+    id: randomUUID(), gymId: gym.id, ownerIdentityId: originalOrderOwner, idempotencyKey: randomUUID(),
+    tier: 'STARTER', amount: '3500', merchantId: '1234567', paidThrough: firstDue,
+  } });
+  const sweep = () => fixture.master.$transaction(tx => sweepGymosSubscriptionNotice(tenant, tx, gym.id));
+  const noticeCode = 'GYMOS_SUBSCRIPTION_PAYMENT_DUE';
+  const count = () => tenant.notification.count({ where: { eventCode: noticeCode } });
+
+  await sweep();
+  expect(await count()).toBe(0);
+  await fixture.master.gymosSubscriptionOrder.update({ where: { id: order.id }, data: { providerSubscriptionId: `synthetic-subscription-${run.runId}` } });
+  await sweep();
+  expect(await count()).toBe(0);
+  await fixture.master.gymosSubscriptionPayment.create({ data: { paymentId: `synthetic-billing-${run.runId}`, orderId: order.id } });
+  await fixture.master.gymosSubscriptionOrder.update({ where: { id: order.id }, data: { paidThrough: new Date(Date.now() + 86_400_000) } });
+  await sweep();
+  expect(await count()).toBe(0);
+
+  await fixture.master.gymosSubscriptionOrder.update({ where: { id: order.id }, data: { paidThrough: firstDue } });
+  await Promise.all([sweep(), sweep()]);
+  const notices = await tenant.notification.findMany({ where: { eventCode: noticeCode }, orderBy: { recipientIdentityId: 'asc' } });
+  const activeOwners = await fixture.master.gymAccess.findMany({
+    where: { gymId: gym.id, role: 'OWNER', linkStatus: 'ACTIVE' },
+    select: { userId: true },
+    orderBy: { userId: 'asc' },
+  });
+  expect(notices.map(row => row.recipientIdentityId)).toEqual(activeOwners.map(row => row.userId));
+  const notice = notices.find(row => row.recipientIdentityId === currentOwner)!;
+  expect(notice).toMatchObject({ recipientIdentityId: currentOwner, linkKind: 'OWNER_SUBSCRIPTION', resourceId: gym.id });
+  expect(await fixture.tenants[1]!.notification.count({ where: { eventCode: noticeCode } })).toBe(0);
+  const ownerPath = `/gyms/${gym.slug}/me/notifications`;
+  const ownerResponse = await call(ownerPath, await bearer(currentOwner));
+  expect(ownerResponse.status).toBe(200);
+  const ownerList = notificationListSchema.parse(await ownerResponse.json());
+  const item = ownerList.items.find(candidate => candidate.id === notice.id)!;
+  expect(notificationHref(gym.slug, item)).toBe(`/gyms/${gym.slug}/owner/subscription`);
+
+  const formerOwnerNotice = await tenant.notification.create({ data: {
+    recipientIdentityId: memberId, sourceEventKey: `billing-role-changed-${run.runId}`,
+    eventCode: notice.eventCode, title: notice.title, message: notice.message, linkKind: notice.linkKind, resourceId: notice.resourceId,
+  } });
+  const member = await bearer(memberId);
+  const memberResponse = await call(ownerPath, member);
+  expect(memberResponse.status).toBe(200);
+  expect(notificationListSchema.parse(await memberResponse.json()).items.some(candidate => candidate.id === formerOwnerNotice.id)).toBe(false);
+  expect((await call(`${ownerPath}/${formerOwnerNotice.id}/read`, member, {})).status).toBe(404);
+  expect((await tenant.notification.findUniqueOrThrow({ where: { id: formerOwnerNotice.id } })).readAt).toBeNull();
+
+  await fixture.master.gymosSubscriptionOrder.update({ where: { id: order.id }, data: { paidThrough: new Date(Date.now() - 60_000) } });
+  await sweep();
+  expect(await tenant.notification.count({ where: { eventCode: noticeCode, recipientIdentityId: currentOwner } })).toBe(2);
 });
