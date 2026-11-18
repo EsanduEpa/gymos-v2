@@ -88,6 +88,9 @@ it('limits personal reads to the authenticated actor, includes all-session month
   expect(memberPage.items).toHaveLength(2);
   expect(memberPage.items.find(item => item.id === id)).toMatchObject({ notes: 'approved session notes', fee: null, currency: null, trainerPay: null, declineReason: null });
   expect(memberPage.items.find(item => item.id === declinedId)).toMatchObject({ state: 'DECLINED', declineReason: 'Please choose another time.' });
+  const calendar = await memberCtx.service.list(memberCtx.access, { month: '2026-11', excludeDeclined: true, page: 1, pageSize: 1 });
+  expect(calendar.items.map(item => item.id)).toEqual([id]);
+  expect(calendar).toMatchObject({ totalCount: 1, totalPages: 1, summary: { monthBookings: 1 } });
   const trainerCtx = await contextFor(0, 'TRAINER');
   const trainerPage = await trainerCtx.service.list(trainerCtx.access, { month: '2026-11', page: 1, pageSize: 10 });
   expect(trainerPage.items[0]).toMatchObject({ id, fee: null, currency: 'LKR', trainerPay: '112.5' });

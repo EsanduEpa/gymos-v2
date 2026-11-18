@@ -2,9 +2,9 @@
 
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import type { GymConfigurationRead, GymThemeSettings, GymPublicProfile } from '@gymos/contracts';
-import { Button, Card, CardHeader, Feedback, Field, Tabs, type TabItem } from '@/components/ui';
-import { saveGymTheme, saveMembershipPlan, saveOperationalConfiguration, savePublicProfile } from '@/app/gym-config-actions';
+import type { GymConfigurationRead, GymThemeSettings, GymPublicProfile, MembershipPlan } from '@gymos/contracts';
+import { Button, Card, CardHeader, ConfirmDialog, Feedback, Field, Tabs, type TabItem } from '@/components/ui';
+import { manageMembershipPlan, saveGymTheme, saveMembershipPlan, saveOperationalConfiguration, savePublicProfile, saveTrainerPaySettings } from '@/app/gym-config-actions';
 
 type InitialSettings = { configuration: GymConfigurationRead; theme: GymThemeSettings; publicProfile: GymPublicProfile };
 type FeedbackState = { tone: 'success' | 'error'; message: string } | null;
@@ -21,12 +21,11 @@ function ratioToPercent(value: string) {
   return expanded.replace(/^0+(?=\d)/, '').replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
 }
 function percentToRatio(value: string) {
-  const [whole, fraction = ''] = value.trim().split('.');
-  if (!/^\d{1,3}$/.test(whole!) || !/^\d{0,4}$/.test(fraction) || Number(value) > 100) return '';
-  const digits = `${whole}${fraction}`.replace(/^0+(?=\d)/, '');
-  const point = whole!.length - 2;
-  const raw = point <= 0 ? `0.${'0'.repeat(-point)}${digits}` : `${digits.slice(0, point)}.${digits.slice(point)}`;
-  return raw.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+  const trimmed = value.trim();
+  if (!/^\d{1,3}(?:\.\d{1,4})?$/.test(trimmed) || Number(trimmed) > 100) return '';
+  const [whole, fraction = ''] = trimmed.split('.');
+  const digits = `${whole!.padStart(3, '0')}${fraction}`;
+  return `${digits[0]}.${digits.slice(1)}`.replace(/\.?0+$/, '');
 }
 function message(result: { ok: boolean; error?: string }, success: string): FeedbackState {
   return result.ok ? { tone: 'success', message: success } : { tone: 'error', message: result.error ?? 'Could not save these settings.' };
@@ -46,7 +45,10 @@ export function OwnerGymConfiguration({ slug, initial }: { slug: string; initial
   const [gymName, setGymName] = useState(initial.publicProfile.name);
   const [feedback, setFeedback] = useState<Record<string, FeedbackState>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  const [payErrors, setPayErrors] = useState<{ level1SessionPay?: string; level2SessionPay?: string; offShiftPremium?: string }>({});
   const [showAddPlan, setShowAddPlan] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<MembershipPlan | null>(null);
+  const [planConfirmation, setPlanConfirmation] = useState<{ plan: MembershipPlan; action: 'ARCHIVE' | 'DELETE' } | null>(null);
   const [planName, setPlanName] = useState('');
   const [planDescription, setPlanDescription] = useState('');
   const [planPrice, setPlanPrice] = useState('');
@@ -61,6 +63,45 @@ export function OwnerGymConfiguration({ slug, initial }: { slug: string; initial
   }
   function fields(data: FormData, keys: string[]) { return Object.fromEntries(keys.map(key => [key, String(data.get(key) ?? '')])); }
   function setConfig(value: unknown) { setConfiguration(current => ({ ...current, configuration: value as GymConfigurationRead['configuration'] })); }
+  function startPlanForm(plan: MembershipPlan | null) {
+    setEditingPlan(plan); setShowAddPlan(true);
+    setPlanName(plan?.name ?? ''); setPlanDescription(plan?.description ?? '');
+    setPlanPrice(plan?.price ?? ''); setPlanDays(String(plan?.durationDays ?? 30));
+    setFeedback(current => ({ ...current, plan: null }));
+  }
+  function applyPlanChange({ id, plan, configurationVersion }: { id: string; plan: MembershipPlan | null; configurationVersion: number }) {
+    setConfiguration(current => ({ ...current, configuration: { ...current.configuration, version: configurationVersion },
+      plans: current.plans.flatMap(previous => previous.id === id ? (plan ? [plan] : []) : [previous]) }));
+  }
+  async function submitPlan(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy) return;
+    setBusy('plan'); setFeedback(current => ({ ...current, plan: null }));
+    const values = { expectedVersion: configuration.configuration.version, name: planName, description: planDescription || null,
+      price: planPrice, durationDays: Number(planDays) };
+    if (editingPlan) {
+      const result = await manageMembershipPlan(slug, editingPlan.id, { ...values, action: 'EDIT', expectedPlanVersion: editingPlan.version });
+      if (result.ok) { applyPlanChange(result.data); setShowAddPlan(false); }
+      setFeedback(current => ({ ...current, plan: message(result, 'Membership plan updated.') }));
+    } else {
+      const result = await saveMembershipPlan(slug, values);
+      if (result.ok) {
+        const { configurationVersion, ...plan } = result.data;
+        setConfiguration(current => ({ ...current, configuration: { ...current.configuration, version: configurationVersion }, plans: [plan, ...current.plans] }));
+        setShowAddPlan(false);
+      }
+      setFeedback(current => ({ ...current, plan: message(result, 'Membership plan created.') }));
+    }
+    setBusy(null);
+  }
+  async function confirmPlanChange() {
+    if (!planConfirmation || busy) return;
+    const { action, plan } = planConfirmation;
+    setBusy('plan'); setFeedback(current => ({ ...current, plan: null }));
+    const result = await manageMembershipPlan(slug, plan.id, { action, expectedVersion: configuration.configuration.version, expectedPlanVersion: plan.version });
+    setBusy(null); setFeedback(current => ({ ...current, plan: message(result, action === 'ARCHIVE' ? 'Membership plan archived.' : 'Membership plan deleted.') }));
+    if (result.ok) { applyPlanChange(result.data); setPlanConfirmation(null); }
+  }
 
   return <div className="gym-config-workspace">
     <Tabs label="Gym configuration" items={tabs} value={activeTab} onChange={id => { setActiveTab(id); setFeedback({}); }} />
@@ -93,20 +134,26 @@ export function OwnerGymConfiguration({ slug, initial }: { slug: string; initial
       </div>
     </section> : null}
     {activeTab === 'plans' ? <section role="tabpanel" id="panel-plans" aria-labelledby="tab-plans" className="config-panel">
-      <FormCard eyebrow="MEMBERSHIP" title={`Active Membership Plans (${configuration.plans.filter(plan => plan.status === 'ACTIVE').length})`} feedback={feedback.plan}>
-        <p className="config-hint">New terms keep the price and plan name agreed when they were created. Existing terms do not change when you add another plan.</p>
-        {configuration.plans.length === 0 ? <div className="config-empty"><strong>No membership plans yet.</strong><span>Add a plan to make it available for future member enrollment.</span></div> : <div className="config-plan-list" role="list">{configuration.plans.map(plan => <article className="config-plan-row" role="listitem" key={plan.id}><div><strong>{plan.name}</strong><small>{plan.description || 'No description'}</small></div><span>{plan.durationDays} days</span><strong>{plan.currency} {plan.price}</strong><span className={`config-plan-status ${plan.status.toLowerCase()}`}>{plan.status}</span></article>)}</div>}
-        {!showAddPlan ? <Button type="button" onClick={() => setShowAddPlan(true)}>+ Add New Plan</Button> : <form className="config-form config-add-plan" onSubmit={event => submit(event, 'plan', 'Membership plan created.', () => ({ expectedVersion: configuration.configuration.version, name: planName, description: planDescription || null, price: planPrice, durationDays: Number(planDays) }), payload => saveMembershipPlan(slug, payload), value => {
-          const plan = value as GymConfigurationRead['plans'][number] & { configurationVersion: number };
-          setConfiguration(current => ({ ...current, configuration: { ...current.configuration, version: plan.configurationVersion }, plans: [plan, ...current.plans] }));
-          setPlanName(''); setPlanDescription(''); setPlanPrice(''); setPlanDays('30'); setShowAddPlan(false);
-        })}>
-          <h3>Create Membership Plan</h3>
+      <FormCard eyebrow="MEMBERSHIP" title={`Active Membership Plans (${configuration.plans.filter(plan => plan.status === 'ACTIVE').length})`} feedback={planConfirmation ? null : feedback.plan}>
+        <p className="config-hint">Plan changes apply to future memberships. Existing memberships keep their agreed price and dates.</p>
+        {configuration.plans.length === 0 ? <div className="config-empty"><strong>No membership plans yet.</strong><span>Add a plan to make it available for future member enrollment.</span></div> : <div className="config-plan-list" role="list">{configuration.plans.map(plan => <article role="listitem" key={plan.id}>
+          <div className="config-plan-row"><div><strong>{plan.name}</strong><small>{plan.description || 'No description'}</small></div><span>{plan.durationDays} days</span><strong>{plan.currency} {plan.price}</strong><span className={`config-plan-status ${plan.status.toLowerCase()}`}>{plan.status === 'ACTIVE' ? 'Active' : 'Archived'}</span></div>
+          <div className="config-actions">{plan.status === 'ACTIVE' ? <>
+            <Button type="button" variant="secondary" disabled={Boolean(busy) || showAddPlan} onClick={() => startPlanForm(plan)}>Edit plan</Button>
+            <Button type="button" variant="secondary" disabled={Boolean(busy) || showAddPlan} onClick={() => { setFeedback(current => ({ ...current, plan: null })); setPlanConfirmation({ plan, action: 'ARCHIVE' }); }}>Archive plan</Button>
+          </> : <Button type="button" variant="secondary" disabled={Boolean(busy) || showAddPlan} onClick={() => { setFeedback(current => ({ ...current, plan: null })); setPlanConfirmation({ plan, action: 'DELETE' }); }}>Delete unused plan</Button>}</div>
+        </article>)}</div>}
+        {!showAddPlan ? <Button type="button" disabled={Boolean(busy)} onClick={() => startPlanForm(null)}>+ Add New Plan</Button> : <form className="config-form config-add-plan" onSubmit={submitPlan}>
+          <h3>{editingPlan ? `Edit ${editingPlan.name}` : 'Create Membership Plan'}</h3>
           <Field label="Plan Name" name="name" value={planName} onChange={event => setPlanName(event.currentTarget.value)} maxLength={80} required />
           <label className="config-field"><span>Description</span><textarea name="description" value={planDescription} onChange={event => setPlanDescription(event.currentTarget.value)} maxLength={500} rows={3} /></label>
           <div className="config-two-cols"><Field label={`Price (${configuration.configuration.currency})`} name="price" inputMode="decimal" value={planPrice} onChange={event => setPlanPrice(event.currentTarget.value)} placeholder="0.00" required /><Field label="Duration (Days)" name="durationDays" type="number" min="1" max="3650" step="1" value={planDays} onChange={event => setPlanDays(event.currentTarget.value)} required /></div>
-          <div className="config-actions"><Button type="submit" pending={busy === 'plan'}>Create Plan</Button><Button variant="secondary" type="button" onClick={() => setShowAddPlan(false)}>Cancel</Button></div>
+          <div className="config-actions"><Button type="submit" pending={busy === 'plan'}>{editingPlan ? 'Save plan changes' : 'Create Plan'}</Button><Button variant="secondary" type="button" disabled={busy === 'plan'} onClick={() => setShowAddPlan(false)}>Cancel</Button></div>
         </form>}
+        <ConfirmDialog open={Boolean(planConfirmation)} title={planConfirmation?.action === 'DELETE' ? 'Delete unused plan?' : 'Archive membership plan?'}
+          description={planConfirmation?.action === 'DELETE' ? 'Only archived plans without membership or application history can be deleted.' : 'This plan will no longer be available for new memberships. Existing terms will keep their agreed price and dates.'}
+          confirmLabel={planConfirmation?.action === 'DELETE' ? 'Delete plan' : 'Archive plan'} destructive pending={busy === 'plan'}
+          error={planConfirmation && feedback.plan?.tone === 'error' ? feedback.plan.message : undefined} onClose={() => setPlanConfirmation(null)} onConfirm={() => void confirmPlanChange()}/>
       </FormCard>
     </section> : null}
     {activeTab === 'fees' ? <section role="tabpanel" id="panel-fees" aria-labelledby="tab-fees" className="config-panel"><FormCard eyebrow="PT SESSION RATES" title="Session Fee Card" feedback={feedback.fees}>
@@ -118,12 +165,17 @@ export function OwnerGymConfiguration({ slug, initial }: { slug: string; initial
       </form>
     </FormCard></section> : null}
     {activeTab === 'rates' ? <section role="tabpanel" id="panel-rates" aria-labelledby="tab-rates" className="config-panel"><FormCard eyebrow="TRAINER PAY RATES" title="Trainer Compensation" feedback={feedback.rates}>
-      <div className="config-notice">These settings apply to future confirmations. Completed session pay snapshots remain unchanged.</div>
-      <form className="config-form" onSubmit={event => submit(event, 'rates', 'Trainer pay rates saved.', data => ({ expectedVersion: configuration.configuration.version,
-        level1BaseRate: percentToRatio(String(data.get('level1BaseRate') ?? '')), level2BaseRate: percentToRatio(String(data.get('level2BaseRate') ?? '')),
-        offShiftPremium: percentToRatio(String(data.get('offShiftPremium') ?? '')) }), payload => saveOperationalConfiguration(slug, payload), setConfig)}>
-        <div className="config-two-cols"><Field label="Level 1 Base Rate (%)" name="level1BaseRate" inputMode="decimal" defaultValue={ratioToPercent(configuration.configuration.level1BaseRate)} required/><Field label="Level 2 Base Rate (%)" name="level2BaseRate" inputMode="decimal" defaultValue={ratioToPercent(configuration.configuration.level2BaseRate)} required/></div>
-        <Field label="Off-Shift Premium (%)" name="offShiftPremium" inputMode="decimal" defaultValue={ratioToPercent(configuration.configuration.offShiftPremium)} required hint="Added to trainer pay when the session falls outside configured shift hours."/>
+      <div className="config-notice">Set the amount a trainer earns for a completed session, including sessions booked with free packs. Trainer overrides are set on the trainer’s profile. Changes apply when a future booking is confirmed.</div>
+      <form className="config-form" noValidate onSubmit={event => submit(event, 'rates', 'Trainer pay rates saved.', data => ({ expectedVersion: configuration.configuration.version,
+        level1SessionPay: data.get('level1SessionPay'), level2SessionPay: data.get('level2SessionPay'),
+        offShiftPremium: percentToRatio(String(data.get('offShiftPremium') ?? '')) }), async payload => {
+          const result = await saveTrainerPaySettings(slug, payload);
+          setPayErrors('fieldErrors' in result ? result.fieldErrors ?? {} : {});
+          return result;
+        }, setConfig)}>
+        <div className="config-two-cols"><Field label={`Level 1 pay per session (${configuration.configuration.currency})`} name="level1SessionPay" inputMode="decimal" defaultValue={configuration.configuration.level1SessionPay} error={payErrors.level1SessionPay} required/><Field label={`Level 2 pay per session (${configuration.configuration.currency})`} name="level2SessionPay" inputMode="decimal" defaultValue={configuration.configuration.level2SessionPay} error={payErrors.level2SessionPay} required/></div>
+        <Field label="Off-shift premium (%)" name="offShiftPremium" inputMode="decimal" defaultValue={ratioToPercent(configuration.configuration.offShiftPremium)} error={payErrors.offShiftPremium} required hint="Percentage added to the agreed amount for sessions outside approved shift hours."/>
+        <p className="config-hint">Cancelled sessions and no-shows earn no trainer pay.</p>
         <Button type="submit" pending={busy === 'rates'}>Update Pay Rates</Button>
       </form>
     </FormCard></section> : null}

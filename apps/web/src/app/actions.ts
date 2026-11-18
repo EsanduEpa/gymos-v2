@@ -164,8 +164,12 @@ export async function issueRecoveryAction(slug: string, identityId: string, _pre
   if (await currentSupportCookie()) return { error: 'Exit read-only support before issuing recovery.' };
   const token = await sessionToken();
   if (!token) redirect('/login');
-  const parsed = recoveryIssueInputSchema.safeParse({ verificationMethod: formData.get('verificationMethod'), reason: formData.get('reason') });
-  if (!parsed.success) return { error: 'Choose how identity was checked and enter a brief attestation.' };
+  const parsed = recoveryIssueInputSchema.safeParse({
+    verificationMethod: formData.get('verificationMethod'),
+    reason: formData.get('reason'),
+    currentPassword: formData.get('currentPassword'),
+  });
+  if (!parsed.success) return { error: 'Choose how identity was checked, enter a brief attestation, and provide your current password.' };
   let response: Response;
   try {
     response = await fetch(apiUrl(`/gyms/${encodeURIComponent(slug)}/owner/account-recovery/${encodeURIComponent(identityId)}`), {
@@ -174,7 +178,9 @@ export async function issueRecoveryAction(slug: string, identityId: string, _pre
     });
   } catch { return { error: 'GymOS is temporarily unavailable. No recovery result could be confirmed.' }; }
   if (response.status === 401) redirect('/login?error=expired');
-  if (!response.ok) return { error: response.status === 403 ? 'This account requires an independent operator recovery process. No credential was issued.' : 'Recovery could not be confirmed. Check the eligible list and try again.' };
+  if (response.status === 403) return { error: 'No link was issued. Check your current password and confirm the account is eligible for owner recovery.' };
+  if (response.status === 429) return { error: 'Too many recovery attempts. Wait a minute and try again.' };
+  if (!response.ok) return { error: 'Recovery could not be confirmed. Check the eligible list and try again.' };
   const result = recoveryIssueResultSchema.safeParse(await response.json().catch(() => null));
   if (!result.success) return { error: 'Recovery was issued but its one-time handoff could not be confirmed. Reissue a credential before handoff.' };
   return { recovery: result.data };

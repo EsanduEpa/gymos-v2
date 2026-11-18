@@ -91,6 +91,7 @@ export class SessionReadsService {
       const actorFilter: Prisma.PTSessionWhereInput = access.role === 'OWNER'
         ? { ...(query.memberId ? { memberId: query.memberId } : {}), ...(query.trainerId ? { trainerId: query.trainerId } : {}) }
         : access.role === 'MEMBER' ? { memberId: access.actor!.id } : { trainerId: access.actor!.id };
+      const calendarStatus = query.excludeDeclined ? { state: { not: 'DECLINED' as const } } : {};
       const whereBase: Prisma.PTSessionWhereInput = {
         ...actorFilter,
         ...(query.state ? { state: query.state } : {}),
@@ -101,6 +102,7 @@ export class SessionReadsService {
         const nowRows = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
         const now = nowRows[0]!.now;
         const where: Prisma.PTSessionWhereInput = { ...whereBase, AND: [
+          calendarStatus,
           { OR: [{ state: { not: 'PENDING_CONFIRMATION' } }, { requestExpiresAt: { gt: now } }] },
           ...(query.q ? [{ OR: [{ member: { fullName: { contains: query.q, mode: 'insensitive' as const } } }, { trainer: { fullName: { contains: query.q, mode: 'insensitive' as const } } }] }] : []),
         ] };
@@ -108,7 +110,7 @@ export class SessionReadsService {
           tx.pTSession.count({ where }),
           tx.pTSession.findMany({ where, orderBy: [{ scheduledStartAt: 'asc' }, { id: 'asc' }], skip: (query.page - 1) * query.pageSize, take: query.pageSize,
             include: { member: { select: { fullName: true } }, trainer: { select: { fullName: true } }, payRecord: { select: { amount: true } }, payCorrections: { select: { amount: true } }, creditHold: { select: { state: true } } } }),
-          query.month && rangeStart && rangeEndExclusive ? tx.pTSession.count({ where: { ...actorFilter, scheduledStartAt: { gte: rangeStart, lt: rangeEndExclusive }, AND: [{ OR: [{ state: { not: 'PENDING_CONFIRMATION' } }, { requestExpiresAt: { gt: now } }] }] } }) : Promise.resolve(null),
+          query.month && rangeStart && rangeEndExclusive ? tx.pTSession.count({ where: { ...actorFilter, ...calendarStatus, scheduledStartAt: { gte: rangeStart, lt: rangeEndExclusive }, AND: [{ OR: [{ state: { not: 'PENDING_CONFIRMATION' } }, { requestExpiresAt: { gt: now } }] }] } }) : Promise.resolve(null),
           access.role === 'MEMBER' ? this.memberPackBalance(tx, access.actor!.id, timeZone, now) : Promise.resolve(null),
         ]);
         const policies = await tx.gymConfigurationVersion.findMany({ where: { gymConfigurationId: 'current', configurationVersion: { in: [...new Set(rows.map(row => row.configurationVersion))] } }, select: { configurationVersion: true, minimumSessionDurationMinutes: true } });
@@ -155,6 +157,7 @@ export class SessionReadsService {
         if (row.creditHold && ['SCHEDULED','ACTIVE','COMPLETED','MISSED','CANCELLED'].includes(row.state) && (row.state !== 'SCHEDULED' || row.scheduledEndAt <= now) && !row.adjustments?.some(adjustment => adjustment.kind === 'RESCHEDULE')) allowedKinds.push('CORRECTION');
         if (awaitingRemedy) allowedKinds.push('REMEDY');
         return sessionDetailSchema.parse({ session: projected, location: policy?.address ?? config.address, creditCost: 1,
+          confirmedTrainerPay: access.role !== 'MEMBER' && row.confirmedTrainerPay != null ? { amount: row.confirmedTrainerPay.toString(), currency: row.currency } : null,
           reservation: row.creditHold?.state ?? 'NONE', settlement: resolution?.effectiveSettlementKind ?? row.settlement?.kind ?? null, creditConsumed: resolution?.creditConsumed ?? row.settlement?.creditConsumed ?? null,
           cancellationDeadline: policy ? new Date(row.scheduledStartAt.getTime() - (row.availabilityVersion != null ? 1440 : policy.cancellationWindowMinutes) * 60_000).toISOString() : null,
           minimumCompletionMinutes: policy?.minimumSessionDurationMinutes ?? null,

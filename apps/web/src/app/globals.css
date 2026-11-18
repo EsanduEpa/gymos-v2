@@ -14,7 +14,7 @@
   --classic-surface-hover: #f9fafb;
   --classic-text: #171b28;
   --classic-text-secondary: #4a4d58;
-  --classic-text-muted: #8b8e98;
+  --classic-text-muted: #626a78;
   --classic-border: #e1e1e4;
   --classic-navigation: #171b28;
   --classic-navigation-muted: #a4a7b0;
@@ -32,11 +32,20 @@
   --muted: var(--classic-text-muted);
   --line: var(--classic-border);
   --paper: var(--classic-page);
+  --dark-page: #0a1528;
+  --dark-text: #eff7ff;
   --brand: var(--classic-primary);
 }
 
+html[data-appearance="dark"] {
+  color-scheme: dark;
+  --paper: var(--dark-page);
+  --ink: var(--dark-text);
+  --muted: #a2b3c9;
+}
+
 * { box-sizing: border-box; }
-html { min-height: 100%; }
+html { min-height: 100%; background: var(--paper); }
 body { margin: 0; min-height: 100vh; color: var(--ink); background: var(--paper); font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 button, input { font: inherit; }
 button { cursor: pointer; }
@@ -62,7 +71,7 @@ a { color: inherit; text-decoration: none; }
 .ui-field input { width: 100%; height: 47px; padding: 0 14px; border: 1px solid #ccd6d8; border-radius: 9px; outline: none; background: var(--classic-surface); color: var(--classic-text); font-size: 14px; }
 .ui-field input:focus { border-color: var(--classic-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--classic-focus) 42%, transparent); }
 .ui-field input[aria-invalid="true"] { border-color: var(--classic-danger); }
-.ui-field input::placeholder { color: #9ba9af; }
+.ui-field :is(input,textarea)::placeholder { color: var(--classic-text-muted); opacity: 1; }
 .ui-field-hint, .ui-field-error { font-size: 11px; font-weight: 400; line-height: 1.4; }
 .ui-field-hint { color: var(--classic-text-muted); }
 .ui-field-error { color: var(--classic-danger); }
@@ -187,7 +196,7 @@ a { color: inherit; text-decoration: none; }
 .stack-form label { display: grid; gap: 8px; font-size: 13px; font-weight: 700; }
 .stack-form input { width: 100%; height: 47px; padding: 0 14px; border: 1px solid #ccd6d8; border-radius: 9px; outline: none; background: #fff; color: var(--ink); font-size: 14px; }
 .stack-form input:focus { border-color: var(--classic-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--classic-focus) 42%, transparent); }
-.stack-form input::placeholder { color: #9ba9af; }
+.stack-form input::placeholder { color: var(--classic-text-muted); opacity: 1; }
 .stack-form small { color: var(--muted); font-size: 11px; font-weight: 400; }
 .stack-form .optional { color: var(--muted); font-size: 11px; font-weight: 400; }
 

@@ -55,6 +55,8 @@ Open `http://localhost:3002/login`. The test API always uses port 3003. If eithe
 
 The private, Git-ignored `.env.manual-test.json` records the container, connections, generated password and gym references. Do not share or commit it. Keep the main `.env` unchanged. `manual:start` never loads `.env`; the development API uses `.env` instead.
 
+The manual test launcher derives a stable encryption key from the private synthetic fixture state. A separate deployment that uses dietary notes, body measurements, training journals or profile photos needs its own stable `GYMOS_COACHING_DATA_KEY` on the API, encoded as 64 hexadecimal characters from 32 random bytes. Keep the key outside source control and backups of the database. Protect and retain a separate recoverable copy for authorized operators. Existing records require the same key after a restore.
+
 If Docker Desktop restarts, its random loopback database port can change. Stop the old test servers, run `pnpm manual:rebind` to verify the owned container and update only its saved port, then run `pnpm manual:start` and `pnpm manual:check` again.
 
 To check the untouched baseline while the test app runs:

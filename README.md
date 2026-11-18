@@ -51,19 +51,27 @@ Set `PROVISIONING_RUNNER_ENABLED=true` on the persistent API process to complete
 
 ## Verify the first milestone
 
-Build both applications, then run the repeatable end-to-end check:
+Prepare the workspace and run the repeatable browser suite:
 
 ```sh
+pnpm prepare:checks
 pnpm --dir apps/api build
 pnpm --dir apps/web build
-pnpm verify:milestone
+GYMOS_TEST_ALLOW_DOCKER=1 pnpm verify:milestone
 ```
 
-The check starts its own API and web servers, creates two temporary gyms through the web form, signs in as both owners, adds one member to each gym, tests distinct theme colors and cross-gym denial, verifies the physical databases, then removes all temporary data. It requires the local PostgreSQL container and `.env`.
+The browser suite starts its own API, web server, and owned PostgreSQL container with synthetic data. It verifies provisioning, role and tenant boundaries, and member, trainer, and owner workflows before removing its test resources. This command requires Docker and explicit opt-in. The runner supplies its own database connections.
 
 ## Current scope
 
-This is the first complete working slice, not a production rollout. Sessions need renewal, and gym provisioning currently runs migrations synchronously from the API. Before onboarding real gyms, add connection limits, background provisioning, recovery for failed provisioning, backups, deployment controls, and deeper automated security coverage.
+The approved V2 scope is a responsive web app with four roles: Super Admin, Gym Owner, Trainer, and Member. Gym accounts are scoped to one gym. The Super Admin manages provisioning and can enter audited, read-only support for a selected gym.
+
+- Owners review member applications, register members and trainers, manage membership plans, issue PT credit packs, and provide staff-assisted account recovery. Credential handoff goes through the person or staff member authorized for that account.
+- Membership plans and packs grant entitlements. Plan changes apply to future terms. Financial views show agreed values, operating earnings, expenses, trainer pay and payroll approvals. Payment collection, cash receipts and trainer payouts are outside V2.
+- One-to-one personal training includes availability, bookings and requests, credit reservations, cancellations and no-shows, workout and meal plans, and session history. Session history records PT activity. Physical gym entry and biometric attendance are outside V2.
+- Account recovery uses one-time links issued by authorized staff. Notifications are delivered in the app. Email delivery, Manager and Front Desk roles, AI coaching, and gamification are outside V2.
+
+See the [future capabilities backlog](docs/V2-FUTURE-CAPABILITIES.md) and the [QA release decision](docs/QA-AUDIT-PRIORITIZED-REMEDIATION-PLAN.md#13-release-decision-checklist) for remaining requirements and verification.
 
 ## Hosted demo deployment
 

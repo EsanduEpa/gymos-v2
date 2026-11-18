@@ -34,7 +34,8 @@ it('upgrades the reviewed PT05 schema, preserves legacy bookings and backfills o
     const before = (await sql.query('SELECT * FROM "PTSession" ORDER BY id')).rows;
     await run.migrate(target.name, 'tenant');
     expect((await verifyInstalledTenant(tenant)).templateVersion).toBe(TENANT_TEMPLATE_MANIFEST.version);
-    expect((await sql.query('SELECT * FROM "PTSession" ORDER BY id')).rows).toEqual(before);
+    const after = (await sql.query('SELECT * FROM "PTSession" ORDER BY id')).rows;
+    expect(after).toEqual(before.map(booking => ({ ...booking, confirmedTrainerPay: null })));
     expect(await tenant.pTSessionReminder.count({ where: { sessionId: 'legacy-future' } })).toBe(4);
     const short = await tenant.pTSessionReminder.findMany({ where: { sessionId: 'legacy-short' } });
     expect(short).toHaveLength(2); expect(short.every(job => job.kind === '1H')).toBe(true);

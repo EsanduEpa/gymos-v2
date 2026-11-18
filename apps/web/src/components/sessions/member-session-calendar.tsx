@@ -66,12 +66,15 @@ export function MemberSessionCalendar({ slug, month, today, timeZone, sessions, 
     event.currentTarget.closest('table')?.querySelector<HTMLButtonElement>(`[data-calendar-date="${next}"]`)?.focus();
   }
   const selectedSessions = byDay.get(selectedDay) ?? [];
-  const selectedWeekday = new Date(`${selectedDay}T12:00:00Z`).getUTCDay() || 7;
-  const selectedMeals = mealPlans.flatMap(plan => plan.entries.filter(entry => entry.dayOfWeek === selectedWeekday).map(entry => ({ ...entry, planName: plan.name })));
-  const mealActivityCount = (date: string) => {
+  const mealsOn = (date: string) => {
     const weekday = new Date(`${date}T12:00:00Z`).getUTCDay() || 7;
-    return mealPlans.reduce((count, plan) => count + plan.entries.filter(entry => entry.dayOfWeek === weekday).length, 0);
+    return mealPlans.flatMap(plan => {
+      const entries = plan.scheduledDate ? (plan.scheduledDate === date ? plan.entries : []) : plan.entries.filter(entry => entry.dayOfWeek === weekday);
+      return entries.map(entry => ({ ...entry, planName: plan.name }));
+    });
   };
+  const selectedMeals = mealsOn(selectedDay);
+  const mealActivityCount = (date: string) => mealsOn(date).length;
   const previous = shiftMonth(month, -1);
   const next = shiftMonth(month, 1);
   const calendarUrl = (value: string) => `/gyms/${encodeURIComponent(slug)}/member/calendar?month=${value}`;

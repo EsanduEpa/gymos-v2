@@ -14,6 +14,7 @@ export const sessionReadQuerySchema = z.strictObject({
   from: localDateSchema.optional(),
   to: localDateSchema.optional(),
   state: sessionReadStateSchema.optional(),
+  excludeDeclined: z.union([z.literal('true'), z.literal(true)]).transform(() => true).optional(),
   q: z.string().trim().min(1).max(100).optional(),
   memberId: idSchema.optional(),
   trainerId: idSchema.optional(),
@@ -72,6 +73,7 @@ export const sessionAttentionQuerySchema = z.strictObject({ page: positivePage.d
 export const sessionAttentionReasonSchema = z.enum(['SCHEDULED_PAST_END', 'ACTIVE_PAST_END', 'REQUEST_EXPIRED', 'CREDIT_REMEDY_REQUIRED']);
 export const sessionDetailSchema = z.strictObject({
   session: sessionReadItemSchema,
+  confirmedTrainerPay: z.strictObject({ amount: z.string(), currency: z.string() }).nullable().optional(),
   location: z.string().max(2000).nullable(),
   creditCost: z.literal(1),
   reservation: z.enum(['NONE', 'HELD', 'CONSUMED', 'RELEASED']),

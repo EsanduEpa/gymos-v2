@@ -4,29 +4,63 @@ import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { publicMemberApplicationInputSchema, memberApplicationInputSchema, memberApplicationDecisionSchema } from '@gymos/contracts';
 import { apiUrl, SESSION_COOKIE } from '@/lib/gymos';
+import { applicationFieldErrors, normalizeGymCode, type ApplicationFormState } from '@/lib/application-form';
 function value(data: FormData, name: string) { const item = data.get(name); return typeof item === 'string' ? item.trim() : ''; }
-export async function submitPublicApplication(slug: string, data: FormData) {
-  const parsed = publicMemberApplicationInputSchema.safeParse({ slug, fullName: value(data, 'fullName'), email: value(data, 'email'),
+function invalidApplication(issues: ReadonlyArray<{ path: PropertyKey[] }>): ApplicationFormState {
+  const fieldErrors: ApplicationFormState['fieldErrors'] = {};
+  for (const { path: [field] } of issues) {
+    if (typeof field !== 'string' || !Object.hasOwn(applicationFieldErrors, field)) continue;
+    const name = field as keyof typeof applicationFieldErrors;
+    fieldErrors[name] = applicationFieldErrors[name];
+  }
+  return { error: 'Check the highlighted fields and try again.', fieldErrors };
+}
+const unavailableGym = 'This gym is no longer accepting applications through this link. Check the code with your gym.';
+const rateLimited = 'Too many attempts. Wait a moment before trying again.';
+
+function applicationDraft(data: FormData, previous: ApplicationFormState, signedIn: boolean) {
+  const draft = {
+    fullName: value(data, 'fullName').slice(0, 120),
+    email: signedIn ? '' : value(data, 'email').slice(0, 254),
+    phone: value(data, 'phone').slice(0, 40),
+    consent: data.get('consent') === 'yes',
+  };
+  const lastAttempt = previous?.attempt;
+  const attempt = typeof lastAttempt === 'number' && Number.isSafeInteger(lastAttempt) ? lastAttempt + 1 : 1;
+  return { draft, attempt };
+}
+
+export async function submitPublicApplication(slug: string, previous: ApplicationFormState, data: FormData): Promise<ApplicationFormState> {
+  const state = applicationDraft(data, previous, false);
+  const code = normalizeGymCode(slug);
+  if (!code) return { ...state, error: unavailableGym };
+  const parsed = publicMemberApplicationInputSchema.safeParse({ slug: code, fullName: value(data, 'fullName'), email: value(data, 'email'),
     phone: value(data, 'phone'), password: data.get('password'), consent: data.get('consent') === 'yes' });
-  if (!parsed.success) redirect(`/apply/${encodeURIComponent(slug)}?error=invalid`);
+  if (!parsed.success) return { ...state, ...invalidApplication(parsed.error.issues) };
+  const unavailable = 'We couldn’t confirm your application. Wait a moment and try again.';
   let response: Response;
   try { response = await fetch(apiUrl('/gyms/applications'), { method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(parsed.data), cache: 'no-store' }); } catch { redirect(`/apply/${encodeURIComponent(slug)}?error=unavailable`); }
-  if (response.status === 429) redirect(`/apply/${encodeURIComponent(slug)}?error=rate`);
-  if (!response.ok) redirect(`/apply/${encodeURIComponent(slug)}?error=unavailable`);
+    body: JSON.stringify(parsed.data), cache: 'no-store' }); } catch { return { ...state, error: unavailable }; }
+  if (response.status === 429) return { ...state, error: rateLimited };
+  if (response.status === 404) return { ...state, error: unavailableGym };
+  if (!response.ok) return { ...state, error: unavailable };
   redirect('/login?application=1');
 }
-export async function submitAuthenticatedApplication(slug: string, data: FormData) {
+export async function submitAuthenticatedApplication(slug: string, previous: ApplicationFormState, data: FormData): Promise<ApplicationFormState> {
+  const state = applicationDraft(data, previous, true);
   const parsed = memberApplicationInputSchema.safeParse({ fullName: value(data, 'fullName'), phone: value(data, 'phone'), consent: data.get('consent') === 'yes' });
-  if (!parsed.success) redirect(`/gyms/${encodeURIComponent(slug)}/apply?error=invalid`);
+  if (!parsed.success) return { ...state, ...invalidApplication(parsed.error.issues) };
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) redirect('/login');
+  const unavailable = 'We couldn’t confirm your application. Check your application status before trying again.';
   let response: Response;
   try { response = await fetch(apiUrl(`/gyms/${encodeURIComponent(slug)}/me/applications`), { method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify(parsed.data), cache: 'no-store' }); }
-  catch { redirect(`/gyms/${encodeURIComponent(slug)}/apply?error=unavailable`); }
+  catch { return { ...state, error: unavailable }; }
   if (response.status === 401) redirect('/login?error=expired');
-  if (!response.ok) redirect(`/gyms/${encodeURIComponent(slug)}/apply?error=unavailable`);
+  if (response.status === 429) return { ...state, error: rateLimited };
+  if (response.status === 404) return { ...state, error: unavailableGym };
+  if (!response.ok) return { ...state, error: unavailable };
   revalidatePath('/applications');
   redirect('/applications?submitted=1');
 }

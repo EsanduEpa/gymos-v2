@@ -78,10 +78,12 @@ async function login(page: Page, email: string): Promise<void> {
   await loginWithPassword(page, email, fixture.password);
 }
 
-async function waitForSessionLifecycle(page: Page): Promise<void> {
+async function waitForSessionLifecycle(page: Page, supportSlug?: string): Promise<void> {
   // Server-rendered shell text can be visible before the client listeners mount.
   // A real focus-triggered/initial BFF response proves the listener is active.
-  const ready=page.waitForResponse(response=>response.url()===`${webBase}/api/session`&&response.request().method()==='GET'&&response.ok());
+  const url = new URL('/api/session', webBase);
+  if (supportSlug) url.searchParams.set('support', supportSlug);
+  const ready = page.waitForResponse(response => response.url() === url.href && response.request().method() === 'GET' && response.ok());
   await page.bringToFront();
   await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
   await ready;
@@ -245,6 +247,96 @@ test('public member application entry stays available without an authenticated s
   }
 });
 
+test('member application normalizes gym codes and lets applicants correct errors and enroll', async ({ page, browser }) => {
+  const gym = fixture.gyms[0]!;
+  const applicant = {
+    name: 'Application Retry Member',
+    email: 'application-retry@example.test',
+    phone: '+94112223351',
+    password: `Section5-${randomBytes(12).toString('hex')}`,
+  };
+  const plan = await fixture.tenants[0].membershipPlan.create({
+    data: { name: 'Application Retry Plan', price: '20.00', currency: 'LKR', durationDays: 30 },
+  });
+
+  await page.goto(`${webBase}/apply/not-a-test-gym`);
+  await expect(page.getByRole('heading', { name: 'Gym not found' })).toBeVisible();
+  await expect(page.locator('head meta[name="robots"]')).toHaveAttribute('content', /noindex/);
+  await page.getByRole('link', { name: 'Try another gym code' }).click();
+  const gymCode = page.getByLabel('Gym code');
+  await gymCode.fill('invalid code!');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(gymCode).toHaveAttribute('aria-invalid', 'true');
+  await expect(gymCode).toHaveValue('invalid code!');
+  await gymCode.fill(`  ${gym.slug.toUpperCase()}  `);
+  await gymCode.press('Enter');
+  await expect(page).toHaveURL(`${webBase}/apply/${gym.slug}`);
+  await page.goto(`${webBase}/apply/%20${gym.slug.toUpperCase()}%20`);
+  await expect(page).toHaveURL(`${webBase}/apply/${gym.slug}`);
+  await expect(page.getByRole('heading', { name: 'Apply to join' })).toBeVisible();
+  const fullName = page.getByLabel('Full name');
+  const email = page.getByLabel('Email address');
+  const phone = page.getByLabel('Phone', { exact: true });
+  const password = page.getByLabel('Create password');
+  const consent = page.getByRole('checkbox');
+  await fullName.fill(applicant.name);
+  await email.fill(applicant.email);
+  await phone.fill(applicant.phone);
+  await password.fill('invalid');
+  await consent.check();
+  await page.getByRole('button', { name: 'Submit application' }).click();
+  await expect(page.locator('main').getByRole('alert')).toContainText('Check the highlighted fields');
+  await expect(password).toHaveAttribute('aria-invalid', 'true');
+  await expect(password).toHaveValue('');
+  await expect(fullName).toHaveValue(applicant.name);
+  await expect(email).toHaveValue(applicant.email);
+  await expect(phone).toHaveValue(applicant.phone);
+  await expect(consent).toBeChecked();
+  await expect(page).toHaveURL(`${webBase}/apply/${gym.slug}`);
+
+  await password.fill(applicant.password);
+  await page.getByRole('button', { name: 'Submit application' }).click();
+  await expect(page).toHaveURL(`${webBase}/login?application=1`);
+  const account = await fixture.master.user.findUniqueOrThrow({ where: { email: applicant.email } });
+  const application = await fixture.master.memberApplication.findFirstOrThrow({ where: { identityId: account.id } });
+  expect(application.state).toBe('PENDING');
+  expect(application.consentedAt).toBeTruthy();
+
+  const ownerContext = await browser.newContext();
+  try {
+    const owner = await ownerContext.newPage();
+    await openWithTestSession(owner, fixture.users.ownerA.id, `/gyms/${gym.slug}/owner/applications`);
+    const card = owner.locator('.owner-application-card').filter({ hasText: applicant.name });
+    await card.getByLabel('Membership plan').selectOption(plan.id);
+    await card.getByLabel('Date of birth (required for member record)').fill('1994-01-31');
+    await card.getByRole('button', { name: 'Approve and enroll member' }).click();
+    await expect(owner.getByText('Application decision saved.')).toBeVisible();
+  } finally {
+    await ownerContext.close();
+  }
+
+  await openWithTestSession(page, account.id, '/applications');
+  await page.getByRole('link', { name: 'Open member workspace' }).click();
+  await expect(page).toHaveURL(`${webBase}/gyms/${gym.slug}/member`);
+  await openWithTestSession(page, account.id, `/gyms/${gym.slug}/profile`);
+  await expect(page.locator('time[datetime="1994-01-31"]').first()).toHaveText('31 Jan 1994');
+
+  const otherGym = fixture.gyms[1]!;
+  await openWithTestSession(page, fixture.users.pendingUser.id, '/no-access');
+  await page.goto(`${webBase}/gyms/${otherGym.slug}/apply`);
+  await page.getByLabel('Full name').fill('A');
+  await page.getByLabel('Phone', { exact: true }).fill(applicant.phone);
+  await page.getByRole('checkbox').check();
+  await page.getByRole('button', { name: 'Submit application' }).click();
+  await expect(page.getByLabel('Full name')).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByLabel('Phone', { exact: true })).toHaveValue(applicant.phone);
+  await expect(page.getByRole('checkbox')).toBeChecked();
+  await page.getByLabel('Full name').fill('Signed In Applicant');
+  await page.getByRole('button', { name: 'Submit application' }).click();
+  await expect(page).toHaveURL(`${webBase}/applications?submitted=1`);
+  await expect(page.getByText('Your application was submitted.')).toBeVisible();
+});
+
 test('owner gym configuration keeps plan drafts on failure and saves exact zero plans', async ({ page }) => {
   await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${fixture.gyms[0]!.slug}/owner/gym-config`);
   await expect(page.getByRole('heading', { name: 'Gym Configuration' })).toBeVisible();
@@ -273,6 +365,86 @@ test('owner gym configuration keeps plan drafts on failure and saves exact zero 
   await expect(page.getByText('LKR 0', { exact: true })).toBeVisible();
   await page.setViewportSize({ width: 320, height: 700 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test('owner can revise and retire plans while retaining agreed membership terms', async ({ page, request }) => {
+  const gym = fixture.gyms[0];
+  const tenant = fixture.tenants[0];
+  const member = await tenant.member.findUniqueOrThrow({ where: { identityId: fixture.users.memberUser.id } });
+  const plan = await tenant.membershipPlan.create({ data: { name: 'Lifecycle Plan', price: '2500', currency: 'LKR', durationDays: 30 } });
+  const unused = await tenant.membershipPlan.create({ data: { name: 'Unused Plan', price: '0', currency: 'LKR', durationDays: 30 } });
+  const term = await tenant.membershipTerm.create({ data: { memberId: member.id, planId: plan.id,
+    startDate: new Date('2020-01-01'), endDateExclusive: new Date('2020-01-31'), agreedPrice: plan.price,
+    currency: plan.currency, planNameSnapshot: plan.name, configurationVersion: 0,
+    actorIdentityId: fixture.users.ownerA.id, idempotencyKey: 'plan-lifecycle-history', requestDigest: 'plan-lifecycle-history' } });
+  const bearer = await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${gym.slug}/owner/gym-config`);
+  await page.getByRole('tab', { name: 'Membership Plans' }).click();
+  const planRow = page.getByRole('listitem').filter({ hasText: 'Lifecycle Plan' });
+  await planRow.getByRole('button', { name: 'Edit plan' }).click();
+  await page.getByLabel('Plan Name').fill('Lifecycle Plan Revised');
+  await page.getByLabel('Price (LKR)').fill('3200');
+  await page.getByLabel('Duration (Days)').fill('45');
+  await page.getByRole('button', { name: 'Save plan changes' }).click();
+  await expect(planRow).toContainText('LKR 3200');
+  await expect(planRow).toContainText('45 days');
+  expect(await tenant.membershipTerm.findUniqueOrThrow({ where: { id: term.id } })).toEqual(term);
+
+  const headers = { authorization: `Bearer ${bearer}` };
+  const config = await tenant.gymConfiguration.findUniqueOrThrow({ where: { id: 'current' } });
+  const archivePayload = { action: 'ARCHIVE', expectedVersion: config.version, expectedPlanVersion: 0 };
+  expect((await request.post(`${apiBase}/gyms/${gym.slug}/membership-plans/${plan.id}`, { headers, data: archivePayload })).status()).toBe(409);
+  expect((await request.post(`${apiBase}/gyms/${fixture.gyms[1].slug}/membership-plans/${plan.id}`, { headers, data: archivePayload })).status()).toBe(403);
+  const renew = () => request.post(`${apiBase}/gyms/${gym.slug}/members/${member.id}/memberships`, { headers,
+    data: { planId: plan.id, expectedMemberVersion: member.version, startPolicy: 'NEXT_AVAILABLE', idempotencyKey: 'plan-lifecycle-renewal' } });
+  const renewal = await renew();
+  expect(renewal.status()).toBe(201);
+  const newTerm = await renewal.json();
+  expect(newTerm).toMatchObject({ agreedPrice: '3200', planName: 'Lifecycle Plan Revised' });
+  expect((Date.parse(newTerm.endDateExclusive) - Date.parse(newTerm.startDate)) / 86_400_000).toBe(45);
+
+  async function archive(row: typeof planRow) {
+    await row.getByRole('button', { name: 'Archive plan' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Archive plan' }).click();
+    await expect(row).toContainText('Archived');
+  }
+  await archive(planRow);
+  await planRow.getByRole('button', { name: 'Delete unused plan' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete plan' }).click();
+  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('no membership or application history');
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
+  const unusedRow = page.getByRole('listitem').filter({ has: page.getByText('Unused Plan', { exact: true }) });
+  await archive(unusedRow);
+  await unusedRow.getByRole('button', { name: 'Delete unused plan' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete plan' }).click();
+  await expect(unusedRow).toHaveCount(0);
+  expect(await tenant.membershipPlan.findUnique({ where: { id: unused.id } })).toBeNull();
+
+  await page.goto(`${webBase}/gyms/${gym.slug}/owner/members/new`);
+  await expect(page.getByLabel('Initial membership plan').locator(`option[value="${plan.id}"]`)).toHaveCount(0);
+  const declined = await request.post(`${apiBase}/gyms/${gym.slug}/members/${member.id}/memberships`, { headers,
+    data: { planId: plan.id, expectedMemberVersion: member.version + 1, startPolicy: 'NEXT_AVAILABLE', idempotencyKey: 'plan-lifecycle-archived-renewal' } });
+  expect(declined.status()).toBe(404);
+});
+
+test('member profile shows recorded PT sessions and the member calendar excludes declined requests', async ({ page }) => {
+  const gym = fixture.gyms[0];
+  const tenant = fixture.tenants[0];
+  const member = await tenant.member.findUniqueOrThrow({ where: { identityId: fixture.users.memberUser.id } });
+  const trainer = await tenant.trainer.findUniqueOrThrow({ where: { identityId: fixture.users.trainerUser.id } });
+  const completed = await tenant.pTSession.create({ data: { memberId: member.id, trainerId: trainer.id, state: 'COMPLETED',
+    scheduledStartAt: new Date('2030-03-14T04:00:00Z'), scheduledEndAt: new Date('2030-03-14T05:00:00Z'), gymTimezone: 'Asia/Colombo',
+    currency: 'LKR', fee: '0', configurationVersion: 0, confirmedAt: new Date('2030-03-13T04:00:00Z'), confirmationRate: '0.4',
+    confirmationLevel: 'LEVEL_1', startedAt: new Date('2030-03-14T04:00:00Z'), endedAt: new Date('2030-03-14T05:00:00Z'), createdByIdentityId: fixture.users.ownerA.id } });
+  await tenant.pTSession.create({ data: { memberId: member.id, trainerId: trainer.id, state: 'DECLINED',
+    scheduledStartAt: new Date('2030-03-15T04:00:00Z'), scheduledEndAt: new Date('2030-03-15T05:00:00Z'), gymTimezone: 'Asia/Colombo',
+    currency: 'LKR', fee: '0', configurationVersion: 0, declineReason: 'Choose another time.', createdByIdentityId: fixture.users.memberUser.id } });
+  await openWithTestSession(page, fixture.users.ownerA.id, `/gyms/${gym.slug}/owner/members/${member.id}`);
+  await page.getByRole('tab', { name: 'PT Session History' }).click();
+  await expect(page.getByRole('link', { name: /14 Mar 2030.*09:30.*completed/ })).toHaveAttribute('href', `/gyms/${gym.slug}/sessions/${completed.id}`);
+  await openWithTestSession(page, fixture.users.memberUser.id, `/gyms/${gym.slug}/member/calendar?month=2030-03`);
+  await expect(page.getByRole('heading', { name: '1 session this month' })).toBeVisible();
+  await page.getByRole('button', { name: /^2030-03-15/ }).click();
+  await expect(page.getByText('Declined', { exact: true })).toHaveCount(0);
 });
 
 test('shared controls support keyboard use, failure recovery, and narrow screens', async ({ page }) => {
@@ -447,14 +619,17 @@ test('real browser and HTTP requests preserve two-gym isolation and pure reads',
   const trainerToken = trainerResult.accessToken as string;
   expect((await request.get(`${apiBase}/gyms/${fixture.gyms[0].slug}/members`, { headers: { authorization: `Bearer ${trainerToken}` } })).status()).toBe(403);
 
+  // Leave the protected document before clearing its session so its client
+  // redirect cannot race the next explicit navigation to sign in.
+  await page.goto('about:blank');
   await page.context().clearCookies();
   await login(page, fixture.users.admin.email);
   await expect(page).toHaveURL(/\/admin$/);
   await expect(page.getByText('Test Gym Alpha')).toBeVisible();
   await expect(page.getByText('Test Gym Beta')).toBeVisible();
 
-  expect(await fixture.tenants[0].member.count()).toBe(fixture.expected.alphaMembers + 1);
-  expect(await fixture.tenants[1].member.count()).toBe(fixture.expected.betaMembers);
+  expect(await fixture.tenants[0].member.count()).toBe(alphaBefore[0]! + 1);
+  expect(await fixture.tenants[1].member.count()).toBe(betaBefore[0]);
   expect(await fixture.master.gymAccess.count({ where: { userId: fixture.users.multiOwner.id, linkStatus: 'ACTIVE' } })).toBe(2);
   expect(await fixture.master.gymAccess.count({ where: { userId: fixture.users.pendingUser.id, linkStatus: 'PENDING' } })).toBe(1);
   expect((await fixture.master.user.findUniqueOrThrow({ where: { id: fixture.users.forcedUser.id } })).mustChangePassword).toBe(false);
@@ -501,7 +676,10 @@ test('full member enrollment hands off a one-time credential and enforces first-
   await page.getByLabel('Phone').fill('+94112223344');
   await page.getByLabel('Date of birth').fill('1995-06-15');
   await page.getByLabel('Initial membership plan').selectOption(plan.id);
-  await page.getByRole('button', { name: 'Register member' }).click();
+  await page.getByRole('button', { name: 'Register member' }).evaluate((button: HTMLButtonElement) => {
+    button.click();
+    button.click();
+  });
   await expect(page.getByRole('heading', { name: 'One-time credential handoff' })).toBeVisible();
   const lostTemporaryPassword = await page.getByLabel('Temporary password').inputValue();
   let temporaryPassword = lostTemporaryPassword;
@@ -566,6 +744,21 @@ test('full member enrollment hands off a one-time credential and enforces first-
       headers: { authorization: `Bearer ${memberCookie?.value}` },
     })).status()).toBe(403);
     expect((await fixture.master.user.findUniqueOrThrow({ where: { id: identity.id } })).mustChangePassword).toBe(false);
+
+    await page.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/owner/account-recovery`);
+    const recovery = page.locator('.ui-card').filter({ hasText: email });
+    await recovery.getByLabel('Identity check').selectOption('IN_PERSON');
+    await recovery.getByLabel('Attestation').fill('Verified the member in person against the enrollment record.');
+    await recovery.locator('[name=currentPassword]').fill(fixture.password);
+    await recovery.getByRole('button', { name: 'Issue one-use recovery link' }).click();
+    const link = recovery.locator('.recovery-handoff-link');
+    await expect(link).toBeVisible();
+    await memberPage.goto(`${webBase}${await link.innerText()}`);
+    const recoveredPassword = `${randomBytes(24).toString('base64url')}!7`;
+    await memberPage.locator('[name=newPassword]').fill(recoveredPassword);
+    await memberPage.locator('[name=confirmPassword]').fill(recoveredPassword);
+    await memberPage.getByRole('button', { name: 'Set new password' }).click();
+    await expect(memberPage.getByText('Your password was updated', { exact: false })).toBeVisible();
   } finally { await memberContext.close(); }
 });
 
@@ -685,7 +878,10 @@ test('trainer registration enforces owner and selected-gym access, then hands of
   await page.getByLabel('Shift start').fill('08:00');
   await page.getByLabel('Shift end').fill('17:00');
   await page.getByLabel('Bio').fill('Browser-created trainer profile.');
-  await page.getByRole('button', { name: 'Register trainer' }).click();
+  await page.getByRole('button', { name: 'Register trainer' }).evaluate((button: HTMLButtonElement) => {
+    button.click();
+    button.click();
+  });
   await expect(page.getByText('Copy the one-time temporary password')).toBeVisible();
   const temporaryPassword = await page.getByLabel('Temporary password').inputValue();
   expect(temporaryPassword.length).toBeGreaterThanOrEqual(20);
@@ -765,12 +961,14 @@ test('trainer roster/profile and member directory are usable at mobile width wit
 
   await trainerProfileLink.click();
   await expect(page.getByRole('heading', { name: 'Trainer Alpha', level: 1 })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Approve recurring shift' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Approve shift', exact: true })).toBeVisible();
   await expect(page.locator('.trainer-profile-session-metrics')).toContainText(/Related clients\s*1/);
-  await expect(page.locator('.trainer-profile-session-metrics')).toContainText(/Completed sessions\s*1/);
-  await expect(page.locator('.trainer-profile-session-metrics')).toContainText(/Completed in latest ten\s*1/);
+  const completed = await tenant.pTSession.count({ where: { trainerId, state: 'COMPLETED' } });
+  const latest = await tenant.pTSession.findMany({ where: { trainerId }, orderBy: [{ scheduledStartAt: 'desc' }, { id: 'desc' }], take: 10 });
+  await expect(page.locator('.trainer-profile-session-metrics')).toContainText(new RegExp(`Completed sessions\\s*${completed}`));
+  await expect(page.locator('.trainer-profile-session-metrics')).toContainText(new RegExp(`Completed in latest ten\\s*${latest.filter(item => item.state === 'COMPLETED').length}`));
   await expect(page.locator('.trainer-profile-sessions')).toContainText('COMPLETED');
-  await expect(page.locator('.trainer-profile-sessions')).toContainText('Nov 1, 2026, 9:30 AM');
+  await expect(page.locator('.trainer-profile-sessions')).toContainText('1 Nov 2026, 09:30 GMT+5:30');
   await expect(page.getByText('Ratings are unavailable until members submit ratings.')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: '/tmp/gymos-task037-owner-profile-390.png', fullPage: true });
@@ -862,11 +1060,44 @@ test('trainer roster/profile and member directory are usable at mobile width wit
   const requestStart = page.getByLabel(/Available start time/);
   await expect(requestStart).toBeEnabled();
   await requestStart.selectOption({ index: 1 });
-  await page.getByLabel('Note for the trainer (optional)').fill('Please review my shoulder warmup.');
+  await page.getByLabel('Note for the trainer (optional)').fill(`Please review my shoulder warmup. ${'LongMemberNote'.repeat(30)}`);
   await page.getByRole('button', { name: 'Request session' }).click();
   await expect(page.getByRole('status')).toContainText('The trainer must accept before credit is reserved.');
   const declinedRequest = await tenant.pTSession.findFirstOrThrow({ where: { memberId, trainerId, state: 'PENDING_CONFIRMATION' }, orderBy: { createdAt: 'desc' } });
   await openWithTestSession(page, fixture.users.trainerUser.id, `/gyms/${gym.slug}/trainer/requests`);
+  for (const route of ['requests', 'schedule']) {
+    await page.goto(`${webBase}/gyms/${gym.slug}/trainer/${route}`);
+    const row = page.locator('.trainer-request-row').filter({ hasText: 'Please review my shoulder warmup.' });
+    await row.getByRole('link').evaluate(anchor => { anchor.textContent = 'LongMemberName'.repeat(8); });
+    await row.getByText('Member note', { exact: true }).press('Enter');
+    await row.getByText('Add optional message for member').press('Enter');
+    const message = row.getByLabel('Message for member');
+    await expect(message).toBeVisible();
+    await page.keyboard.press('Tab');
+    await expect(message).toBeFocused();
+    await expect(message).toHaveCSS('outline-style', 'solid');
+
+    for (const [width, zoom] of [[1440, 1], [1024, 1], [768, 1], [390, 1], [320, 1], [1440, 2]]) {
+      await page.setViewportSize({ width, height: 900 });
+      const fitsPage = await page.evaluate(scale => {
+        document.documentElement.style.zoom = String(scale);
+        return document.documentElement.scrollWidth <= innerWidth;
+      }, zoom);
+      expect(fitsPage, `${route} at ${width}px and ${zoom * 100}% zoom`).toBe(true);
+      expect(await row.evaluate(element => element.scrollWidth <= element.clientWidth), `${route} request row at ${width}px and ${zoom * 100}% zoom`).toBe(true);
+      const clearsMetadata = await row.evaluate(element => {
+        const metadata = element.querySelector(':is(.trainer-request-details, .trainer-schedule-request-title)')!;
+        const bottom = metadata.getBoundingClientRect().bottom;
+        return Array.from(element.querySelectorAll('.session-request-decision button')).every(button => button.getBoundingClientRect().top >= bottom);
+      });
+      expect(clearsMetadata).toBe(true);
+      for (const name of ['Accept and reserve one credit', 'Decline request']) {
+        const button = row.getByRole('button', { name });
+        await button.click({ trial: true });
+      }
+    }
+  }
+  await page.goto(`${webBase}/gyms/${gym.slug}/trainer/requests`);
   const declineCard = page.locator('.session-request-card').filter({ hasText: 'Please review my shoulder warmup.' });
   await expect(declineCard).toBeVisible();
   await declineCard.getByText('Add optional message for member').click();
@@ -1277,11 +1508,31 @@ test('platform registry supports audited read-only gym selection, switching, exi
   const reason=page.getByRole('textbox',{name:/^Support reason/});await reason.fill('Synthetic owner-summary diagnosis');
   await page.getByRole('button',{name:'Enter support',exact:true}).click();
   await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/owner$`));
-  // The server action can change the URL before the streamed owner shell has
-  // rendered its selected gym. Read support context from a fresh document.
-  await page.goto('about:blank');
-  await page.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/owner`);
-  await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[0].slug}/owner$`));
+  await expect(page.locator('[data-support-session] .support-banner')).toContainText('Viewing Test Gym Alpha');
+  await page.reload();
+  await expect(page.locator('[data-support-session] .support-banner')).toContainText('Viewing Test Gym Alpha');
+  const alphaSlug = fixture.gyms[0].slug;
+  await waitForSessionLifecycle(page, alphaSlug);
+  // Recreate the streamed-shell race by restoring its markers while an
+  // unscoped session request is in flight. The browser must check again.
+  const shell = page.locator('.application-shell');
+  const markers = await shell.evaluate(element => ({
+    identity: element.getAttribute('data-session-identity')!, support: element.getAttribute('data-support-session')!,
+  }));
+  await page.route(`${webBase}/api/session`, async route => {
+    await shell.evaluate((element, saved) => {
+      element.setAttribute('data-session-identity', saved.identity);
+      element.setAttribute('data-support-session', saved.support);
+    }, markers);
+    await route.continue();
+  }, { times: 1 });
+  const rechecked = page.waitForResponse(`${webBase}/api/session?support=${alphaSlug}`, { timeout: 5_000 });
+  await shell.evaluate(element => {
+    element.removeAttribute('data-session-identity');
+    element.removeAttribute('data-support-session');
+    window.dispatchEvent(new Event('focus'));
+  });
+  expect((await rechecked).ok()).toBe(true);
   await expect(page.locator('[data-support-session] .support-banner')).toContainText('Viewing Test Gym Alpha');
   await expect(page.getByRole('main').getByRole('heading',{name:'Test Gym Alpha',exact:true})).toBeVisible();
   await expect(page.getByRole('button',{name:'Add member'})).toHaveCount(0);
@@ -1301,12 +1552,6 @@ test('platform registry supports audited read-only gym selection, switching, exi
   await beta.getByRole('button',{name:'Open support'}).click();
   await page.getByRole('textbox',{name:/^Support reason/}).fill('Synthetic second-gym diagnosis');
   await page.getByRole('button',{name:'Enter support',exact:true}).click();
-  await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[1].slug}/owner$`));
-  // A support-context broadcast can redirect an older Alpha document while
-  // the Beta navigation is still streaming. Read the new context from a fresh
-  // document so no stale shell state can satisfy the Beta assertions.
-  await page.goto('about:blank');
-  await page.goto(`${webBase}/gyms/${fixture.gyms[1].slug}/owner`);
   await expect(page).toHaveURL(new RegExp(`/gyms/${fixture.gyms[1].slug}/owner$`));
   await expect(page.locator('[data-support-session] .support-banner')).toContainText('Viewing Test Gym Beta');
   await expect(page.getByRole('main').getByRole('heading',{name:'Test Gym Beta',exact:true})).toBeVisible();
@@ -1402,11 +1647,14 @@ test('logout clears the browser even when API revocation is unavailable', async 
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(page).toHaveURL(/\/login\?error=logout-uncertain(?:&|$)/);
   await expect(page.locator('.ui-feedback[role="alert"]')).toContainText('server could not confirm session revocation');
-  expect((await page.context().cookies()).some(item => item.name === 'gymos_access_token')).toBe(false);
+  const cookieNames = (await page.context().cookies()).map(cookie => cookie.name);
+  expect(cookieNames).not.toContain('gymos_access_token');
+  expect(cookieNames).not.toContain('gymos_refresh_token');
   expect((await fixture.master.user.findUniqueOrThrow({ where: { id: fixture.users.ownerB.id } })).authVersion).toBe(before);
   await page.screenshot({ path: join(webDirectory, 'test-results/migration-evidence/GYMOS-MIG-020/backend-unavailable.png'), animations: 'disabled' });
   await page.goto(`${webBase}/gyms/${fixture.gyms[1].slug}/owner`);
   await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible();
 });
 
 test('browser recovers an unpublished tenant commit after Master activation fails without duplicate effects', async ({ page, browser, request }) => {
@@ -1624,7 +1872,7 @@ test('member roster and profile keep role, tenant, privacy, empty, and dependenc
   const overview = tabs.getByRole('tab', { name: 'Overview' });
   await overview.focus();
   await page.keyboard.press('ArrowRight');
-  await expect(tabs.getByRole('tab', { name: 'Attendance' })).toBeFocused();
+  await expect(tabs.getByRole('tab', { name: 'PT Session History' })).toBeFocused();
   await page.keyboard.press('ArrowRight');
   await expect(tabs.getByRole('tab', { name: 'Membership & Packs' })).toBeFocused();
   await page.keyboard.press('Home');
@@ -1694,12 +1942,29 @@ test('owner appearance upgrades live operations with accurate metrics and recove
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   const base = `/gyms/${fixture.gyms[0].slug}/owner`;
+  const tenant = fixture.tenants[0]!;
+  const today = localDate(new Date(), 'Asia/Colombo');
+  const day = (days: number) => new Date(Date.parse(`${today}T00:00:00Z`) + days * 86400000);
+  const plan = await tenant.membershipPlan.create({ data: { name: 'Dashboard expiry review', price: '0', currency: 'LKR', durationDays: 30 } });
+  const members = await Promise.all(['Due soon', 'Already renewed', 'Ends in 30 days', 'Inactive member'].map((fullName, index) =>
+    tenant.member.create({ data: { fullName, status: index === 3 ? 'INACTIVE' : 'ACTIVE' } })));
+  const terms = [[members[0]!, -1, 5], [members[1]!, -1, 3], [members[1]!, 3, 33], [members[2]!, -1, 30], [members[3]!, -1, 6]] as const;
+  for (const [member, from, to] of terms) {
+    const key = randomBytes(16).toString('hex');
+    await tenant.membershipTerm.create({ data: { memberId: member.id, planId: plan.id, startDate: day(from), endDateExclusive: day(to),
+      agreedPrice: '0', currency: 'LKR', planNameSnapshot: plan.name, configurationVersion: 0, actorIdentityId: fixture.users.ownerA.id,
+      idempotencyKey: key, requestDigest: requestDigest({ key }) } });
+  }
   await openWithTestSession(page, fixture.users.ownerA.id, base);
   await expect(page.locator('.owner-workspace')).toBeVisible();
   const token = (await page.context().cookies()).find(cookie => cookie.name === 'gymos_access_token')!.value;
   const response = await request.get(`${apiBase}/gyms/${fixture.gyms[0].slug}/dashboard`, { headers: { authorization: `Bearer ${token}` } });
   expect(response.ok()).toBe(true);
   const snapshot = await response.json();
+  expect(snapshot.memberships.activeCount).toBeGreaterThanOrEqual(3);
+  expect(snapshot.memberships.expiring).toContainEqual({ memberId: members[0]!.id, memberName: 'Due soon', endDateExclusive: day(5).toISOString().slice(0, 10) });
+  for (const member of members.slice(1)) expect(snapshot.memberships.expiring).not.toContainEqual(expect.objectContaining({ memberId: member.id }));
+  await expect(page.getByRole('region', { name: 'Expiring memberships' }).getByRole('link', { name: 'Due soon' })).toBeVisible();
   await expect(page.locator('.dashboard-metric').nth(0).locator('strong')).toHaveText(String(snapshot.metrics.activeSessionsToday.value));
   await expect(page.locator('.dashboard-metric').nth(1).locator('strong')).toHaveText(String(snapshot.metrics.activeSessions.value));
   await expect(page.locator('.dashboard-metric').nth(3).locator('strong')).toHaveText(String(snapshot.metrics.trainersWithSessionsToday.value));

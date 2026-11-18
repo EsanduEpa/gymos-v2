@@ -1,0 +1,35 @@
+.charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 1rem;
+  margin-block: 1rem;
+}
+
+.chart {
+  border: 1px solid var(--ui-border);
+  border-radius: .75rem;
+  padding: 1rem;
+  min-width: 0;
+}
+
+.chart h3 { margin: 0 0 .5rem; }
+.plot {
+  position: relative;
+  height: 6rem;
+  border: solid var(--ui-border);
+  border-width: 0 0 1px 1px;
+  margin-block: .5rem;
+}
+
+.point {
+  position: absolute;
+  width: .4rem;
+  height: .4rem;
+  background: var(--gym-color, #147a70);
+  border: 1px solid currentColor;
+  border-radius: 100%;
+  translate: -50% 50%;
+}
+
+.chartScale { display: flex; gap: .5rem; justify-content: space-between; }
+.filters { display: flex; flex-wrap: wrap; align-items: end; gap: .75rem; }

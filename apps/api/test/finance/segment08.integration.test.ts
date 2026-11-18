@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import ExcelJS from 'exceljs';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import { SignJWT } from 'jose';
@@ -82,6 +83,8 @@ it('isolates and replays expense/budget commands, reconciles P&L, and closes pay
   expect(suspended.rangeStart).toBe('2026-08-31T18:30:00.000Z');
   expect(suspended.totals.membership).toBe('0.1000');
   expect(suspended.lines.filter((item: { sourceType: string }) => item.sourceType === 'MEMBERSHIP_TERM').map((item: { amount: string }) => item.amount)).toEqual(['0.04', '0.03', '0.03']);
+  const firstDayPnl = await (await call(`/gyms/${slug}/financials/pnl?from=2026-09-01&to=2026-09-01`, owner)).json();
+  expect(firstDayPnl.operationalEarning).toBe('0.0400');
   const expired = await (await call(`/gyms/${slug}/financials/revenue?from=2026-09-04&to=2026-09-04&page=1&pageSize=25`, owner)).json();
   expect(expired.totals.membership).toBe('0.0000');
 
@@ -169,6 +172,24 @@ it('exports complete bounded row sets over 100, protects formulas, exports only 
   expect(exportResponse.headers.get('cache-control')).toContain('no-store');
   const csvBytes = new Uint8Array(await exportResponse.arrayBuffer()); const csv = new TextDecoder().decode(csvBytes); expect(Array.from(csvBytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]); expect(csv.match(/\r\n/g)?.length).toBe(count + 1);
   expect(csv).toContain("'=1+1"); expect(csv).toContain('"row-104"');
+  const reportInput = { kind: 'expenses', from: '2026-10-01', to: '2026-10-31' };
+  const xlsx = await call(`/gyms/${slug}/financials/export`, owner, { ...reportInput, format: 'xlsx' });
+  expect(xlsx.status).toBe(200);
+  expect(xlsx.headers.get('content-type')).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  expect(xlsx.headers.get('content-disposition')).toMatch(/\.xlsx"$/);
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(await xlsx.arrayBuffer());
+  const sheet = workbook.getWorksheet('Report')!;
+  expect(sheet.rowCount).toBe(count + 3);
+  const formulaTest = sheet.getColumn(5).values.find(value => value === '=1+1');
+  expect(formulaTest).toBe('=1+1');
+  expect(sheet.getCell('C4').value).toBe(1);
+  const pdf = await call(`/gyms/${slug}/financials/export`, owner, { ...reportInput, format: 'pdf' });
+  expect(pdf.status).toBe(200);
+  expect(pdf.headers.get('content-type')).toBe('application/pdf');
+  expect(pdf.headers.get('content-disposition')).toMatch(/\.pdf"$/);
+  expect(Buffer.from(await pdf.arrayBuffer()).subarray(0, 8).toString('ascii')).toMatch(/^%PDF-/);
+  expect(await tenant.auditLog.count({ where: { eventCode: { in: ['PDF_EXPORTED', 'XLSX_EXPORTED'] } } })).toBe(2);
   const auditExport = await call(`/gyms/${slug}/financials/export`, owner, { kind: 'audit', page: 1, pageSize: 20, actionType: 'EXPENSE_CREATED' });
   expect(auditExport.status).toBe(200); expect((await auditExport.text()).match(/\r\n/g)?.length).toBe(2);
   expect(await tenant.auditLog.count({ where: { eventCode: 'CSV_EXPORTED' } })).toBeGreaterThanOrEqual(2);
@@ -191,11 +212,22 @@ it('exports complete bounded row sets over 100, protects formulas, exports only 
   const dashboard = await call(`/gyms/${slug}/dashboard`, owner); expect(dashboard.status).toBe(200); const data = await dashboard.json();
   expect(data.timeZone).toBe('Asia/Colombo'); expect(data.earningChart).toHaveLength(8); expect(data.metrics.activeSessionsToday.definition).toContain('scheduled start falls');
   expect(data.rangeStart).toBe(midnightUtc.toISOString()); expect(data.metrics.todayOperationalEarning.value).toBe('9.0000');
+  const month = data.metrics.monthOperationalEarning;
+  const monthRevenue = await (await call(`/gyms/${slug}/financials/revenue?from=${month.from}&to=${month.through}`, owner)).json();
+  expect(month).toMatchObject({ from: `${localToday.slice(0, 7)}-01`, through: localToday, value: monthRevenue.totals.totalOperational });
   expect(data.earningChart[0]).toMatchObject({ startHour: 6, endHour: 8, amount: '3.0000' });
   expect(data.earningChart[1]).toMatchObject({ startHour: 8, endHour: 10, amount: '4.0000' });
   expect((await call(`/gyms/${slug}/dashboard`, await bearer(fixture.users.memberUser.id))).status).toBe(403);
   const analytics = await call(`/gyms/${slug}/analytics?window=6m`, owner); expect(analytics.status).toBe(200); const insights = await analytics.json();
   expect(insights.memberGrowth.points).toHaveLength(6); expect(insights.peakHours.points).toHaveLength(15); expect(insights.utilization.formula).toContain('overnight shifts wrap midnight');
+  const performance = insights.trainerPerformance;
+  const played = await tenant.pTSession.findMany({
+    where: { trainerId: trainerRow.id, state: 'COMPLETED', endedAt: { gte: new Date(performance.currentFrom), lt: new Date(performance.throughExclusive) } },
+    select: { memberId: true },
+  });
+  expect(performance.points).toContainEqual(expect.objectContaining({
+    trainerId: trainerRow.id, completedSessions: played.length, clients: new Set(played.map(row => row.memberId)).size,
+  }));
   const oldestMonth = insights.memberGrowth.points[0].month as string;
   const oldestBoundary = new Date(Date.parse(`${oldestMonth}-01T00:00:00Z`) - 330 * 60_000);
   const currentMonth = insights.memberGrowth.points[5].month as string;

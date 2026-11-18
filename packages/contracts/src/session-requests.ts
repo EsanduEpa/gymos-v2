@@ -36,7 +36,8 @@ export const sessionRequestOptionsSchema = z.strictObject({ trainerId: id, train
   activeMembershipToday: z.boolean(), asOf: z.iso.datetime({ offset: true }) });
 export const trainerSessionRequestsSchema = z.strictObject({ items: z.array(z.strictObject({ id, memberId: id, memberName: z.string().min(2).max(120),
   state: z.literal('PENDING_CONFIRMATION'), requestExpiresAt: z.iso.datetime({ offset: true }), type, scheduledStartAt: z.iso.datetime({ offset: true }), scheduledEndAt: z.iso.datetime({ offset: true }),
-  timeZone: z.string().min(1).max(100), durationMinutes: z.number().int().min(15).max(480), notes: z.string().max(4000).nullable(), version: z.number().int().nonnegative() })).max(100),
+  timeZone: z.string().min(1).max(100), durationMinutes: z.number().int().min(15).max(480), notes: z.string().max(4000).nullable(), version: z.number().int().nonnegative(),
+  estimatedTrainerPay: z.strictObject({ amount, currency }).optional() })).max(100),
   asOf: z.iso.datetime({ offset: true }) });
 export const sessionDecisionResultSchema = z.strictObject({ receiptId: id, replayed: z.boolean(), session: sessionSchema, decision: z.enum(['ACCEPT', 'DECLINE']), notificationOutcome,
   creditReservation: z.strictObject({ holdId: id, packId: id, state: z.literal('HELD'), creditOrdinal: z.number().int().min(1).max(1000),

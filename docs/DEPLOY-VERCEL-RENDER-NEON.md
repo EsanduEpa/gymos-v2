@@ -12,7 +12,7 @@ The API start command runs Node directly with a 256 MB old-generation heap cap a
 
 Render Free sleeps after 15 minutes without inbound traffic and usually needs about a minute to wake. Provisioning, session expiry and reminders run only while the API is awake. Both workers remain enabled and sweep on startup; overdue work may require multiple batches. Do not promise timely reminders while asleep. No separate paid worker, Redis service or Render database is required.
 
-Before each demonstration, open the Render API root URL directly and wait for the application's response. You can also run `GYMOS_API_URL=https://your-api.onrender.com pnpm deploy:demo:wake` from the repository root. This sends one bounded request; it does not schedule keep-alive traffic. Then sign in through Vercel and check Owner Sessions for recent successful scheduled work. A root response only confirms the process is listening. Avoid making the first login request wait for a sleeping API through Vercel.
+Before each demonstration, open the Render API's `/readyz` endpoint and wait for HTTP 200. You can also run `GYMOS_API_URL=https://your-api.onrender.com pnpm deploy:demo:wake` from the repository root. This sends one bounded request. Then sign in through Vercel and check Owner Sessions for recent successful scheduled work.
 
 The workers query Neon frequently while Render is awake, preventing database idle sleep during that period. Monitor Neon compute/storage quotas and Render usage in their dashboards. Stop the demo service when finished if appropriate. Free services have limited capacity; keep the demo small and verify actual memory/latency in the hosted rehearsal.
 
@@ -106,6 +106,8 @@ For a beginner, GitHub Desktop is convenient: add the existing repository, revie
 | GYMOS_WEB_ORIGIN | `https://example.invalid` for the initial boot only |
 
 5. Blueprint supplies NODE_VERSION, NODE_ENV, both worker flags and generates JWT_SECRET. In Environment, replace the generated JWT_SECRET with the private stable value from `.env.deploy.neon`, then save/redeploy. Never put JWT_SECRET on Vercel.
+6. Apply/create the Blueprint after confirming no paid resources are selected. If Render asks for build/start settings, they are `corepack enable && pnpm install --frozen-lockfile && pnpm build:deploy:api` and `pnpm start:deploy:api`.
+7. Watch Events/Logs until deployment succeeds. Copy the actual public `https://...onrender.com` address. Render's health check uses `/readyz`; update the health check path in the service settings if the service was set up manually.
 6. Apply/create the Blueprint after confirming no paid resources are selected. If Render asks for build/start settings, they are `corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm build:deploy:api` and `node --max-old-space-size=256 --max-semi-space-size=16 infrastructure/deployment/start-api.mjs`.
 7. Watch Events/Logs until deployment succeeds. Copy the actual public `https://...onrender.com` address. Open it: the root response confirms the API process is listening, not complete database/worker readiness.
 8. Confirm logs include provisioning runner enabled and PT scheduled-work runner enabled. Zero gyms is expected before creating the first gym.
@@ -156,6 +158,18 @@ Keep this a synthetic demo until separate public-release security findings are c
 ## Updating later
 
 Edit/test locally, commit and push. For this manually controlled setup, deploy the compatible API revision on Render first, then deploy Vercel (which may auto-deploy on push unless you change its Git settings). For changes requiring a coordinated rollout, pause frontend automatic deployment before pushing. Master migrations are explicit; the deployment command does not upgrade existing gym schemas. Use the controlled tenant rollout for those changes. Never reset cloud databases just to publish a UI update.
+
+### Health and browser security checks
+
+| Endpoint | Expected result |
+| --- | --- |
+| Vercel `/api/health` | HTTP 200 with `{"status":"ok"}` when the web deployment runs |
+| Render `/healthz` | HTTP 200 with `{"status":"ok"}` when the API process runs |
+| Render `/readyz` | HTTP 200 when the master database answers; HTTP 503 with a generic message when it cannot |
+
+The readiness probes cover the web process, API process and master connectivity. Verify the selected gym and worker health after signing in. Browser calls use the Vercel origin and the web server calls Render. Keep cross-origin response headers disabled on private routes and health probes. The web server checks the configured origin before accepting mutations.
+
+Check the deployed web login, a protected page, `/api/health`, and a 404 for the CSP, frame protection, content type protection, referrer policy, and permissions policy. Verify HTTPS and HSTS at the hosting edge. Keep the web CSP compatible with Next.js streaming and gym HTTPS logos. It allows inline scripts and styles for the current renderer, and restricts external scripts to the web origin. Check hydration, form submissions, downloads, and frame blocking in the hosted browser.
 
 ## Troubleshooting
 

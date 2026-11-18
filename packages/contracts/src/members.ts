@@ -69,6 +69,7 @@ export const memberDetailSchema = z.strictObject({
     expiryAdjustments: z.array(z.strictObject({ creditOrdinal: z.number().int().positive(), endDateExclusive: localDateSchema, state: z.enum(['UNHELD','HELD','CONSUMED','EXPIRED']) })).max(1000).default([]),
     status: z.enum(['ACTIVE', 'EXPIRED', 'DEPLETED']) })).max(100),
   recentSessions: z.array(z.strictObject({ id: idSchema, scheduledStart: isoInstantSchema, state: z.string().min(1).max(40) })).max(5),
+  timeZone: z.string().min(1).optional(),
   asOf: isoInstantSchema,
 });
 

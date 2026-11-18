@@ -1,3 +1,4 @@
+import { formatDisplayDateTime } from '@/lib/display-date';
 import { SessionExceptionControls } from '@/components/sessions/session-exception-controls';
 import type { CSSProperties } from 'react';
 import { randomUUID } from 'node:crypto';
@@ -37,7 +38,7 @@ export default async function SessionDetailPage({ params, searchParams }: {
   const brand = resolveGymBrandColors(theme.primaryColor);
   const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
   const back = `/gyms/${encodeURIComponent(slug)}/${role === 'OWNER' ? 'owner/sessions' : role === 'TRAINER' ? 'trainer/schedule' : 'member/sessions'}`;
-  const time = (instant: string) => new Intl.DateTimeFormat('en-GB', { timeZone: booking!.gymTimeZone, dateStyle: 'medium', timeStyle: 'short' }).format(new Date(instant));
+  const time = (instant: string) => formatDisplayDateTime(instant, booking!.gymTimeZone);
   const state = (value: string) => value.replaceAll('_', ' ').toLowerCase();
   return <DashboardChrome identityId={account.identityId} key={`${account.identityId}:${gym.id}:${role}`} gym={gym} gyms={account.gyms} displayName={account.displayName ?? 'GymOS user'} style={style}>
     <div className="gym-banner"><div><h1>PT booking details</h1><p>Your appointment, credit outcome and session history.</p></div><a className="ui-button ui-button-secondary" href={back}>Back to sessions</a></div>
@@ -62,7 +63,9 @@ export default async function SessionDetailPage({ params, searchParams }: {
         {data.creditRemedyStatus === 'AWAITING_OWNER' ? <Feedback tone="info">The restored credit has expired and is awaiting owner resolution. It is not available to book yet.</Feedback> : data.creditRemedyStatus === 'APPROVED' ? <Feedback tone="info">The owner approved this source credit for use before {data.restoredCreditExpiry}. Membership and current credit availability are checked when booking.</Feedback> : null}
         {data.expiryAwaitingSweep ? <Feedback tone="info">The request deadline has passed. This time is available again and no credit was reserved. Its expiry history is awaiting background processing.</Feedback> : null}
         {booking.declineReason ? <p>Trainer’s message: {booking.declineReason}</p> : null}
-        {booking.fee !== null ? <p>Session fee: {booking.currency} {booking.fee}</p> : null}
+        {booking.fee !== null ? <p>Listed session fee: {booking.currency} {booking.fee}</p> : null}
+        {data.confirmedTrainerPay ? <p>Agreed trainer pay on completion: {data.confirmedTrainerPay.currency} {data.confirmedTrainerPay.amount}</p>
+          : role !== 'MEMBER' && booking.confirmedAt ? <p>This booking uses the original pack-based trainer pay terms.</p> : null}
         {booking.trainerPay !== null ? <p>Your recorded earning: {booking.currency} {booking.trainerPay}</p> : null}
         <h2>Member-visible session notes</h2><p className={styles.notes}>{booking.notes || 'No session notes yet.'}</p>
       </Card>

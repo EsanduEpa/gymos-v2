@@ -49,7 +49,7 @@ export const financePnlSchema = z.strictObject({ gymSlug: slug, from: localDate,
   operationalEarning: decimal, expenses: decimal, payrollCost: decimal, salaryExpenseExcluded: decimal, operatingSurplus: decimal,
   expenseByCategory: z.array(z.strictObject({ category: expenseCategorySchema, amount: decimal, sourceCount: z.number().int().nonnegative() })).length(7),
   sourceCounts: z.strictObject({ earning: z.number().int().nonnegative(), expense: z.number().int().nonnegative(), payroll: z.number().int().nonnegative() }) });
-export const financeExportInputSchema = z.strictObject({ kind: z.enum(['revenue', 'expenses', 'payroll', 'audit']), from: localDate.optional(), to: localDate.optional(),
+export const financeExportInputSchema = z.strictObject({ kind: z.enum(['revenue', 'expenses', 'payroll', 'audit']), format: z.enum(['csv', 'xlsx', 'pdf']).default('csv'), from: localDate.optional(), to: localDate.optional(),
   page: z.number().int().min(1).max(1_000_000).default(1), pageSize: z.number().int().min(1).max(100).default(20), actionType: auditEventCodeSchema.optional() })
   .superRefine((value, ctx) => {
     if ((value.kind === 'revenue' || value.kind === 'expenses' || value.kind === 'payroll') && (!value.from || !value.to || value.from > value.to)) {
@@ -66,7 +66,13 @@ export const ownerDashboardSchema = z.strictObject({ gymSlug: slug, date: localD
     activeSessions: z.strictObject({ value: z.number().int().nonnegative(), definition: z.string(), numerator: z.number().int().nonnegative(), denominator: z.null(), sourceCount: z.number().int().nonnegative() }),
     trainersWithSessionsToday: z.strictObject({ value: z.number().int().nonnegative(), definition: z.string(), numerator: z.number().int().nonnegative(), denominator: z.null(), sourceCount: z.number().int().nonnegative() }),
     todayOperationalEarning: z.strictObject({ value: decimal, definition: z.string(), numerator: decimal, denominator: z.null(), sourceCount: z.number().int().nonnegative(), currency }),
+    monthOperationalEarning: z.strictObject({ value: decimal, from: localDate, through: localDate }),
     pendingRequests: z.strictObject({ value: z.number().int().nonnegative(), definition: z.string(), numerator: z.number().int().nonnegative(), denominator: z.null(), sourceCount: z.number().int().nonnegative() }),
+  }),
+  memberships: z.strictObject({
+    activeCount: z.number().int().nonnegative(),
+    expiringCount: z.number().int().nonnegative(),
+    expiring: z.array(z.strictObject({ memberId: id, memberName: z.string().min(1).max(120), endDateExclusive: localDate })).max(10),
   }),
   earningChart: z.array(z.strictObject({ startHour: z.number().int().min(6).max(20), endHour: z.number().int().min(8).max(22), amount: decimal, sourceCount: z.number().int().nonnegative() })).length(8),
   sessions: z.array(z.strictObject({ id, state: z.string().min(1).max(32), type: z.string().min(1).max(32), scheduledStartAt: instant,

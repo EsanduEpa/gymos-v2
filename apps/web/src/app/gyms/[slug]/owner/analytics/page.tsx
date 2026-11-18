@@ -18,6 +18,7 @@ export default async function OwnerAnalyticsPage({ params, searchParams }: { par
   const parsed = response.ok ? gymAnalyticsSchema.safeParse(await response.json().catch(() => null)) : null;
   const data = parsed?.success ? parsed.data : null;
   const brand = resolveGymBrandColors(theme.primaryColor); const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
+  const dateTime = data ? new Intl.DateTimeFormat('en-GB', { timeZone: data.timeZone, dateStyle: 'medium', timeStyle: 'short' }) : null;
   return <DashboardChrome identityId={session.identityId} key={`${session.identityId}:${gym.id}:${gym.role}`} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'} style={style}>
     <div className="gym-banner"><div><h1>Operational Analytics</h1><p>Insights on trainer utilisation, member peak hours, and signup growth.</p></div></div>
     <nav className="finance-tabs" aria-label="Analytics windows"><a className={`finance-tab ${window === '30d' ? 'finance-tab-active' : ''}`} aria-current={window === '30d' ? 'page' : undefined} href="?window=30d">30 days</a><a className={`finance-tab ${window === '6m' ? 'finance-tab-active' : ''}`} aria-current={window === '6m' ? 'page' : undefined} href="?window=6m">Six months</a></nav>
@@ -25,6 +26,18 @@ export default async function OwnerAnalyticsPage({ params, searchParams }: { par
       <Card><CardHeader eyebrow="CAPACITY ESTIMATE" title={data.utilization.label}/><p className="owner-analytics-method">{data.utilization.formula}</p>{data.utilization.points.length ? <div className="owner-utilization-chart">{data.utilization.points.map(point => <div className="owner-utilization-row" key={point.trainerId}><span>{point.trainerName}</span><div className="owner-utilization-track" aria-label={`${point.valuePercent ?? 'Unavailable'} percent estimated utilization`}><i style={{ width: `${point.valuePercent ?? 0}%` }}/></div><strong>{point.valuePercent === null ? 'Unavailable' : `${point.valuePercent}%`}</strong><small>{point.scheduledHours} scheduled h · {point.idleHours} estimated idle h · {point.availableHours} available h</small></div>)}</div> : <EmptyState title="No active trainers to compare." hint="Trainer utilization appears when trainer profiles have operating shifts or use the documented default."/>}</Card>
       <Card><CardHeader eyebrow="PEAK SESSION HOURS" title={data.peakHours.label}/><p className="owner-analytics-method">{data.peakHours.formula}</p><div className="owner-analytics-bars" role="img" aria-label="Average sessions by gym-local hour; exact values are listed below">{data.peakHours.points.map(point => { const max = Math.max(1, ...data.peakHours.points.map(value => value.averagePerDay)); return <div key={point.hour}><b>{point.averagePerDay}</b><i style={{ height: `${Math.max(2, point.averagePerDay / max * 100)}%` }}/><small>{String(point.hour).padStart(2, '0')}</small></div>; })}</div><p className="owner-analytics-sr-only">{data.peakHours.points.map(point => `${String(point.hour).padStart(2, '0')}:00, ${point.averagePerDay} average per day; `)}</p></Card>
       <Card><CardHeader eyebrow="MEMBER GROWTH" title={data.memberGrowth.label}/><p className="owner-analytics-method">{data.memberGrowth.formula}</p><div className="owner-analytics-bars owner-growth-chart" role="img" aria-label="Member profiles created by month; exact values are listed below">{data.memberGrowth.points.map(point => { const max = Math.max(1, ...data.memberGrowth.points.map(value => value.count)); return <div key={point.month}><b>{point.count}</b><i style={{ height: `${Math.max(2, point.count / max * 100)}%` }}/><small>{point.month}</small></div>; })}</div><p className="owner-analytics-sr-only">{data.memberGrowth.points.map(point => `${point.month}, ${point.count} profiles; `)}</p></Card>
+      <Card><CardHeader title="Trainer performance"/>
+        <p>{dateTime?.format(new Date(data.trainerPerformance.currentFrom))} to {dateTime?.format(new Date(data.trainerPerformance.throughExclusive))} · {data.timeZone}</p>
+        <p>Returning clients completed PT with the same trainer in both this period and the preceding period of equal length.</p>
+        {data.trainerPerformance.points.length ? <div className="ui-table-shell"><div className="ui-table-scroll" tabIndex={0} role="region" aria-label="Trainer performance table">
+          <table><thead><tr><th scope="col">Trainer</th><th scope="col">Completed PT</th><th scope="col">Clients</th><th scope="col">Returning / prior clients</th><th scope="col">Retention</th></tr></thead>
+            <tbody>{data.trainerPerformance.points.map(point => <tr key={point.trainerId}>
+              <th scope="row">{point.trainerName}</th><td>{point.completedSessions}</td><td>{point.clients}</td>
+              <td>{point.returningClients} / {point.priorClients}</td><td>{point.retentionPercent === null ? '—' : `${point.retentionPercent}%`}</td>
+            </tr>)}</tbody>
+          </table>
+        </div></div> : <EmptyState title="No active trainers to compare."/>}
+      </Card>
     </div>}
   </DashboardChrome>;
 }

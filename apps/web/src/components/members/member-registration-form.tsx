@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useRef, useState, useTransition } from 'react';
+import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import type { MembershipPlan } from '@gymos/contracts';
 import { acknowledgeMemberCredential, registerMemberAction, reissueMemberCredential } from '@/app/member-actions';
@@ -10,6 +10,8 @@ import { Button, Card, CardHeader, Feedback } from '@/components/ui';
 export function MemberRegistrationForm({ slug, plans, initialRequestKey }: { slug: string; plans: MembershipPlan[]; initialRequestKey: string }) {
   const router = useRouter();
   const [state, action, pending] = useActionState(registerMemberAction.bind(null, slug), { idempotencyKey: initialRequestKey } satisfies MemberRegistrationActionState);
+  const submitting = useRef(false);
+  useEffect(() => { submitting.current = false; }, [state]);
   const [requestKey, setRequestKey] = useState(initialRequestKey);
   const [draft, setDraft] = useState({ fullName: '', email: '', phone: '', dateOfBirth: '', emergencyContact: '', healthNotes: '', membershipPlanId: '' });
   const [replacement, setReplacement] = useState<{ password?: string; version: number } | null>(null);
@@ -69,6 +71,10 @@ export function MemberRegistrationForm({ slug, plans, initialRequestKey }: { slu
       This email belongs to an existing GymOS identity. The person must sign in, review this gym enrollment, and explicitly accept it before registration can finish. Share this private sign-in path and request reference with them, then retry this unchanged form: <a href={`/gyms/${encodeURIComponent(slug)}/enrollment-consent/${encodeURIComponent(result.operationId)}`}>Review enrollment consent</a> · <code>{result.operationId}</code>
     </Feedback> : null}
     {!completed ? <form action={action} className="stack-form member-registration-fields" onSubmit={event => {
+      // A second submit can be queued before React disables the button. Its
+      // replay result cannot contain the one-time password from the first.
+      if (submitting.current) { event.preventDefault(); return; }
+      submitting.current = true;
       // Server Actions reset their form controls after resolving. Capture the
       // submitted values into React state before that reset so a pending
       // consent response can be resumed without changing the enrollment.

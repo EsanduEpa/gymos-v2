@@ -1,3 +1,4 @@
+import { formatDisplayDate } from '@/lib/display-date';
 import type { CSSProperties } from 'react';
 import { randomUUID } from 'node:crypto';
 import { notFound, redirect } from 'next/navigation';
@@ -5,6 +6,8 @@ import { accountProfileSchema, selfMemberProfileSchema, selfTrainerProfileSchema
 import { resolveGymBrandColors } from '@gymos/theme-tokens';
 import { DashboardChrome } from '@/components/navigation/dashboard-chrome';
 import { AccountProfileForm, GymSelfProfileForm } from '@/components/profile/profile-forms';
+import { ProfilePhotoForm } from '@/components/profile/profile-photo-form';
+import { TrainerShiftRequestForm } from '@/components/trainers/trainer-shift-request-form';
 import { Card, Feedback } from '@/components/ui';
 import { apiUrl } from '@/lib/gymos';
 import { requireGymContext } from '@/lib/gym-context';
@@ -34,10 +37,14 @@ export default async function GymProfilePage({ params }: { params: Promise<{ slu
         {'trainerId' in profile.data ? <><div><dt>Experience</dt><dd>{profile.data.yearsExperience === null ? 'Not provided' : `${profile.data.yearsExperience} years`}</dd></div>
           <div><dt>Specialisations</dt><dd>{profile.data.specialisations.join(', ') || 'Not listed'}</dd></div>
           <div className="profile-details-wide"><dt>Professional biography</dt><dd>{profile.data.biography || 'Not provided'}</dd></div></>
-          : <><div><dt>Date of birth</dt><dd>{profile.data.dateOfBirth || 'Not provided'}</dd></div><div><dt>Emergency contact</dt><dd>{profile.data.emergencyContact || 'Not provided'}</dd></div></>}</> : null}
+          : <><div><dt>Date of birth</dt><dd>{profile.data.dateOfBirth ? <time dateTime={profile.data.dateOfBirth}>{formatDisplayDate(profile.data.dateOfBirth)}</time> : 'Not provided'}</dd></div><div><dt>Emergency contact</dt><dd>{profile.data.emergencyContact || 'Not provided'}</dd></div></>}</> : null}
     </dl></Card>
     {!account?.success ? <Card><Feedback tone="error">Your account profile is unavailable. No changes were made.</Feedback></Card> : <AccountProfileForm key={`identity:${account.data.version}`} profile={account.data} requestKey={randomUUID()}/>}
     {gym.role !== 'OWNER' ? !profile?.success ? <Card><Feedback tone="error">Your gym profile is unavailable. No changes were made.</Feedback></Card>
-      : <GymSelfProfileForm key={`${'memberId' in profile.data ? profile.data.memberId : profile.data.trainerId}:${profile.data.version}`} slug={slug} role={gym.role} profile={profile.data} requestKey={randomUUID()}/> : <Card><h2>Gym owner profile</h2><p>The account display name above is your profile name. Owner role and gym business details are managed separately.</p></Card>}
+      : <>
+        <GymSelfProfileForm key={`${'memberId' in profile.data ? profile.data.memberId : profile.data.trainerId}:${profile.data.version}`} slug={slug} role={gym.role} profile={profile.data} requestKey={randomUUID()}/>
+        <ProfilePhotoForm slug={slug} version={profile.data.version} hasPhoto={Boolean(profile.data.hasPhoto)} requestKey={randomUUID()}/>
+        {'trainerId' in profile.data ? <TrainerShiftRequestForm key={profile.data.version} slug={slug} profile={profile.data} requestKey={randomUUID()}/> : null}
+      </> : <Card><h2>Gym owner profile</h2><p>The account display name above is your profile name. Owner role and gym business details are managed separately.</p></Card>}
   </DashboardChrome>;
 }

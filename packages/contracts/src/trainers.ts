@@ -1,10 +1,13 @@
 import { z } from 'zod';
+import { trainerSessionPaySchema } from './configuration.js';
 const idSchema = z.string().min(1).max(128).regex(/^[A-Za-z0-9_:-]+$/);
 const versionSchema = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const idempotencyKeySchema = z.string().min(16).max(128).regex(/^[\x21-\x7e]+$/);
 
 const trainerLevelSchema = z.enum(['LEVEL_1', 'LEVEL_2']);
 const shiftTimeSchema = z.string().regex(/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/);
+const shiftHoursSchema = z.strictObject({ start: shiftTimeSchema, end: shiftTimeSchema, overnight: z.boolean() });
+export const pendingTrainerShiftSchema = shiftHoursSchema.extend({ id: z.uuid(), submittedAt: z.iso.datetime({ offset: true }) });
 const pageQuerySchema = z.strictObject({
   page: z.union([z.number(), z.string().regex(/^[1-9][0-9]*$/)]).transform(Number).pipe(z.number().int().min(1)).default(1),
   pageSize: z.union([z.number(), z.string().regex(/^[1-9][0-9]*$/)]).transform(Number).pipe(z.number().int().min(1).max(100)).default(25),
@@ -14,6 +17,7 @@ export const trainerListQuerySchema = pageQuerySchema.extend({
   q: z.string().trim().max(120).optional(),
   status: z.enum(['ACTIVE', 'DEACTIVATED']).optional(),
   level: trainerLevelSchema.optional(),
+  shift: z.literal('pending').optional(),
 });
 
 const trainerSummarySchema = z.strictObject({
@@ -21,6 +25,7 @@ const trainerSummarySchema = z.strictObject({
   level: trainerLevelSchema.nullable(), specialisations: z.array(z.string().max(60)).max(20), yearsExperience: z.number().int().nonnegative().max(80).nullable(),
   shiftStart: shiftTimeSchema.nullable(), shiftEnd: shiftTimeSchema.nullable(), bio: z.string().max(2000).nullable(),
   status: z.enum(['ACTIVE', 'DEACTIVATED']), registrationState: z.enum(['PENDING', 'COMPLETE', 'FAILED']), version: versionSchema, createdAt: z.iso.datetime({ offset: true }),
+  hasPendingShift: z.boolean().optional(),
 });
 const trainerMemberSummarySchema = z.strictObject({
   id: idSchema, fullName: z.string().min(2).max(120), level: trainerLevelSchema.nullable(),
@@ -47,14 +52,21 @@ const trainerRecentSessionSchema = z.strictObject({
 });
 export const trainerProfileSchema = z.strictObject({
   trainer: trainerSummarySchema,
+  pendingShift: pendingTrainerShiftSchema.nullable().optional(),
+  compensation: z.strictObject({ sessionPayOverride: trainerSessionPaySchema.nullable(), currency: z.enum(['LKR', 'USD']) }).optional(),
   gymTimeZone: z.string().min(1).max(100),
   profile: z.strictObject({ email: z.email().nullable(), phone: z.string().max(40).nullable(), biography: z.string().max(2000).nullable(), joinedAt: z.iso.datetime({ offset: true }) }),
   recentSessions: z.strictObject({ items: z.array(trainerRecentSessionSchema).max(10), limit: z.literal(10), totalCount: z.number().int().nonnegative(), hasMore: z.boolean() }),
   stats: z.strictObject({ relatedClientCount: z.number().int().nonnegative(), completedInLoadedWindow: z.number().int().nonnegative(), totalCompleted: z.number().int().nonnegative(), rating: z.null() }),
   asOf: z.iso.datetime({ offset: true }),
 });
-export const trainerShiftInputSchema = z.strictObject({ start: shiftTimeSchema, end: shiftTimeSchema, overnight: z.boolean(), expectedVersion: versionSchema });
-export const trainerShiftResultSchema = z.strictObject({ trainerId: idSchema, shift: z.strictObject({ start: shiftTimeSchema, end: shiftTimeSchema, overnight: z.boolean() }), timeZone: z.string().min(1).max(100), version: versionSchema });
+export const trainerSessionPayInputSchema = z.strictObject({ amount: trainerSessionPaySchema.nullable(), expectedVersion: versionSchema });
+export const trainerSessionPayResultSchema = z.strictObject({ amount: trainerSessionPaySchema.nullable(), version: versionSchema });
+export const trainerShiftInputSchema = shiftHoursSchema.extend({ expectedVersion: versionSchema });
+export const trainerShiftProposalInputSchema = trainerShiftInputSchema.extend({ requestId: z.uuid() });
+export const trainerShiftReviewInputSchema = z.strictObject({ requestId: z.uuid(), decision: z.enum(['APPROVE', 'DECLINE']), expectedVersion: versionSchema });
+export const trainerShiftResultSchema = z.strictObject({ trainerId: idSchema, shift: shiftHoursSchema, timeZone: z.string().min(1).max(100), version: versionSchema });
+export type PendingTrainerShift = z.infer<typeof pendingTrainerShiftSchema>;
 export const trainerStatusInputSchema = z.strictObject({
   targetStatus: z.enum(['ACTIVE', 'DEACTIVATED']),
   expectedVersion: versionSchema,
@@ -70,6 +82,7 @@ export const memberTrainerDirectoryQuerySchema = pageQuerySchema.extend({ q: z.s
 export const memberTrainerDirectorySchema = trainerPageSchema(trainerMemberSummarySchema);
 export const memberTrainerProfileSchema = z.strictObject({
   trainer: trainerMemberSummarySchema.extend({ yearsExperience: z.number().int().nonnegative().max(80).nullable() }),
+  hasPhoto: z.boolean().optional(),
   completedSessions: z.number().int().nonnegative(),
   asOf: z.iso.datetime({ offset: true }),
 });

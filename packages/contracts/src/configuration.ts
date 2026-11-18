@@ -6,13 +6,16 @@ const decimalStringSchema = z.string().max(128).regex(/^-?(?:0|[1-9][0-9]*)(?:\.
 
 export const payPeriodSchema = z.enum(['WEEKLY', 'MONTHLY']);
 export const moneyAmountSchema = decimalStringSchema.refine((value) => ((value.replace(/^-/, '').split('.')[1]?.length ?? 0) <= 4));
+export const trainerSessionPaySchema = z.string().trim().regex(/^(?:0|[1-9]\d{0,14})(?:\.\d{1,2})?$/, 'Enter an amount of zero or more with up to two decimal places.');
+const payPremiumSchema = z.string().regex(/^(?:0|1)(?:\.\d{1,6})?$/, 'Enter a percentage from 0 to 100.').refine(value => Number(value) <= 1, 'Enter a percentage from 0 to 100.');
 export const gymConfigurationSchema = z.strictObject({
   version: versionSchema,
   currency: z.enum(['LKR', 'USD']), timezone: z.string().min(1).max(100),
   address: z.string().max(300), phone: z.string().max(40).nullable(), email: z.email().max(254).nullable(),
   payPeriod: payPeriodSchema,
   defaultSessionFee: moneyAmountSchema, level2SessionFee: moneyAmountSchema.nullable(), introSessionFee: moneyAmountSchema.nullable(),
-  level1BaseRate: moneyAmountSchema, level2BaseRate: moneyAmountSchema, offShiftPremium: moneyAmountSchema,
+  level1BaseRate: payPremiumSchema, level2BaseRate: payPremiumSchema, offShiftPremium: payPremiumSchema,
+  level1SessionPay: trainerSessionPaySchema.optional(), level2SessionPay: trainerSessionPaySchema.optional(),
   cancellationWindowMinutes: z.number().int().min(0).max(10080), lateCancelDeduction: z.boolean(),
   minimumSessionDurationMinutes: z.number().int().min(15).max(480),
 });
@@ -30,13 +33,21 @@ export const createMembershipPlanSchema = z.strictObject({
   name: z.string().trim().min(1).max(80), description: z.string().trim().max(500).nullable().optional(),
   price: decimalStringSchema, durationDays: z.number().int().min(1).max(3650),
 });
+export const manageMembershipPlanSchema = z.discriminatedUnion('action', [
+  createMembershipPlanSchema.extend({ action: z.literal('EDIT'), expectedPlanVersion: versionSchema }),
+  z.strictObject({ action: z.enum(['ARCHIVE', 'DELETE']), expectedVersion: versionSchema, expectedPlanVersion: versionSchema }),
+]);
+export const managedMembershipPlanSchema = z.strictObject({
+  id: idSchema, plan: membershipPlanSchema.nullable(), configurationVersion: versionSchema,
+});
 export const updateConfigurationSchema = z.strictObject({
   expectedVersion: versionSchema,
   address: z.string().trim().max(300).optional(), phone: z.string().trim().max(40).nullable().optional(),
   email: z.union([z.email().max(254), z.literal('')]).nullable().optional(), payPeriod: payPeriodSchema.optional(),
   defaultSessionFee: decimalStringSchema.optional(), level2SessionFee: z.union([decimalStringSchema, z.literal('')]).nullable().optional(),
   introSessionFee: z.union([decimalStringSchema, z.literal('')]).nullable().optional(),
-  level1BaseRate: decimalStringSchema.optional(), level2BaseRate: decimalStringSchema.optional(), offShiftPremium: decimalStringSchema.optional(),
+  level1BaseRate: decimalStringSchema.optional(), level2BaseRate: decimalStringSchema.optional(), offShiftPremium: payPremiumSchema.optional(),
+  level1SessionPay: trainerSessionPaySchema.optional(), level2SessionPay: trainerSessionPaySchema.optional(),
   cancellationWindowMinutes: z.number().int().min(0).max(10080).optional(), lateCancelDeduction: z.boolean().optional(),
   minimumSessionDurationMinutes: z.number().int().min(15).max(480).optional(),
 }).refine(({ expectedVersion: _version, ...changes }) => Object.keys(changes).length > 0);

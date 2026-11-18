@@ -173,6 +173,10 @@ test('trainer appearance covers schedule requests clients builders and earnings 
   page.on('pageerror', e => errors.push(e.message));
   await openAs(page, fixture.users.trainerUser.id, `/gyms/${fixture.gyms[0].slug}`);
   await expect(page).toHaveURL(new RegExp(`${base}/schedule$`));
+  const active = await fixture.tenants[0]!.pTSession.findUniqueOrThrow({ where: { id: `read-active-${environment.runId}` } });
+  const activeDate = localDate(active.scheduledStartAt, active.gymTimezone);
+  const daySchedule = `${webBase}${base}/schedule?mode=day&date=${activeDate}`;
+  await page.goto(daySchedule);
   await expect(page.locator('.trainer-workspace')).toBeVisible();
   await expect(page.locator('.trainer-metric').nth(1).locator('strong')).toHaveText('1');
   await expect(page.locator('.trainer-metric').nth(2).locator('strong')).toHaveText('2');
@@ -204,7 +208,7 @@ test('trainer appearance covers schedule requests clients builders and earnings 
         await page.screenshot({ path: join(evidenceDirectory, `${mode}-screen-${index}-${width}.png`), fullPage: true, animations: 'disabled' });
       }
     }
-    await page.goto(`${webBase}${base}/schedule`);
+    await page.goto(daySchedule);
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('data-appearance', mode);
   }
@@ -385,7 +389,9 @@ test('trainer accepts declines completes with confirmation and saves member-visi
   const tenant = fixture.tenants[0];
   expect((await tenant.pTSession.findFirstOrThrow({ where: { notes: 'Trainer UI request 0' } })).state).toBe('SCHEDULED');
   expect((await tenant.pTSession.findFirstOrThrow({ where: { notes: 'Trainer UI request 1' } })).state).toBe('DECLINED');
-  await page.goto(`${webBase}${base}/schedule`);
+  const activeSession = await tenant.pTSession.findUniqueOrThrow({ where: { id: `read-active-${environment.runId}` } });
+  const activeDate = localDate(activeSession.scheduledStartAt, activeSession.gymTimezone);
+  await page.goto(`${webBase}${base}/schedule?mode=day&date=${activeDate}`);
   const card = page.locator(`#session-read-active-${environment.runId}`);
   await card.getByRole('button', { name: 'Complete session', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Complete this session?', exact: true });
@@ -403,13 +409,16 @@ test('trainer accepts declines completes with confirmation and saves member-visi
   await card.getByLabel('Member-visible session notes').fill('Trainer UI completed coaching notes');
   await card.getByRole('button', { name: 'Save notes', exact: true }).click();
   await expect(card).toContainText('Shared session notes saved.');
-  const ready = page.locator(`#session-trainer-ready-${environment.runId}`);
+  const readySession = await tenant.pTSession.findUniqueOrThrow({ where: { id: `trainer-ready-${environment.runId}` } });
+  const readyDate = localDate(readySession.scheduledStartAt, readySession.gymTimezone);
+  if (readyDate !== activeDate) await page.goto(`${webBase}${base}/schedule?mode=day&date=${readyDate}`);
+  const ready = page.locator(`#session-${readySession.id}`);
   await ready.getByRole('button', { name: 'Start session', exact: true }).click();
   await expect(ready).toContainText('ACTIVE');
   expect((await tenant.pTSession.findUniqueOrThrow({ where: { id: `trainer-ready-${environment.runId}` } })).state).toBe('ACTIVE');
   await page.goto(`${webBase}${base}/earnings`);
   await expect(page.locator('.trainer-earnings-metrics')).not.toContainText('Unavailable');
   await expect(page.getByRole('main')).toContainText('do not report payment or payout');
-  await openAs(page, fixture.users.memberUser.id, `/gyms/${fixture.gyms[0].slug}/member/sessions`);
+  await openAs(page, fixture.users.memberUser.id, `/gyms/${fixture.gyms[0].slug}/member/sessions?mode=day&date=${activeDate}`);
   await expect(page.getByRole('main')).toContainText('Trainer UI completed coaching notes');
 });

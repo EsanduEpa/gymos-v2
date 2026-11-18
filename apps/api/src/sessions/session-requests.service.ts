@@ -12,6 +12,8 @@ import { reserveSessionCredit } from './credit-holds.js';
 import { retrySessionTransaction } from './session-transactions.js';
 import { allowedStartMinutes, type AvailabilityRule } from './availability-policy.js';
 import { requestCanBeAccepted, requestExpiryInstant } from './session-state.js';
+import { withinShift } from './booking.service.js';
+import { trainerPayForConfirmation } from './trainer-pay.js';
 import { sessionDecisionInputSchema, sessionDecisionResultSchema, sessionRequestInputSchema, sessionRequestOptionsSchema, sessionRequestResultSchema, trainerSessionRequestsSchema } from '@gymos/contracts';
 
 type Access = TenantGateContext & { identityId: string; identityVersion: number; accessVersion: number; role: string; slug: string;
@@ -24,24 +26,6 @@ function partsAt(instant: Date, timeZone: string) {
 }
 function localKey(p: ReturnType<typeof partsAt>) { return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}T${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}`; }
 function localDateAt(date: Date, zone: string) { const p = partsAt(date, zone); return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`; }
-function shiftCovered(start: Date, end: Date, zone: string, shiftStart: string | null, shiftEnd: string | null) {
-  if (!shiftStart || !shiftEnd) return true;
-  const a = partsAt(start, zone); const b = partsAt(new Date(end.getTime() - 60_000), zone);
-  const startMinute = a.hour * 60 + a.minute; const endMinute = b.hour * 60 + b.minute + 1;
-  const shiftA = Number(shiftStart.slice(0, 2)) * 60 + Number(shiftStart.slice(3)); const shiftB = Number(shiftEnd.slice(0, 2)) * 60 + Number(shiftEnd.slice(3));
-  const startDate = localDateAt(start, zone); const endDate = localDateAt(new Date(end.getTime() - 60_000), zone);
-  if (shiftB > shiftA) return startDate === endDate && startMinute >= shiftA && endMinute <= shiftB;
-  const nextDate = new Date(`${startDate}T00:00:00.000Z`); nextDate.setUTCDate(nextDate.getUTCDate() + 1);
-  const next = nextDate.toISOString().slice(0, 10);
-  if (startMinute >= shiftA) return endDate === startDate || endDate === next && endMinute <= shiftB;
-  return startMinute < shiftB && endDate === startDate && endMinute <= shiftB;
-}
-function addDecimal(left: string, right: string) {
-  const [lw = '0', lf = ''] = left.split('.'); const [rw = '0', rf = ''] = right.split('.'); const scale = Math.max(lf.length, rf.length); const unit = 10n ** BigInt(scale);
-  const a = BigInt(lw) * unit + BigInt((lf + '0'.repeat(scale)).slice(0, scale) || '0'); const b = BigInt(rw) * unit + BigInt((rf + '0'.repeat(scale)).slice(0, scale) || '0');
-  const total = a + b; const fraction = (total % unit).toString().padStart(scale, '0').replace(/0+$/, '');
-  return fraction ? `${total / unit}.${fraction}` : (total / unit).toString();
-}
 function resolveLocal(date: string, time: string, zone: string, selectedOffset?: string) {
   try { new Intl.DateTimeFormat('en', { timeZone: zone }).format(new Date()); } catch { throw new UnprocessableEntityException('Use the gym time zone'); }
   const [y, m, d] = date.split('-').map(Number); const [h, min] = time.split(':').map(Number);
@@ -128,9 +112,10 @@ export class SessionRequestsService {
     return this.gate.withVerifiedTenant(access, async tenant => withGymAccessFence(this.db.master, [
       { identityId: access.identityId, gymId: access.gymId, role: 'TRAINER', tenantActorId: access.actor!.id },
     ], async () => {
-      const [trainer, clockRows] = await Promise.all([
-        tenant.trainer.findUnique({ where: { id: access.actor!.id }, select: { identityId: true, registrationState: true, status: true } }),
+      const [trainer, clockRows, config] = await Promise.all([
+        tenant.trainer.findUnique({ where: { id: access.actor!.id }, select: { identityId: true, registrationState: true, status: true, level: true, sessionPayOverride: true, shiftStart: true, shiftEnd: true } }),
         tenant.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`,
+        tenant.gymConfiguration.findUnique({ where: { id: 'current' } }),
       ]);
       if (!trainer || trainer.identityId !== access.identityId || trainer.registrationState !== 'COMPLETE' || trainer.status !== 'ACTIVE') throw new ForbiddenException('Trainer access is inactive');
       const rows = await tenant.pTSession.findMany({ where: { trainerId: access.actor!.id, state: 'PENDING_CONFIRMATION', requestExpiresAt: { gt: clockRows[0]!.now } },
@@ -138,7 +123,11 @@ export class SessionRequestsService {
       return trainerSessionRequestsSchema.parse({ items: rows.map(session => ({ id: session.id, memberId: session.memberId,
         memberName: session.member.fullName, state: session.state, type: session.type, scheduledStartAt: session.scheduledStartAt.toISOString(),
         scheduledEndAt: session.scheduledEndAt.toISOString(), timeZone: session.gymTimezone, requestExpiresAt: session.requestExpiresAt!.toISOString(),
-        durationMinutes: Math.round((session.scheduledEndAt.getTime() - session.scheduledStartAt.getTime()) / 60_000), notes: session.notes, version: session.version })),
+        durationMinutes: Math.round((session.scheduledEndAt.getTime() - session.scheduledStartAt.getTime()) / 60_000), notes: session.notes, version: session.version,
+        ...(config?.currency && config.timezone && trainer.level ? { estimatedTrainerPay: {
+          currency: config.currency, amount: trainerPayForConfirmation(config, trainer, withinShift(session.scheduledStartAt, session.scheduledEndAt, config.timezone, trainer.shiftStart, trainer.shiftEnd)),
+        } } : {}),
+      })),
         asOf: clockRows[0]!.now.toISOString() });
     }));
   }
@@ -265,12 +254,11 @@ export class SessionRequestsService {
               const term = await tx.membershipTerm.findFirst({ where: { memberId: session.memberId, startDate: { lte: day }, endDateExclusive: { gt: day } }, select: { id: true } });
               if (!term) throw new UnprocessableEntityException('Member has no active membership for the session date');
               const fee = session.trainer.level === 'LEVEL_2' ? config.level2SessionFee ?? config.defaultSessionFee : config.defaultSessionFee;
-              const rate = session.trainer.level === 'LEVEL_2' ? config.level2BaseRate : config.level1BaseRate;
-              const coveredByShift = shiftCovered(session.scheduledStartAt, session.scheduledEndAt, config.timezone, session.trainer.shiftStart, session.trainer.shiftEnd);
-              const confirmationRate = coveredByShift ? rate.toString() : addDecimal(rate.toString(), config.offShiftPremium.toString());
+              const coveredByShift = withinShift(session.scheduledStartAt, session.scheduledEndAt, config.timezone, session.trainer.shiftStart, session.trainer.shiftEnd);
+              const confirmedTrainerPay = trainerPayForConfirmation(config, session.trainer, coveredByShift);
               updated = await tx.pTSession.update({ where: { id: session.id, version: input.data.expectedVersion, state: 'PENDING_CONFIRMATION' }, data: {
                 state: 'SCHEDULED', version: { increment: 1 }, confirmedAt: requestClock!.now, gymTimezone: config.timezone,
-                fee: fee.toString(), currency: config.currency, confirmationLevel: session.trainer.level!, confirmationRate,
+                fee: fee.toString(), currency: config.currency, confirmationLevel: session.trainer.level!, confirmationRate: '0', confirmedTrainerPay,
                 confirmationShiftStart: session.trainer.shiftStart, confirmationShiftEnd: session.trainer.shiftEnd, configurationVersion: config.version,
               } });
               await reserveSessionCredit(tx, { masterGymId: access.gymId, sessionId: session.id, memberId: session.memberId, trainerId: session.trainerId,

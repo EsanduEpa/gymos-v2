@@ -14,7 +14,7 @@
   --secondary: #f4f7fc;
   --secondary-foreground: #344054;
   --muted: #f4f7fc;
-  --muted-foreground: #667085;
+  --muted-foreground: #586478;
   --accent: #eaf1ff;
   --accent-foreground: #1d4ed8;
   --border: #e3e9f1;
@@ -69,8 +69,8 @@
 }
 html[data-appearance="dark"] .themed-workspace {
   color-scheme: dark;
-  --background: #0a1528;
-  --foreground: #eff7ff;
+  --background: var(--dark-page);
+  --foreground: var(--dark-text);
   --card: #17243b;
   --card-foreground: #eff7ff;
   --sidebar: #0d1b30;
@@ -100,6 +100,7 @@ html[data-appearance="dark"] .themed-workspace {
   --info-soft: #213657;
 }
 .themed-workspace *, .themed-workspace *::before, .themed-workspace *::after { box-sizing: border-box; }
+.themed-workspace :is(.muted, .form-note) { color: var(--muted-foreground); }
 .themed-workspace :focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
 .themed-workspace button, .themed-workspace input, .themed-workspace select, .themed-workspace textarea { font: inherit; }
 .themed-workspace svg { flex-shrink: 0; stroke-width: 1.8; }
@@ -245,7 +246,7 @@ html:not([data-appearance="dark"]) .appearance-toggle button:first-child, html[d
 .themed-workspace .ui-field-label { color: var(--foreground); font-size: 12px; text-transform: none; }
 .themed-workspace .ui-field input, .themed-workspace .ui-field select, .themed-workspace .ui-field textarea { width: 100%; min-width: 0; min-height: 42px; padding: 10px 12px; border: 1px solid var(--input); border-radius: 8px; background: var(--card); color: var(--foreground); font-size: 12px; line-height: 1.5; outline: none; }
 .themed-workspace .ui-field input:focus, .themed-workspace .ui-field select:focus, .themed-workspace .ui-field textarea:focus { border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 20%, transparent); }
-.themed-workspace .ui-field input::placeholder { color: var(--muted-foreground); }
+.themed-workspace .ui-field :is(input, select, textarea):focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .password-input-row { position: relative; display: block; }
 .themed-workspace .password-input-row input { padding-right: 104px; }
 .password-visibility { position: absolute; top: 50%; right: 10px; transform: translateY(-50%); border: 0; background: transparent; color: var(--primary); font-size: 11px; font-weight: 600; cursor: pointer; }

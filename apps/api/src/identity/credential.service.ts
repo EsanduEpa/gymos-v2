@@ -482,10 +482,19 @@ export class CredentialService {
       await tx.$queryRaw`SELECT "id" FROM "RecoveryCredential" WHERE "id" = ${input.credentialId} FOR UPDATE`;
       const credential = await tx.recoveryCredential.findUnique({ where: { id: input.credentialId } });
       const now = await this.databaseNow(tx);
-      if (credential?.identityId === located.identityId && credential.redeemedAt && !credential.revokedAt
+      if (credential?.identityId === located.identityId && credential.redeemedAt && !credential.revokedAt && credential.expiresAt > now
         && timingSafeEqual(Buffer.from(credential.secretHash, 'hex'), Buffer.from(secretHash(input.secret), 'hex'))) {
-        // A response-lost retry confirms the completed outcome without changing credentials again.
-        return { success: true as const };
+        // Confirm a response-lost retry only while its requested password is
+        // still current. A used link must not report success for a different password.
+        const user = await tx.user.findUnique({ where: { id: credential.identityId }, select: { passwordHash: true, passwordChangedAt: true } });
+        const account = credential.gymId ? await tx.gymAccount.findUnique({
+          where: { userId_gymId: { userId: credential.identityId, gymId: credential.gymId } },
+          select: { status: true, passwordHash: true, passwordChangedAt: true },
+        }) : null;
+        if (account && account.status !== 'ACTIVE') return { success: false as const };
+        const current = account ?? user;
+        return { success: Boolean(current?.passwordHash && current.passwordChangedAt?.getTime() === credential.redeemedAt.getTime()
+          && await argon2.verify(current.passwordHash, input.newPassword)) };
       }
       if (!credential || credential.identityId !== located.identityId || credential.redeemedAt || credential.revokedAt
         || credential.expiresAt <= now || credential.attempts >= credential.maxAttempts) {

@@ -93,7 +93,10 @@ it('creates a pending request without a hold, audits/notifies once and accepts i
   const replay = await service.request(memberAccess, body);
   expect(replay).toMatchObject({ receiptId: pending.receiptId, replayed: true, session: { id: pending.session.id } });
   const decision = { action: 'ACCEPT' as const, expectedVersion: 0, idempotencyKey: `accept-${run.runId}-0123456789` };
+  await tenant.trainer.update({ where: { id: trainer.id }, data: { sessionPayOverride: '37.50' } });
   const accepted = await service.decide(trainerAccess, pending.session.id, decision);
+  expect((await tenant.pTSession.findUniqueOrThrow({ where: { id: pending.session.id } })).confirmedTrainerPay?.toString()).toBe('37.5');
+  await tenant.trainer.update({ where: { id: trainer.id }, data: { sessionPayOverride: null } });
   expect(accepted).toMatchObject({ replayed: false, decision: 'ACCEPT', session: { state: 'SCHEDULED', version: 1 }, creditReservation: { state: 'HELD', packId: mainPack.id },
     notificationOutcome: { recipient: { role: 'MEMBER', actorId: member.id }, gymSlug: gym.slug, state: 'AVAILABLE', retryable: false } });
   const decisionReceipt = await tenant.commandReceipt.findUniqueOrThrow({ where: { id: accepted.receiptId } });

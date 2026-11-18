@@ -1,11 +1,12 @@
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
+import { ConflictException, ForbiddenException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { PrismaClient as TenantClient } from '../../src/generated/tenant/client.js';
 import { DatabaseService } from '../../src/database.service.js';
 import { CoachingService } from '../../src/coaching/coaching.service.js';
 import { TenantSchemaGateService } from '../../src/tenancy/tenant-schema-gate.service.js';
 import { createDisposableEnvironment } from '../support/disposable-environment.js';
 import { seedTwoGymFixture } from '../fixtures/two-gym-fixture.js';
+import { addLocalDays, asDate, gymLocalDate } from '../../src/membership-rules.js';
 
 let run: Awaited<ReturnType<typeof createDisposableEnvironment>>;
 let fixture: Awaited<ReturnType<typeof seedTwoGymFixture>>;
@@ -248,3 +249,183 @@ it('assigns meal entries once with server-computed totals and only exposes each 
   await expect(trainerContext.service.createMealPlan(trainerContext.access, member.id, randomUUID(), { ...body, totalCalories: 500 })).rejects.toThrow();
   await expect(trainerContext.service.memberMealPlans({ ...memberContext.access, role: 'TRAINER' }, {})).rejects.toBeInstanceOf(ForbiddenException);
 }, 60_000);
+
+it('filters dated and weekly workouts and records completion only for the assigned member and revision', async () => {
+  const trainer = await contextFor(0, 'TRAINER');
+  const member = await contextFor(0, 'MEMBER');
+  const assignedMember = await member.tenant.member.findUniqueOrThrow({ where: { id: member.access.actor!.id } });
+  await addSession({ memberId: assignedMember.id, trainerId: trainer.access.actor!.id, state: 'SCHEDULED', startAt: new Date(Date.now() + 14 * 86400000) });
+  const today = gymLocalDate('Asia/Colombo');
+  const weekday = asDate(today).getUTCDay() || 7;
+  const exercises = [{ name: 'Squat', sets: 3, restSeconds: 45 }];
+  const { plan } = await trainer.service.createWorkoutPlan(trainer.access, assignedMember.id, randomUUID(), {
+    name: 'Today’s workout', schedule: { kind: 'DATE', date: today }, exercises,
+  });
+  const { plan: recurring } = await trainer.service.createWorkoutPlan(trainer.access, assignedMember.id, randomUUID(), {
+    name: 'Weekly workout', schedule: { kind: 'WEEKLY', weekdays: [weekday] }, exercises,
+  });
+  expect((await member.service.memberWorkoutPlans(member.access, { on: 'today' })).items.map(item => item.id))
+    .toEqual(expect.arrayContaining([plan.id, recurring.id]));
+  const nextWeek = await member.service.memberWorkoutPlans(member.access, { on: addLocalDays(today, 7) });
+  expect(nextWeek.items.map(item => item.id)).toEqual([recurring.id]);
+  expect(nextWeek.canRecordCompletion).toBe(false);
+  expect(plan.exercises[0]?.restSeconds).toBe(45);
+
+  const change = { date: today, planRevision: plan.revision, sortOrder: 0, completed: true };
+  const other = await createBoundMember(0, 'Unassigned Workout Reviewer');
+  const otherAccess = { ...member.access, identityId: other.identity.id,
+    actor: { kind: 'MEMBER', id: other.member.id, registrationOperationId: other.member.enrollmentOperationId! } };
+  await expect(member.service.recordWorkoutCompletion(otherAccess, plan.id, change)).rejects.toBeInstanceOf(NotFoundException);
+  await expect(member.service.recordWorkoutCompletion(member.access, plan.id, { ...change, date: addLocalDays(today, 1) }))
+    .rejects.toBeInstanceOf(ConflictException);
+  await member.service.recordWorkoutCompletion(member.access, plan.id, change);
+  await member.service.recordWorkoutCompletion(member.access, plan.id, change);
+  expect(await member.tenant.workoutExerciseCompletion.count({ where: { planId: plan.id } })).toBe(1);
+  const scheduled = await member.service.memberWorkoutPlans(member.access, { on: 'today' });
+  expect(scheduled.items.find(item => item.id === plan.id)?.completedExerciseOrders).toEqual([0]);
+  await member.service.recordWorkoutCompletion(member.access, plan.id, { ...change, completed: false });
+  expect(await member.tenant.workoutExerciseCompletion.count({ where: { planId: plan.id } })).toBe(0);
+  await trainer.service.updateWorkoutPlan(trainer.access, assignedMember.id, plan.id, randomUUID(), {
+    name: 'Updated workout', expectedRevision: plan.revision, exercises,
+  });
+  await expect(member.service.recordWorkoutCompletion(member.access, plan.id, change)).rejects.toBeInstanceOf(ConflictException);
+}, 60_000);
+
+it('preserves the meal date across reads and edits and uses the gym calendar weekday', async () => {
+  const trainer = await contextFor(0, 'TRAINER');
+  const member = await contextFor(0, 'MEMBER');
+  const memberId = member.access.actor!.id;
+  await addSession({ memberId, trainerId: trainer.access.actor!.id, state: 'SCHEDULED', startAt: new Date(Date.now() + 15 * 86400000) });
+  const entries = [{ dayOfWeek: 1, mealType: 'Breakfast', foodItem: 'Test meal', calories: 350 }];
+  const date = '2026-11-15';
+  const { plan } = await trainer.service.createMealPlan(trainer.access, memberId, randomUUID(), {
+    name: 'Dated meals', scheduledDate: date, entries,
+  });
+  expect(plan).toMatchObject({ scheduledDate: date, entries: [{ dayOfWeek: 7, foodItem: 'Test meal' }] });
+  expect((await member.service.memberMealPlans(member.access, {})).items).toContainEqual(plan);
+  const { plan: updated } = await trainer.service.updateMealPlan(trainer.access, memberId, plan.id, randomUUID(), {
+    name: 'Dated meals revised', scheduledDate: null, expectedRevision: plan.revision, entries,
+  });
+  expect(updated.scheduledDate).toBeUndefined();
+  expect(updated.entries[0]?.dayOfWeek).toBe(1);
+}, 60_000);
+
+it('keeps dietary notes and progress private, stores encrypted values, and rejects stale dietary edits', async () => {
+  vi.stubEnv('GYMOS_COACHING_DATA_KEY', randomBytes(32).toString('hex'));
+  try {
+    const trainer = await contextFor(0, 'TRAINER');
+    const member = await contextFor(0, 'MEMBER');
+    const otherOwner = await contextFor(1, 'OWNER');
+    const memberId = member.access.actor!.id;
+    await addSession({ memberId, trainerId: trainer.access.actor!.id, state: 'SCHEDULED', startAt: new Date(Date.now() + 16 * 86400000) });
+    const other = await createBoundMember(0, 'Unassigned Coaching Records Reviewer');
+    const otherAccess = { ...member.access, identityId: other.identity.id,
+      actor: { kind: 'MEMBER', id: other.member.id, registrationOperationId: other.member.enrollmentOperationId! } };
+
+    const dietary = { expectedVersion: null, allergies: ['Synthetic cashew allergy'], restrictions: ['Vegetarian'] };
+    const saved = await trainer.service.saveDietaryProfile(trainer.access, memberId, dietary);
+    expect(saved).toMatchObject({ version: 0, allergies: dietary.allergies, restrictions: dietary.restrictions });
+    expect(await trainer.service.saveDietaryProfile(trainer.access, memberId, dietary)).toEqual(saved);
+    expect(await member.service.memberDietaryProfile(member.access)).toEqual(saved);
+    expect(await member.service.memberDietaryProfile(otherAccess)).toMatchObject({ allergies: [], restrictions: [] });
+    await expect(trainer.service.trainerDietaryProfile(trainer.access, other.member.id)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(otherOwner.service.trainerDietaryProfile(otherOwner.access, memberId)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(trainer.service.saveDietaryProfile(trainer.access, memberId, { ...dietary, allergies: [] })).rejects.toBeInstanceOf(ConflictException);
+    const sealed = await member.tenant.memberDietaryProfile.findUniqueOrThrow({ where: { memberId } });
+    expect(sealed.encryptedData).toMatch(/^v1\./);
+    expect(sealed.encryptedData).not.toContain('cashew');
+    const audit = await member.tenant.auditLog.findFirstOrThrow({ where: { eventCode: 'DIETARY_PROFILE_UPDATED', resourceId: memberId } });
+    expect(JSON.stringify(audit)).not.toContain('cashew');
+
+    const today = gymLocalDate('Asia/Colombo');
+    const yesterday = addLocalDays(today, -1);
+    const reading = { measuredOn: yesterday, weightKg: '80.50', heightCm: '180', bodyFatPct: null };
+    expect(await member.service.saveBodyMeasurement(member.access, reading)).toMatchObject({ weightKg: '80.5', bmi: 24.8 });
+    expect(await member.service.saveBodyMeasurement(member.access, { ...reading, weightKg: null, heightCm: null, bodyFatPct: '21' }))
+      .toMatchObject({ weightKg: '80.5', bodyFatPct: '21' });
+    const report = await member.service.memberProgress(member.access, { through: yesterday });
+    expect(report.measurements).toEqual([{ measuredOn: yesterday, weightKg: '80.5', heightCm: '180', bodyFatPct: '21', bmi: 24.8 }]);
+    expect((await trainer.service.trainerProgress(trainer.access, memberId, { through: yesterday })).measurements).toEqual(report.measurements);
+    expect((await member.service.memberProgress(otherAccess, {})).measurements).toHaveLength(0);
+    await expect(trainer.service.trainerProgress(trainer.access, other.member.id, {})).rejects.toBeInstanceOf(NotFoundException);
+
+    await member.tenant.memberDietaryProfile.update({ where: { memberId }, data: { encryptedData: 'v1.invalid.invalid.invalid' } });
+    await expect(member.service.memberDietaryProfile(member.access)).rejects.toBeInstanceOf(ServiceUnavailableException);
+    await member.tenant.memberDietaryProfile.update({ where: { memberId }, data: { encryptedData: sealed.encryptedData } });
+    vi.stubEnv('GYMOS_COACHING_DATA_KEY', '');
+    await expect(member.service.memberProgress(member.access, {})).rejects.toBeInstanceOf(ServiceUnavailableException);
+  } finally { vi.unstubAllEnvs(); }
+}, 60_000);
+
+it('reuses a trainer workout template across clients without sharing assignment changes', async () => {
+  const { service, access } = await contextFor(0, 'TRAINER');
+  const foreign = await contextFor(1, 'OWNER');
+  const first = await createBoundMember(0, 'Template Client One');
+  const second = await createBoundMember(0, 'Template Client Two');
+  for (const [index, client] of [first, second].entries()) {
+    await addSession({ memberId: client.member.id, trainerId: access.actor!.id, state: 'SCHEDULED',
+      startAt: new Date(Date.now() + (19 + index) * 86_400_000) });
+  }
+  const draft = { name: 'Reusable foundation', exercises: [{ name: 'Squat', sets: 3, restSeconds: 60 }] };
+  const source = await service.createWorkoutPlan(access, first.member.id, randomUUID(),
+    { ...draft, schedule: { kind: 'WEEKLY', weekdays: [1] } });
+  const template = await service.saveWorkoutTemplate(access, first.member.id, source.plan.id);
+  expect(await service.saveWorkoutTemplate(access, first.member.id, source.plan.id)).toEqual(template);
+  expect((await service.workoutTemplates(access, {})).items).toContainEqual({ id: template.id, name: draft.name });
+  await expect(foreign.service.workoutTemplate(foreign.access, template.id)).rejects.toBeInstanceOf(ForbiddenException);
+  await expect(service.workoutTemplate({ ...access, gymId: foreign.gym.id }, template.id)).rejects.toThrow();
+  await expect(service.saveWorkoutTemplate(access, second.member.id, source.plan.id)).rejects.toBeInstanceOf(NotFoundException);
+  const { id: _id, ...content } = await service.workoutTemplate(access, template.id);
+  expect(content).not.toHaveProperty('schedule');
+  const a = await service.createWorkoutPlan(access, first.member.id, randomUUID(), content);
+  const b = await service.createWorkoutPlan(access, second.member.id, randomUUID(), content);
+  await service.updateWorkoutPlan(access, first.member.id, a.plan.id, randomUUID(),
+    { ...content, name: 'Client one only', expectedRevision: a.plan.revision });
+  expect((await service.trainerWorkoutPlan(access, second.member.id, b.plan.id)).name).toBe(draft.name);
+  expect(await service.workoutTemplate(access, template.id)).toEqual(template);
+});
+
+it('saves a private member journal on gym dates, compares goals and rejects stale writes', async () => {
+  vi.stubEnv('GYMOS_COACHING_DATA_KEY', randomBytes(32).toString('hex'));
+  try {
+    const { service, access, tenant } = await contextFor(0, 'MEMBER');
+    const journalMember = await createBoundMember(0, 'Training Journal Member');
+    const other = await createBoundMember(0, 'Other Training Journal');
+    const otherAccess = { ...access, identityId: other.identity.id, actor: { kind: 'MEMBER', id: other.member.id,
+      registrationOperationId: other.member.enrollmentOperationId! } };
+    const actor = journalMember.member;
+    const mine = { ...access, identityId: journalMember.identity.id,
+      actor: { kind: 'MEMBER', id: actor.id, registrationOperationId: actor.enrollmentOperationId! } };
+    const today = (await service.trainingJournal(mine, {})).today;
+    await service.saveBodyMeasurement(mine, { measuredOn: today, weightKg: '73', heightCm: null, bodyFatPct: null });
+    const trainer = await contextFor(0, 'TRAINER');
+    await addSession({ memberId: actor.id, trainerId: trainer.access.actor!.id, state: 'COMPLETED', endedAt: new Date() });
+    for (const data of [{ type: 'WEIGHT', target: 70 }, { type: 'STRENGTH', target: 85, exercise: 'Squat' }, { type: 'SESSIONS', target: 4 }]) {
+      await service.saveTrainingJournal(mine, { kind: 'GOAL', expectedVersion: null, data });
+    }
+    const id = randomUUID();
+    const workout = { kind: 'SOLO', id, expectedVersion: null, data: { date: today, durationMinutes: 45,
+      notes: 'Only visible in my journal', exercises: [{ name: 'squat', weightKg: 77.5 }] } };
+    expect(await service.saveTrainingJournal(mine, workout)).toEqual(await service.saveTrainingJournal(mine, workout));
+    const food = { kind: 'FOOD', expectedVersion: null, data: { date: today, calories: 2250, protein: 128.5, carbs: 240, fat: 62 } };
+    await service.saveTrainingJournal(mine, food);
+    await expect(service.saveTrainingJournal(mine, { ...food, data: { ...food.data, calories: 2400 } })).rejects.toBeInstanceOf(ConflictException);
+    await service.saveTrainingJournal(mine, { ...food, expectedVersion: 0, data: { ...food.data, calories: 2400 } });
+    const journal = await service.trainingJournal(mine, { workout: id, date: today });
+    expect(journal.selectedFood).toMatchObject({ data: { calories: 2400, protein: 128.5 }, version: 1 });
+    expect(journal.selectedWorkout?.data.notes).toBe(workout.data.notes);
+    expect(journal.goals).toEqual(expect.arrayContaining([
+      expect.objectContaining({ data: { type: 'WEIGHT', target: 70 }, current: 73 }),
+      expect.objectContaining({ data: { type: 'STRENGTH', target: 85, exercise: 'Squat' }, current: 77.5 }),
+      expect.objectContaining({ data: { type: 'SESSIONS', target: 4 }, current: 2 }),
+    ]));
+    expect(await service.trainingJournal(otherAccess, { workout: id, date: today })).toMatchObject({
+      goals: [], solo: [], food: [], selectedWorkout: null, selectedFood: null,
+    });
+    await expect(trainer.service.trainingJournal(trainer.access, {})).rejects.toBeInstanceOf(ForbiddenException);
+    const stored = await tenant.memberJournalEntry.findMany({ where: { memberId: actor.id } });
+    expect(stored).toHaveLength(5);
+    expect(stored.every(row => row.encryptedData.startsWith('v1.'))).toBe(true);
+    expect(JSON.stringify(stored)).not.toContain(workout.data.notes);
+  } finally { vi.unstubAllEnvs(); }
+});

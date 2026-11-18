@@ -7,9 +7,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { slug } = await params;
   const form = await request.formData();
   const kind = String(form.get('kind') ?? '');
+  const format = String(form.get('format') ?? 'csv');
   const actionType = String(form.get('actionType') ?? '');
   const returnToAudit = form.get('returnTo') === 'audit';
-  const input = financeExportInputSchema.safeParse({ kind, ...(form.get('from') ? { from: String(form.get('from')) } : {}),
+  const input = financeExportInputSchema.safeParse({ kind, format, ...(form.get('from') ? { from: String(form.get('from')) } : {}),
     ...(form.get('to') ? { to: String(form.get('to')) } : {}), page: Number(form.get('page') ?? 1), pageSize: Number(form.get('pageSize') ?? 20),
     ...(actionType ? { actionType } : {}) });
   const destination = new URL(returnToAudit ? `/gyms/${encodeURIComponent(slug)}/owner/audit?exportError=1${actionType ? `&actionType=${encodeURIComponent(actionType)}` : ''}&page=${encodeURIComponent(String(form.get('page') ?? '1'))}` : `/gyms/${encodeURIComponent(slug)}/owner/financials?tab=export&exportError=1`, request.url);
@@ -23,8 +24,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (response.status === 403 || response.status === 404) return new NextResponse('Export is not available for this account.', { status: response.status });
     if (!response.ok) return NextResponse.redirect(destination, 303);
     const bytes = await response.arrayBuffer();
-    const contentType = response.headers.get('content-type') === 'text/csv; charset=utf-8' ? 'text/csv; charset=utf-8' : 'application/octet-stream';
-    const contentDisposition = response.headers.get('content-disposition') ?? 'attachment; filename="gymos-export.csv"';
+    const expectedType = { csv: 'text/csv; charset=utf-8', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', pdf: 'application/pdf' }[input.data.format];
+    const contentType = response.headers.get('content-type') === expectedType ? expectedType : 'application/octet-stream';
+    const contentDisposition = response.headers.get('content-disposition') ?? `attachment; filename="gymos-export.${input.data.format}"`;
     return new NextResponse(bytes, { status: 200, headers: { 'content-type': contentType, 'content-disposition': contentDisposition,
       'cache-control': 'no-store, private', 'x-content-type-options': 'nosniff' } });
   } catch { return NextResponse.redirect(destination, 303); }

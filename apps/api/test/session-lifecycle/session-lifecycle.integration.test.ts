@@ -52,7 +52,7 @@ async function setup(gymIndex = 0) {
   return { service, reads, tenant, gym, member, trainer, config, configVersion, trainerAccess, ownerAccess, memberAccess };
 }
 
-async function createSession(ctx: Awaited<ReturnType<typeof setup>>, suffix: string, scheduledStart?: Date) {
+async function createSession(ctx: Awaited<ReturnType<typeof setup>>, suffix: string, scheduledStart?: Date, terms = { creditValue: '100', creditMinor: 10000n, confirmedTrainerPay: null as string | null }) {
   const now = new Date(); const start = scheduledStart ?? new Date(now.getTime() - 5 * 60_000); const end = new Date(start.getTime() + 60 * 60_000);
   const localDate = localDateAt(start, ctx.config.timezone ?? 'Asia/Colombo'); const currency = ctx.config.currency ?? 'LKR'; const ownerId = ctx.ownerAccess.identityId;
   const plan = await ctx.tenant.membershipPlan.create({ data: { name: `Lifecycle ${suffix}`, price: '0', currency, durationDays: 90 } });
@@ -62,8 +62,8 @@ async function createSession(ctx: Awaited<ReturnType<typeof setup>>, suffix: str
     idempotencyKey: uuidKey('lc-term'), requestDigest: requestDigest({ suffix, term: true }) } });
   const receipt = await ctx.tenant.commandReceipt.create({ data: { actorIdentityId: ownerId, commandKind: 'TEST_SESSION_PACK', idempotencyKey: uuidKey('lc-pack-receipt'),
     requestDigest: requestDigest({ suffix, pack: true }), state: 'COMMITTED', committedAt: now, safeResult: { resourceIds: [] } } });
-  const pack = await ctx.tenant.sessionPack.create({ data: { memberId: ctx.member.id, issuedCredits: 1, price: '100.0000', currency, totalMinorUnits: 10000n,
-    creditBaseMinorUnits: 10000n, creditRemainder: 0, creditAllocationPolicyVersion: 'DEC-06-v1', validityDays: 90,
+  const pack = await ctx.tenant.sessionPack.create({ data: { memberId: ctx.member.id, issuedCredits: 1, price: terms.creditValue, currency, totalMinorUnits: terms.creditMinor,
+    creditBaseMinorUnits: terms.creditMinor, creditRemainder: 0, creditAllocationPolicyVersion: 'DEC-06-v1', validityDays: 90,
     startDate: new Date(`${termStart}T00:00:00Z`), endDateExclusive: new Date(`${termEnd}T00:00:00Z`), commandReceiptId: receipt.id,
     actorIdentityId: ownerId, idempotencyKey: uuidKey('lc-pack'), requestDigest: requestDigest({ suffix, issued: true }) } });
   await ctx.tenant.packCreditMovement.create({ data: { packId: pack.id, kind: 'ISSUE', availableDelta: 1, heldDelta: 0, consumedDelta: 0, expiredDelta: 0,
@@ -71,6 +71,7 @@ async function createSession(ctx: Awaited<ReturnType<typeof setup>>, suffix: str
   const session = await ctx.tenant.pTSession.create({ data: { memberId: ctx.member.id, trainerId: ctx.trainer.id, state: 'SCHEDULED', type: 'IN_PERSON',
     scheduledStartAt: start, scheduledEndAt: end, gymTimezone: ctx.config.timezone ?? 'Asia/Colombo', fee: '100.0000', currency,
     confirmationRate: '0.400000', confirmationLevel: 'LEVEL_1', configurationVersion: ctx.configVersion.configurationVersion,
+    confirmedTrainerPay: terms.confirmedTrainerPay,
     confirmedAt: now, createdByIdentityId: ownerId } });
   const bookingReceipt = await ctx.tenant.commandReceipt.create({ data: { actorIdentityId: ownerId, commandKind: 'TEST_SESSION_BOOKING', idempotencyKey: uuidKey('lc-book-receipt'),
     requestDigest: requestDigest({ suffix, session: session.id }), state: 'COMMITTED', committedAt: now, resourceType: 'PT_SESSION', resourceId: session.id, safeResult: { resourceIds: [session.id] } } });
@@ -78,6 +79,18 @@ async function createSession(ctx: Awaited<ReturnType<typeof setup>>, suffix: str
     scheduledLocalDate: localDate, explicitPackId: pack.id, actorIdentityId: ownerId, receiptId: bookingReceipt.id }));
   return { session, pack };
 }
+
+it('settles the same confirmed trainer pay for free and paid credits without changing pack revenue', async () => {
+  const ctx = await setup();
+  for (const [index, creditValue, creditMinor] of [[0, '0', 0n], [1, '170', 17000n]] as const) {
+    const ready = await createSession(ctx, `confirmed-pay-${index}-${run.runId}`, undefined, { creditValue, creditMinor, confirmedTrainerPay: '34.50' });
+    await ctx.service.start(ctx.trainerAccess, ready.session.id, { expectedVersion: 0, idempotencyKey: uuidKey('fixed-pay-start') });
+    await ctx.tenant.pTSession.update({ where: { id: ready.session.id }, data: { startedAt: new Date(Date.now() - 25 * 60_000) } });
+    const result = await ctx.service.complete(ctx.trainerAccess, ready.session.id, { expectedVersion: 1, idempotencyKey: uuidKey('fixed-pay-complete') });
+    expect(result).toMatchObject({ recognizedRevenue: { amount: creditValue }, trainerPay: { amount: '34.5' } });
+    expect((await ctx.tenant.payRecord.findUniqueOrThrow({ where: { sessionId: ready.session.id } })).amount.toString()).toBe('34.5');
+  }
+});
 
 it('starts once under the selected-gym fence; rejects early, foreign, inactive and wrong-role starts', async () => {
   const ctx = await setup(); const ready = await createSession(ctx, `start-${run.runId}`);

@@ -13,3 +13,8 @@ apps/web/test-results/
 apps/web/tests/visual/fixtures/v1-baseline/images/
 
 *.tsbuildinfo
+
+# Local requirements documents
+/FitCore_Software_Project_Proposal (1).docx
+/GymOS_Doc1_Role_Function_List (1).pdf
+/GymOS_SRS_v1.0.docx

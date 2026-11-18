@@ -5,6 +5,7 @@ import { Activity, ArrowUpRight, CalendarDays, CircleDollarSign, Clock3, Dumbbel
 import { LatestRequestSequence, type OwnerDashboard } from '@gymos/contracts';
 import { loadOwnerDashboard } from '@/app/dashboard-actions';
 import { EmptyState, Feedback, StatusBadge } from '@/components/ui';
+import { formatDisplayDate } from '@/lib/display-date';
 
 type Data = OwnerDashboard;
 function money(value: string) {
@@ -55,9 +56,29 @@ export function OwnerDashboardLive({ slug, initial }: { slug: string; initial: D
           <ol className="dashboard-bars" aria-label={`Operational earnings by two-hour window, ${data.timeZone}`}>
             {data.earningChart.map(bucket => <li key={bucket.startHour}><span className="dashboard-bar-value">{money(bucket.amount)}</span><span className="dashboard-bar-track" aria-hidden="true"><span className="dashboard-bar" style={{ height: `${Number(bucket.amount) / maximum * 100}%` }}/></span><span className="dashboard-bar-label">{String(bucket.startHour).padStart(2, '0')}:00<span className="owner-chart-end">–{String(bucket.endHour).padStart(2, '0')}:00</span></span></li>)}
           </ol><p className="owner-chart-footnote">Operational earnings are not cash received. This chart covers 06:00–22:00; the daily total includes the full day.</p>
+          <p><strong>Month-to-date operational earnings</strong> {data.currency} {money(data.metrics.monthOperationalEarning.value)}
+            <br/><small>{formatDisplayDate(data.metrics.monthOperationalEarning.from)} to {formatDisplayDate(data.metrics.monthOperationalEarning.through)}</small></p>
         </article>
         <aside className="owner-quick-panel" aria-labelledby="owner-quick-heading"><span className="platform-eyebrow">DAILY WORKSPACE</span><h2 id="owner-quick-heading">Keep your gym moving</h2><div className="owner-request-summary"><span className="platform-section-icon"><Clock3 size={20}/></span><div><strong>{data.metrics.pendingRequests.value} pending PT {data.metrics.pendingRequests.value === 1 ? 'request' : 'requests'}</strong><p>Unexpired requests awaiting confirmation.</p></div></div><div className="owner-quick-actions"><a href={`${base}/members/new`}><UserPlus size={18}/><span>Register a member</span><ArrowUpRight size={15}/></a><a href={`${base}/trainers/new`}><Dumbbell size={18}/><span>Add a trainer</span><ArrowUpRight size={15}/></a><a href={`${base}/sessions/book`}><CalendarDays size={18}/><span>Book a PT session</span><ArrowUpRight size={15}/></a></div><a href={`${base}/sessions#owner-attention`} className="platform-text-link">Review session attention <ArrowUpRight size={16}/></a></aside>
       </div>
+      <article className="dashboard-sessions-card">
+        <header>
+          <div><h2>Memberships</h2><p>{data.memberships.activeCount} {data.memberships.activeCount === 1 ? 'member has' : 'members have'} an active membership today.</p></div>
+          <a href={`${base}/members`} className="platform-text-link">View members <ArrowUpRight size={16}/></a>
+        </header>
+        <h3>Expiring in less than 30 days</h3>
+        {data.memberships.expiring.length ? <>
+          <p>{data.memberships.expiringCount > data.memberships.expiring.length ? `Showing the first ${data.memberships.expiring.length} of ` : ''}{data.memberships.expiringCount} {data.memberships.expiringCount === 1 ? 'membership' : 'memberships'} due to expire.</p>
+          <div className="ui-table-shell"><div className="ui-table-scroll" tabIndex={0} role="region" aria-label="Expiring memberships">
+            <table><thead><tr><th scope="col">Member</th><th scope="col">First day without coverage</th></tr></thead>
+              <tbody>{data.memberships.expiring.map(member => <tr key={member.memberId}>
+                <td><a className="platform-text-link" href={`${base}/members/${encodeURIComponent(member.memberId)}`}>{member.memberName}</a></td>
+                <td><time dateTime={member.endDateExclusive}>{formatDisplayDate(member.endDateExclusive)}</time></td>
+              </tr>)}</tbody>
+            </table>
+          </div></div>
+        </> : <EmptyState title="No memberships are due to expire in this window."/>}
+      </article>
       <article className="dashboard-sessions-card"><header><div><span className="platform-eyebrow">LIVE PT</span><h2>Sessions in progress</h2><p>Every currently active session across your gym’s trainers, including sessions scheduled on earlier dates.</p></div></header>
         {data.activeSessionItems.length ? <div className="ui-table-shell"><div className="ui-table-scroll" tabIndex={0} role="region" aria-label="All active PT sessions"><table aria-label="All active PT sessions"><thead><tr><th>Started</th><th>Member</th><th>Trainer</th></tr></thead><tbody>{data.activeSessionItems.map(session => <tr key={session.id}><td><time dateTime={session.startedAt}>{new Date(session.startedAt).toLocaleString('en-GB', { timeZone: data.timeZone, dateStyle: 'medium', timeStyle: 'short' })}</time></td><td><a className="platform-text-link" href={`/gyms/${encodeURIComponent(slug)}/sessions/${encodeURIComponent(session.id)}`}>{session.memberName}</a></td><td>{session.trainerName}</td></tr>)}</tbody></table></div></div> : <EmptyState title="No sessions in progress." hint="Active PT sessions across all scheduled dates will appear here."/>}
       </article>

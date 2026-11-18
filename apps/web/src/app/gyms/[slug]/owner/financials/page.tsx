@@ -87,14 +87,16 @@ export default async function OwnerFinancialsPage({ params, searchParams }: {
           ].map(([label, value]) => <div className="finance-metric" key={label}><small>{label}</small><strong>{value} {pnl.data!.currency}</strong></div>)}</div>
             <h3>Expense mix · {pnl.data.from}–{pnl.data.to}</h3><div className="ui-table-shell"><table aria-label="Full-window expense totals by category"><thead><tr><th>Category</th><th>Amount</th><th>Records</th></tr></thead><tbody>{pnl.data.expenseByCategory.map(row => <tr key={row.category}><td>{row.category}</td><td>{row.amount} {pnl.data!.currency}</td><td>{row.sourceCount}</td></tr>)}</tbody></table></div>
             <p>Full window; recognition date for earnings, accounting date for expenses, scheduled source-session date for trainer payroll · as of {pnl.data.asOf} · {pnl.data.timeZone}.</p></> : <Feedback tone="error">P&L reconciliation unavailable. No financial result is inferred from partial pages.</Feedback> : null}
-          {tab === 'export' ? <><Feedback tone="info">Authenticated CSV snapshot · 5,000-row cap · spreadsheet formulas are escaped. Audit exports contain only the selected filtered page.</Feedback>
+          {tab === 'export' ? <><Feedback tone="info">Exports are limited to 5,000 rows. Audit exports contain only the selected filtered page.</Feedback>
             {search.exportError ? <Feedback tone="error">The export failed or could not be verified. No file was delivered; adjust the scope and try again.</Feedback> : null}
             <form method="post" action={`/api/gyms/${encodeURIComponent(slug)}/financials/export`} className="member-directory-filters">
               <label className="ui-field"><span className="ui-field-label">Export type</span><select name="kind"><option value="revenue">Operational earnings</option><option value="expenses">Expenses</option><option value="payroll">Trainer payroll</option><option value="audit">Audit · current page</option></select></label>
               <label className="ui-field"><span className="ui-field-label">From</span><input type="date" name="from" defaultValue={from}/></label><label className="ui-field"><span className="ui-field-label">To</span><input type="date" name="to" defaultValue={to}/></label>
               <label className="ui-field"><span className="ui-field-label">Audit page</span><input name="page" type="number" min="1" defaultValue="1"/></label><input type="hidden" name="pageSize" value="20"/>
               <label className="ui-field"><span className="ui-field-label">Audit action filter</span><select name="actionType"><option value="">All events</option>{auditEventCodeSchema.options.map(code => <option key={code} value={code}>{code.replaceAll('_', ' ')}</option>)}</select></label>
-              <button className="ui-button ui-button-primary" type="submit">Download CSV</button>
+              <button className="ui-button ui-button-primary" type="submit" name="format" value="csv">Download CSV</button>
+              <button className="ui-button ui-button-secondary" type="submit" name="format" value="xlsx">Download Excel</button>
+              <button className="ui-button ui-button-secondary" type="submit" name="format" value="pdf">Download PDF</button>
             </form>
           </> : null}
         </> : <Feedback tone="error">Revenue data is unavailable. No finance state was changed. Reload to retry.</Feedback>}

@@ -2,10 +2,11 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { trainerLifecycleResultSchema, trainerShiftInputSchema, trainerShiftResultSchema, trainerStatusInputSchema, idempotencyKeySchema } from '@gymos/contracts';
+import { trainerLifecycleResultSchema, trainerShiftInputSchema, trainerShiftResultSchema, trainerShiftReviewInputSchema, profileCommandResultSchema, trainerStatusInputSchema, idempotencyKeySchema } from '@gymos/contracts';
 import { apiUrl, SESSION_COOKIE } from '@/lib/gymos';
 import { cookies } from 'next/headers';
 import { randomUUID } from 'node:crypto';
+import { trainerSessionPayInputSchema, trainerSessionPayResultSchema } from '@gymos/contracts';
 
 export type TrainerShiftActionState = { error?: string; success?: string };
 export type TrainerLifecycleActionState = { error?: string; success?: string; operation?: { operationId: string; state: string; targetStatus: string };
@@ -13,6 +14,27 @@ export type TrainerLifecycleActionState = { error?: string; success?: string; op
 
 function validRoute(slug: string, trainerId: string) {
   return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) && /^[A-Za-z0-9_:-]{1,128}$/.test(trainerId);
+}
+
+export async function saveTrainerSessionPay(slug: string, trainerId: string, amount: string | null, expectedVersion: number) {
+  const parsed = trainerSessionPayInputSchema.safeParse({ amount, expectedVersion });
+  if (!validRoute(slug, trainerId) || !parsed.success) return { fieldError: 'Enter an amount of zero or more with up to two decimal places, or leave it blank.' };
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token) redirect('/login');
+  let response: Response;
+  try {
+    response = await fetch(apiUrl(`/gyms/${encodeURIComponent(slug)}/trainers/${encodeURIComponent(trainerId)}/session-pay`), {
+      method: 'PUT', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify(parsed.data), cache: 'no-store',
+    });
+  } catch { return { error: 'Trainer pay could not be confirmed. Reload before retrying.' }; }
+  if (response.status === 401) redirect('/login?error=expired');
+  if (response.status === 409) return { error: 'The trainer profile changed. Reload before saving.' };
+  if (!response.ok) return { error: 'Trainer pay could not be saved. Check your gym access and try again.' };
+  const result = trainerSessionPayResultSchema.safeParse(await response.json().catch(() => null));
+  if (!result.success) return { error: 'Trainer pay could not be confirmed. Reload before retrying.' };
+  revalidatePath(`/gyms/${slug}/owner/trainers/${trainerId}`);
+  return { data: result.data };
 }
 
 export async function changeTrainerStatus(slug: string, trainerId: string, initialKey: string,
@@ -82,7 +104,10 @@ export async function approveTrainerShift(slug: string, trainerId: string, _prev
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) redirect('/login');
   const expectedVersion = Number(formData.get('expectedVersion'));
-  const parsed = trainerShiftInputSchema.safeParse({ start: formData.get('start'), end: formData.get('end'), overnight: formData.get('overnight') === 'true', expectedVersion });
+  const requestId = formData.get('requestId');
+  const decision = formData.get('decision');
+  const parsed = requestId ? trainerShiftReviewInputSchema.safeParse({ requestId, decision, expectedVersion })
+    : trainerShiftInputSchema.safeParse({ start: formData.get('start'), end: formData.get('end'), overnight: formData.get('overnight') === 'true', expectedVersion });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Enter a valid shift.' };
   let response: Response;
   try {
@@ -95,9 +120,12 @@ export async function approveTrainerShift(slug: string, trainerId: string, _prev
   if (response.status === 404) return { error: 'Trainer not found in this gym.' };
   if (response.status === 409) return { error: 'This profile changed. Reload and review the current shift before approving.' };
   if (!response.ok) return { error: response.status === 422 ? 'Shift must be 15–960 minutes. Check the overnight setting.' : 'Could not confirm the shift update. Reload before retrying.' };
-  const result = trainerShiftResultSchema.safeParse(await response.json().catch(() => null));
-  if (!result.success) return { error: 'The shift update could not be confirmed. Reload the profile.' };
+  const data = await response.json().catch(() => null);
+  const result = trainerShiftResultSchema.safeParse(data);
+  const declined = requestId && decision === 'DECLINE' && profileCommandResultSchema.safeParse(data).success;
+  if (!result.success && !declined) return { error: 'The shift update could not be confirmed. Reload the profile.' };
   revalidatePath(`/gyms/${encodeURIComponent(slug)}/owner/trainers`);
   revalidatePath(`/gyms/${encodeURIComponent(slug)}/owner/trainers/${encodeURIComponent(trainerId)}`);
-  return { success: `Shift approved in ${result.data.timeZone}.` };
+  revalidatePath(`/gyms/${encodeURIComponent(slug)}/profile`);
+  return { success: result.success ? `Shift approved in ${result.data.timeZone}.` : 'Shift request declined.' };
 }

@@ -24,9 +24,10 @@ function localDate(instant: string, timeZone: string) {
 async function Content({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const { token, session, gym, theme } = await requireGymContext(slug, 'MEMBER');
-  const [snapshot, workouts, meals, pending] = await Promise.all([
+  const [snapshot, workouts, scheduledWorkouts, meals, pending] = await Promise.all([
     read(slug, token, 'sessions?page=1&pageSize=1', value => sessionReadPageSchema.safeParse(value)),
     read(slug, token, 'workout-plans?page=1&pageSize=1', value => memberWorkoutPlanPageSchema.safeParse(value)),
+    read(slug, token, 'workout-plans?on=today&page=1&pageSize=1', value => memberWorkoutPlanPageSchema.safeParse(value)),
     read(slug, token, 'meal-plans?page=1&pageSize=1', value => memberMealPlanPageSchema.safeParse(value)),
     read(slug, token, 'sessions?state=PENDING_CONFIRMATION&page=1&pageSize=2', value => sessionReadPageSchema.safeParse(value)),
   ]);
@@ -40,7 +41,7 @@ async function Content({ params }: { params: Promise<{ slug: string }> }) {
   const brand = resolveGymBrandColors(theme.primaryColor);
   const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
   return <DashboardChrome identityId={session.identityId} key={`${session.identityId}:${gym.id}:${gym.role}`} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'} style={style}>
-    <MemberHome slug={slug} name={session.displayName ?? 'there'} gymName={gym.name} snapshot={snapshot} workouts={workouts} meals={meals} upcoming={upcoming} completed={completed} pending={pending}/>
+    <MemberHome slug={slug} name={session.displayName ?? 'there'} gymName={gym.name} snapshot={snapshot} workouts={workouts} scheduledWorkouts={scheduledWorkouts} meals={meals} upcoming={upcoming} completed={completed} pending={pending}/>
   </DashboardChrome>;
 }
 export default function MemberWorkspace(props: { params: Promise<{ slug: string }> }) { return <Suspense fallback={<div className="themed-workspace member-loading"><LoadingState label="Loading your training home…" page/></div>}><Content {...props}/></Suspense>; }
