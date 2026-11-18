@@ -191,7 +191,10 @@ test('profile contracts keep global identity, self-service fields, and owner cor
   assert.equal(updateAccountProfileSchema.safeParse({ displayName: 'Synthetic account name', expectedVersion: 0, idempotencyKey: 'profile-0123456789' }).success, true);
   assert.equal(updateAccountProfileSchema.safeParse({ displayName: 'Changed', email: 'attacker@example.test', expectedVersion: 0, idempotencyKey: 'profile-0123456789' }).success, false);
   assert.equal(updateSelfMemberProfileSchema.safeParse({ phone: null, emergencyContact: null, expectedVersion: 0, idempotencyKey: 'member-profile-012345' }).success, true);
-  assert.equal(updateSelfMemberProfileSchema.safeParse({ phone: null, emergencyContact: null, healthNotes: 'private', expectedVersion: 0, idempotencyKey: 'member-profile-012345' }).success, false);
+  const memberEdit = { phone: null, emergencyContact: null, healthNotes: 'private', expectedVersion: 0, idempotencyKey: 'member-profile-012345' };
+  assert.equal(updateSelfMemberProfileSchema.safeParse(memberEdit).success, true);
+  assert.equal(updateSelfMemberProfileSchema.safeParse({ ...memberEdit, healthNotes: 'x'.repeat(4001) }).success, false);
+  assert.equal(updateSelfMemberProfileSchema.safeParse({ ...memberEdit, fullName: 'Official name' }).success, false);
   const trainer = { phone: null, biography: 'Synthetic biography', specialisations: ['Strength', 'Mobility'], yearsExperience: 8, expectedVersion: 1, idempotencyKey: 'trainer-profile-012345' };
   assert.equal(updateSelfTrainerProfileSchema.safeParse(trainer).success, true);
   assert.equal(updateSelfTrainerProfileSchema.safeParse({ ...trainer, specialisations: ['Strength', 'strength'] }).success, false);

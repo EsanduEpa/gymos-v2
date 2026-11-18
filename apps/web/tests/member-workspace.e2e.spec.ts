@@ -267,9 +267,10 @@ test('member plans preserve exact details paging and calendar keyboard selection
   await expect(plan).toContainText('0 kg');
   await expect(plan).toContainText('10 min');
   await expect(plan).toContainText('Keep the movement controlled.');
-  await page.getByRole('link', { name: 'Next', exact: true }).click();
+  const workoutHistoryPager = page.getByRole('navigation', { name: 'Workout plan pages', exact: true });
+  await workoutHistoryPager.getByRole('link', { name: 'Next', exact: true }).click();
   await expect(page).toHaveURL(/page=2/);
-  await expect(page.locator('.member-plan-pager')).toContainText('Page 2 of 2');
+  await expect(workoutHistoryPager).toContainText('Page 2 of 2');
   await page.goto(`${webBase}${base}/meal-plans`);
   const totals = page.getByRole('region', { name: 'Recorded nutrition totals for Weekly Meal Guidance' });
   await expect(totals).toContainText('500 kcal');

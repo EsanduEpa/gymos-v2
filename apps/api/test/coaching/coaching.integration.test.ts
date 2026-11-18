@@ -356,3 +356,76 @@ it('keeps dietary notes and progress private, stores encrypted values, and rejec
     await expect(member.service.memberProgress(member.access, {})).rejects.toBeInstanceOf(ServiceUnavailableException);
   } finally { vi.unstubAllEnvs(); }
 }, 60_000);
+
+it('reuses a trainer workout template across clients without sharing assignment changes', async () => {
+  const { service, access } = await contextFor(0, 'TRAINER');
+  const foreign = await contextFor(1, 'OWNER');
+  const first = await createBoundMember(0, 'Template Client One');
+  const second = await createBoundMember(0, 'Template Client Two');
+  for (const [index, client] of [first, second].entries()) {
+    await addSession({ memberId: client.member.id, trainerId: access.actor!.id, state: 'SCHEDULED',
+      startAt: new Date(Date.now() + (19 + index) * 86_400_000) });
+  }
+  const draft = { name: 'Reusable foundation', exercises: [{ name: 'Squat', sets: 3, restSeconds: 60 }] };
+  const source = await service.createWorkoutPlan(access, first.member.id, randomUUID(),
+    { ...draft, schedule: { kind: 'WEEKLY', weekdays: [1] } });
+  const template = await service.saveWorkoutTemplate(access, first.member.id, source.plan.id);
+  expect(await service.saveWorkoutTemplate(access, first.member.id, source.plan.id)).toEqual(template);
+  expect((await service.workoutTemplates(access, {})).items).toContainEqual({ id: template.id, name: draft.name });
+  await expect(foreign.service.workoutTemplate(foreign.access, template.id)).rejects.toBeInstanceOf(ForbiddenException);
+  await expect(service.workoutTemplate({ ...access, gymId: foreign.gym.id }, template.id)).rejects.toThrow();
+  await expect(service.saveWorkoutTemplate(access, second.member.id, source.plan.id)).rejects.toBeInstanceOf(NotFoundException);
+  const { id: _id, ...content } = await service.workoutTemplate(access, template.id);
+  expect(content).not.toHaveProperty('schedule');
+  const a = await service.createWorkoutPlan(access, first.member.id, randomUUID(), content);
+  const b = await service.createWorkoutPlan(access, second.member.id, randomUUID(), content);
+  await service.updateWorkoutPlan(access, first.member.id, a.plan.id, randomUUID(),
+    { ...content, name: 'Client one only', expectedRevision: a.plan.revision });
+  expect((await service.trainerWorkoutPlan(access, second.member.id, b.plan.id)).name).toBe(draft.name);
+  expect(await service.workoutTemplate(access, template.id)).toEqual(template);
+});
+
+it('saves a private member journal on gym dates, compares goals and rejects stale writes', async () => {
+  vi.stubEnv('GYMOS_COACHING_DATA_KEY', randomBytes(32).toString('hex'));
+  try {
+    const { service, access, tenant } = await contextFor(0, 'MEMBER');
+    const journalMember = await createBoundMember(0, 'Training Journal Member');
+    const other = await createBoundMember(0, 'Other Training Journal');
+    const otherAccess = { ...access, identityId: other.identity.id, actor: { kind: 'MEMBER', id: other.member.id,
+      registrationOperationId: other.member.enrollmentOperationId! } };
+    const actor = journalMember.member;
+    const mine = { ...access, identityId: journalMember.identity.id,
+      actor: { kind: 'MEMBER', id: actor.id, registrationOperationId: actor.enrollmentOperationId! } };
+    const today = (await service.trainingJournal(mine, {})).today;
+    await service.saveBodyMeasurement(mine, { measuredOn: today, weightKg: '73', heightCm: null, bodyFatPct: null });
+    const trainer = await contextFor(0, 'TRAINER');
+    await addSession({ memberId: actor.id, trainerId: trainer.access.actor!.id, state: 'COMPLETED', endedAt: new Date() });
+    for (const data of [{ type: 'WEIGHT', target: 70 }, { type: 'STRENGTH', target: 85, exercise: 'Squat' }, { type: 'SESSIONS', target: 4 }]) {
+      await service.saveTrainingJournal(mine, { kind: 'GOAL', expectedVersion: null, data });
+    }
+    const id = randomUUID();
+    const workout = { kind: 'SOLO', id, expectedVersion: null, data: { date: today, durationMinutes: 45,
+      notes: 'Only visible in my journal', exercises: [{ name: 'squat', weightKg: 77.5 }] } };
+    expect(await service.saveTrainingJournal(mine, workout)).toEqual(await service.saveTrainingJournal(mine, workout));
+    const food = { kind: 'FOOD', expectedVersion: null, data: { date: today, calories: 2250, protein: 128.5, carbs: 240, fat: 62 } };
+    await service.saveTrainingJournal(mine, food);
+    await expect(service.saveTrainingJournal(mine, { ...food, data: { ...food.data, calories: 2400 } })).rejects.toBeInstanceOf(ConflictException);
+    await service.saveTrainingJournal(mine, { ...food, expectedVersion: 0, data: { ...food.data, calories: 2400 } });
+    const journal = await service.trainingJournal(mine, { workout: id, date: today });
+    expect(journal.selectedFood).toMatchObject({ data: { calories: 2400, protein: 128.5 }, version: 1 });
+    expect(journal.selectedWorkout?.data.notes).toBe(workout.data.notes);
+    expect(journal.goals).toEqual(expect.arrayContaining([
+      expect.objectContaining({ data: { type: 'WEIGHT', target: 70 }, current: 73 }),
+      expect.objectContaining({ data: { type: 'STRENGTH', target: 85, exercise: 'Squat' }, current: 77.5 }),
+      expect.objectContaining({ data: { type: 'SESSIONS', target: 4 }, current: 2 }),
+    ]));
+    expect(await service.trainingJournal(otherAccess, { workout: id, date: today })).toMatchObject({
+      goals: [], solo: [], food: [], selectedWorkout: null, selectedFood: null,
+    });
+    await expect(trainer.service.trainingJournal(trainer.access, {})).rejects.toBeInstanceOf(ForbiddenException);
+    const stored = await tenant.memberJournalEntry.findMany({ where: { memberId: actor.id } });
+    expect(stored).toHaveLength(5);
+    expect(stored.every(row => row.encryptedData.startsWith('v1.'))).toBe(true);
+    expect(JSON.stringify(stored)).not.toContain(workout.data.notes);
+  } finally { vi.unstubAllEnvs(); }
+});

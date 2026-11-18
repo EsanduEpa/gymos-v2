@@ -13,6 +13,21 @@ function safeRoute(slug: string, memberId: string) {
   return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) && /^[A-Za-z0-9_:-]{1,128}$/.test(memberId);
 }
 
+export async function saveWorkoutTemplate(slug: string, memberId: string, planId: string, state: WorkoutPlanActionState): Promise<WorkoutPlanActionState> {
+  if (state.success) return state;
+  if (!safeRoute(slug, memberId) || !safeRoute(slug, planId)) return { error: 'Reload the workout plan before saving a template.' };
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token) redirect('/login');
+  const path = `/gyms/${encodeURIComponent(slug)}/me/clients/${encodeURIComponent(memberId)}/workout-plans/${encodeURIComponent(planId)}/template`;
+  const response = await fetch(apiUrl(path), { method: 'POST', headers: { authorization: `Bearer ${token}` }, cache: 'no-store' })
+    .catch(() => new Response(null, { status: 503 }));
+  if (response.status === 401) redirect('/login?error=expired');
+  if (!response.ok) return { error: response.status === 404 || response.status === 403
+    ? 'This workout plan is no longer available.' : 'The template could not be confirmed. Try again.' };
+  revalidatePath(`/gyms/${encodeURIComponent(slug)}/trainer/plans/workout/new`);
+  return { success: 'Template saved. Choose it when creating a workout for any of your confirmed clients.' };
+}
+
 export async function saveWorkoutPlan(slug: string, initialKey: string, state: WorkoutPlanActionState, formData: FormData): Promise<WorkoutPlanActionState> {
   const memberId = String(formData.get('memberId') ?? '');
   if (!safeRoute(slug, memberId)) return { error: 'Choose a valid confirmed client before saving.' };

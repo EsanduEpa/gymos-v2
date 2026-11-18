@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { pendingTrainerShiftSchema } from './trainers.js';
 
 const idSchema = z.string().min(1).max(128).regex(/^[A-Za-z0-9_:-]+$/);
 const versionSchema = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
@@ -25,15 +26,21 @@ export const profileCommandResultSchema = z.strictObject({ version: versionSchem
 export const selfMemberProfileSchema = z.strictObject({
   memberId: idSchema, fullName: z.string().min(2).max(120), phone: z.string().max(40).nullable(),
   emergencyContact: z.string().max(240).nullable(), dateOfBirth: z.iso.date().nullable(), version: versionSchema,
+  healthNotes: nullableText(4000).optional(),
+  hasPhoto: z.boolean().optional(),
 });
 export const updateSelfMemberProfileSchema = z.strictObject({
   phone: nullableText(40), emergencyContact: nullableText(240),
+  healthNotes: nullableText(4000).optional(),
   expectedVersion: versionSchema, idempotencyKey,
 });
 export const selfTrainerProfileSchema = z.strictObject({
   trainerId: idSchema, fullName: z.string().min(2).max(120), phone: z.string().max(40).nullable(),
   biography: z.string().max(2000).nullable(), specialisations: z.array(z.string().max(60)).max(20),
   yearsExperience: z.number().int().min(0).max(80).nullable(), version: versionSchema,
+  shiftStart: z.string().nullable().optional(), shiftEnd: z.string().nullable().optional(),
+  pendingShift: pendingTrainerShiftSchema.nullable().optional(),
+  hasPhoto: z.boolean().optional(),
 });
 export const updateSelfTrainerProfileSchema = z.strictObject({
   phone: nullableText(40), biography: nullableText(2000), specialisations: z.array(z.string().trim().min(1).max(60)).max(20),

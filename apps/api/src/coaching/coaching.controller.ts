@@ -9,6 +9,20 @@ import { CoachingService } from './coaching.service.js';
 export class CoachingController {
   constructor(private readonly coaching: CoachingService) {}
 
+  @Get('training-journal')
+  trainingJournal(@Req() request: GymRequest, @Query() query: unknown) {
+    const access = request.gymAccess;
+    if (!access) throw new ForbiddenException('Member access is required');
+    return this.coaching.trainingJournal(access, query);
+  }
+
+  @Post('training-journal')
+  saveTrainingJournal(@Req() request: GymRequest, @Body() body: unknown) {
+    const access = request.gymAccess;
+    if (!access) throw new ForbiddenException('Member access is required');
+    return this.coaching.saveTrainingJournal(access, body);
+  }
+
   @Get('progress')
   memberProgress(@Req() request: GymRequest, @Query() query: unknown) {
     const access = request.gymAccess;
@@ -82,6 +96,27 @@ export class CoachingController {
     const parsed = memberWorkoutPlansQuerySchema.safeParse(query ?? {});
     if (!parsed.success) throw new UnprocessableEntityException('Enter valid workout plan page details');
     return this.coaching.trainerWorkoutPlans(access, memberId, parsed.data);
+  }
+
+  @Post('clients/:memberId/workout-plans/:planId/template')
+  saveWorkoutTemplate(@Req() request: GymRequest, @Param('memberId') memberId: string, @Param('planId') planId: string) {
+    const access = request.gymAccess;
+    if (!access) throw new ForbiddenException('Trainer access is required');
+    return this.coaching.saveWorkoutTemplate(access, memberId, planId);
+  }
+
+  @Get('workout-templates')
+  workoutTemplates(@Req() request: GymRequest, @Query() query: unknown) {
+    const access = request.gymAccess;
+    if (!access) throw new ForbiddenException('Trainer access is required');
+    return this.coaching.workoutTemplates(access, query);
+  }
+
+  @Get('workout-templates/:id')
+  workoutTemplate(@Req() request: GymRequest, @Param('id') id: string) {
+    const access = request.gymAccess;
+    if (!access) throw new ForbiddenException('Trainer access is required');
+    return this.coaching.workoutTemplate(access, id);
   }
 
   @Get('clients/:memberId/workout-plans/:planId')

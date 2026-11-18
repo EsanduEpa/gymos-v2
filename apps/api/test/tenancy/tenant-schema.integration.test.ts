@@ -1150,12 +1150,15 @@ it('keeps global and gym profiles separate, fences self edits, versions and repl
 
   const self = await profileController.getMine(memberRequest) as { memberId: string; version: number; phone: string | null };
   expect(self).toMatchObject({ memberId: member.id, version: member.version });
-  const selfBody = { phone: '+94770001122', emergencyContact: 'Synthetic Contact · 0710000000', expectedVersion: self.version };
+  const selfBody = { phone: '+94770001122', emergencyContact: 'Synthetic Contact · 0710000000',
+    healthNotes: 'Synthetic member health note', expectedVersion: self.version };
   const selfResult = await profileController.updateMine(memberRequest, 'profile-member-save-0001', selfBody);
   expect(selfResult).toMatchObject({ version: self.version + 1, replayed: false });
   expect(await profileController.updateMine(memberRequest, 'profile-member-save-0001', selfBody)).toMatchObject({ version: self.version + 1, replayed: true });
-  expect(await tenant.member.findUniqueOrThrow({ where: { id: member.id } })).toMatchObject({ phone: selfBody.phone, emergencyContact: selfBody.emergencyContact, fullName: beforeGlobalName });
-  await expect(profileController.updateMine(memberRequest, 'profile-member-save-0002', { ...selfBody, expectedVersion: self.version, healthNotes: 'forged' }))
+  expect(await profileController.getMine(memberRequest)).toMatchObject({ phone: selfBody.phone, emergencyContact: selfBody.emergencyContact,
+    healthNotes: selfBody.healthNotes, fullName: beforeGlobalName });
+  await expect(profileController.updateMine(memberRequest, 'profile-member-save-0002',
+    { ...selfBody, expectedVersion: self.version + 1, fullName: 'Synthetic unauthorized name' }))
     .rejects.toBeInstanceOf(UnprocessableEntityException);
   await expect(profileController.updateMine({ gymAccess: { ...memberAccess, identityId: actorId } } as GymRequest, 'profile-member-save-0003',
     { ...selfBody, expectedVersion: self.version + 1 })).rejects.toBeInstanceOf(ForbiddenException);

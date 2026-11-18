@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import Image from 'next/image';
 import { notFound, redirect } from 'next/navigation';
 import { memberTrainerProfileSchema } from '@gymos/contracts';
 import { resolveGymBrandColors } from '@gymos/theme-tokens';
@@ -25,7 +26,10 @@ export default async function MemberTrainerProfilePage({ params }: { params: Pro
       <a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/member/trainers`}>← All trainers</a></div>
     {!trainer ? <Card><Feedback tone="error">This trainer profile is temporarily unavailable. No request was sent.</Feedback></Card> : <div className="trainer-review-grid">
       <Card><CardHeader eyebrow="TRAINER PROFILE" title="About your trainer"/>
-        <div className="trainer-review-identity"><span className="trainer-avatar" aria-hidden="true">{trainer.fullName.charAt(0).toUpperCase()}</span>
+        <div className="trainer-review-identity">{profile?.success && profile.data.hasPhoto
+          ? <Image alt="" unoptimized width={64} height={64} src={`/api/gyms/${slug}/profile-photo?trainer=${encodeURIComponent(trainer.id)}`}
+              style={{ borderRadius: '50%', objectFit: 'cover' }}/>
+          : <span className="trainer-avatar" aria-hidden="true">{trainer.fullName.charAt(0).toUpperCase()}</span>}
           <div><h2>{trainer.fullName}</h2><p>{trainer.level === 'LEVEL_2' ? 'Level 2 Senior Trainer' : trainer.level === 'LEVEL_1' ? 'Level 1 Trainer' : 'Trainer level not listed'}</p></div></div>
         <p>{trainer.bio || 'This trainer has not added a biography yet.'}</p>
         <h3>Specialisations</h3><div className="trainer-specialisations">{trainer.specialisations.length ? trainer.specialisations.map(item => <span key={item}>{item}</span>) : <span>Not listed</span>}</div>

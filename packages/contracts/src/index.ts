@@ -13,6 +13,7 @@ export * from './session-lifecycle.js';
 export * from './member-lifecycle.js';
 export * from './coaching.js';
 export * from './coaching-records.js';
+export * from './training-journal.js';
 export * from './finance.js';
 export * from './analytics.js';
 export * from './request-safety.js';

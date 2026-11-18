@@ -1,6 +1,6 @@
-import { Body, ConflictException, Controller, ForbiddenException, Get, Headers, HttpCode, NotFoundException, Param, Post, Put, Query, Req, UnprocessableEntityException, UseGuards } from '@nestjs/common';
+import { Body, ConflictException, Controller, ForbiddenException, Get, Header, Headers, HttpCode, NotFoundException, Param, Post, Put, Query, Req, UnprocessableEntityException, UseGuards } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { trainerSessionPayInputSchema, trainerSessionPayResultSchema } from '@gymos/contracts';
+import { profileCommandResultSchema, trainerSessionPayInputSchema, trainerSessionPayResultSchema, trainerShiftProposalInputSchema, trainerShiftReviewInputSchema } from '@gymos/contracts';
 import type { Prisma, PrismaClient } from './generated/tenant/client.js';
 import { idempotencyKeySchema, trainerListQuerySchema, trainerListSchema, memberTrainerDirectorySchema, memberTrainerDirectoryQuerySchema, memberTrainerProfileSchema, trainerProfileSchema, trainerShiftInputSchema, trainerShiftResultSchema, trainerStatusInputSchema } from '@gymos/contracts';
 import { appendTenantAudit } from './operations/transaction-audit.js';
@@ -10,6 +10,8 @@ import { GymAccessGuard, type GymRequest } from './gym-access.guard.js';
 import { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js';
 import { withGymAccessFence } from './identity/gym-access-fence.js';
 import { TrainerLifecycleService } from './trainer-lifecycle.service.js';
+import { streamProfilePhoto } from './profile-photo.js';
+import { pendingTrainerShift, shiftIsValid } from './trainer-shift-request.js';
 
 type TrainerRow = {
   id: string; fullName: string; email: string | null; phone: string | null; level: 'LEVEL_1' | 'LEVEL_2' | null;
@@ -61,18 +63,21 @@ export class TrainersController {
     if (!access || access.role !== 'OWNER') throw new ForbiddenException('Trainer roster is owner-only');
     const parsed = trainerListQuerySchema.safeParse(query ?? {});
     if (!parsed.success) invalid('Enter valid trainer filters and page details');
-    const { q, status, level, page, pageSize } = parsed.data;
+    const { q, status, level, shift, page, pageSize } = parsed.data;
     return this.tenantGate.withVerifiedTenant(access, async tenant => {
       const bindings = await this.publishedTrainerBindings(tenant, access.gymId, false);
       const where: Prisma.TrainerWhereInput = { registrationState: 'COMPLETE', OR: bindings.map(binding => ({ id: binding.id, identityId: binding.identityId, enrollmentOperationId: binding.operationId })),
         ...(status ? { status } : {}), ...(level ? { level } : {}),
-        ...(q ? { OR: [{ fullName: { contains: q, mode: 'insensitive' } }, { email: { contains: q, mode: 'insensitive' } }] } : {}) };
+        ...(shift ? { shiftRequest: { isNot: null } } : {}),
+        ...(q ? { AND: [{ OR: [{ fullName: { contains: q, mode: 'insensitive' } }, { email: { contains: q, mode: 'insensitive' } }] }] } : {}) };
       const [totalCount, rows] = await Promise.all([
         tenant.trainer.count({ where }),
         tenant.trainer.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * pageSize, take: pageSize,
-          select: { id: true, fullName: true, email: true, phone: true, level: true, specialisations: true, yearsExperience: true, shiftStart: true, shiftEnd: true, bio: true, status: true, registrationState: true, version: true, createdAt: true, identityId: true, enrollmentOperationId: true } }),
+          select: { id: true, fullName: true, email: true, phone: true, level: true, specialisations: true, yearsExperience: true, shiftStart: true, shiftEnd: true, bio: true, status: true, registrationState: true, version: true, createdAt: true, identityId: true, enrollmentOperationId: true, shiftRequest: { select: { id: true } } } }),
       ]);
-      return trainerListSchema.parse({ items: rows.map(row => trainerDto(row as TrainerRow)), page, pageSize,
+      return trainerListSchema.parse({ items: rows.map(({ shiftRequest, ...row }) => ({
+        ...trainerDto(row), hasPendingShift: Boolean(shiftRequest),
+      })), page, pageSize,
         totalCount, totalPages: Math.ceil(totalCount / pageSize), asOf: new Date().toISOString() });
     });
   }
@@ -85,7 +90,7 @@ export class TrainersController {
       const bindings = await this.publishedTrainerBindings(tenant, access.gymId, false);
       if (!bindings.some(candidate => candidate.id === trainerId)) throw new NotFoundException('Trainer not found');
       const trainer = await tenant.trainer.findFirst({ where: { id: trainerId, registrationState: 'COMPLETE' },
-        select: { id: true, fullName: true, email: true, phone: true, level: true, specialisations: true, yearsExperience: true, shiftStart: true, shiftEnd: true, bio: true, status: true, registrationState: true, version: true, createdAt: true, identityId: true, enrollmentOperationId: true, sessionPayOverride: true } });
+        select: { id: true, fullName: true, email: true, phone: true, level: true, specialisations: true, yearsExperience: true, shiftStart: true, shiftEnd: true, bio: true, status: true, registrationState: true, version: true, createdAt: true, identityId: true, enrollmentOperationId: true, sessionPayOverride: true, shiftRequest: true } });
       if (!trainer) throw new NotFoundException('Trainer not found');
       if (!bindings.some(candidate => candidate.id === trainer.id && candidate.identityId === trainer.identityId && candidate.operationId === trainer.enrollmentOperationId)) throw new NotFoundException('Trainer not found');
       const [totalSessions, totalCompleted, relatedMembers, recentRows, configuration] = await Promise.all([
@@ -99,8 +104,9 @@ export class TrainersController {
       if (!configuration?.timezone) throw new NotFoundException('Gym time zone is unavailable');
       const recentSessions = recentRows.map(session => ({ ...session,
         scheduledStartAt: session.scheduledStartAt.toISOString(), scheduledEndAt: session.scheduledEndAt.toISOString(), createdAt: session.createdAt.toISOString() }));
-      const { sessionPayOverride, ...profileTrainer } = trainer;
+      const { sessionPayOverride, shiftRequest, ...profileTrainer } = trainer;
       return trainerProfileSchema.parse({ trainer: trainerDto(profileTrainer),
+        pendingShift: pendingTrainerShift(shiftRequest),
         ...(configuration.currency ? { compensation: { sessionPayOverride: sessionPayOverride?.toString() ?? null, currency: configuration.currency } } : {}),
         profile: { email: trainer.email, phone: trainer.phone, biography: trainer.bio, joinedAt: trainer.createdAt.toISOString() },
         gymTimeZone: configuration.timezone,
@@ -141,25 +147,78 @@ export class TrainersController {
       const trainer = await tenant.trainer.findFirst({ where: { id: trainerId, identityId: binding.identityId,
         enrollmentOperationId: binding.operationId, registrationState: 'COMPLETE', status: 'ACTIVE' },
         select: { id: true, fullName: true, level: true, specialisations: true, bio: true, yearsExperience: true,
-          shiftStart: true, shiftEnd: true } });
+          shiftStart: true, shiftEnd: true, profilePhoto: { select: { id: true } } } });
       if (!trainer) throw new NotFoundException('Trainer not found');
       const completedSessions = await tenant.pTSession.count({ where: { trainerId, state: 'COMPLETED' } });
-      return memberTrainerProfileSchema.parse({ trainer: { ...trainer, rating: null }, completedSessions, asOf: new Date().toISOString() });
+      const { profilePhoto, ...details } = trainer;
+      return memberTrainerProfileSchema.parse({ trainer: { ...details, rating: null }, hasPhoto: Boolean(profilePhoto), completedSessions, asOf: new Date().toISOString() });
     });
+  }
+
+  @Get('me/trainers/:trainerId/photo')
+  @Header('Cache-Control', 'private, no-store')
+  @Header('X-Content-Type-Options', 'nosniff')
+  async memberTrainerPhoto(@Req() request: GymRequest, @Param('trainerId') trainerId: string) {
+    const access = request.gymAccess;
+    if (!access || access.role !== 'MEMBER' || access.actor?.kind !== 'MEMBER') throw new ForbiddenException('Member access is required');
+    return this.tenantGate.withVerifiedTenant(access, async tenant => {
+      const binding = (await this.publishedTrainerBindings(tenant, access.gymId, true)).find(item => item.id === trainerId);
+      if (!binding) throw new NotFoundException('Trainer photo not found');
+      const photo = await tenant.profilePhoto.findFirst({ where: { trainerId, trainer: { identityId: binding.identityId,
+        enrollmentOperationId: binding.operationId, registrationState: 'COMPLETE', status: 'ACTIVE' } }, select: { encryptedData: true } });
+      if (!photo) throw new NotFoundException('Trainer photo not found');
+      return streamProfilePhoto(photo.encryptedData, access.gymId, 'TRAINER', trainerId);
+    });
+  }
+
+  @Put('me/shift-request')
+  async proposeShift(@Req() request: GymRequest, @Body() body: unknown) {
+    const access = request.gymAccess;
+    if (!access || access.role !== 'TRAINER' || access.actor?.kind !== 'TRAINER') throw new ForbiddenException('Trainer access is required');
+    const parsed = trainerShiftProposalInputSchema.safeParse(body);
+    if (!parsed.success) invalid('Enter a valid shift and current trainer version');
+    const { requestId, expectedVersion, ...hours } = parsed.data;
+    shiftIsValid(hours);
+    const { id: trainerId, registrationOperationId } = access.actor;
+    return this.tenantGate.withVerifiedTenant(access, tenant => withGymAccessFence(this.database.master, [
+      { identityId: access.identityId, gymId: access.gymId, role: 'TRAINER', tenantActorId: trainerId },
+    ], () => tenant.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "Trainer" WHERE id = ${trainerId} FOR UPDATE`;
+      const trainer = await tx.trainer.findFirst({ where: { id: trainerId, identityId: access.identityId,
+        enrollmentOperationId: registrationOperationId, registrationState: 'COMPLETE', status: 'ACTIVE' } });
+      if (!trainer) throw new NotFoundException('Trainer not found');
+      const receiptKey = { actorIdentityId: access.identityId, commandKind: 'SUBMIT_TRAINER_SHIFT', idempotencyKey: requestId };
+      const digest = requestDigest({ trainerId, ...parsed.data });
+      const previous = await tx.commandReceipt.findUnique({ where: { actorIdentityId_commandKind_idempotencyKey: receiptKey } });
+      if (previous) {
+        if (previous.requestDigest !== digest || previous.resourceId !== trainerId || previous.state !== 'COMMITTED') {
+          throw new ConflictException('This shift request key was already used');
+        }
+        return { ...profileCommandResultSchema.parse(previous.safeResult), replayed: true };
+      }
+      if (trainer.version !== expectedVersion) throw new ConflictException('Trainer profile changed; reload before submitting a shift');
+      if (await tx.trainerShiftRequest.findUnique({ where: { id: requestId } })) throw new ConflictException('This shift request key was already used');
+      await tx.trainerShiftRequest.upsert({ where: { trainerId }, create: { id: requestId, trainerId, ...hours },
+        update: { id: requestId, ...hours, submittedAt: new Date() } });
+      const updated = await tx.trainer.update({ where: { id: trainerId, version: expectedVersion }, data: { version: { increment: 1 } } });
+      const result = { version: updated.version, replayed: false };
+      const receipt = await tx.commandReceipt.create({ data: { ...receiptKey, requestDigest: digest, resourceType: 'TRAINER', resourceId: trainerId,
+        state: 'COMMITTED', safeResult: result, committedAt: new Date() } });
+      await appendTenantAudit(tx, { masterGymId: access.gymId, receiptId: receipt.id, actorIdentityId: access.identityId,
+        eventCode: 'TRAINER_SHIFT_REQUESTED', resourceType: 'TRAINER', resourceId: trainerId, transition: { to: 'PENDING', version: updated.version } });
+      return result;
+    })));
   }
 
   @Put('trainers/:trainerId/shift')
   async updateShift(@Req() request: GymRequest, @Param('trainerId') trainerId: string, @Body() body: unknown) {
     const access = request.gymAccess;
     if (!access || access.role !== 'OWNER') throw new ForbiddenException('Only gym owners can approve trainer shifts');
-    const parsed = trainerShiftInputSchema.safeParse(body);
-    if (!parsed.success) invalid('Enter a valid shift and current trainer version');
-    const { start, end, overnight, expectedVersion } = parsed.data;
-    const startMinute = Number(start.slice(0, 2)) * 60 + Number(start.slice(3));
-    const endMinute = Number(end.slice(0, 2)) * 60 + Number(end.slice(3));
-    const actualOvernight = endMinute <= startMinute;
-    const duration = (endMinute - startMinute + 1440) % 1440;
-    if (overnight !== actualOvernight || duration < 15 || duration > 960) invalid('Shift duration must be 15 to 960 minutes and overnight must match the entered times');
+    const review = trainerShiftReviewInputSchema.safeParse(body).data;
+    const direct = trainerShiftInputSchema.safeParse(body).data;
+    const expectedVersion = (review ?? direct)?.expectedVersion;
+    if (expectedVersion === undefined) invalid('Enter a valid shift and current trainer version');
+    if (direct) shiftIsValid(direct);
 
     return this.tenantGate.withVerifiedTenant(access, async tenant => {
       const binding = (await this.publishedTrainerBindings(tenant, access.gymId, false)).find(item => item.id === trainerId);
@@ -170,28 +229,36 @@ export class TrainersController {
       ], async () => tenant.$transaction(async tx => {
       await this.assertCurrentOwner(access);
       await tx.$queryRaw`SELECT "id" FROM "Trainer" WHERE "id" = ${trainerId} FOR UPDATE`;
-      const trainer = await tx.trainer.findFirst({ where: { id: trainerId, registrationState: 'COMPLETE' } });
+      const trainer = await tx.trainer.findFirst({ where: { id: trainerId, registrationState: 'COMPLETE' }, include: { shiftRequest: true } });
       if (!trainer) throw new NotFoundException('Trainer not found');
-      const idempotencyKey = `shift:${trainerId}:v${expectedVersion + 1}`;
-      const digest = requestDigest({ start, end, overnight, expectedVersion });
+      const idempotencyKey = review ? `shift-review:${trainerId}:${review.requestId}` : `shift:${trainerId}:v${expectedVersion + 1}`;
+      const digest = requestDigest(review ?? direct);
+      const declined = review?.decision === 'DECLINE';
       const previous = await tx.commandReceipt.findUnique({ where: { actorIdentityId_commandKind_idempotencyKey: {
         actorIdentityId: access.identityId, commandKind: 'APPROVE_TRAINER_SHIFT', idempotencyKey,
       } } });
       if (previous) {
         if (previous.requestDigest !== digest || previous.resourceId !== trainerId || previous.state !== 'COMMITTED') throw new ConflictException('Shift request conflicts with an earlier command');
-        return trainerShiftResultSchema.parse(previous.safeResult);
+        return declined ? profileCommandResultSchema.parse(previous.safeResult) : trainerShiftResultSchema.parse(previous.safeResult);
       }
       if (trainer.version !== expectedVersion) throw new ConflictException('Trainer profile changed; reload before approving this shift');
+      const requestHours = trainer.shiftRequest;
+      if (review ? requestHours?.id !== review.requestId : requestHours) throw new ConflictException('Review the current pending shift request');
+      const { start, end, overnight } = direct ?? requestHours!;
+      shiftIsValid({ start, end, overnight });
       const [configuration, updated] = await Promise.all([
         tx.gymConfiguration.findUnique({ where: { id: 'current' }, select: { timezone: true, masterGymId: true } }),
-        tx.trainer.update({ where: { id: trainerId, version: expectedVersion }, data: { shiftStart: start, shiftEnd: end, version: { increment: 1 } } }),
+        tx.trainer.update({ where: { id: trainerId, version: expectedVersion },
+          data: { ...(declined ? {} : { shiftStart: start, shiftEnd: end }), version: { increment: 1 } } }),
       ]);
       if (!configuration?.timezone || configuration.masterGymId !== access.gymId) throw new ConflictException('Gym timezone is unavailable');
-      const result = trainerShiftResultSchema.parse({ trainerId, shift: { start, end, overnight }, timeZone: configuration.timezone, version: updated.version });
+      if (review) await tx.trainerShiftRequest.delete({ where: { trainerId } });
+      const result = declined ? { version: updated.version, replayed: false }
+        : trainerShiftResultSchema.parse({ trainerId, shift: { start, end, overnight }, timeZone: configuration.timezone, version: updated.version });
       const receipt = await tx.commandReceipt.create({ data: { actorIdentityId: access.identityId, commandKind: 'APPROVE_TRAINER_SHIFT', idempotencyKey,
         requestDigest: digest, resourceType: 'TRAINER', resourceId: trainerId, state: 'COMMITTED', safeResult: result, committedAt: new Date() } });
       await appendTenantAudit(tx, { masterGymId: access.gymId, receiptId: receipt.id, actorIdentityId: access.identityId,
-        eventCode: 'TRAINER_SHIFT_APPROVED', resourceType: 'TRAINER', resourceId: trainerId,
+        eventCode: declined ? 'TRAINER_SHIFT_DECLINED' : 'TRAINER_SHIFT_APPROVED', resourceType: 'TRAINER', resourceId: trainerId,
         transition: { from: String(trainer.version), to: String(updated.version), version: updated.version } });
       return result;
       }));

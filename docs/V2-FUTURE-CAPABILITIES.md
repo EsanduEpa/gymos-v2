@@ -1,6 +1,6 @@
 # GymOS future capabilities
 
-The product owner approved the [V2 scope](../README.md#current-scope) on 14 November 2026 and requested development of the audit gaps on 15 November. The original exclusions below record the baseline. The new work expands that baseline in reviewable changes. See the [client review checklist](CLIENT-REVIEW.md) for workflows available in the review build.
+The product owner approved the [V2 scope](../README.md#current-scope) on 14 November 2026 and requested development of the audit gaps on 15 November. The tables below record the earlier baseline. The scope and decisions confirmed on 16 November are in the [ordered development checklist](AUDIT-REMAINING-CHECKLIST.md). See the [client review guide](CLIENT-REVIEW.md) for locally verified workflows.
 
 ## Approved exclusions for V2
 
@@ -19,10 +19,10 @@ The product owner still needs to decide which enhancements to schedule. Existing
 
 | Capability group | References | Work needed if in scope | Minimum completion evidence |
 | --- | --- | --- | --- |
-| Workout scheduling, copying, completion and rest periods | WRK-01–05 | Dated and weekly assignments, same-client copying, rest seconds and per-date member completion are implemented on the web. Reusable templates across clients and a physical check-in trigger remain open. | Trainer assigns; member sees the correct day’s plan; completion persists with correct permissions |
+| Workout scheduling, copying, completion and rest periods | WRK-01–05 | Dated and weekly assignments, same-client copying, reusable templates across confirmed clients, rest seconds and per-date member completion are implemented on the web. A physical check-in trigger remains open. | The trainer assigns a plan, the member sees it on the correct day, and completion persists with correct permissions. |
 | Meal dates and dietary restrictions | MEL-02, MEL-04 | Dated meals follow their assigned calendar date, and weekly meals continue to recur. The member and their confirmed trainer can view encrypted dietary and allergy records. The confirmed trainer can edit them. | Restrictions and assigned meals persist and appear only to authorized users |
 | Body metrics and progress reports/photos | PRG-01–06, RPT-06 | Members record weight, height and body fat. Members and confirmed trainers can view date-bounded charts, derived BMI and completed PT totals. Private photo storage, consent, retention and comparison remain open. | Time-series accuracy and private-media access verified |
-| Member goals, solo logs, wearable data | D1-1.1, D1-1.4, D1-2.3 | Agree supported data, consent, integrations, and member/trainer visibility | Representative data updates correctly without unauthorized access |
+| Member goals, solo logs, wearable data | D1-1.1, D1-1.4, D1-2.3 | The private training journal includes goals, solo workouts and daily nutrition. Wearable providers, consent and permitted data use remain open. | Representative data updates correctly without unauthorized access. |
 | Messaging, ratings, virtual sessions | D1-1.6, D1-2.4, D1-2.6 | Define communication, moderation, review eligibility, and remote-session rules | End-to-end authorized interaction and abuse/error handling verified |
 | Expanded trainer self-service | D1-2.1, D1-3.3 | Define additional profile and marketplace controls and any changes to shift review | Owner and trainer see consistent approval states and availability |
 | QR entry and additional PT controls | D1-1.3, D1-2.2, WF-M3, WF-T1 | Define proposed controls against the current timing and trainer completion workflow | Authorized state transitions, timing limits, and credits/settlements remain correct |

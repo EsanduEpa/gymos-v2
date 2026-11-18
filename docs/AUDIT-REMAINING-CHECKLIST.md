@@ -1,90 +1,84 @@
-# Remaining audit work
+# Remaining GymOS work
 
-Reviewed on 16 November 2026 against the audit PDF, current source and recorded local test results. This is the recommended implementation order. Related tasks can proceed together when their dependencies are ready. Tick a task after its feature and acceptance checks pass.
+Updated 16 November 2026 after reviewing the audit, the GymOS SRS v1.0 working draft, the GymOS Role Function List v2.0 and the FitCore proposal. The application baseline for this review is commit `cced34c`. Tick a development task after its acceptance checks pass and record the commit and test result.
 
-The development starting point is commit `cced34c` on branch `codex/finalize-gymos-20261107`. The 36 unchecked tasks below form the remaining-work baseline for the next development cycle. Record the implementation commit and test result as each task is completed. GitHub Actions results for the forthcoming pull request are pending.
+The local build already covers the original registration and recovery fixes, membership plan editing, PT history, dated workouts and meals, exercise completion, dietary notes, basic measurements, membership expiry warnings, basic trainer performance and four PDF/Excel exports. The checklist covers the unfinished parts. [Developer review and local evidence](CLIENT-REVIEW.md)
 
-The original audit predates the recent fixes. Registration, recovery, plan editing, PT history, trainer pay and the reported interface defects have recorded local fixes. Dated workouts and meals, workout completion, dietary notes, body measurements, membership expiry warnings, trainer performance and some PDF/Excel downloads have also been added. Final hosted verification remains open.
+## 1. Confirm the requirements
 
-The full original requirements and traceability file are still awaited. This checklist covers the gaps identifiable from the audit. Those files may add acceptance details or change task boundaries. Earlier exclusions in project documents record historical decisions. The current request is to finish all PDF requirements.
+- [x] **1. Review the supplied requirements and update the checklist.** The confirmed scope and remaining decisions are recorded below. The SRS functional requirements are mapped to the work in the [requirements review](GYMOS-REQUIREMENTS-REVIEW.md).
 
-## 1. Confirm the missing details
+### Confirmed decisions
 
-- [ ] **1. Read the original requirements files when supplied.** Match every requirement to the current application and update this checklist. Confirm staff permissions, subscription rules and the expanded platform features.
+| Topic | Current decision |
+| --- | --- |
+| Product scope | Use the narrower GymOS SRS scope. Defer POS, equipment maintenance, multiple branches, Sinhala/Tamil localization and other FitCore-only premium extensions such as white-label apps. The standard member and trainer mobile workflows and GymOS Phase 3 wearables and AI are in scope. |
+| Staff roles | Keep SuperAdmin, Gym Owner, Trainer and Member. L1/L2 are trainer pay levels. The Owner handles daily operations, member registration and manual access overrides for their own gym. Defer Manager and Front Desk accounts and route gym-entry alerts to the Owner. |
+| Trainer pay | Keep the current agreed fixed pay amount per completed session and the existing off-shift adjustment and per-trainer override. Preserve saved booking terms and historical payroll. Any percentage-of-fee change is future work. |
+| GymOS subscription | The Owner manages their gym's software subscription separately from member payments. Show the current tier and billing status, allow upgrades/downgrades and billing-method updates, notify the Owner of a failed payment and allow seven days to resolve it. |
+| Hosting and providers | Keep the hosted rehearsal paused. Use free test environments and synthetic data for development. |
+
+Open decisions apply to their respective tasks. These include subscription tiers/prices and post-grace restrictions, biometric hardware and access fallback, privacy permissions and retention, and provider choices for payments, notifications, storage and wearables. [Decision details](GYMOS-REQUIREMENTS-REVIEW.md#decisions-to-resolve)
 
 ## 2. Finish member and trainer features
 
-- [ ] **2. Add reusable workout templates across members.** A trainer should be able to use a saved plan for several clients and edit each assignment independently.
-- [ ] **3. Add member fitness goals and independent workout logs.** Members should record goals and exercise they do outside a trainer session.
-- [ ] **4. Add private progress photos.** Include upload, authorized access, deletion and agreed storage/retention rules.
-- [ ] **5. Finish progress comparisons and reports.** Add side-by-side photos and photos in the existing measurement/session report.
-- [ ] **6. Finish trainer self-service controls.** Allow the required profile edits, marketplace visibility and AI preferences. Compare the existing shift approval flow with the original acceptance rules.
+- [x] **2. Add reusable workout templates across members.** Chromium verified two independent assignments from one template. Editing one assignment preserved the other and the template. The coaching integration tests checked access and duplicate saves. (WRK-03)
+- [x] **3. Add goals, solo workouts and daily food logs.** Members can compare weight, strength and weekly sessions against targets, log solo exercise and save daily calories and macros. Chromium verified progress and persistence. The coaching integration tests checked privacy, encryption and stale updates. (FR-005, FR-023–024)
+- [x] **4. Complete member and trainer profiles.** Members can edit health notes and profile photos. Trainers can edit photos, biography, specialties and experience. Chromium verified profile changes and Owner shift approval. The trainer integration tests covered declining, replacing and retrying shift requests and checked that another gym cannot approve them. (FR-003, FR-034, FR-055, FR-060)
+- [ ] **5. Finish body measurements and progress reports.** Add chest, waist and arm measurements and allow assigned trainers to record dated measurements. Verify member and assigned-trainer access and agree which progress data Owners may see. (FR-008, PRG-01–02, PRG-05, RPT-06)
+- [ ] **6. Add private progress photos and comparison.** Allow authorized uploads to a dated timeline, show first/latest side by side and include the timeline in the progress report. Verify private, expiring access and the agreed deletion and retention behavior. (FR-007, PRG-03–06, RPT-06)
 
-References include WRK-03–04, PRG-01–06, RPT-06, D1-1.1, D1-1.4 and D1-2.1.
+## 3. Build payments and the GymOS subscription
 
-## 3. Add staff access and payments
+- [ ] **7. Complete membership plans and renewals.** Verify plans can include the agreed PT allowance and support concurrent active plans. Show term and renewal status and pack balances to members. (FR-004, FR-050)
+- [ ] **8. Add online membership and PT-pack purchases.** Show price and available plans/packs before checkout. Verify one paid transaction creates or renews one entitlement, failed payments leave entitlements unchanged, and retries or repeated callbacks never double-credit a member. (FR-018–019)
+- [ ] **9. Add payment history, methods and receipts.** Show member and authorized Owner history, issue payment confirmations and receipts, and decide the cash/bank transfer, refund and reconciliation rules. Activate paid staff-assisted enrollments only after payment is confirmed and trigger onboarding. (FR-001, FR-020, MEM-06–08)
+- [ ] **10. Build the Owner's GymOS subscription page.** Agree the tier catalogue and what happens after the grace period. Test plan changes, failed payment and recovery inside seven days on a synthetic gym. (FR-079, BR-087, UC-15)
 
-- [ ] **7. Add Manager and Front Desk accounts.** Implement invitations and the agreed permissions for each role, with tests that prevent access to another gym's data.
-- [ ] **8. Complete the owner's subscription page.** Implement the agreed GymOS service plans, billing status, invoices and plan changes. Confirm exact subscription rules from the original documents.
-- [ ] **9. Add online membership and PT-pack purchases.** Connect the selected payment provider in its free test environment and handle payment confirmation, failed payments and duplicate callbacks safely.
-- [ ] **10. Add cash payment records, receipts and payment history.** Match paid amounts to memberships and packs. Confirm refund and reconciliation rules with the source requirements.
+## 4. Complete gym entry and PT operations
 
-References include D3-1.3, D1-3.9, MEM-02–08, D1-1.8 and WF-M4.
+- [ ] **11. Build biometric enrollment and gym entry.** Confirm fingerprint/face support and device choice. Log granted and denied scans, check for a match plus active membership and suspension, prompt renewal for expired members, and alert the Owner. Verify three failed scans trigger the five-minute lockout. (FR-010, FR-012, FR-077–078)
+- [ ] **12. Add Owner access overrides and attendance.** Record manual grants/denials with actor, member, time and reason. Settle the QR/offline fallback design and checkout rules. Show personal check-in history, live occupancy, today's visits, monthly attendance and today's workout after check-in. (FR-011, FR-013, FR-058, FR-071, FR-077, BIO-05–07, WRK-04, RPT-02)
+- [ ] **13. Complete QR-based PT timing.** Verify member and booking match on scans, live elapsed time, trainer alerts, manual completion fallback and the gym-configurable minimum duration. A valid completion updates the session, pack, revenue and fixed trainer pay once. (FR-015–016, FR-036–037, FR-063–064)
+- [ ] **14. Finish booking, notes and no-show rules.** Recheck booking/rescheduling, alternative slots, trainer-deactivation handling and owner corrections. Close gaps for live notes, the 24-hour missing-note reminder, automatic no-show handling and gym-configured deductions. Confirm when auto-no-show should take effect before changing the existing timing. (FR-014, FR-017, FR-038–039, FR-052, FR-055, FR-064, BR-084)
+- [ ] **15. Finish trainer earnings and payroll reports.** Verify fixed amounts and off-shift adjustments, zero pay for missed/late-cancelled sessions, itemized earnings and in-/off-shift totals for weekly or monthly periods. Protect saved booking terms and previously approved periods. (FR-044–046, FR-051, BUG-007)
 
-## 4. Add messages and reminders
+## 5. Add communications and marketplace features
 
-- [ ] **11. Add email account verification/recovery and welcome messages.** Complete the email OTP flow required by the original proposal.
-- [ ] **12. Add external alerts and notification choices.** Cover payment failures, renewals, bookings, new-member prompts and the required email, SMS, WhatsApp or push channels. Members and trainers need the relevant preferences and duplicate prevention.
-- [ ] **13. Add private member–trainer messaging.** Include access restrictions and the agreed reporting/moderation behavior.
-- [ ] **14. Add trainer ratings and reviews.** Limit reviews to eligible members and qualifying completed sessions.
-- [ ] **15. Complete virtual-session booking and attendance.** Define how remote sessions start, end and affect credits and trainer pay.
+- [ ] **16. Finish sign-in and account delivery.** Confirm the email recovery/OTP decision and how welcome and activation messages should be sent. Exercise owner-assisted registration and the existing account recovery paths. Cover member device-biometric sign-in in the mobile app. (FR-001–002, AUTH-03)
+- [ ] **17. Add external notifications and preferences.** Cover PT reminders at 24 hours and one hour, pack alerts, payment failures, renewals, no-shows and applicable member/trainer preferences. Confirm providers and the role of WhatsApp. (FR-012, FR-014, FR-017–019, SRS §§16–17, D1-1.9, D1-2.7)
+- [ ] **18. Build the 30-day onboarding journey.** Send the day 1, 3, 7, 14, 21 and 30 prompts and track completion and skips. Verify the day 3 prompt is conditional and skipped steps do not stop later prompts. (FR-009, FR-059)
+- [ ] **19. Add private member–trainer messaging.** Permit messages between the member and assigned trainer, deliver alerts and test isolation. (FR-028)
+- [ ] **20. Complete marketplace discovery and trainer reviews.** Require both gym and trainer visibility settings. Add the 48-hour interest-request window and introductory session proposal. Allow a 1–5 star review after a completed session and require Owner moderation before publication. (FR-029–030, FR-034, FR-043, FR-047, FR-062)
+- [ ] **21. Complete virtual PT sessions.** Allow opted-in trainers to schedule, start and complete remote sessions. Verify credit, revenue and shift-based pay adjustments match the agreed in-person rules. (FR-048)
 
-References include AUTH-03, MEM-02–07, D1-1.6, D1-1.9, D1-2.4, D1-2.6 and D1-2.7.
+## 6. Finish reports and member engagement
 
-## 5. Add gym entry and attendance
+- [ ] **22. Add the missing financial and PT reporting.** Cover revenue by plan tier and new/renewal status, trainer level, off-shift amounts, pack use, budget-overrun alerts and period comparison. Finish trainer performance metrics such as revenue, no-show rates and ratings. Confirm how cash received and earned revenue should appear before changing ledger recognition. (FR-061, FR-065–069, RPT-03–04)
+- [ ] **23. Extend exports and accounting connections.** Cover the required session log and PDF/Excel reports, reconcile them with on-screen totals, and implement the agreed Xero/QuickBooks export and cash forecasts. (FR-065, FR-070, FR-076, RPT-05)
+- [ ] **24. Finish the Owner dashboard and analytics.** Verify the gym profile/config fields, live activity, occupancy, growth sources, onboarding funnel, attendance patterns and engagement/adoption reports. Add a retention heatmap, weekly churn scores and intervention suggestions. (FR-049, FR-059, FR-063, FR-071–073)
+- [ ] **25. Add streaks, challenges, rewards and leaderboards.** Use a configurable weekly target with a default of three check-ins. Award the defined milestones and keep the leaderboard off until the member opts in. (FR-031–033, FR-053)
+- [ ] **26. Add re-engagement campaigns.** Support Owner-configured messages and manual outreach. Verify scheduled outreach for at-risk and lapsed members and stop the sequence when the member checks in. (FR-054, FR-057, FR-059, FR-072, BR-019–024)
+- [ ] **27. Finish the audit log and gym data export.** Cover the required Owner actions and provide an authorized, gym-scoped export for compliance or migration. Verify the export scope for sensitive data. (FR-081)
 
-- [ ] **16. Connect fingerprint enrollment and gym entry.** Integrate the required ZKTeco device or a suitable simulator and verify the audit's under-two-second check-in target.
-- [ ] **17. Add QR fallback and staff-recorded attendance.** Record entry, exit, time spent and denied access, including alerts and owner access logs.
-- [ ] **18. Connect attendance to the existing screens.** Show today's gym visits, monthly physical attendance and the day's workout after check-in.
-- [ ] **19. Complete QR-based PT timing.** Verify starting and ending sessions, timing rules, credits and trainer pay against the existing session controls.
+## 7. Complete mobile and GymOS Phase 3
 
-References include BIO-01–07, WRK-04, RPT-01–02, D1-1.2–1.3, D1-2.2, D1-3.8, WF-M2–M3 and WF-T1.
+- [ ] **28. Build the standard member and trainer mobile workflows.** Verify supported devices, secure sign-in, plans, gym check-in, PT scans, payments and the relevant notifications. Confirm whether FitCore's offline plan access and device-version targets apply. (FR-002, FR-013–016, FR-019, FR-021–022, FR-036, SRS §§5, 22.1)
+- [ ] **29. Add wearable connections and recovery indicators.** Confirm the first providers and data permissions, support connect/disconnect and sync, and surface wellness, recovery and client insights. Verify the alert for three consecutive days of high fatigue. (FR-006, FR-025, FR-040–042)
+- [ ] **30. Add the member AI coach.** Require trainer opt-in per client, use assigned plans as context, support non-PT-day prompts and route flagged injury or medical topics to the assigned trainer. (FR-026–027, FR-035)
+- [ ] **31. Add Owner AI insights.** Use gym-scoped, read-only data for financial answers, weekly accounts and anomaly alerts. Add the agreed demand, pricing, renewal and cash forecasts. Verify answers against source data. (FR-074–076)
 
-## 6. Finish reporting and member engagement
+## 8. Verify and hand off the release
 
-- [ ] **20. Add the missing revenue breakdowns.** Show income by membership tier and new memberships versus renewals, with trends.
-- [ ] **21. Add the missing member analytics.** Show how applicants become active members, members who stop returning and patterns in member retention.
-- [ ] **22. Extend PDF and Excel to all required reports.** Verify totals, long reports and the required languages. Existing downloads cover revenue, expenses, payroll and audit. Sinhala/Tamil PDF rendering is still open.
-- [ ] **23. Add accounting integration and cash forecasts.** Agree the mappings for Xero/QuickBooks and calculate forecasts using the agreed payment rules.
-- [ ] **24. Add streaks, challenges, leaderboards and owner settings.** Implement the community and reward rules from the original requirements.
-- [ ] **25. Add campaigns to bring inactive members back.** Include eligibility, contact preferences and tracking of results.
-
-References include RPT-04–05, D1-1.7, D1-3.1–3.2, D1-3.5–3.6 and WF-O3–O4.
-
-## 7. Build the expanded features
-
-- [ ] **26. Add wearable integrations and recovery indicators.** Define data permissions and supported devices, then add the required recovery and overtraining information and alerts.
-- [ ] **27. Add member AI coaching and owner AI insights.** Include trainer/owner controls, flagged conversations, approved data access and testing of the generated guidance.
-- [ ] **28. Add point-of-sale and equipment maintenance features.** Follow the detailed Phase 3 workflows when supplied.
-- [ ] **29. Add multiple-branch management.** Implement the required shared and branch-specific views and permissions.
-- [ ] **30. Add the required native mobile and gym-branded apps.** Verify member and trainer workflows on the required devices.
-- [ ] **31. Add Sinhala and Tamil.** Cover application screens, validation, notifications and exports required by the source documents.
-
-References include D1-1.4–1.5, D1-2.3–2.4, D1-3.7, NFR-06, WF-M5 and WF-O5.
-
-## 8. Verify the final build and prepare the handoff
-
-- [ ] **32. Verify protection of personal information.** Extend and verify encryption for all required personal-data fields and establish recoverable key handling. Encryption of the new coaching records is already implemented.
-- [ ] **33. Finish the final review checklist.** Retest all original defects and added features, permissions, mobile layouts and reports. Resolve whether the unknown-gym page must return a technical HTTP 404, since its friendly error page currently returns HTTP 200.
-- [ ] **34. Prepare a reproducible client review package.** Include the exact source version, database changes, setup steps, synthetic test accounts supplied privately and an updated requirement-by-requirement result sheet.
-- [ ] **35. Complete hosted checks when hosting work resumes.** Verify security headers, health monitoring, gym creation, database upgrades, scheduled tasks and payroll on the exact review version. Measure the under-300-ms API target, 500+ concurrent-user capacity, 99.5% uptime, daily backups and recovery within four hours.
-- [ ] **36. Deliver the finished review package to the client's developer.** Supply testing instructions and the remaining verification status. Record their findings and fix confirmed issues.
-
-References include BUG-006, BUG-007, BUG-012, NFR-01–03 and SA-01. Hosted work is paused at the user's request. Current local evidence does not establish the hosted targets. Free service/test allowances govern integration and hosting choices. Any requirement that exceeds available free capacity needs a decision before spending.
+- [ ] **32. Confirm and verify the data protection rules.** Cover personal information, coaching records, photos, wearable data, payments and biometrics. Agree access and retention and verify encryption, key recovery and deletion. (SRS §§19–20, NFR-02)
+- [ ] **33. Retest the exact review build.** Replay the original defects and new features, including role and gym isolation. Confirm whether the friendly unknown-gym page needs an HTTP 404. Reconcile SuperAdmin operational permissions with the current scoped, read-only support workflow. (BUG-012, SA-01, SRS §7)
+- [ ] **34. Prepare the client review package.** Include the exact source version, setup, migration steps, synthetic accounts supplied privately and requirement-by-requirement results.
+- [ ] **35. Verify the intended hosted environment when work resumes.** Verify security headers, health, gym creation, migrations, scheduled work and payroll. Confirm release targets before measuring response time, capacity, uptime, backup and recovery. The FitCore audit targets are recorded in the requirements review. (BUG-006–007, NFR-01–03)
+- [ ] **36. Deliver the finished review package to the client's developer.** Record their results, address confirmed issues and capture acceptance.
 
 ## Evidence
 
 - [Original audit](../gymos_v2_qa_audit_report.pdf), particularly pages 3–7 and 17–18.
-- [Current developer review and recorded checks](CLIENT-REVIEW.md).
+- [Requirements review and source mapping](GYMOS-REQUIREMENTS-REVIEW.md).
+- [Developer review and recorded checks](CLIENT-REVIEW.md).
 - [Defect remediation and verification record](QA-AUDIT-PRIORITIZED-REMEDIATION-PLAN.md#12-evidence-and-completion-record).
-- [Capability backlog](V2-FUTURE-CAPABILITIES.md).

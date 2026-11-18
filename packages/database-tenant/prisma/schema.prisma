@@ -57,8 +57,23 @@ model Member {
   mealPlans             MealPlan[]               @relation("MealPlanMember")
   dietaryProfile        MemberDietaryProfile?
   bodyMeasurements      MemberBodyMeasurement[]
+  trainingJournal       MemberJournalEntry[]
+  profilePhoto          ProfilePhoto?
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
+}
+
+model MemberJournalEntry {
+  memberId      String
+  member        Member   @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  kind          String
+  entryKey      String
+  recordedOn    DateTime @db.Date
+  encryptedData String
+  version       Int      @default(0)
+
+  @@id([memberId, kind, entryKey])
+  @@index([memberId, kind, recordedOn(sort: Desc), entryKey(sort: Desc)])
 }
 
 model MemberDietaryProfile {
@@ -134,9 +149,45 @@ model Trainer {
   sessions              PTSession[]              @relation("SessionTrainer")
   availabilityRules     PTAvailabilityRule[]
   workoutPlans          WorkoutPlan[]            @relation("WorkoutPlanTrainer")
+  workoutTemplates      WorkoutTemplate[]
+  profilePhoto          ProfilePhoto?
+  shiftRequest          TrainerShiftRequest?
   mealPlans             MealPlan[]               @relation("MealPlanTrainer")
   createdAt             DateTime                 @default(now())
   updatedAt             DateTime                 @updatedAt
+}
+
+model ProfilePhoto {
+  id            String   @id @default(cuid())
+  memberId      String?  @unique
+  member        Member?  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  trainerId     String?  @unique
+  trainer       Trainer? @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  encryptedData String
+}
+
+model TrainerShiftRequest {
+  trainerId   String   @id
+  trainer     Trainer  @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  id          String   @unique
+  start       String
+  end         String
+  overnight   Boolean
+  submittedAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model WorkoutTemplate {
+  id             String   @id @default(cuid())
+  trainerId      String
+  trainer        Trainer  @relation(fields: [trainerId], references: [id], onDelete: Restrict)
+  sourcePlanId   String
+  sourceRevision String
+  name           String
+  content        Json
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([trainerId, sourcePlanId, sourceRevision])
+  @@index([trainerId, createdAt(sort: Desc), id(sort: Desc)])
 }
 
 model WorkoutPlan {
