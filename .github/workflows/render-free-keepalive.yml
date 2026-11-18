@@ -1,0 +1,28 @@
+name: Render free API keepalive
+
+on:
+  schedule:
+    # Stay 10 minutes apart without queueing on the top of each hour.
+    - cron: '7-59/10 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: render-free-api-keepalive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    name: Wake the Render API
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Request the lightweight liveness route
+        env:
+          GYMOS_RENDER_URL: https://gymos-api-dw7n.onrender.com/
+        run: >-
+          curl --fail --silent --show-error --output /dev/null
+          --connect-timeout 10 --max-time 15
+          --retry 6 --retry-delay 10 --retry-max-time 95 --retry-all-errors
+          "$GYMOS_RENDER_URL"
