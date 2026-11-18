@@ -269,8 +269,35 @@ model Gym {
   memberApplications           MemberApplication[]
   memberApplicationNotices     MemberApplicationNotice[]
   recoveryCredentials          RecoveryCredential[]
+  gymosSubscriptionOrders      GymosSubscriptionOrder[]
   createdAt                    DateTime                  @default(now())
   updatedAt                    DateTime                  @updatedAt
+}
+
+model GymosSubscriptionOrder {
+  id                     String                      @id @db.Uuid
+  gymId                  String
+  gym                    Gym                         @relation(fields: [gymId], references: [id], onDelete: Restrict)
+  ownerIdentityId        String
+  idempotencyKey         String
+  tier                   String
+  amount                 Decimal                     @db.Decimal(19, 4)
+  merchantId             String
+  providerSubscriptionId String?                     @unique
+  paidThrough            DateTime?                   @db.Timestamptz(3)
+  stoppedAt              DateTime?                   @db.Timestamptz(3)
+  createdAt              DateTime                    @default(now()) @db.Timestamptz(3)
+  payments               GymosSubscriptionPayment[]
+
+  @@unique([gymId, idempotencyKey])
+  @@index([gymId, createdAt])
+}
+
+model GymosSubscriptionPayment {
+  paymentId  String                 @id
+  orderId    String                 @db.Uuid
+  order      GymosSubscriptionOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  verifiedAt DateTime               @default(now()) @db.Timestamptz(3)
 }
 
 enum MemberApplicationState {

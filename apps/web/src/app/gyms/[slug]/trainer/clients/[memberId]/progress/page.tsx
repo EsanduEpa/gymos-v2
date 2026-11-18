@@ -1,8 +1,9 @@
 import { notFound, redirect } from 'next/navigation';
 import { progressReportQuerySchema, progressReportSchema } from '@gymos/contracts';
 import { DashboardChrome } from '@/components/navigation/dashboard-chrome';
+import { BodyMeasurementForm } from '@/components/coaching/coaching-record-forms';
 import { ProgressReport } from '@/components/coaching/progress-report';
-import { Card, Feedback } from '@/components/ui';
+import { Card, CardHeader, Feedback } from '@/components/ui';
 import { requireGymContext } from '@/lib/gym-context';
 import { apiUrl } from '@/lib/gymos';
 
@@ -27,7 +28,9 @@ export default async function TrainerClientProgressPage({ params, searchParams }
   const report = response.ok ? progressReportSchema.safeParse(await response.json().catch(() => null)) : null;
   return <DashboardChrome identityId={session.identityId} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'}>
     <div className="gym-banner"><h1>Client progress</h1><a className="ui-button ui-button-secondary" href={clientPath}>Back to client</a></div>
-    {report?.success ? <ProgressReport report={report.data} path={path}/> :
-      <Card><Feedback tone="error">Progress could not be loaded. Refresh to try again.</Feedback></Card>}
+    {report?.success ? <>
+      <Card><CardHeader title="Record a measurement"/><BodyMeasurementForm slug={slug} today={report.data.today} memberId={memberId}/></Card>
+      <ProgressReport report={report.data} path={path} slug={slug} memberId={memberId}/>
+    </> : <Card><Feedback tone="error">Progress could not be loaded. Refresh to try again.</Feedback></Card>}
   </DashboardChrome>;
 }

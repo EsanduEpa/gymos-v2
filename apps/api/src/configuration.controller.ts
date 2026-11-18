@@ -4,12 +4,14 @@ import {
   Post, Req, UnprocessableEntityException, UseGuards,
 } from '@nestjs/common';
 import { appendTenantAudit } from './operations/transaction-audit.js';
+import { issueMembershipPtAllowance } from './membership-pt-allowance.js';
 import { requestDigest } from './operations/primitives.js';
-import { configurationReadSchema, createMembershipPlanSchema, managedMembershipPlanSchema, manageMembershipPlanSchema, membershipEligibilitySchema, renewalResultSchema, renewMembershipSchema, updateConfigurationSchema } from '@gymos/contracts';
+import { configurationReadSchema, createMembershipPlanSchema, managedMembershipPlanSchema, manageMembershipPlanSchema, memberMembershipOverviewSchema, membershipEligibilitySchema, renewalResultSchema, renewMembershipSchema, updateConfigurationSchema } from '@gymos/contracts';
 import { GymAccessGuard, type GymRequest } from './gym-access.guard.js';
 import { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js';
 import { DatabaseService } from './database.service.js';
 import { addLocalDays, asDate, dateString, deriveMembershipEligibility, gymLocalDate } from './membership-rules.js';
+import { creditTotals } from './sessions/credit-unit-projection.js';
 
 function validMoney(value: string, currency: string): boolean {
   const [whole, fraction = ''] = value.split('.');
@@ -76,7 +78,8 @@ export class ConfigurationController {
       const [row, plans] = await Promise.all([
         tenant.gymConfiguration.findUnique({ where: { id: 'current' } }),
         tenant.membershipPlan.findMany({ orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], take: 500,
-          select: { id: true, name: true, description: true, price: true, currency: true, durationDays: true, status: true, version: true, createdAt: true } }),
+          select: { id: true, name: true, description: true, price: true, currency: true, durationDays: true, includedPtCredits: true,
+            status: true, version: true, createdAt: true } }),
       ]);
       if (!row) throw new NotFoundException('Gym configuration not found');
       const configuration = configurationDto(row);
@@ -125,7 +128,7 @@ export class ConfigurationController {
   async createPlan(@Req() request: GymRequest, @Body() body: unknown) {
     const access = this.owner(request);
     const parsed = createMembershipPlanSchema.safeParse(body);
-    if (!parsed.success) throw new UnprocessableEntityException('Enter a plan name, exact price and duration from 1 to 3650 days');
+    if (!parsed.success) throw new UnprocessableEntityException('Enter a plan name, price, duration from 1 to 3650 days and up to 1000 PT credits');
     return this.tenantGate.withVerifiedTenant(access, tenant => tenant.$transaction(async tx => {
       await this.assertCurrentOwner(access);
       await tx.$queryRaw`SELECT "id" FROM "GymConfiguration" WHERE "id" = 'current' FOR UPDATE`;
@@ -135,8 +138,10 @@ export class ConfigurationController {
       if (!validMoney(parsed.data.price, current.currency)) throw new UnprocessableEntityException('Price precision must match the gym currency');
       const version = current.version + 1;
       const plan = await tx.membershipPlan.create({ data: { name: parsed.data.name, description: parsed.data.description || null,
-        price: parsed.data.price, currency: current.currency, durationDays: parsed.data.durationDays },
-        select: { id: true, name: true, description: true, price: true, currency: true, durationDays: true, status: true, version: true, createdAt: true } });
+        price: parsed.data.price, currency: current.currency, durationDays: parsed.data.durationDays,
+        includedPtCredits: parsed.data.includedPtCredits ?? 0 },
+        select: { id: true, name: true, description: true, price: true, currency: true, durationDays: true, includedPtCredits: true,
+          status: true, version: true, createdAt: true } });
       await tx.gymConfiguration.update({ where: { id: 'current' }, data: { version } });
       const receiptId = randomUUID();
       await tx.commandReceipt.create({ data: { id: receiptId, actorIdentityId: access.identityId,
@@ -170,15 +175,21 @@ export class ConfigurationController {
 
       let plan = null;
       if (input.action === 'DELETE') {
-        const term = await tx.membershipTerm.findFirst({ where: { planId }, select: { id: true } });
-        if (current.status !== 'INACTIVE' || term || application) throw new ConflictException('Only archived plans without membership or application history can be deleted');
+        const [term, checkout] = await Promise.all([
+          tx.membershipTerm.findFirst({ where: { planId }, select: { id: true } }),
+          tx.memberPaymentOrder.findFirst({ where: { planId }, select: { id: true } }),
+        ]);
+        if (current.status !== 'INACTIVE' || term || application || checkout) {
+          throw new ConflictException('Only archived plans without membership, application or checkout history can be deleted');
+        }
         await tx.membershipPlan.delete({ where: { id: planId } });
       } else {
         if (application) throw new ConflictException('Finish processing applications that use this plan before changing it');
         if (current.status !== 'ACTIVE') throw new ConflictException('This plan is already archived');
         if (input.action === 'EDIT' && !validMoney(input.price, current.currency)) throw new UnprocessableEntityException('Price must have at most two decimal places');
         plan = await tx.membershipPlan.update({ where: { id: planId }, data: {
-          ...(input.action === 'EDIT' ? { name: input.name, description: input.description || null, price: input.price, durationDays: input.durationDays } : { status: 'INACTIVE' }),
+          ...(input.action === 'EDIT' ? { name: input.name, description: input.description || null, price: input.price,
+            durationDays: input.durationDays, includedPtCredits: input.includedPtCredits ?? current.includedPtCredits } : { status: 'INACTIVE' }),
           version: { increment: 1 },
         } });
       }
@@ -194,7 +205,7 @@ export class ConfigurationController {
         transition: { from: current.status, to: plan?.status ?? 'DELETED', version: current.version + 1 } });
       return managedMembershipPlanSchema.parse({ id: planId, configurationVersion: version, plan: plan ? {
         id: plan.id, name: plan.name, description: plan.description, price: plan.price.toString(), currency: plan.currency,
-        durationDays: plan.durationDays, status: plan.status, version: plan.version, createdAt: plan.createdAt.toISOString(),
+        durationDays: plan.durationDays, includedPtCredits: plan.includedPtCredits, status: plan.status, version: plan.version, createdAt: plan.createdAt.toISOString(),
       } : null });
     }));
   }
@@ -219,6 +230,67 @@ export class ConfigurationController {
     });
   }
 
+  @Get('me/memberships')
+  async memberMembershipOverview(@Req() request: GymRequest) {
+    const access = this.access(request);
+    if (access.role !== 'MEMBER' || access.actor?.kind !== 'MEMBER') {
+      throw new ForbiddenException('Member access is required');
+    }
+    const memberId = access.actor.id;
+    return this.tenantGate.withVerifiedTenant(access, tenant => tenant.$transaction(async tx => {
+      const config = await tx.gymConfiguration.findUnique({ where: { id: 'current' }, select: { timezone: true, currency: true } });
+      if (!config?.timezone) throw new NotFoundException('Membership overview is unavailable');
+      const today = gymLocalDate(config.timezone);
+      const date = asDate(today);
+      const select = { id: true, planId: true, planNameSnapshot: true, startDate: true, endDateExclusive: true, agreedPrice: true,
+        currency: true, includedPtCredits: true } as const;
+      const [terms, latestExpired, balances, availablePlans] = await Promise.all([
+        tx.membershipTerm.findMany({
+          where: { memberId, endDateExclusive: { gt: date } },
+          orderBy: [{ startDate: 'asc' }, { id: 'asc' }],
+          select,
+        }),
+        tx.membershipTerm.findFirst({
+          where: { memberId, endDateExclusive: { lte: date } },
+          orderBy: [{ endDateExclusive: 'desc' }, { id: 'asc' }],
+          select,
+        }),
+        creditTotals(tx, [memberId], today, true),
+        config.currency ? tx.membershipPlan.findMany({
+          where: { status: 'ACTIVE', currency: config.currency },
+          orderBy: [{ name: 'asc' }, { id: 'asc' }],
+          select: { id: true, name: true, price: true, currency: true, durationDays: true, includedPtCredits: true },
+        }) : [],
+      ]);
+      const describeTerm = (term: (typeof terms)[number]) => ({
+        id: term.id,
+        planName: term.planNameSnapshot,
+        startDate: dateOnly(term.startDate),
+        endDateExclusive: dateOnly(term.endDateExclusive),
+        agreedPrice: term.agreedPrice.toString(),
+        currency: term.currency,
+        includedPtCredits: term.includedPtCredits,
+      });
+      const upcoming = terms.filter(term => term.startDate > date);
+      const firstUpcomingByPlan = new Map<string, string>();
+      for (const term of upcoming) {
+        if (!firstUpcomingByPlan.has(term.planId)) firstUpcomingByPlan.set(term.planId, dateOnly(term.startDate));
+      }
+      const balance = balances.get(memberId);
+      return memberMembershipOverviewSchema.parse({
+        asOfLocalDate: today,
+        active: terms.filter(term => term.startDate <= date).map(term => ({
+          ...describeTerm(term),
+          renewalStartsOn: firstUpcomingByPlan.get(term.planId) ?? null,
+        })),
+        upcoming: upcoming.map(describeTerm),
+        latestExpired: latestExpired ? describeTerm(latestExpired) : null,
+        credits: { available: balance?.available ?? 0, held: balance?.held ?? 0 },
+        availablePlans: availablePlans.map(plan => ({ ...plan, price: plan.price.toString() })),
+      });
+    }, { isolationLevel: 'RepeatableRead' }));
+  }
+
   @Post('members/:memberId/memberships')
   async renew(@Req() request: GymRequest, @Param('memberId') memberId: string, @Body() body: unknown) {
     const access = this.owner(request); const parsed = renewMembershipSchema.safeParse(body);
@@ -240,22 +312,27 @@ export class ConfigurationController {
         if (member.version !== parsed.data.expectedMemberVersion) throw new ConflictException('Member changed; reload before renewing');
         if (member.status !== 'ACTIVE') throw new ConflictException('Only active members can renew a membership');
         await tx.$queryRaw`SELECT "id" FROM "MembershipPlan" WHERE "id" = ${parsed.data.planId} FOR SHARE`;
-        const [plan, config, terms] = await Promise.all([
+        const [plan, config, latestTerm] = await Promise.all([
           tx.membershipPlan.findUnique({ where: { id: parsed.data.planId } }),
           tx.gymConfiguration.findUnique({ where: { id: 'current' } }),
-          tx.membershipTerm.findMany({ where: { memberId }, orderBy: { endDateExclusive: 'desc' } }),
+          tx.membershipTerm.findFirst({
+            where: { memberId, planId: parsed.data.planId },
+            orderBy: { endDateExclusive: 'desc' },
+            select: { endDateExclusive: true },
+          }),
         ]);
         if (!plan || plan.status !== 'ACTIVE') throw new NotFoundException('Membership plan not found');
         if (!config?.currency || !config.timezone || plan.currency !== config.currency) throw new ConflictException('Plan configuration is unavailable');
         const today = gymLocalDate(config.timezone);
-        const latestEnd = terms.reduce<string | null>((latest, term) => {
-          const date = dateOnly(term.endDateExclusive); return !latest || date > latest ? date : latest;
-        }, null);
-        if (parsed.data.startPolicy === 'IMMEDIATE' && latestEnd && latestEnd > today) throw new ConflictException('An active or future term prevents immediate renewal');
+        const latestEnd = latestTerm ? dateOnly(latestTerm.endDateExclusive) : null;
+        if (parsed.data.startPolicy === 'IMMEDIATE' && latestEnd && latestEnd > today) {
+          throw new ConflictException('This plan already has an active or future term');
+        }
         const start = parsed.data.startPolicy === 'NEXT_AVAILABLE' && latestEnd && latestEnd > today ? latestEnd : today;
         const end = addLocalDays(start, plan.durationDays);
         const term = await tx.membershipTerm.create({ data: { memberId, planId: plan.id, startDate: asDate(start), endDateExclusive: asDate(end),
           agreedPrice: plan.price, currency: plan.currency, planNameSnapshot: plan.name, configurationVersion: config.version,
+          includedPtCredits: plan.includedPtCredits,
           actorIdentityId: access.identityId, idempotencyKey: parsed.data.idempotencyKey, requestDigest: digest } });
         const changed = await tx.member.updateMany({ where: { id: memberId, version: parsed.data.expectedMemberVersion }, data: { version: { increment: 1 } } });
         if (changed.count !== 1) throw new ConflictException('Member changed during renewal');
@@ -266,6 +343,8 @@ export class ConfigurationController {
         await appendTenantAudit(tx, { masterGymId: access.gymId, receiptId, actorIdentityId: access.identityId,
           eventCode: 'MEMBERSHIP_RENEWED', resourceType: 'MEMBERSHIP_TERM', resourceId: term.id,
           transition: { version: nextVersion } });
+        const allowanceAudit = await issueMembershipPtAllowance(tx, term, receiptId);
+        if (allowanceAudit) await appendTenantAudit(tx, { ...allowanceAudit, masterGymId: access.gymId, receiptId });
         return renewalResultSchema.parse({ termId: term.id, memberId, startDate: start, endDateExclusive: end,
           agreedPrice: plan.price.toString(), currency: plan.currency, planName: plan.name, memberVersion: nextVersion, replayed: false });
       }));

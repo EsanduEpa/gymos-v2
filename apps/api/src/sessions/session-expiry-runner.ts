@@ -4,6 +4,7 @@ import { TenantDatabaseService } from '../tenant-database.service.js';
 import { TENANT_TEMPLATE_MANIFEST, tenantManifestDigest } from '../tenancy/tenant-template-manifest.js';
 import { verifyInstalledTenant } from '../tenancy/tenant-schema-verifier.js';
 import { canonicalJson } from '../operations/primitives.js';
+import { sweepGymosSubscriptionNotice } from '../payments/gymos-subscription-notices.js';
 import { sweepSessionReminders } from './session-reminders.js';
 import { expirePendingSession } from './expire-pending-session.js';
 
@@ -104,6 +105,13 @@ export class SessionExpiryRunner implements OnModuleInit, OnApplicationShutdown 
               const reminders = await sweepSessionReminders(tenant, this.database.master, gym.id);
               failures += reminders.failed; this.totalFailures += reminders.failed;
               this.logger.log(`PT reminders: gym=${gym.id} sent=${reminders.sent} failed=${reminders.failed}`);
+              try {
+                await sweepGymosSubscriptionNotice(tenant, masterTx, gym.id);
+              } catch {
+                failures++;
+                this.totalFailures++;
+                this.logger.warn(`GymOS subscription notice sweep will retry for gym=${gym.id}`);
+              }
               return { skipped: false, expired: tenantExpired };
             });
           }, { timeout: 120_000, maxWait: 5_000 });

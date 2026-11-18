@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
 import { createServer as createHttpServer, request as forwardRequest, type Server } from 'node:http';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
@@ -17,6 +17,13 @@ const root = fileURLToPath(new URL('../../../', import.meta.url));
 const apiDirectory = join(root, 'apps/api');
 const webDirectory = join(root, 'apps/web');
 const evidenceDirectory = join(webDirectory, 'test-results/ui-transformation/member');
+const payHereUi = process.env.GYMOS_TEST_PAYHERE_UI === '1';
+const syntheticMerchant = {
+  GYMOS_PAYHERE_SANDBOX_MERCHANT_ID: '1234567',
+  GYMOS_PAYHERE_SANDBOX_MERCHANT_SECRET: 'synthetic-browser-only-secret',
+  GYMOS_PAYHERE_SANDBOX_API_ORIGIN: 'https://payment-callback.example.test',
+  GYMOS_PAYHERE_SANDBOX_WEB_ORIGIN: 'http://localhost:3002',
+};
 type RunningProcess = { child: ChildProcess; errorText: () => string };
 let environment: Awaited<ReturnType<typeof createDisposableEnvironment>>;
 let fixture: Awaited<ReturnType<typeof seedTwoGymFixture>>;
@@ -118,7 +125,8 @@ test.beforeAll('start isolated session-read fixtures and local services', async 
   apiBase = `http://127.0.0.1:${apiPort}`; webBase = `http://127.0.0.1:${webPort}`; jwtSecret = randomBytes(32).toString('hex');
   api = launch(process.execPath, [join(apiDirectory, 'dist/main.js')], apiDirectory, { PATH: process.env.PATH, HOME: process.env.HOME,
     NODE_ENV: 'production', TZ: 'UTC', PORT: String(apiPort), MASTER_DATABASE_URL: environment.masterUrl,
-    TENANT_DATABASE_URL: environment.masterUrl, PROVISION_DATABASE_URL: environment.masterUrl, JWT_SECRET: jwtSecret });
+    TENANT_DATABASE_URL: environment.masterUrl, PROVISION_DATABASE_URL: environment.masterUrl, JWT_SECRET: jwtSecret,
+    GYMOS_COACHING_DATA_KEY: randomBytes(32).toString('hex'), ...(payHereUi ? syntheticMerchant : {}) });
   await waitReady(`${apiBase}/`, api);
   const proxyPort = await reservePort();
   proxy = createHttpServer((req, res) => {
@@ -129,7 +137,8 @@ test.beforeAll('start isolated session-read fixtures and local services', async 
   });
   await new Promise<void>(resolve => proxy.listen(proxyPort, '127.0.0.1', resolve));
   web = launch(process.execPath, [join(webDirectory, 'node_modules/next/dist/bin/next'), 'start', '-H', '127.0.0.1', '-p', String(webPort)], webDirectory,
-    { PATH: process.env.PATH, HOME: process.env.HOME, NODE_ENV: 'production', TZ: 'UTC', GYMOS_API_URL: `http://127.0.0.1:${proxyPort}`, GYMOS_WEB_ORIGIN: webBase });
+    { PATH: process.env.PATH, HOME: process.env.HOME, NODE_ENV: 'production', TZ: 'UTC', GYMOS_API_URL: `http://127.0.0.1:${proxyPort}`,
+      GYMOS_WEB_ORIGIN: webBase, ...(payHereUi ? { GYMOS_PAYHERE_CHECKOUT_ENABLED: '1' } : {}) });
   await waitReady(`${webBase}/login`, web);
 });
 
@@ -193,6 +202,159 @@ async function seedMemberPlans() {
   const start = new Date(`${today}T01:00:00+05:30`);
   await tenant.pTSession.create({ data: { memberId, trainerId, state: 'COMPLETED', type: 'IN_PERSON', scheduledStartAt: start, scheduledEndAt: new Date(start.getTime() + 1800000), gymTimezone: 'Asia/Colombo', fee: '50', currency: 'LKR', confirmationRate: '0.4', confirmationLevel: 'LEVEL_1', configurationVersion: 0, confirmedAt: start, startedAt: start, endedAt: new Date(start.getTime() + 1800000), createdByIdentityId: fixture.users.ownerA.id, notes: 'Member visible coaching feedback' } });
 }
+
+test('membership and GymOS subscription show role-scoped prices', async ({ page }) => {
+  test.skip(payHereUi, 'This baseline checks the disabled checkout pages.');
+  const gymPath = `/gyms/${fixture.gyms[0].slug}`;
+  const workspace = page.getByRole('main');
+  const paymentAction = /\b(buy|checkout|subscribe|pay now|add payment method|change plan)\b/i;
+
+  await openAs(page, fixture.users.memberUser.id, `${gymPath}/member/membership`);
+  await expect(workspace.getByRole('heading', { name: 'Membership', exact: true })).toBeVisible();
+  await expect(workspace.getByRole('heading', { name: 'Active plans' })).toBeVisible();
+  await expect(workspace.getByText('No renewal scheduled')).toBeVisible();
+  await expect(workspace.getByRole('region', { name: 'PT pack balances' }).locator('dd')).toHaveText(['3', '2']);
+  const offer = workspace.getByRole('listitem').filter({ hasText: '90 days' });
+  await expect(offer).toContainText('Trainer browser membership · LKR 0');
+  await expect(offer).toContainText('90 days · 0 PT credits included');
+  await expect(workspace.getByRole('button', { name: paymentAction })).toHaveCount(0);
+  await expect(workspace.getByRole('link', { name: paymentAction })).toHaveCount(0);
+
+  await page.goto(`${webBase}${gymPath}/owner/subscription`);
+  await expect(page).toHaveURL(`${webBase}${gymPath}/member`);
+  await expect(workspace.getByRole('heading', { name: 'Proposed GymOS plans' })).toHaveCount(0);
+
+  await openAs(page, fixture.users.ownerA.id, `${gymPath}/owner/subscription`);
+  await expect(workspace.getByRole('heading', { name: 'Proposed GymOS plans' })).toBeVisible();
+  const starter = workspace.getByRole('row').filter({ has: page.getByRole('rowheader', { name: 'Starter', exact: true }) });
+  await expect(starter.getByRole('cell', { name: 'LKR 3,500', exact: true })).toBeVisible();
+  await expect(workspace.getByText('Prices are provisional.', { exact: false })).toBeVisible();
+  await expect(workspace.getByText('Trainer browser membership', { exact: false })).toHaveCount(0);
+  await expect(workspace.getByRole('button', { name: paymentAction })).toHaveCount(0);
+  await expect(workspace.getByRole('link', { name: paymentAction })).toHaveCount(0);
+});
+
+test('member checkout reaches a confirmed receipt from a synthetic callback', async ({ page, request }) => {
+  test.skip(!payHereUi, 'Set GYMOS_TEST_PAYHERE_UI=1 to enable the isolated sandbox fixture.');
+  const gymPath = `/gyms/${fixture.gyms[0].slug}`;
+  const membershipPath = `${gymPath}/member/membership`;
+  const planName = 'Synthetic paid membership';
+  const amount = '725.50';
+  const currency = 'LKR';
+  const plan = await fixture.tenants[0].membershipPlan.create({
+    data: { name: planName, price: amount, currency, durationDays: 20 },
+  });
+  await page.route('https://sandbox.payhere.lk/**', route => route.abort());
+  await openAs(page, fixture.users.memberUser.id, membershipPath);
+  const membership = await page.reload();
+  expect(membership?.headers()['content-security-policy']).toContain("form-action 'self' https://sandbox.payhere.lk/pay/checkout");
+  const opener = page.getByText('Start membership sandbox checkout', { exact: true });
+  await opener.click();
+  await page.locator('details').filter({ has: opener }).locator('select[name="productId"]').selectOption(plan.id);
+  for (const [label, value] of [
+    ['First name', 'Synthetic'], ['Last name', 'Member'], ['Email', 'checkout-browser@example.test'],
+    ['Phone', '+94770000500'], ['Billing address', 'Synthetic address'],
+    ['City', 'Colombo'], ['Country', 'Sri Lanka'],
+  ]) {
+    await page.getByLabel(label, { exact: true }).fill(value);
+  }
+  await page.getByRole('button', { name: 'Prepare membership order' }).click();
+
+  const handoff = page.locator('form').filter({ has: page.getByRole('button', { name: 'Continue to PayHere Sandbox' }) });
+  await expect(handoff).toHaveAttribute('action', 'https://sandbox.payhere.lk/pay/checkout');
+  await expect(handoff).toHaveAttribute('method', 'post');
+  await expect(handoff.locator('input[name="amount"]')).toHaveValue(amount);
+  const orderId = await handoff.locator('input[name="order_id"]').inputValue();
+  const returnUrl = new URL(await handoff.locator('input[name="return_url"]').inputValue());
+  expect(returnUrl.pathname).toBe(membershipPath);
+  expect(returnUrl.searchParams.get('paymentOrder')).toBe(orderId);
+
+  // Follow the return path on the fixture and post the callback only to its local API.
+  await page.goto(`${webBase}${returnUrl.pathname}${returnUrl.search}`);
+  await expect(page.getByText('Waiting for PayHere to confirm your payment.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'View receipt' })).toHaveCount(0);
+  const checksum = (value: string) => createHash('md5').update(value).digest('hex').toUpperCase();
+  const merchantId = syntheticMerchant.GYMOS_PAYHERE_SANDBOX_MERCHANT_ID;
+  const merchantSecret = syntheticMerchant.GYMOS_PAYHERE_SANDBOX_MERCHANT_SECRET;
+  const status = '2';
+  const notification = await request.post(`${apiBase}${gymPath}/payments/payhere/membership-notify`, {
+    form: {
+      merchant_id: merchantId, order_id: orderId, payhere_amount: amount, payhere_currency: currency,
+      status_code: status, md5sig: checksum(merchantId + orderId + amount + currency + status + checksum(merchantSecret)),
+    },
+  });
+  expect(notification.status()).toBe(204);
+
+  await page.reload();
+  await expect(page.getByText('Payment confirmed. Your membership appears below.')).toBeVisible();
+  await page.getByRole('link', { name: 'View receipt' }).click();
+  await expect(page.getByRole('heading', { name: 'Payment receipt' })).toBeVisible();
+  await expect(page.getByText(`${planName} · Membership`, { exact: true })).toBeVisible();
+  await expect(page.getByText(`${currency} ${amount}`, { exact: true })).toBeVisible();
+  await expect(page.getByText(orderId, { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Print receipt' })).toBeVisible();
+});
+
+test('member saves circumference measurements and sees them after reload', async ({ page }) => {
+  await openAs(page, fixture.users.memberUser.id, `/gyms/${fixture.gyms[0].slug}/member/progress`);
+  await page.getByLabel('Chest (cm)').fill('95.5');
+  await page.getByLabel('Waist (cm)').fill('82.25');
+  await page.getByLabel('Arm (cm)').fill('32');
+  await page.getByRole('button', { name: 'Save measurement' }).click();
+  await expect(page.getByText('Measurement saved.')).toBeVisible();
+  await page.reload();
+  const history = page.getByRole('region', { name: 'Measurement history' });
+  for (const reading of ['95.5', '82.25', '32']) {
+    await expect(history.getByRole('cell', { name: reading, exact: true })).toBeVisible();
+  }
+});
+
+test('member manages private progress photos and assigned trainer can compare them', async ({ page }) => {
+  const base = `/gyms/${fixture.gyms[0].slug}`;
+  const today = localDate(new Date(), 'Asia/Colombo');
+  const yesterday = localDate(new Date(Date.now() - 86_400_000), 'Asia/Colombo');
+  // Two generated 4×4 solid-color PNGs.
+  const samplePngs = [
+    'iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAEElEQVR4nGMQdsiCIwbiOAAt8wvRaf347QAAAABJRU5ErkJggg==',
+    'iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAEElEQVR4nGPQOlADRwzEcQBA8hZhw5bFFQAAAABJRU5ErkJggg==',
+  ];
+  await openAs(page, fixture.users.memberUser.id, `${base}/member/progress`);
+  const timeline = page.getByRole('list', { name: 'Photo timeline' });
+  for (const [index, date] of [yesterday, today].entries()) {
+    await page.getByLabel('Date taken').fill(date);
+    await page.locator('input[type="file"][name="photo"]').setInputFiles({
+      name: 'synthetic.png', mimeType: 'image/png', buffer: Buffer.from(samplePngs[index]!, 'base64'),
+    });
+    await page.getByRole('button', { name: 'Upload progress photo' }).click();
+    await expect(timeline.getByRole('listitem')).toHaveCount(index + 1);
+  }
+  const comparison = page.getByRole('group', { name: 'First and latest photo comparison' });
+  await expect(comparison.locator('time').first()).toHaveAttribute('datetime', yesterday);
+  await expect(comparison.locator('time').last()).toHaveAttribute('datetime', today);
+  const memberImageSrc = (await comparison.getByRole('img').last().getAttribute('src'))!;
+  const media = await page.request.get(`${webBase}${memberImageSrc}`);
+  expect(media.status()).toBe(200);
+  expect(media.headers()['cache-control']?.split(/,\s*/)).toEqual(expect.arrayContaining(['private', 'no-store']));
+  expect(media.headers()['content-type']).toBe('image/webp');
+
+  await openAs(page, fixture.users.trainerUser.id, `${base}/trainer/clients/${memberId}/progress`);
+  await expect(comparison.getByRole('img')).toHaveCount(2);
+  const trainerImageSrc = (await comparison.getByRole('img').last().getAttribute('src'))!;
+  expect((await page.request.get(`${webBase}${trainerImageSrc}`)).status()).toBe(200);
+  await expect(timeline.getByText('Delete photo', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Upload progress photo' })).toHaveCount(0);
+
+  await openAs(page, fixture.users.ownerA.id, `${base}/owner/members/${memberId}`);
+  expect([403, 404]).toContain((await page.request.get(`${webBase}${trainerImageSrc}`)).status());
+
+  await openAs(page, fixture.users.memberUser.id, `${base}/member/progress`);
+  const latestPhoto = timeline.getByRole('listitem').first();
+  await latestPhoto.getByText('Delete photo', { exact: true }).click();
+  await latestPhoto.getByRole('button', { name: 'Confirm deletion' }).click();
+  await expect(timeline.getByRole('listitem')).toHaveCount(1);
+  await expect(comparison).toHaveCount(0);
+  expect((await page.request.get(`${webBase}${memberImageSrc}`)).status()).toBe(404);
+});
 
 test('member appearance presents verified home and all member screens in both themes', async ({ page, request }) => {
   test.setTimeout(180000);

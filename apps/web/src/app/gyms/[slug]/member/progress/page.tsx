@@ -3,6 +3,7 @@ import { progressReportQuerySchema, progressReportSchema } from '@gymos/contract
 import { DashboardChrome } from '@/components/navigation/dashboard-chrome';
 import { BodyMeasurementForm } from '@/components/coaching/coaching-record-forms';
 import { ProgressReport } from '@/components/coaching/progress-report';
+import { UploadProgressPhotoForm } from '@/components/coaching/progress-photo-forms';
 import { Card, CardHeader, Feedback } from '@/components/ui';
 import { requireGymContext } from '@/lib/gym-context';
 import { apiUrl } from '@/lib/gymos';
@@ -25,7 +26,8 @@ export default async function MemberProgressPage({ params, searchParams }: { par
     <div className="gym-banner"><h1>Your progress</h1></div>
     {report?.success ? <>
       <Card><CardHeader title="Record a measurement"/><BodyMeasurementForm slug={slug} today={report.data.today}/></Card>
-      <ProgressReport report={report.data} path={path}/>
+      <UploadProgressPhotoForm slug={slug} today={report.data.today}/>
+      <ProgressReport report={report.data} path={path} slug={slug}/>
     </> : <Card><Feedback tone="error">Progress could not be loaded. Refresh to try again.</Feedback></Card>}
   </DashboardChrome>;
 }

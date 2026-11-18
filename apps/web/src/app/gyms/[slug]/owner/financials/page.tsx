@@ -67,7 +67,9 @@ export default async function OwnerFinancialsPage({ params, searchParams }: {
     displayName={session.displayName ?? 'GymOS user'} style={style}>
     <div className="gym-banner"><div><h1>Financial Management</h1><p>Revenue, expense tracking, payroll close and P&amp;L statements · {settings.data.configuration.currency} · {settings.data.configuration.timezone}</p></div><div className="owner-header-actions"><a className="ui-button ui-button-primary" href={`${base}?${new URLSearchParams({ ...Object.fromEntries(sharedParams), tab: 'expenses' })}`}>＋ Log Expense</a><a className="ui-button ui-button-secondary" href={`${base}?${new URLSearchParams({ ...Object.fromEntries(sharedParams), tab: 'export' })}`}>Export Financials</a></div></div>
     <nav className="finance-tabs" aria-label="Finance sections">{tabs.map(([id, label]) => <a key={id} aria-current={tab === id ? 'page' : undefined}
-      className={`finance-tab ${tab === id ? 'finance-tab-active' : ''}`} href={`${base}?${new URLSearchParams({ ...Object.fromEntries(sharedParams), tab: id })}`}>{label}</a>)}</nav>
+      className={`finance-tab ${tab === id ? 'finance-tab-active' : ''}`} href={`${base}?${new URLSearchParams({ ...Object.fromEntries(sharedParams), tab: id })}`}>{label}</a>)}
+      <a className="finance-tab" href={`${base}/payments`}>Member payments</a>
+    </nav>
     <section id={`panel-${tab}`} role="region" aria-label={tabs.find(([id]) => id === tab)?.[1]}>
       {['revenue', 'deferred', 'pnl', 'export'].includes(tab) ? <Card><CardHeader eyebrow="OPERATIONAL EARNINGS" title={tab === 'revenue' ? 'Revenue' : tab === 'deferred' ? 'Deferred value' : tab === 'pnl' ? 'Operational P&L' : 'Export'}/>
         {revenue.data ? <><form method="get" className="member-directory-filters"><input type="hidden" name="tab" value={tab}/><label className="ui-field"><span className="ui-field-label">From</span><input type="date" name="from" defaultValue={from} required/></label><label className="ui-field"><span className="ui-field-label">To</span><input type="date" name="to" defaultValue={to} required/></label><button className="ui-button ui-button-secondary">Apply window</button></form>

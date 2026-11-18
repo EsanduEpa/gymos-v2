@@ -16,17 +16,37 @@ function decimal(min: number, max: number) {
     .transform(value => String(Number(value)));
 }
 
-export const bodyReadingSchema = z.strictObject({
+const circumferenceCm = decimal(0.01, 999.99).nullable().default(null);
+const bodyReadingFields = z.strictObject({
   weightKg: decimal(0.01, 700).nullable(),
   heightCm: decimal(30, 300).nullable(),
   bodyFatPct: decimal(0, 100).nullable(),
-}).refine(value => Object.values(value).some(entry => entry !== null));
+  chestCm: circumferenceCm,
+  waistCm: circumferenceCm,
+  armCm: circumferenceCm,
+});
+type BodyReading = z.output<typeof bodyReadingFields>;
+
+function hasReading({ weightKg, heightCm, bodyFatPct, chestCm, waistCm, armCm }: BodyReading) {
+  return [weightKg, heightCm, bodyFatPct, chestCm, waistCm, armCm].some(value => value !== null);
+}
+
+export const bodyReadingSchema = bodyReadingFields.refine(hasReading);
 const calendarDate = z.iso.date().refine(value => value >= '0001-01-01');
 export const bodyMeasurementInputSchema = bodyReadingSchema.safeExtend({ measuredOn: calendarDate });
 export const bodyMeasurementSchema = bodyMeasurementInputSchema.safeExtend({
   bmi: z.number().finite().positive().nullable(),
 });
 export const progressReportQuerySchema = z.strictObject({ through: calendarDate.optional() });
+export const progressPhotoDateSchema = calendarDate;
+export const progressPhotoLinkQuerySchema = z.strictObject({
+  expiresAt: z.iso.datetime(),
+  signature: z.string().regex(/^[a-f0-9]{64}$/),
+});
+const progressPhotoSchema = progressPhotoLinkQuerySchema.extend({
+  id: z.uuid(),
+  takenOn: calendarDate,
+});
 export const progressReportSchema = z.strictObject({
   from: z.iso.date(),
   through: z.iso.date(),
@@ -34,6 +54,7 @@ export const progressReportSchema = z.strictObject({
   timeZone: z.string().min(1).max(100),
   completedSessions: z.number().int().nonnegative(),
   measurements: z.array(bodyMeasurementSchema).max(90),
+  photos: z.array(progressPhotoSchema).max(100).default([]),
 });
 
 export type DietaryProfile = z.infer<typeof dietaryProfileSchema>;

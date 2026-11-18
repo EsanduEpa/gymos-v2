@@ -1,6 +1,7 @@
 import { creditTotals } from '../sessions/credit-unit-projection.js';
-import { ConflictException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException, StreamableFile, UnprocessableEntityException } from '@nestjs/common';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { z } from 'zod';
 import type { Prisma } from '../generated/tenant/client.js';
 import {
   trainerClientPageSchema,
@@ -35,6 +36,7 @@ import {
   dietaryProfileUpdateSchema,
   progressReportQuerySchema,
   progressReportSchema,
+  progressPhotoLinkQuerySchema,
 } from '@gymos/contracts';
 import { DatabaseService } from '../database.service.js';
 import { withGymAccessFence } from '../identity/gym-access-fence.js';
@@ -42,7 +44,8 @@ import { TenantSchemaGateService, type TenantGateContext } from '../tenancy/tena
 import { appendTenantAudit } from '../operations/transaction-audit.js';
 import { requestDigest } from '../operations/primitives.js';
 import { addLocalDays, asDate, dateString, gymLocalDate } from '../membership-rules.js';
-import { openCoachingRecord, sealCoachingRecord } from './coaching-records-crypto.js';
+import { openCoachingRecord, sealCoachingRecord, signCoachingLink } from './coaching-records-crypto.js';
+import { prepareProgressPhoto } from '../profile-photo.js';
 import { readJournal, writeJournal } from './training-journal.js';
 
 type Access = TenantGateContext & { identityId: string; role: string; actor?: { kind: string; id: string; registrationOperationId?: string } | null };
@@ -70,13 +73,33 @@ function measurement(gymId: string, memberId: string, row: { measuredOn: Date; e
   return bodyMeasurementSchema.parse({ ...reading, measuredOn, bmi });
 }
 
-async function progressReport(tx: Prisma.TransactionClient, gymId: string, memberId: string, timeZone: string, now: Date, requested: string | undefined) {
+const maxProgressPhotos = 100;
+type ProgressPhotoLink = z.output<typeof progressPhotoLinkQuerySchema>;
+
+function photoSignature(access: Access, memberId: string, photoId: string, expiresAt: string) {
+  return signCoachingLink(['progress-photo', access.gymId, access.identityId, access.role, memberId, photoId, expiresAt]);
+}
+
+async function readProgressPhoto(tx: Prisma.TransactionClient, access: Access, memberId: string, photoId: string, now: Date,
+  { expiresAt, signature }: ProgressPhotoLink) {
+  if (Date.parse(expiresAt) <= now.getTime()) throw new NotFoundException('Progress photo link expired');
+  const expected = photoSignature(access, memberId, photoId, expiresAt);
+  if (!timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(signature, 'hex'))) {
+    throw new NotFoundException('Progress photo not found');
+  }
+  const photo = await tx.memberProgressPhoto.findUnique({ where: { id: photoId, memberId }, select: { encryptedData: true } });
+  if (!photo) throw new NotFoundException('Progress photo not found');
+  const image = openCoachingRecord(photo.encryptedData, ['progress-photo', access.gymId, memberId, photoId], z.base64());
+  return new StreamableFile(Buffer.from(image, 'base64'), { type: 'image/webp' });
+}
+
+async function progressReport(tx: Prisma.TransactionClient, access: Access, memberId: string, timeZone: string, now: Date, requested: string | undefined) {
   const today = gymLocalDate(timeZone, now);
   const through = requested ?? today;
   if (through > today) invalid('The report end date cannot be in the future');
   const from = through < '0001-03-31' ? '0001-01-01' : addLocalDays(through, -89);
   const after = addLocalDays(through, 1);
-  const [rows, [sessions]] = await Promise.all([
+  const [rows, [sessions], photos] = await Promise.all([
     tx.memberBodyMeasurement.findMany({
       where: { memberId, measuredOn: { gte: asDate(from), lte: asDate(through) } },
       orderBy: { measuredOn: 'asc' },
@@ -86,10 +109,22 @@ async function progressReport(tx: Prisma.TransactionClient, gymId: string, membe
       WHERE "memberId" = ${memberId} AND state = 'COMPLETED'
         AND "endedAt" >= (${from}::date::timestamp AT TIME ZONE ${timeZone})
         AND "endedAt" < (${after}::date::timestamp AT TIME ZONE ${timeZone})`,
+    tx.memberProgressPhoto.findMany({
+      where: { memberId, takenOn: { gte: asDate(from), lte: asDate(through) } },
+      orderBy: [{ takenOn: 'asc' }, { uploadedAt: 'asc' }, { id: 'asc' }],
+      select: { id: true, takenOn: true },
+    }),
   ]);
+  const expiresAt = new Date(now.getTime() + 60 * 60 * 1000).toISOString();
   return progressReportSchema.parse({
     from, through, today, timeZone, completedSessions: sessions!.count,
-    measurements: rows.map(row => measurement(gymId, memberId, row)),
+    measurements: rows.map(row => measurement(access.gymId, memberId, row)),
+    photos: photos.map(photo => ({
+      id: photo.id,
+      takenOn: dateString(photo.takenOn),
+      expiresAt,
+      signature: photoSignature(access, memberId, photo.id, expiresAt),
+    })),
   });
 }
 
@@ -185,36 +220,81 @@ export class CoachingService {
 
   async memberProgress(access: Access, query: unknown) {
     const input = progressReportQuerySchema.parse(query);
-    return this.withOwnMember(access, (tx, memberId, now, timeZone) => progressReport(tx, access.gymId, memberId, timeZone, now, input.through));
+    return this.withOwnMember(access, (tx, memberId, now, timeZone) => progressReport(tx, access, memberId, timeZone, now, input.through));
   }
 
   async trainerProgress(access: Access, memberId: string, query: unknown) {
     const input = progressReportQuerySchema.parse(query);
     return this.withRelatedMember(access, memberId, (tx, member, _trainer, now, timeZone) =>
-      progressReport(tx, access.gymId, member.id, timeZone, now, input.through));
+      progressReport(tx, access, member.id, timeZone, now, input.through));
+  }
+
+  async addProgressPhoto(access: Access, takenOn: string, upload: Buffer) {
+    const image = await prepareProgressPhoto(upload);
+    return this.withOwnMember(access, async (tx, memberId, now, timeZone) => {
+      if (takenOn > gymLocalDate(timeZone, now)) invalid('The photo date cannot be in the future');
+      await tx.$queryRaw`SELECT id FROM "Member" WHERE id = ${memberId} FOR UPDATE`;
+      if (await tx.memberProgressPhoto.count({ where: { memberId } }) >= maxProgressPhotos) {
+        throw new ConflictException('Remove a progress photo before adding another');
+      }
+      const id = randomUUID();
+      await tx.memberProgressPhoto.create({ data: {
+        id, memberId, takenOn: asDate(takenOn),
+        encryptedData: sealCoachingRecord(image.toString('base64'), ['progress-photo', access.gymId, memberId, id]),
+      } });
+    }, true);
+  }
+
+  async deleteProgressPhoto(access: Access, photoId: string) {
+    return this.withOwnMember(access, async (tx, memberId) => {
+      await tx.memberProgressPhoto.deleteMany({ where: { id: photoId, memberId } });
+    }, true);
+  }
+
+  memberProgressPhoto(access: Access, photoId: string, query: unknown) {
+    const link = progressPhotoLinkQuerySchema.parse(query);
+    return this.withOwnMember(access, (tx, memberId, now) => readProgressPhoto(tx, access, memberId, photoId, now, link));
+  }
+
+  trainerProgressPhoto(access: Access, memberId: string, photoId: string, query: unknown) {
+    const link = progressPhotoLinkQuerySchema.parse(query);
+    return this.withRelatedMember(access, memberId, (tx, member, _trainer, now) => readProgressPhoto(tx, access, member.id, photoId, now, link));
   }
 
   async saveBodyMeasurement(access: Access, input: unknown) {
-    const { measuredOn, ...reading } = bodyMeasurementInputSchema.parse(input);
-    return this.withOwnMember(access, async (tx, memberId, now, timeZone) => {
-      if (measuredOn > gymLocalDate(timeZone, now)) invalid('The measurement date cannot be in the future');
-      const key = { memberId, measuredOn: asDate(measuredOn) };
-      const binding = ['measurement', access.gymId, memberId, measuredOn];
-      await tx.$queryRaw`SELECT id FROM "Member" WHERE id = ${memberId} FOR UPDATE`;
-      const current = await tx.memberBodyMeasurement.findUnique({ where: { memberId_measuredOn: key } });
-      const prior = current ? openCoachingRecord(current.encryptedData, binding, bodyReadingSchema) : null;
-      const merged = {
-        weightKg: reading.weightKg ?? prior?.weightKg ?? null,
-        heightCm: reading.heightCm ?? prior?.heightCm ?? null,
-        bodyFatPct: reading.bodyFatPct ?? prior?.bodyFatPct ?? null,
-      };
-      if (current && prior && prior.weightKg === merged.weightKg && prior.heightCm === merged.heightCm && prior.bodyFatPct === merged.bodyFatPct) {
-        return measurement(access.gymId, memberId, current);
-      }
-      const encryptedData = sealCoachingRecord(merged, binding);
-      const saved = await tx.memberBodyMeasurement.upsert({ where: { memberId_measuredOn: key }, create: { ...key, encryptedData }, update: { encryptedData } });
-      return measurement(access.gymId, memberId, saved);
-    }, true);
+    const reading = bodyMeasurementInputSchema.parse(input);
+    return this.withOwnMember(access, (tx, memberId, now, timeZone) =>
+      this.writeMeasurement(tx, access.gymId, memberId, gymLocalDate(timeZone, now), reading), true);
+  }
+
+  async saveClientBodyMeasurement(access: Access, memberId: string, input: unknown) {
+    const reading = bodyMeasurementInputSchema.parse(input);
+    return this.withRelatedMember(access, memberId, (tx, member, _trainer, now, timeZone) =>
+      this.writeMeasurement(tx, access.gymId, member.id, gymLocalDate(timeZone, now), reading), true);
+  }
+
+  private async writeMeasurement(tx: Prisma.TransactionClient, gymId: string, memberId: string, today: string,
+    { measuredOn, ...reading }: ReturnType<typeof bodyMeasurementInputSchema.parse>) {
+    if (measuredOn > today) invalid('The measurement date cannot be in the future');
+    const key = { memberId, measuredOn: asDate(measuredOn) };
+    const binding = ['measurement', gymId, memberId, measuredOn];
+    await tx.$queryRaw`SELECT id FROM "Member" WHERE id = ${memberId} FOR UPDATE`;
+    const current = await tx.memberBodyMeasurement.findUnique({ where: { memberId_measuredOn: key } });
+    const prior = current ? openCoachingRecord(current.encryptedData, binding, bodyReadingSchema) : null;
+    const merged = {
+      weightKg: reading.weightKg ?? prior?.weightKg ?? null,
+      heightCm: reading.heightCm ?? prior?.heightCm ?? null,
+      bodyFatPct: reading.bodyFatPct ?? prior?.bodyFatPct ?? null,
+      chestCm: reading.chestCm ?? prior?.chestCm ?? null,
+      waistCm: reading.waistCm ?? prior?.waistCm ?? null,
+      armCm: reading.armCm ?? prior?.armCm ?? null,
+    };
+    if (current && prior && Object.entries(merged).every(([field, value]) => prior[field as keyof typeof prior] === value)) {
+      return measurement(gymId, memberId, current);
+    }
+    const encryptedData = sealCoachingRecord(merged, binding);
+    const saved = await tx.memberBodyMeasurement.upsert({ where: { memberId_measuredOn: key }, create: { ...key, encryptedData }, update: { encryptedData } });
+    return measurement(gymId, memberId, saved);
   }
 
   async memberDietaryProfile(access: Access) {

@@ -3,7 +3,7 @@ const idSchema = z.string().min(1).max(128).regex(/^[A-Za-z0-9_:-]+$/);
 const gymSlugSchema = z.string().min(1).max(100).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 const isoInstantSchema = z.iso.datetime({ offset: true });
 
-export const notificationLinkKindSchema = z.enum(['OWNER_SESSIONS', 'TRAINER_SCHEDULE', 'MEMBER_SESSIONS', 'TRAINER_REQUESTS', 'MEMBER_PROFILE', 'MEMBER_APPLICATIONS', 'OWNER_APPLICATIONS', 'MEMBER_WORKOUT_PLANS', 'MEMBER_MEAL_PLANS']);
+export const notificationLinkKindSchema = z.enum(['OWNER_SESSIONS', 'OWNER_SUBSCRIPTION', 'TRAINER_SCHEDULE', 'MEMBER_SESSIONS', 'TRAINER_REQUESTS', 'MEMBER_PROFILE', 'MEMBER_APPLICATIONS', 'OWNER_APPLICATIONS', 'MEMBER_WORKOUT_PLANS', 'MEMBER_MEAL_PLANS']);
 export const notificationSchema = z.strictObject({
   id: idSchema,
   eventCode: z.string().min(1).max(80),
@@ -125,6 +125,7 @@ export function notificationHref(slug: string, item: Pick<z.infer<typeof notific
   if (item.linkKind === 'MEMBER_PROFILE') return `/gyms/${safeSlug}/profile`;
   if (item.linkKind === 'MEMBER_WORKOUT_PLANS') return `/gyms/${safeSlug}/member/workout-plans`;
   if (item.linkKind === 'MEMBER_MEAL_PLANS') return `/gyms/${safeSlug}/member/meal-plans`;
+  if (item.linkKind === 'OWNER_SUBSCRIPTION') return `/gyms/${safeSlug}/owner/subscription`;
   if (sessionId) return notificationTargetHref({ kind: 'SESSION_DETAIL', gymSlug: safeSlug, sessionId: item.resourceId! });
   if (item.linkKind === 'OWNER_SESSIONS') return `/gyms/${safeSlug}/owner/sessions`;
   if (item.linkKind === 'TRAINER_SCHEDULE') return `/gyms/${safeSlug}/trainer/schedule`;

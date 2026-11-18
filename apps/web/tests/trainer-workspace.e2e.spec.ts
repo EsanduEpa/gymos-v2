@@ -24,6 +24,7 @@ let web: RunningProcess | undefined;
 let apiBase = '';
 let webBase = '';
 let jwtSecret = '';
+let coachingKey = '';
 let targetMonth = '2026-12';
 let memberId = '';
 let trainerId = '';
@@ -104,7 +105,8 @@ async function startApi() {
   const apiPort = new URL(apiBase).port;
   api = launch(process.execPath, [join(apiDirectory, 'dist/main.js')], apiDirectory, { PATH: process.env.PATH, HOME: process.env.HOME,
     NODE_ENV: 'production', TZ: 'UTC', PORT: apiPort, MASTER_DATABASE_URL: environment.masterUrl,
-    TENANT_DATABASE_URL: environment.masterUrl, PROVISION_DATABASE_URL: environment.masterUrl, JWT_SECRET: jwtSecret });
+    TENANT_DATABASE_URL: environment.masterUrl, PROVISION_DATABASE_URL: environment.masterUrl, JWT_SECRET: jwtSecret,
+    GYMOS_COACHING_DATA_KEY: coachingKey });
   await waitReady(`${apiBase}/`, api);
 }
 test.beforeEach('start isolated trainer fixture and local services', async ({ page }) => {
@@ -119,6 +121,7 @@ test.beforeEach('start isolated trainer fixture and local services', async ({ pa
   await seedCoachingCredits();
   const [apiPort, webPort] = await Promise.all([reservePort(), reservePort()]);
   apiBase = `http://127.0.0.1:${apiPort}`; webBase = `http://127.0.0.1:${webPort}`; jwtSecret = randomBytes(32).toString('hex');
+  coachingKey = randomBytes(32).toString('hex');
   await startApi();
   web = launch(process.execPath, [join(webDirectory, 'node_modules/next/dist/bin/next'), 'start', '-H', '127.0.0.1', '-p', String(webPort)], webDirectory,
     { PATH: process.env.PATH, HOME: process.env.HOME, NODE_ENV: 'production', TZ: 'UTC', GYMOS_API_URL: apiBase, GYMOS_WEB_ORIGIN: webBase });
@@ -266,6 +269,16 @@ test('trainer calendar shows every monthly session and links to the day schedule
   const lastDate = `${targetMonth}-${daysInMonth}`;
   await page.getByRole('button', { name: new RegExp(`^${lastDate}, 4 sessions`) }).click();
   await expect(page.getByRole('complementary', { name: `Trainer sessions on ${lastDate}` }).locator('li')).toHaveCount(4);
+});
+
+test('trainer saves a dated measurement visible to the member', async ({ page }) => {
+  const gym = `/gyms/${fixture.gyms[0].slug}`;
+  await openAs(page, fixture.users.trainerUser.id, `${gym}/trainer/clients/${memberId}/progress`);
+  await page.getByLabel('Chest (cm)').fill('95.5');
+  await page.getByRole('button', { name: 'Save measurement' }).click();
+  await expect(page.getByText('Measurement saved.')).toBeVisible();
+  await openAs(page, fixture.users.memberUser.id, `${gym}/member/progress`);
+  await expect(page.getByRole('region', { name: 'Measurement history' }).getByRole('cell', { name: '95.5', exact: true })).toBeVisible();
 });
 
 test('trainer coaching keeps drafts assigns real plans and preserves client-only access', async ({ page, request }) => {

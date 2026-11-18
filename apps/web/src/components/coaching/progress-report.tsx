@@ -1,15 +1,19 @@
 import type { ProgressReport as Report } from '@gymos/contracts';
 import { Card, CardHeader } from '@/components/ui';
 import { formatDisplayDate } from '@/lib/display-date';
+import { ProgressPhotos } from './progress-photos';
 import styles from './progress-report.module.css';
 
 const metrics = [
   { key: 'weightKg', label: 'Weight', unit: 'kg' },
   { key: 'bmi', label: 'BMI', unit: '' },
   { key: 'bodyFatPct', label: 'Body fat', unit: '%' },
+  { key: 'chestCm', label: 'Chest', unit: 'cm' },
+  { key: 'waistCm', label: 'Waist', unit: 'cm' },
+  { key: 'armCm', label: 'Arm', unit: 'cm' },
 ] as const;
 
-export function ProgressReport({ report, path }: { report: Report; path: string }) {
+export function ProgressReport({ report, path, slug, memberId }: { report: Report; path: string; slug: string; memberId?: string }) {
   const start = Date.parse(report.from);
   const days = Math.max(1, (Date.parse(report.through) - start) / 86_400_000);
   return <Card>
@@ -40,15 +44,21 @@ export function ProgressReport({ report, path }: { report: Report; path: string 
       </div>
       <div className="ui-table-shell"><div className="ui-table-scroll" tabIndex={0} role="region" aria-label="Measurement history">
         <table><caption>Measured values by date</caption>
-          <thead><tr><th scope="col">Date</th><th scope="col">Weight (kg)</th><th scope="col">Height (cm)</th><th scope="col">BMI</th><th scope="col">Body fat (%)</th></tr></thead>
+          <thead><tr>
+            <th scope="col">Date</th><th scope="col">Weight (kg)</th><th scope="col">Height (cm)</th>
+            <th scope="col">BMI</th><th scope="col">Body fat (%)</th>
+            <th scope="col">Chest (cm)</th><th scope="col">Waist (cm)</th><th scope="col">Arm (cm)</th>
+          </tr></thead>
           <tbody>{[...report.measurements].reverse().map(row => <tr key={row.measuredOn}>
             <th scope="row"><time dateTime={row.measuredOn}>{formatDisplayDate(row.measuredOn)}</time></th>
             <td>{row.weightKg ?? '—'}</td><td>{row.heightCm ?? '—'}</td>
             <td>{row.bmi ?? '—'}</td><td>{row.bodyFatPct ?? '—'}</td>
+            <td>{row.chestCm ?? '—'}</td><td>{row.waistCm ?? '—'}</td><td>{row.armCm ?? '—'}</td>
           </tr>)}</tbody>
         </table>
       </div></div>
       <p className="ui-field-hint">BMI uses weight and height recorded on the same day.</p>
     </> : <p>No measurements recorded during this period.</p>}
+    <ProgressPhotos photos={report.photos} slug={slug} memberId={memberId}/>
   </Card>;
 }

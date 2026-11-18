@@ -52,15 +52,28 @@ model Member {
   healthNotes           String?
   sessionPacks          SessionPack[]
   memberships           MembershipTerm[]
+  paymentOrders         MemberPaymentOrder[]
   sessionsAsMember      PTSession[]             @relation("SessionMember")
   workoutPlans          WorkoutPlan[]            @relation("WorkoutPlanMember")
   mealPlans             MealPlan[]               @relation("MealPlanMember")
   dietaryProfile        MemberDietaryProfile?
   bodyMeasurements      MemberBodyMeasurement[]
+  progressPhotos        MemberProgressPhoto[]
   trainingJournal       MemberJournalEntry[]
   profilePhoto          ProfilePhoto?
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt
+}
+
+model MemberProgressPhoto {
+  id            String   @id @db.Uuid
+  memberId      String
+  member        Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  takenOn       DateTime @db.Date
+  uploadedAt    DateTime @default(now()) @db.Timestamptz(3)
+  encryptedData String
+
+  @@index([memberId, takenOn, uploadedAt, id], map: "MemberProgressPhoto_timeline_idx")
 }
 
 model MemberJournalEntry {
@@ -104,6 +117,9 @@ model SessionPack {
   id                    String            @id @default(cuid())
   memberId              String
   member                Member            @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  membershipTermId      String?           @unique
+  membershipTerm        MembershipTerm?   @relation(fields: [membershipTermId], references: [id], onDelete: Restrict)
+  paymentOrder          MemberPaymentOrder?
   issuedCredits         Int
   price                 Decimal           @db.Decimal(19, 4)
   currency              String
@@ -606,6 +622,7 @@ model PTCreditRemedy {
 
 enum NotificationLinkKind {
   OWNER_SESSIONS
+  OWNER_SUBSCRIPTION
   TRAINER_SCHEDULE
   MEMBER_SESSIONS
   TRAINER_REQUESTS
@@ -716,11 +733,13 @@ model MembershipPlan {
   price        Decimal @db.Decimal(19, 4)
   currency     String
   durationDays Int
+  includedPtCredits Int @default(0)
   status       MembershipPlanStatus @default(ACTIVE)
   version      Int @default(0)
   createdAt    DateTime @default(now()) @db.Timestamptz(3)
   updatedAt    DateTime @updatedAt @db.Timestamptz(3)
   memberships  MembershipTerm[]
+  paymentOrders MemberPaymentOrder[]
 
   @@index([status, createdAt])
 }
@@ -736,6 +755,9 @@ model MembershipTerm {
   agreedPrice           Decimal @db.Decimal(19, 4)
   currency              String
   planNameSnapshot      String
+  includedPtCredits     Int @default(0)
+  includedPtPack        SessionPack?
+  paymentOrder          MemberPaymentOrder?
   configurationVersion  Int
   actorIdentityId       String
   idempotencyKey        String
@@ -744,6 +766,73 @@ model MembershipTerm {
 
   @@unique([actorIdentityId, idempotencyKey])
   @@index([memberId, startDate, endDateExclusive])
+}
+
+enum MemberPaymentOrderStatus {
+  PENDING
+  FAILED
+  CANCELLED
+  CONFIRMED
+  REVIEW_REQUIRED
+  CHARGEBACK
+}
+
+enum MemberPaymentKind {
+  MEMBERSHIP
+  PT_PACK
+}
+
+enum PtPackOfferStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+model PtPackOffer {
+  id                String            @id @default(cuid())
+  name              String
+  credits           Int
+  price             Decimal           @db.Decimal(19, 2)
+  currency          String
+  validityDays      Int
+  status            PtPackOfferStatus @default(ACTIVE)
+  version           Int              @default(0)
+  createdAt         DateTime         @default(now()) @db.Timestamptz(3)
+  paymentOrders     MemberPaymentOrder[]
+}
+
+model MemberPaymentOrder {
+  id                    String                   @id @db.Uuid
+  memberId              String
+  member                Member                   @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  identityId            String
+  enrollmentOperationId String
+  idempotencyKey        String
+  kind                  MemberPaymentKind
+  planId                String?
+  plan                  MembershipPlan?          @relation(fields: [planId], references: [id], onDelete: Restrict)
+  offerId               String?
+  offer                 PtPackOffer?             @relation(fields: [offerId], references: [id], onDelete: Restrict)
+  itemName              String
+  durationDays          Int
+  credits               Int
+  amount                Decimal                  @db.Decimal(19, 2)
+  currency              String
+  configurationVersion  Int
+  timeZone              String
+  merchantId            String
+  status                MemberPaymentOrderStatus @default(PENDING)
+  createdAt             DateTime                 @default(now()) @db.Timestamptz(3)
+  expiresAt             DateTime                 @db.Timestamptz(3)
+  confirmedAt           DateTime?                @db.Timestamptz(3)
+  termId                String?                  @unique
+  term                  MembershipTerm?          @relation(fields: [termId], references: [id], onDelete: Restrict)
+  packId                String?                  @unique
+  pack                  SessionPack?             @relation(fields: [packId], references: [id], onDelete: Restrict)
+
+  @@unique([identityId, idempotencyKey])
+  @@index([planId])
+  @@index([offerId])
+  @@index([memberId, createdAt, id])
 }
 
 model SchemaState {

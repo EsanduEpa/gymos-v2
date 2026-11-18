@@ -1,0 +1,1 @@
+ALTER TYPE "NotificationLinkKind" ADD VALUE 'OWNER_SUBSCRIPTION';

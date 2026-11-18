@@ -69,6 +69,32 @@ This checks the admin and three `test-alpha` logins, their role scoped API reads
 
 For a fresh installation, build the clients, packages and API, then run `pnpm manual:setup` once. Setup refuses to overwrite an existing sandbox.
 
+## PayHere Sandbox callbacks
+
+Ordinary manual testing keeps checkout disabled. To exercise PayHere Sandbox, configure a private, Git-ignored `.env.payhere-sandbox` with these values.
+
+```dotenv
+GYMOS_PAYHERE_CHECKOUT_ENABLED=1
+GYMOS_PAYHERE_SANDBOX_MERCHANT_ID=
+GYMOS_PAYHERE_SANDBOX_MERCHANT_SECRET=
+GYMOS_PAYHERE_SANDBOX_API_ORIGIN=
+GYMOS_PAYHERE_SANDBOX_APP_ID=
+GYMOS_PAYHERE_SANDBOX_APP_SECRET=
+```
+
+The API origin is the public HTTPS origin of the separate synthetic callback relay. Use the domain-specific PayHere Sandbox merchant credentials. Subscription reconciliation also requires a Sandbox App ID and App Secret from an API key with Automated Charging API permission. Keep credentials in the private environment file. PayHere redirects the test browser back to `http://localhost:3002`.
+
+After building and syncing the owned fixture, start the configured local instance and relay in separate terminals.
+
+```sh
+node --env-file=.env.payhere-sandbox apps/api/scripts/manual-test.mjs start
+node apps/api/scripts/payhere-sandbox-relay.mjs
+```
+
+Point your HTTPS forwarding service at the relay on `127.0.0.1:3004`. The relay forwards only PayHere form POSTs for `test-alpha`, `test-beta` and `test-gamma` to the testing API. In the test browser, use synthetic sign-ins and PayHere’s simulated cards. Check a successful and declined purchase, the member and Owner receipt views, and a recurring GymOS payment. Stop the public forwarding service when testing ends. [PayHere Sandbox & Testing](https://support.payhere.lk/sandbox-and-testing) · [Checkout API](https://support.payhere.lk/api-%26-mobile-sdk/checkout-api)
+
+For a temporary Cloudflare Quick Tunnel, start `node apps/api/scripts/payhere-sandbox-relay.mjs`, then run `cloudflared tunnel --no-autoupdate --url http://127.0.0.1:3004` in another terminal. Copy the generated HTTPS origin into `GYMOS_PAYHERE_SANDBOX_API_ORIGIN` in `.env.payhere-sandbox`, then start/restart the local test app with the command above. The generated `trycloudflare.com` hostname lasts only while that tunnel process remains running and changes on restart. Never point a tunnel at ports 3000/3001 or the hosted Render demo for this test.
+
 ## Suggested manual tests
 
 1. Sign in as each account and check the correct screens and gym scope.
