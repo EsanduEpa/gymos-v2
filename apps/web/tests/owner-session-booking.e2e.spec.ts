@@ -48,7 +48,7 @@ async function stop(processState: ProcessState | undefined) {
 async function loginAsOwner(page: Page) {
   const owner = fixture.users.ownerA;
   await installBrowserSession({ page, master: fixture.master, identityId: owner.id, gymId: fixture.gyms[0]!.id, jwtSecret, origin: webBase });
-  await page.goto(`${webBase}/gyms/${fixture.gyms[0]!.slug}/owner/sessions/book`);
+  await page.goto(`${webBase}/gyms/${fixture.gyms[0]!.slug}/owner`);
 }
 
 test.beforeAll('prepare owner booking fixture and web servers', async () => {
@@ -96,11 +96,24 @@ test.afterAll('stop owner booking servers and clean fixtures', async () => {
 test('owner can choose a same-gym member/trainer and see the committed quote, credit allocation and slot result', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await loginAsOwner(page);
+  await mkdir(evidenceDirectory, { recursive: true });
+  await expect(page.getByRole('heading', { name: 'Live Gym Operations' })).toBeVisible();
+  await page.screenshot({ path: join(evidenceDirectory, 'owner-dashboard-390.png'), fullPage: true });
+  await page.goto(`${webBase}/gyms/${fixture.gyms[0]!.slug}/owner/members/${memberId}`);
+  await expect(page.getByRole('main')).toContainText('Member Alpha');
+  await page.screenshot({ path: join(evidenceDirectory, 'owner-member-detail-390.png'), fullPage: true });
+  await page.goto(`${webBase}/gyms/${fixture.gyms[0]!.slug}/owner/sessions/book`);
+
   await expect(page.getByRole('heading', { name: 'Book Personal Training Session' })).toBeVisible();
-  await page.getByLabel(/^Select member/).selectOption(memberId);
-  await page.getByLabel(/^Select personal trainer/).selectOption(trainerId);
+  await page.locator('select[name="memberId"]').selectOption(memberId);
+  await page.locator('select[name="trainerId"]').selectOption(trainerId);
+  await expect(page.getByRole('button', { name: 'Confirm and book' })).toBeDisabled();
   await page.getByLabel(/Session date/).fill(bookingDate);
   const startTime = page.getByLabel(/^Available start time/);
+  await expect(startTime).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Confirm and book' })).toBeDisabled();
+  await mkdir(evidenceDirectory, { recursive: true });
+  await page.screenshot({ path: join(evidenceDirectory, 'owner-booking-before-slot-390.png'), fullPage: true });
   await startTime.selectOption(await startTime.locator('option').filter({ hasText: '15:00' }).getAttribute('value') ?? '');
   await page.getByLabel('Session notes (optional)').fill('Synthetic owner booking');
   await page.getByRole('button', { name: 'Confirm and book' }).click();

@@ -136,6 +136,8 @@ test('PT priority, detail routes and bell preserve both themes at mobile/tablet/
     await loginAs(page, role, workspace);
     if (role === 'MEMBER') {
       await expect(page.getByRole('heading', { name: 'Your next PT session' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Your next plan starts here' })).toBeVisible();
+      await expect(page.getByText('Assigned by your trainer', { exact: true })).toHaveCount(0);
       await expect(page.locator('.member-pt-priority')).toContainText('Decision due');
       await expect(page.locator('.member-pt-priority')).toContainText('3 unheld · 1 reserved');
       await expect(page.locator('.member-pt-priority')).toContainText('Next unheld credit expires');
@@ -146,8 +148,15 @@ test('PT priority, detail routes and bell preserve both themes at mobile/tablet/
       await expect(popover).toContainText('Notifications refresh while GymOS is open and this tab is visible.');
       await popover.getByRole('button', { name: 'Close notifications' }).click();
     }
+    if (role === 'TRAINER') {
+      await expect(page.getByRole('heading', { name: 'Pending session requests (1)', exact: true })).toBeVisible();
+      await expect(page.getByText('PENDING SESSION REQUESTS', { exact: true })).toHaveCount(0);
+    }
     if (role === 'OWNER') {
-      await expect(page.getByRole('heading', { name: 'Scheduled work health' })).toBeVisible();
+      const health = page.getByRole('heading', { name: 'Scheduled work health' });
+      await expect(health).toBeVisible();
+      const healthCard = page.locator('.owner-session-work-health');
+      await expect(healthCard).toHaveCSS('margin-block-start', '16px');
       await expect(page.getByRole('navigation', { name: 'Daily date navigation' })).toBeVisible();
       await expect(page.getByRole('heading', { name: 'No sessions found' })).toBeVisible();
     }

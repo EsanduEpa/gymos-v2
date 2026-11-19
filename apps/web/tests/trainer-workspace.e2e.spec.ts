@@ -338,6 +338,7 @@ test('trainer coaching keeps drafts assigns real plans and preserves client-only
   await expect(page.getByLabel('Live nutrition totals')).toContainText('500');
   await page.getByRole('button', { name: 'Save and assign meal plan' }).click();
   await expect(page.locator('form').getByRole('status')).toContainText('Meal plan assigned');
+  await page.screenshot({ path: join(evidenceDirectory, 'demo-meal-plan-assigned.png'), fullPage: true });
   await page.goto(`${webBase}${base}/clients/${memberId}`);
   await expect(page.locator('#workouts')).toContainText('Trainer UI Strength');
   await expect(page.locator('#meals')).toContainText('Trainer UI Nutrition');
@@ -381,6 +382,10 @@ test('trainer coaching keeps drafts assigns real plans and preserves client-only
   expect((await request.get(`${apiBase}/gyms/${fixture.gyms[0].slug}/me/clients/${unrelated.id}`, { headers: { authorization: `Bearer ${token}` } })).status()).toBe(404);
   await openAs(page, fixture.users.memberUser.id, `/gyms/${fixture.gyms[0].slug}/member/workout-plans`);
   await expect(page.getByRole('article').filter({ hasText: 'Trainer UI Strength Revised' })).toBeVisible();
+  await page.goto(`${webBase}/gyms/${fixture.gyms[0].slug}/member/meal-plans`);
+  await expect(page.getByText('Trainer UI Nutrition Revised', { exact: true })).toBeVisible();
+  await page.screenshot({ path: join(evidenceDirectory, 'demo-member-meal-plan.png'), fullPage: true });
+
   await expect(page.getByRole('button', { name: /Save and assign/ })).toHaveCount(0);
 });
 
@@ -388,6 +393,8 @@ test('trainer accepts declines completes with confirmation and saves member-visi
   const base = `/gyms/${fixture.gyms[0].slug}/trainer`;
   await openAs(page, fixture.users.trainerUser.id, `${base}/requests`);
   const accept = page.locator('.session-request-card').filter({ hasText: 'Trainer UI request 0' });
+  await expect(accept).toBeVisible();
+  await page.screenshot({ path: join(evidenceDirectory, 'requests-before-decisions.png'), fullPage: true });
   await accept.getByRole('button', { name: 'Accept and reserve one credit' }).click();
   await expect.poll(async () => (await fixture.tenants[0].pTSession.findFirstOrThrow({ where: { notes: 'Trainer UI request 0' } })).state).toBe('SCHEDULED');
   await expect(accept).toHaveCount(0);
@@ -399,6 +406,7 @@ test('trainer accepts declines completes with confirmation and saves member-visi
   await expect(decline).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole('heading', { name: 'No pending requests' })).toBeVisible();
+  await page.screenshot({ path: join(evidenceDirectory, 'requests-empty-after-decisions.png'), fullPage: true });
   const tenant = fixture.tenants[0];
   expect((await tenant.pTSession.findFirstOrThrow({ where: { notes: 'Trainer UI request 0' } })).state).toBe('SCHEDULED');
   expect((await tenant.pTSession.findFirstOrThrow({ where: { notes: 'Trainer UI request 1' } })).state).toBe('DECLINED');
@@ -416,6 +424,7 @@ test('trainer accepts declines completes with confirmation and saves member-visi
   await card.getByRole('button', { name: 'Complete session', exact: true }).click();
   await dialog.getByRole('button', { name: 'Complete session', exact: true }).click();
   await expect(card).toContainText('COMPLETED');
+  await page.screenshot({ path: join(evidenceDirectory, 'completed-session.png'), fullPage: true });
   expect(await tenant.sessionSettlement.count({ where: { sessionId: `read-active-${environment.runId}` } })).toBe(1);
   expect(await tenant.sessionCreditHold.count({ where: { sessionId: `read-active-${environment.runId}`, state: 'CONSUMED' } })).toBe(1);
   await card.locator('summary').filter({ hasText: 'Edit Notes' }).click();

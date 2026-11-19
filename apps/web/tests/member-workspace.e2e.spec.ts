@@ -475,11 +475,13 @@ test('member requests keep drafts and withdraw without holding credits then conf
   await page.getByRole('link', { name: 'Request a private session', exact: true }).click();
   await page.setViewportSize({ width: 320, height: 844 });
   const requestDay = localDate(new Date(Date.now() + 4 * 86400000), 'Asia/Colombo');
+  await expect(page.getByRole('button', { name: 'Request session', exact: true })).toBeDisabled();
   await page.getByLabel('Session date', { exact: true }).fill(requestDay);
   const startTime = page.getByLabel(/^Available start time/);
   await expect(startTime).toBeEnabled();
   await startTime.selectOption(await startTime.locator('option').filter({ hasText: '15:00' }).getAttribute('value') ?? '');
   await page.getByLabel('Note for the trainer (optional)').fill('Member UI request');
+  await page.screenshot({ path: join(evidenceDirectory, 'request-ready-320.png'), fullPage: true });
   const holdsBefore = await tenant.sessionCreditHold.count();
   const movementsBefore = await tenant.packCreditMovement.count();
   await page.getByRole('button', { name: 'Request session', exact: true }).click();
@@ -489,6 +491,7 @@ test('member requests keep drafts and withdraw without holding credits then conf
     console.error('[member-request-browser-diagnostics]', { api: api?.errorText(), web: web?.errorText(), form: await page.locator('.member-request-form').innerText() });
     throw error;
   }
+  await page.screenshot({ path: join(evidenceDirectory, 'request-confirmation-320.png'), fullPage: true });
   const session = await tenant.pTSession.findFirstOrThrow({ where: { notes: 'Member UI request' } });
   expect(session.state).toBe('PENDING_CONFIRMATION');
   expect(await tenant.sessionCreditHold.count()).toBe(holdsBefore);
