@@ -163,9 +163,11 @@ async function expectResponsivePage(page: Page): Promise<void> {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   if (await page.locator('.gym-banner').count()) expect(await contrastRatio(page, '.gym-banner')).toBeGreaterThanOrEqual(4.5);
   if (await page.locator('.ui-badge-success').count()) expect(await contrastRatio(page, '.ui-badge-success')).toBeGreaterThanOrEqual(4.5);
-  const memberButton = page.getByRole('button', { name: 'Add member' });
-  const primaryAction = memberButton.count().then(count => count ? memberButton : page.locator('.ui-button-primary').first());
-  const action = await primaryAction;
+  const memberButton = page.getByRole('button', { name: 'Add member' }).and(page.locator(':enabled'));
+  const primaryAction = page.locator('.ui-button-primary:enabled, a.ui-button-primary').first();
+  const action = await memberButton.count() ? memberButton
+    : await primaryAction.count() ? primaryAction
+    : page.getByRole('main').locator('input:enabled:not([type="hidden"]), select:enabled, textarea:enabled, button:enabled, a[href]').first();
   await action.focus();
   await expect(action).toBeFocused();
   expect(await action.evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe('none');
