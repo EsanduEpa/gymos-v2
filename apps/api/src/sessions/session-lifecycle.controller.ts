@@ -32,6 +32,13 @@ export class SessionLifecycleController {
     return this.lifecycle.start(access, sessionId, body);
   }
 
+  @Get('scan-code')
+  async scanCode(@Req() request: GymRequest, @Param('sessionId') sessionId: string) {
+    const access = request.gymAccess;
+    if (access?.role !== 'MEMBER') throw new ForbiddenException('Member gym access is required');
+    return this.lifecycle.scanCode(access, sessionId);
+  }
+
   @Patch('notes')
   async updateNotes(@Req() request: GymRequest, @Param('sessionId') sessionId: string, @Body() body: unknown, @Headers('idempotency-key') key?: string) {
     const access = this.access(request);

@@ -1,3 +1,4 @@
+import { noShowIsEligible } from './session-no-show.js';
 import { creditTotals, creditUnits } from './credit-unit-projection.js';
 import { ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma, type PrismaClient } from '../generated/tenant/client.js';
@@ -31,18 +32,19 @@ export function sessionCommandAffordances(session: { state: string; scheduledSta
     if (session.state === 'PENDING_CONFIRMATION' && session.requestExpiresAt && now < session.requestExpiresAt) commands.push('ACCEPT', 'DECLINE');
     if (session.state === 'SCHEDULED') {
       commands.push('CANCEL');
-      if (session.scheduledStartAt.getTime() - 15 * 60_000 <= now.getTime() && now <= session.scheduledEndAt) commands.push('START');
-      if (now.getTime() >= session.scheduledStartAt.getTime() + 15 * 60_000) commands.push('NO_SHOW');
+      if (session.scheduledStartAt.getTime() - 15 * 60_000 <= now.getTime() && now <= session.scheduledEndAt
+        && !noShowIsEligible(now.getTime(), session.scheduledStartAt.getTime())) commands.push('START');
+      if (noShowIsEligible(now.getTime(), session.scheduledStartAt.getTime())) commands.push('NO_SHOW');
     }
-    if (session.state === 'COMPLETED') commands.push('UPDATE_NOTES');
+    if (session.state === 'ACTIVE' || session.state === 'COMPLETED') commands.push('UPDATE_NOTES');
   } else if (role === 'MEMBER') {
     if (session.state === 'PENDING_CONFIRMATION' && session.requestExpiresAt && now < session.requestExpiresAt) commands.push('WITHDRAW');
     if (session.state === 'SCHEDULED') commands.push('CANCEL');
   }
   else if (role === 'OWNER') {
     if (session.state === 'SCHEDULED') commands.push('CANCEL');
-    if (session.state === 'COMPLETED') commands.push('UPDATE_NOTES');
-    if (session.state === 'SCHEDULED' && now.getTime() >= session.scheduledStartAt.getTime() + 15 * 60_000) commands.push('NO_SHOW');
+    if (session.state === 'ACTIVE' || session.state === 'COMPLETED') commands.push('UPDATE_NOTES');
+    if (session.state === 'SCHEDULED' && noShowIsEligible(now.getTime(), session.scheduledStartAt.getTime())) commands.push('NO_SHOW');
   }
   if (session.state === 'ACTIVE' && session.startedAt && role === 'TRAINER' && minimumCompletionMinutes !== null
     && now.getTime() >= session.startedAt.getTime() + minimumCompletionMinutes * 60_000) commands.push('COMPLETE');
@@ -167,7 +169,7 @@ export class SessionReadsService {
           restoredCreditExpiry: row.creditHold?.remedies?.length && sourceUnit ? sourceUnit.effectiveEndDateExclusive.toISOString().slice(0,10) : null,
           replacementSessionId: row.adjustments?.find(adjustment => adjustment.replacementSessionId)?.replacementSessionId ?? null, originalSessionId: row.replacementAdjustment?.sessionId ?? null,
           ownerRecovery: access.role === 'OWNER' ? { latestEventId: latestEvent?.id ?? null, allowedKinds, latestReason: row.adjustments?.[0]?.reason ?? null } : null,
-          timeline: events.map(event => ({ from: event.fromState, to: event.toState, at: event.createdAt.toISOString(), notesUpdated: event.fromState === 'COMPLETED' && event.toState === 'COMPLETED' && !timelineAdjustments.some(adjustment => adjustment.committedVersion === event.committedVersion), adjustmentKind: timelineAdjustments.find(adjustment => adjustment.committedVersion === event.committedVersion)?.kind ?? null })),
+          timeline: events.map(event => ({ from: event.fromState, to: event.toState, at: event.createdAt.toISOString(), notesUpdated: event.fromState === event.toState && (event.toState === 'ACTIVE' || event.toState === 'COMPLETED') && !timelineAdjustments.some(adjustment => adjustment.committedVersion === event.committedVersion), adjustmentKind: timelineAdjustments.find(adjustment => adjustment.committedVersion === event.committedVersion)?.kind ?? null })),
           timelinePage, timelineTotal: total, timelinePages: Math.ceil(total / 50), asOf: now.toISOString() });
       }, { isolationLevel: 'RepeatableRead' });
     });

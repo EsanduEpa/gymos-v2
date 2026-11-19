@@ -43,7 +43,7 @@ export class MembershipCheckoutService {
   constructor(private readonly database: DatabaseService, private readonly tenantGate: TenantSchemaGateService) {}
 
   async start(access: MemberCheckoutAccess, item: CheckoutItem, input: CheckoutDetails) {
-    const gateway = payHereSandboxCheckoutConfig();
+    const gateway = payHereSandboxCheckoutConfig(item.kind);
     const order = await this.tenantGate.withVerifiedTenant(access, tenant => withGymAccessFence(this.database.master, [{
       identityId: access.identityId, gymId: access.gymId, role: 'MEMBER', tenantActorId: access.actor.id,
     }], () => tenant.$transaction(async tx => {

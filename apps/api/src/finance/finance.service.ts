@@ -9,6 +9,7 @@ import { CommandReceiptFoundationService } from '../operations/receipt.service.j
 import { OperationConflictError } from '../operations/primitives.js';
 import { allocateMembershipMinorUnits } from './finance-arithmetic.js';
 import { makeReportFile, reportContentTypes } from './report-file.js';
+import { withinShift } from '../sessions/booking.service.js';
 import { resolvedStartSlots } from '../sessions/availability-policy.js';
 
 type Access = TenantGateContext & { identityId: string; role: string; slug: string; actor?: { kind: string; id: string } | null };
@@ -452,16 +453,25 @@ export class FinanceService {
       const endExclusive = localMidnight(nextDate(query.data.to), config.timezone);
       return tenant.$transaction(async tx => {
         await tx.$executeRaw`SET TRANSACTION READ ONLY`;
+        const sessionSelect = { scheduledStartAt: true, scheduledEndAt: true, gymTimezone: true,
+          confirmationShiftStart: true, confirmationShiftEnd: true } as const;
         const [clock, baseRows, correctionRows] = await Promise.all([
           tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`,
-          tx.payRecord.findMany({ where: { currency, session: { trainerId: trainer.id, scheduledStartAt: { gte: start, lt: endExclusive } } }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], take: 5001, include: { period: { select: { id: true, state: true } }, session: { select: { scheduledStartAt: true } } } }),
-          tx.trainerPayCorrection.findMany({ where: { currency, session: { trainerId: trainer.id, scheduledStartAt: { gte: start, lt: endExclusive } } }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], take: 5001, include: { correctionPeriod: { select: { id: true, state: true } }, session: { select: { scheduledStartAt: true } } } }),
+          tx.payRecord.findMany({ where: { currency, session: { trainerId: trainer.id, scheduledStartAt: { gte: start, lt: endExclusive } } }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], take: 5001, include: { period: { select: { id: true, state: true } }, session: { select: sessionSelect } } }),
+          tx.trainerPayCorrection.findMany({ where: { currency, session: { trainerId: trainer.id, scheduledStartAt: { gte: start, lt: endExclusive } } }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], take: 5001, include: { correctionPeriod: { select: { id: true, state: true } }, session: { select: sessionSelect } } }),
         ]);
         if (baseRows.length + correctionRows.length > 5000) throw new UnprocessableEntityException('Narrow the earnings date range');
         const allRows = [...baseRows, ...correctionRows.map(row => ({ ...row, periodId: row.correctionPeriodId, period: row.correctionPeriod }))].sort((a,b) => a.createdAt.getTime()-b.createdAt.getTime() || a.id.localeCompare(b.id));
-        const totalCount = allRows.length;
-        const totalAmount = money(allRows.reduce((sum,row) => sum + micros(row.amount.toString()),0n));
-        const rows = allRows.slice((query.data.page-1)*query.data.pageSize,query.data.page*query.data.pageSize);
+        const categorizedRows = allRows.map(row => {
+          const session = row.session;
+          const shift = withinShift(session.scheduledStartAt, session.scheduledEndAt, session.gymTimezone,
+            session.confirmationShiftStart, session.confirmationShiftEnd) ? 'IN_SHIFT' as const : 'OFF_SHIFT' as const;
+          return { ...row, shift };
+        });
+        const totalCount = categorizedRows.length;
+        const totals = { IN_SHIFT: 0n, OFF_SHIFT: 0n };
+        for (const row of categorizedRows) totals[row.shift] += micros(row.amount.toString());
+        const rows = categorizedRows.slice((query.data.page-1)*query.data.pageSize,query.data.page*query.data.pageSize);
         const currentPeriod = await tx.trainerPayPeriod.findFirst({ where: { utcStartAt: { lte: clock[0]!.now }, utcEndAt: { gt: clock[0]!.now }, OR: [
           { records: { some: { session: { trainerId: trainer.id } } } },
           { corrections: { some: { session: { trainerId: trainer.id } } } },
@@ -474,8 +484,9 @@ export class FinanceService {
         return trainerEarningsSchema.parse({ gymSlug: access.slug, trainerId: trainer.id, from: query.data.from, to: query.data.to,
           rangeStart: start.toISOString(), rangeEndExclusive: endExclusive.toISOString(), currency, asOf: clock[0]!.now.toISOString(),
           lines: rows.map(row => ({ id: row.id, sessionId: row.sessionId, periodId: row.periodId, scheduledStartAt: row.session.scheduledStartAt.toISOString(),
-            amount: row.amount.toString(), currency: row.currency, periodState: row.period.state })), page: query.data.page, pageSize: query.data.pageSize,
-          totalCount, total: totalAmount, currentPeriod: currentPeriod ? {
+            amount: row.amount.toString(), currency: row.currency, periodState: row.period.state, shift: row.shift })), page: query.data.page, pageSize: query.data.pageSize,
+          totalCount, total: money(totals.IN_SHIFT + totals.OFF_SHIFT),
+          shiftTotals: { inShift: money(totals.IN_SHIFT), offShift: money(totals.OFF_SHIFT) }, currentPeriod: currentPeriod ? {
             id: currentPeriod.id, state: currentPeriod.state, start: currentPeriod.localStartDate.toISOString().slice(0, 10),
             endExclusive: currentPeriod.localEndDateExclusive.toISOString().slice(0, 10), total: currentTotal!,
           } : null });

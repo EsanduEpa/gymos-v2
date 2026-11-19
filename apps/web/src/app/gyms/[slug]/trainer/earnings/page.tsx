@@ -26,14 +26,20 @@ function formatMoney(amount: string, currency: string) {
 
 export default async function TrainerEarningsPage({ params, searchParams }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ month?: string; page?: string }>;
+  searchParams: Promise<{ month?: string; weekStart?: string; page?: string }>;
 }) {
   const { slug } = await params;
   const filters = await searchParams;
   const { token, session, gym, theme } = await requireGymContext(slug, 'TRAINER');
   const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(filters.month ?? '') ? filters.month! : currentMonth();
   const page = /^[1-9]\d{0,5}$/.test(filters.page ?? '') ? Number(filters.page) : 1;
-  const { from, to } = monthBounds(month);
+  const week = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(filters.weekStart ?? '') ? filters.weekStart! : '';
+  const start = week ? new Date(`${week}T00:00:00Z`) : null;
+  const validWeek = start && !Number.isNaN(start.getTime()) && start.toISOString().slice(0, 10) === week ? week : '';
+  const { from, to } = validWeek
+    ? { from: validWeek, to: new Date(start!.getTime() + 6 * 86_400_000).toISOString().slice(0, 10) }
+    : monthBounds(month);
+  const dateFilters = { month, ...(validWeek ? { weekStart: validWeek } : {}) };
   const query = new URLSearchParams({ from, to, page: String(page), pageSize: '25' });
   let response: Response | null = null;
   try { response = await fetch(apiUrl(`/gyms/${encodeURIComponent(slug)}/me/earnings?${query}`), { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' }); }
@@ -59,11 +65,12 @@ export default async function TrainerEarningsPage({ params, searchParams }: {
       <Card><CardHeader eyebrow="AVERAGE PER SESSION" title={formatMoney(averagePerSession(data.total, data.totalCount), data.currency)}/></Card>
     </div> : null}
     <Card><CardHeader eyebrow="ITEMIZED EARNINGS" title="Earnings summary" />
-      <form method="get" className="member-directory-filters"><label className="ui-field"><span className="ui-field-label">Month</span><input name="month" type="month" defaultValue={month}/></label><button className="ui-button ui-button-secondary">Apply</button></form>
+      <form method="get" className="member-directory-filters"><label className="ui-field"><span className="ui-field-label">Month</span><input name="month" type="month" defaultValue={month}/></label><label className="ui-field"><span className="ui-field-label">Week starting (optional)</span><input name="weekStart" type="date" defaultValue={validWeek}/></label><button className="ui-button ui-button-secondary">Apply</button></form>
       {data ? <><p><strong>{formatMoney(data.total, data.currency)}</strong> · {data.totalCount} earned sessions · {data.from} to {data.to} · as of {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: earningsTimeZone }).format(new Date(data.asOf))}</p>
+        {data.shiftTotals ? <p>In shift {formatMoney(data.shiftTotals.inShift, data.currency)} · Off shift {formatMoney(data.shiftTotals.offShift, data.currency)}</p> : null}
         {data.currentPeriod ? <p>Current pay period: {data.currentPeriod.start}–{data.currentPeriod.endExclusive} · {data.currentPeriod.state} · {formatMoney(data.currentPeriod.total, data.currency)}</p> : <p>No current pay period has been created by a completed session.</p>}
-        {data.lines.length ? <div className="member-list">{data.lines.map(line => <div className="member-row" key={line.id}><div><strong>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeZone: earningsTimeZone }).format(new Date(line.scheduledStartAt))}</strong><small>Session {line.sessionId} · payroll status {line.periodState.toLowerCase()}</small></div><span>{formatMoney(line.amount, line.currency)}</span></div>)}</div> : <EmptyState title="No earnings in this period." hint="Trainer earnings are recorded when an eligible session is completed."/>}
-        <div className="ui-pager"><span>Page {data.page} · {data.totalCount} matching sessions</span><div>{data.page > 1 ? <a className="ui-button ui-button-secondary" href={`?${new URLSearchParams({ month, page: String(data.page - 1) })}`}>Previous</a> : null}{data.page * data.pageSize < data.totalCount ? <a className="ui-button ui-button-secondary" href={`?${new URLSearchParams({ month, page: String(data.page + 1) })}`}>Next</a> : null}</div></div>
+        {data.lines.length ? <div className="member-list">{data.lines.map(line => <div className="member-row" key={line.id}><div><strong>{new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeZone: earningsTimeZone }).format(new Date(line.scheduledStartAt))}</strong><small>Session {line.sessionId} · payroll status {line.periodState.toLowerCase()}{line.shift ? ` · ${line.shift === 'OFF_SHIFT' ? 'Off shift' : 'In shift'}` : ''}</small></div><span>{formatMoney(line.amount, line.currency)}</span></div>)}</div> : <EmptyState title="No earnings in this period." hint="Trainer earnings are recorded when an eligible session is completed."/>}
+        <div className="ui-pager"><span>Page {data.page} · {data.totalCount} matching sessions</span><div>{data.page > 1 ? <a className="ui-button ui-button-secondary" href={`?${new URLSearchParams({ ...dateFilters, page: String(data.page - 1) })}`}>Previous</a> : null}{data.page * data.pageSize < data.totalCount ? <a className="ui-button ui-button-secondary" href={`?${new URLSearchParams({ ...dateFilters, page: String(data.page + 1) })}`}>Next</a> : null}</div></div>
       </> : <Feedback tone="error">Earnings are temporarily unavailable. No financial state was changed. Reload to try again.</Feedback>}
     </Card>
   </DashboardChrome>;

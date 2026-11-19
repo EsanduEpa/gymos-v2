@@ -95,6 +95,21 @@ Point your HTTPS forwarding service at the relay on `127.0.0.1:3004`. The relay 
 
 For a temporary Cloudflare Quick Tunnel, start `node apps/api/scripts/payhere-sandbox-relay.mjs`, then run `cloudflared tunnel --no-autoupdate --url http://127.0.0.1:3004` in another terminal. Copy the generated HTTPS origin into `GYMOS_PAYHERE_SANDBOX_API_ORIGIN` in `.env.payhere-sandbox`, then start/restart the local test app with the command above. The generated `trycloudflare.com` hostname lasts only while that tunnel process remains running and changes on restart. Never point a tunnel at ports 3000/3001 or the hosted Render demo for this test.
 
+## Hosted membership Sandbox checkout
+
+Use the synthetic demo accounts for this checkout. In the PayHere Sandbox portal, approve the deployed frontend hostname and use the merchant ID and secret for that integration. Enter the secret in Render's private environment settings.
+
+| Service | Variable | Value |
+| --- | --- | --- |
+| Render API | `GYMOS_PAYHERE_MEMBERSHIP_SANDBOX_ENABLED` | `1` |
+| Render API | `GYMOS_PAYHERE_SANDBOX_MERCHANT_ID` | Sandbox merchant ID |
+| Render API | `GYMOS_PAYHERE_SANDBOX_MERCHANT_SECRET` | Secret for the hosted frontend integration |
+| Render API | `GYMOS_PAYHERE_SANDBOX_API_ORIGIN` | `https://gymos-api-dw7n.onrender.com` |
+| Render API | `GYMOS_PAYHERE_SANDBOX_WEB_ORIGIN` | `https://gymos-v2-ten.vercel.app` |
+| Vercel web | `GYMOS_PAYHERE_MEMBERSHIP_SANDBOX_ENABLED` | `1` |
+
+Leave `GYMOS_PAYHERE_CHECKOUT_ENABLED` unset on Vercel for this scope. Deploy the membership Sandbox changes to both services. Verify that the synthetic member's Membership page starts PayHere Sandbox checkout and the signed provider callback confirms exactly one renewal. Open the member receipt after returning to the hosted frontend. The hosted flow uses Render directly for delivery and does not need the temporary local tunnel.
+
 ## Suggested manual tests
 
 1. Sign in as each account and check the correct screens and gym scope.

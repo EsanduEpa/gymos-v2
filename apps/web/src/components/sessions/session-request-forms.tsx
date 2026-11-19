@@ -9,8 +9,8 @@ const subscribeToReadiness = () => () => {};
 const clientReady = () => true;
 const serverReady = () => false;
 
-export function SessionRequestForm({ slug, trainerId, timeZone, requestKey, minDate }: {
-  slug: string; trainerId: string; timeZone: string; requestKey: string; minDate: string;
+export function SessionRequestForm({ slug, trainerId, timeZone, requestKey, minDate, offersVirtualPt }: {
+  slug: string; trainerId: string; timeZone: string; requestKey: string; minDate: string; offersVirtualPt?: boolean;
 }) {
   // Keep the server-rendered fields disabled until their draft handlers are attached.
   const ready = useSyncExternalStore(subscribeToReadiness, clientReady, serverReady);
@@ -26,7 +26,8 @@ export function SessionRequestForm({ slug, trainerId, timeZone, requestKey, minD
     <label className="ui-field"><span className="ui-field-label">Session date</span><input disabled={!ready} type="date" name="localDate" min={minDate} value={draft.localDate} onChange={event => update('localDate', event.currentTarget.value)} required/></label>
     <label className="ui-field"><span className="ui-field-label">Available start time ({timeZone})</span><select disabled={!ready || loadingSlots || !slotResult.data?.slots.length} value={draft.startAt} onChange={event => { const slot = slotResult.data?.slots.find(item => item.startAt === event.currentTarget.value); setDraft(current => ({ ...current, startAt: slot?.startAt ?? '', localTime: slot?.localTime ?? '', offset: slot?.offset ?? '' })); }} required><option value="">{loadingSlots ? 'Loading times…' : slotResult.data?.slots.length ? 'Choose a time' : 'No times available'}</option>{slotResult.data?.slots.map(slot => <option key={slot.startAt} value={slot.startAt}>{slot.localTime} · UTC{slot.offset}</option>)}</select>{slotResult.error ? <small role="alert">{slotResult.error}</small> : null}{slotResult.data?.reason ? <small>{slotResult.data.reason === 'NO_AVAILABILITY' ? 'This trainer has not published bookable times for this date.' : slotResult.data.reason === 'CLOSED' ? 'The gym is closed on this date.' : 'No available times remain for this date.'}</small> : null}</label>
     <input type="hidden" name="localTime" value={draft.localTime}/><input type="hidden" name="offset" value={draft.offset}/>
-    <input type="hidden" name="type" value="IN_PERSON"/><input type="hidden" name="durationMinutes" value="60"/><div className="ui-feedback">In-person PT · 60 minutes · 1 credit. Requests made within 24 hours of the start are already in the late-cancellation window if accepted.</div>
+    {offersVirtualPt ? <label className="ui-field"><span className="ui-field-label">Session format</span><select name="type" defaultValue="IN_PERSON"><option value="IN_PERSON">In-person PT</option><option value="VIRTUAL">Virtual PT</option></select></label> : <input type="hidden" name="type" value="IN_PERSON"/>}
+    <input type="hidden" name="durationMinutes" value="60"/><div className="ui-feedback"> 60 minutes · 1 credit. Requests made within 24 hours of the start are already in the late-cancellation window if accepted.</div>
     <label className="ui-field"><span className="ui-field-label">Note for the trainer (optional)</span><textarea disabled={!ready} name="notes" value={draft.notes} onChange={event => update('notes', event.currentTarget.value)} maxLength={4000} rows={4}/></label>
     {state.error ? <p role="alert" className="ui-feedback ui-feedback-error">{state.error}</p> : null}
     {state.success ? <p role="status" className="ui-feedback ui-feedback-success">{state.success} {state.sessionId ? <a href={`/gyms/${encodeURIComponent(slug)}/sessions/${encodeURIComponent(state.sessionId)}`}>View booking</a> : null}</p> : null}

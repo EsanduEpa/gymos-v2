@@ -33,7 +33,7 @@ export async function startSession(slug: string, sessionId: string, expectedVers
   _state: SessionLifecycleActionState, formData: FormData): Promise<SessionLifecycleActionState> {
   if (!safeRoute(slug, sessionId) || !Number.isSafeInteger(expectedVersion) || expectedVersion < 0) return { error: 'This session action is invalid.' };
   const key = String(formData.get('idempotencyKey') ?? initialKey);
-  const parsed = sessionLifecycleCommandInputSchema.safeParse({ expectedVersion, idempotencyKey: key });
+  const parsed = sessionLifecycleCommandInputSchema.safeParse({ expectedVersion, idempotencyKey: key, scanToken: formData.get('scanToken') || undefined });
   if (!parsed.success) return { error: 'Refresh the session before starting it.', nextKey: randomUUID() };
   const token = await tokenOrRedirect(); const response = await send(slug, sessionId, 'start', token, parsed.data, key);
   if (!response) return { error: 'The start outcome is unknown. Retry with this same key to resolve it.', currentKey: key, outcomeUnknown: true };
@@ -41,7 +41,10 @@ export async function startSession(slug: string, sessionId: string, expectedVers
   if (response.status === 403 || response.status === 404) return { error: 'This session is not available to your trainer account.', nextKey: randomUUID() };
   if (response.status === 409) return { error: 'This session changed or cannot be started. Refresh the schedule.', nextKey: randomUUID() };
   const result = sessionStartResultSchema.safeParse(await response.json().catch(() => null));
-  if (!response.ok || !result.success) return { error: response.status === 422 ? 'The server start window has not opened or has passed.' : 'The start outcome is unknown. Retry with this same key.',
+  if (response.status === 422) return { error: parsed.data.scanToken
+    ? 'The PT code expired, does not match this booking, or the session cannot start now.'
+    : 'The server start window has not opened or has passed.', nextKey: randomUUID() };
+  if (!response.ok || !result.success) return { error: 'The start outcome is unknown. Retry with this same key.',
     currentKey: key, outcomeUnknown: response.status >= 500 || response.ok };
   refresh(slug);
   return { success: 'Session started using server time.', nextKey: randomUUID() };
@@ -51,7 +54,7 @@ export async function completeSession(slug: string, sessionId: string, expectedV
   _state: SessionLifecycleActionState, formData: FormData): Promise<SessionLifecycleActionState> {
   if (!safeRoute(slug, sessionId) || !Number.isSafeInteger(expectedVersion) || expectedVersion < 0) return { error: 'This session action is invalid.' };
   const key = String(formData.get('idempotencyKey') ?? initialKey);
-  const parsed = sessionLifecycleCommandInputSchema.safeParse({ expectedVersion, idempotencyKey: key });
+  const parsed = sessionLifecycleCommandInputSchema.safeParse({ expectedVersion, idempotencyKey: key, scanToken: formData.get('scanToken') || undefined });
   if (!parsed.success) return { error: 'Refresh the session before completing it.', nextKey: randomUUID() };
   const token = await tokenOrRedirect(); const response = await send(slug, sessionId, 'complete', token, parsed.data, key);
   if (!response) return { error: 'The completion outcome is unknown. Retry with this same key to resolve it.', currentKey: key, outcomeUnknown: true };
@@ -59,7 +62,10 @@ export async function completeSession(slug: string, sessionId: string, expectedV
   if (response.status === 403 || response.status === 404) return { error: 'This session is not available to your trainer account.', nextKey: randomUUID() };
   if (response.status === 409) return { error: 'This session changed or cannot be completed. Refresh the schedule.', nextKey: randomUUID() };
   const result = sessionCompleteResultSchema.safeParse(await response.json().catch(() => null));
-  if (!response.ok || !result.success) return { error: response.status === 422 ? 'The session is not ready to complete yet.' : 'The completion outcome is unknown. Retry with this same key.',
+  if (response.status === 422) return { error: parsed.data.scanToken
+    ? 'The PT code expired, does not match this booking, or the minimum duration has not elapsed.'
+    : 'The session is not ready to complete yet.', nextKey: randomUUID() };
+  if (!response.ok || !result.success) return { error: 'The completion outcome is unknown. Retry with this same key.',
     currentKey: key, outcomeUnknown: response.status >= 500 || response.ok };
   refresh(slug);
   return { success: `Session completed. ${result.data.recognizedRevenue.currency} ${result.data.recognizedRevenue.amount} recognized; trainer earning ${result.data.trainerPay.currency} ${result.data.trainerPay.amount}.`, nextKey: randomUUID() };
@@ -77,7 +83,7 @@ export async function saveSessionNotes(slug: string, sessionId: string, expected
   if (response.status === 403 || response.status === 404) return { error: 'This session is not available to your trainer account.', nextKey: randomUUID() };
   if (response.status === 409) return { error: 'These notes changed elsewhere. Refresh the session before saving.', nextKey: randomUUID() };
   const result = sessionNotesResultSchema.safeParse(await response.json().catch(() => null));
-  if (!response.ok || !result.success) return { error: response.status === 422 ? 'Notes can only be saved for a completed session.' : 'The save outcome is unknown. Retry with this same key.',
+  if (!response.ok || !result.success) return { error: response.status === 422 ? 'Notes can only be saved for an active or completed session.' : 'The save outcome is unknown. Retry with this same key.',
     currentKey: key, outcomeUnknown: response.status >= 500 || response.ok };
   refresh(slug);
   return { success: 'Shared session notes saved.', nextKey: randomUUID() };

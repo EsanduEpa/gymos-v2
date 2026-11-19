@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
+import { vi } from 'vitest';
 import { PrismaClient as TenantClient } from '../../src/generated/tenant/client.js';
 import type { DatabaseService } from '../../src/database.service.js';
 import { requestDigest } from '../../src/operations/primitives.js';
 import { SessionLifecycleService } from '../../src/sessions/session-lifecycle.service.js';
 import { SessionReadsService } from '../../src/sessions/session-reads.service.js';
+import { createSessionScan } from '../../src/sessions/session-scan.js';
 import { reserveSessionCredit } from '../../src/sessions/credit-holds.js';
 import { TenantSchemaGateService } from '../../src/tenancy/tenant-schema-gate.service.js';
 import { createDisposableEnvironment } from '../support/disposable-environment.js';
@@ -52,7 +54,7 @@ async function setup(gymIndex = 0) {
   return { service, reads, tenant, gym, member, trainer, config, configVersion, trainerAccess, ownerAccess, memberAccess };
 }
 
-async function createSession(ctx: Awaited<ReturnType<typeof setup>>, suffix: string, scheduledStart?: Date, terms = { creditValue: '100', creditMinor: 10000n, confirmedTrainerPay: null as string | null }) {
+async function createSession(ctx: Awaited<ReturnType<typeof setup>>, suffix: string, scheduledStart?: Date, terms = { creditValue: '100', creditMinor: 10000n, confirmedTrainerPay: null as string | null }, type: 'IN_PERSON' | 'VIRTUAL' = 'IN_PERSON') {
   const now = new Date(); const start = scheduledStart ?? new Date(now.getTime() - 5 * 60_000); const end = new Date(start.getTime() + 60 * 60_000);
   const localDate = localDateAt(start, ctx.config.timezone ?? 'Asia/Colombo'); const currency = ctx.config.currency ?? 'LKR'; const ownerId = ctx.ownerAccess.identityId;
   const plan = await ctx.tenant.membershipPlan.create({ data: { name: `Lifecycle ${suffix}`, price: '0', currency, durationDays: 90 } });
@@ -68,7 +70,7 @@ async function createSession(ctx: Awaited<ReturnType<typeof setup>>, suffix: str
     actorIdentityId: ownerId, idempotencyKey: uuidKey('lc-pack'), requestDigest: requestDigest({ suffix, issued: true }) } });
   await ctx.tenant.packCreditMovement.create({ data: { packId: pack.id, kind: 'ISSUE', availableDelta: 1, heldDelta: 0, consumedDelta: 0, expiredDelta: 0,
     sourceKey: `lc-issue-${suffix}`, receiptId: receipt.id, actorIdentityId: ownerId } });
-  const session = await ctx.tenant.pTSession.create({ data: { memberId: ctx.member.id, trainerId: ctx.trainer.id, state: 'SCHEDULED', type: 'IN_PERSON',
+  const session = await ctx.tenant.pTSession.create({ data: { memberId: ctx.member.id, trainerId: ctx.trainer.id, state: 'SCHEDULED', type,
     scheduledStartAt: start, scheduledEndAt: end, gymTimezone: ctx.config.timezone ?? 'Asia/Colombo', fee: '100.0000', currency,
     confirmationRate: '0.400000', confirmationLevel: 'LEVEL_1', configurationVersion: ctx.configVersion.configurationVersion,
     confirmedTrainerPay: terms.confirmedTrainerPay,
@@ -82,8 +84,8 @@ async function createSession(ctx: Awaited<ReturnType<typeof setup>>, suffix: str
 
 it('settles the same confirmed trainer pay for free and paid credits without changing pack revenue', async () => {
   const ctx = await setup();
-  for (const [index, creditValue, creditMinor] of [[0, '0', 0n], [1, '170', 17000n]] as const) {
-    const ready = await createSession(ctx, `confirmed-pay-${index}-${run.runId}`, undefined, { creditValue, creditMinor, confirmedTrainerPay: '34.50' });
+  for (const [index, creditValue, creditMinor, type] of [[0, '0', 0n, 'IN_PERSON'], [1, '170', 17000n, 'VIRTUAL']] as const) {
+    const ready = await createSession(ctx, `confirmed-pay-${index}-${run.runId}`, undefined, { creditValue, creditMinor, confirmedTrainerPay: '34.50' }, type);
     await ctx.service.start(ctx.trainerAccess, ready.session.id, { expectedVersion: 0, idempotencyKey: uuidKey('fixed-pay-start') });
     await ctx.tenant.pTSession.update({ where: { id: ready.session.id }, data: { startedAt: new Date(Date.now() - 25 * 60_000) } });
     const result = await ctx.service.complete(ctx.trainerAccess, ready.session.id, { expectedVersion: 1, idempotencyKey: uuidKey('fixed-pay-complete') });
@@ -105,8 +107,12 @@ it('starts once under the selected-gym fence; rejects early, foreign, inactive a
   expect(await ctx.tenant.auditLog.count({ where: { receiptId: first.receiptId, eventCode: 'PT_SESSION_STARTED' } })).toBe(1);
   await expect(ctx.service.start(ctx.trainerAccess, ready.session.id, { ...body, idempotencyKey: uuidKey('lifecycle-start-different') })).rejects.toMatchObject({ status: 409 });
   await expect(ctx.service.start(ctx.memberAccess, ready.session.id, { expectedVersion: 1, idempotencyKey: uuidKey('lifecycle-wrong-role') })).rejects.toMatchObject({ status: 403 });
+  const live = await ctx.service.updateNotes(ctx.trainerAccess, ready.session.id, { notes: 'In-session observations', expectedVersion: 1, idempotencyKey: uuidKey('lifecycle-live-notes') });
+  expect(live).toMatchObject({ notes: 'In-session observations', version: 2 });
+  expect(await ctx.tenant.pTSession.findUnique({ where: { id: ready.session.id } })).toMatchObject({ state: 'ACTIVE', version: 2 });
+  expect(await ctx.tenant.sessionSettlement.count({ where: { sessionId: ready.session.id } })).toBe(0);
   await ctx.tenant.pTSession.update({ where: { id: ready.session.id }, data: { startedAt: new Date(Date.now() - 25 * 60_000) } });
-  await ctx.service.complete(ctx.trainerAccess, ready.session.id, { expectedVersion: 1, idempotencyKey: uuidKey('lifecycle-free-slot') });
+  await ctx.service.complete(ctx.trainerAccess, ready.session.id, { expectedVersion: 2, idempotencyKey: uuidKey('lifecycle-free-slot') });
 
   const tooEarly = await createSession(ctx, `early-${run.runId}`, new Date(Date.now() + 2 * 60 * 60_000));
   await expect(ctx.service.start(ctx.trainerAccess, tooEarly.session.id, { expectedVersion: 0, idempotencyKey: uuidKey('lifecycle-early') })).rejects.toMatchObject({ status: 422 });
@@ -128,6 +134,51 @@ it('starts once under the selected-gym fence; rejects early, foreign, inactive a
   await expect(ctx.service.complete(ctx.trainerAccess, tooEarly.session.id, { expectedVersion: 0, idempotencyKey: uuidKey('lifecycle-direct-complete') })).rejects.toMatchObject({ status: 409 });
   expect(await ctx.tenant.sessionSettlement.count({ where: { sessionId: tooEarly.session.id } })).toBe(0);
   expect(await ctx.tenant.sessionCreditHold.count({ where: { sessionId: tooEarly.session.id, state: 'HELD' } })).toBe(1);
+});
+
+it('binds each PT scan to the member booking and phase, then settles a replayed completion only once', async () => {
+  vi.stubEnv('JWT_SECRET', 'synthetic-session-scan-test-secret-for-disposable-fixtures');
+  try {
+    const ctx = await setup();
+    const ready = await createSession(ctx, `scanned-${run.runId}`);
+    const other = await createSession(ctx, `wrong-scan-${run.runId}`, new Date(Date.now() - 90 * 60_000));
+    const startCode = await ctx.service.scanCode(ctx.memberAccess, ready.session.id);
+    const otherCode = await ctx.service.scanCode(ctx.memberAccess, other.session.id);
+    await expect(ctx.service.scanCode(ctx.trainerAccess, ready.session.id)).rejects.toMatchObject({ status: 403 });
+    await expect(ctx.service.start(ctx.trainerAccess, ready.session.id, {
+      expectedVersion: 0, idempotencyKey: uuidKey('wrong-booking-scan'), scanToken: otherCode.token,
+    })).rejects.toMatchObject({ status: 422 });
+    const binding = { ...ready.session, gymId: ctx.gym.id, command: 'START' as const };
+    const wrongMember = createSessionScan({ ...binding, memberId: 'different-member' }, new Date());
+    const expired = createSessionScan(binding, new Date(Date.now() - 121_000));
+    for (const fixtureCode of [wrongMember, expired]) {
+      await expect(ctx.service.start(ctx.trainerAccess, ready.session.id, {
+        expectedVersion: 0, idempotencyKey: uuidKey('invalid-member-scan'), scanToken: fixtureCode.token,
+      })).rejects.toMatchObject({ status: 422 });
+    }
+    await ctx.service.start(ctx.trainerAccess, ready.session.id, {
+      expectedVersion: 0, idempotencyKey: uuidKey('start-scan'), scanToken: startCode.token,
+    });
+    expect(await ctx.tenant.notification.count({ where: {
+      resourceId: ready.session.id, recipientIdentityId: ctx.trainerAccess.identityId, eventCode: 'SESSION_STARTED',
+    } })).toBe(1);
+    const endCode = await ctx.service.scanCode(ctx.memberAccess, ready.session.id);
+    const complete = { expectedVersion: 1, idempotencyKey: uuidKey('complete-scan'), scanToken: endCode.token };
+    await expect(ctx.service.complete(ctx.trainerAccess, ready.session.id, complete)).rejects.toMatchObject({ status: 422 });
+    const elapsed = (ctx.configVersion.minimumSessionDurationMinutes + 1) * 60_000;
+    await ctx.tenant.pTSession.update({ where: { id: ready.session.id }, data: { startedAt: new Date(Date.now() - elapsed) } });
+    await expect(ctx.service.complete(ctx.trainerAccess, ready.session.id, {
+      ...complete, idempotencyKey: uuidKey('wrong-phase-scan'), scanToken: startCode.token,
+    })).rejects.toMatchObject({ status: 422 });
+    const settled = await ctx.service.complete(ctx.trainerAccess, ready.session.id, complete);
+    expect(await ctx.service.complete(ctx.trainerAccess, ready.session.id, complete)).toMatchObject({ replayed: true, receiptId: settled.receiptId });
+    expect(await ctx.tenant.sessionSettlement.count({ where: { sessionId: ready.session.id } })).toBe(1);
+    expect(await ctx.tenant.revenueRecord.count({ where: { sessionId: ready.session.id } })).toBe(1);
+    expect(await ctx.tenant.payRecord.count({ where: { sessionId: ready.session.id } })).toBe(1);
+    expect(await ctx.tenant.packCreditMovement.count({ where: { packId: ready.pack.id, kind: 'CONSUME' } })).toBe(1);
+  } finally {
+    vi.unstubAllEnvs();
+  }
 });
 
 it('completes the held credit using the booking policy snapshot, replays safely, and keeps notes member-visible without money effects', async () => {

@@ -49,6 +49,7 @@ export function GymSelfProfileForm({ slug, role, profile, requestKey }: { slug: 
         </label>
       </> : <>
         <label className="ui-field"><span className="ui-field-label">Professional biography <span>optional</span></span><textarea name="biography" rows={5} maxLength={2000} defaultValue={trainer.biography ?? ''} aria-invalid={state.fieldErrors?.biography ? true : undefined}/>{state.fieldErrors?.biography ? <span className="ui-field-error">{state.fieldErrors.biography}</span> : null}</label>
+        {trainer.offersVirtualPt !== undefined ? <><input type="hidden" name="virtualPtPreferencePresent" value="1"/><label><input type="checkbox" name="offersVirtualPt" defaultChecked={trainer.offersVirtualPt}/> Offer virtual PT sessions</label></> : null}
         <label className="ui-field"><span className="ui-field-label">Specialisations <span>optional</span></span><textarea name="specialisations" rows={4} maxLength={1220} defaultValue={trainer.specialisations.join('\n')} aria-invalid={state.fieldErrors?.specialisations ? true : undefined}/>{state.fieldErrors?.specialisations ? <span className="ui-field-error">{state.fieldErrors.specialisations}</span> : <span className="ui-field-hint">One specialisation per line, up to 20.</span>}</label>
         <Field label="Years of experience" name="yearsExperience" type="number" min={0} max={80} defaultValue={trainer.yearsExperience ?? ''} optional error={state.fieldErrors?.yearsExperience}/>
       </>}

@@ -7,6 +7,7 @@ import { Card, CardHeader, Feedback } from '@/components/ui';
 import { formatDisplayDate } from '@/lib/display-date';
 import { requireGymContext } from '@/lib/gym-context';
 import { apiUrl } from '@/lib/gymos';
+import { isPayHereMemberCheckoutEnabled } from '@/lib/payhere-member-checkout';
 
 function MembershipDate({ value }: { value: string }) {
   return <time dateTime={value}>{formatDisplayDate(value)}</time>;
@@ -53,8 +54,11 @@ export default async function MemberMembershipPage({ params, searchParams }: {
   const ptPacks = ptPackResponse.ok ? ptPackOffersSchema.safeParse(await ptPackResponse.json().catch(() => null)) : null;
   const packOffers = ptPacks?.success ? ptPacks.data.offers : null;
   const checkoutPlans = overview?.availablePlans.filter(plan => Number(plan.price) > 0) ?? [];
-  const showCheckout = process.env.GYMOS_PAYHERE_CHECKOUT_ENABLED === '1' &&
+  const checkoutAllowed =
     order?.status !== 'PENDING' && order?.status !== 'REVIEW_REQUIRED';
+
+  const showPackCheckout = checkoutAllowed && isPayHereMemberCheckoutEnabled('PT_PACK');
+  const showMembershipCheckout = checkoutAllowed && isPayHereMemberCheckoutEnabled('MEMBERSHIP');
 
   return <DashboardChrome identityId={session.identityId} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'}>
     <div className="platform-page">
@@ -121,7 +125,7 @@ export default async function MemberMembershipPage({ params, searchParams }: {
               <div>{plan.durationDays} {plan.durationDays === 1 ? 'day' : 'days'} · {ptCredits(plan.includedPtCredits)} included</div>
             </li>)}
           </ul> : <p>No membership plans are currently available.</p>}
-          {showCheckout && checkoutPlans.length ? <MembershipCheckoutForm
+          {showMembershipCheckout && checkoutPlans.length ? <MembershipCheckoutForm
             slug={slug} kind="MEMBERSHIP" orderKey={randomUUID()} offers={checkoutPlans}/> : null}
         </Card>
       </> : <Card><Feedback tone="error">Your membership could not be loaded. Refresh to try again.</Feedback></Card>}
@@ -134,7 +138,7 @@ export default async function MemberMembershipPage({ params, searchParams }: {
               <div>{ptCredits(offer.credits)} · Valid for {offer.validityDays} {offer.validityDays === 1 ? 'day' : 'days'}</div>
             </li>)}
           </ul> : <p>No PT packs are currently available.</p>}
-        {showCheckout && packOffers?.length ? <MembershipCheckoutForm
+        {showPackCheckout && packOffers?.length ? <MembershipCheckoutForm
           slug={slug} kind="PT_PACK" orderKey={randomUUID()} offers={packOffers}/> : null}
       </Card>
     </div>

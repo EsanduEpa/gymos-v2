@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { PrismaClient as TenantClient } from '../../src/generated/tenant/client.js';
 import type { DatabaseService } from '../../src/database.service.js';
 import { requestDigest } from '../../src/operations/primitives.js';
+import { markOverdueSessionMissed } from '../../src/sessions/session-no-show.js';
 import { SessionLifecycleService } from '../../src/sessions/session-lifecycle.service.js';
 import { reserveSessionCredit } from '../../src/sessions/credit-holds.js';
 import { TenantSchemaGateService } from '../../src/tenancy/tenant-schema-gate.service.js';
@@ -150,6 +151,26 @@ it('withdraws pending requests freely; enforces no-show grace, role, acknowledgm
   expect(await ctx.tenant.revenueRecord.count({ where: { sessionId: ready.session.id, category: 'MISSED_LATE' } })).toBe(1);
   expect(await ctx.tenant.payRecord.count({ where: { sessionId: ready.session.id } })).toBe(0);
   expect(await ctx.tenant.packCreditMovement.count({ where: { packId: ready.pack.id, kind: 'CONSUME' } })).toBe(1);
+});
+
+
+it('automatically settles a due no-show once while preserving bookings before the cutoff', async () => {
+  const ctx = await context();
+  const eligibleLater = await scheduled(ctx, `auto-early-${run.runId}`, new Date(Date.now() + 9 * 60 * 60_000));
+  expect(await markOverdueSessionMissed(ctx.tenant, ctx.gym.id, eligibleLater.session.id)).toBe(false);
+  expect(await ctx.tenant.sessionCreditHold.findUnique({ where: { sessionId: eligibleLater.session.id } })).toMatchObject({ state: 'HELD' });
+
+  const due = await scheduled(ctx, `auto-due-${run.runId}`, new Date(Date.now() - 17 * 60_000));
+  await expect(ctx.service.start(ctx.trainerAccess, due.session.id, { expectedVersion: 0, idempotencyKey: uuidKey('late-start') })).rejects.toMatchObject({ status: 422 });
+  const missed = () => markOverdueSessionMissed(ctx.tenant, ctx.gym.id, due.session.id);
+  expect((await Promise.all([missed(), missed()])).filter(Boolean)).toHaveLength(1);
+  expect(await missed()).toBe(false);
+  expect(await ctx.tenant.pTSession.findUnique({ where: { id: due.session.id } })).toMatchObject({ state: 'MISSED', version: 1 });
+  expect(await ctx.tenant.sessionSettlement.count({ where: { sessionId: due.session.id, kind: 'MISSED', creditConsumed: true } })).toBe(1);
+  expect(await ctx.tenant.packCreditMovement.count({ where: { packId: due.pack.id, kind: 'CONSUME' } })).toBe(1);
+  expect(await ctx.tenant.revenueRecord.count({ where: { sessionId: due.session.id, category: 'MISSED_LATE' } })).toBe(1);
+  expect(await ctx.tenant.payRecord.count({ where: { sessionId: due.session.id } })).toBe(0);
+  expect(await ctx.tenant.notification.count({ where: { resourceId: due.session.id, eventCode: 'SESSION_MISSED' } })).toBe(2);
 });
 
 it('returns a fresh quote for stale session versions and isolates foreign session IDs', async () => {

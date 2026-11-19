@@ -10,6 +10,7 @@ import { apiUrl } from '@/lib/gymos';
 import { DashboardChrome } from '@/components/navigation/dashboard-chrome';
 import { Card, CardHeader, Feedback, StatusBadge } from '@/components/ui';
 import { SessionLifecycleControls } from '@/components/sessions/session-lifecycle-controls';
+import { MemberPtCode } from '@/components/sessions/pt-scan-controls';
 import { SessionPolicyControls } from '@/components/sessions/read-views/session-policy-controls';
 import { SessionRequestDecisionForm } from '@/components/sessions/session-request-forms';
 import { SessionReadRefresh } from '@/components/sessions/read-views/session-read-refresh';
@@ -72,6 +73,8 @@ export default async function SessionDetailPage({ params, searchParams }: {
       <div className={styles.stack}>
         <Card><CardHeader eyebrow="SESSION ACTIONS" title={booking.state === 'ACTIVE' ? 'Training in progress' : 'Manage this booking'}/>
           {role !== 'MEMBER' ? <SessionLifecycleControls slug={slug} session={booking}/> : null}
+          {role === 'MEMBER' && booking.type === 'IN_PERSON' && ['SCHEDULED', 'ACTIVE'].includes(booking.state)
+            ? <MemberPtCode key={`${booking.id}-${booking.version}`} slug={slug} sessionId={booking.id}/> : null}
           <SessionPolicyControls slug={slug} session={booking} role={role}/>
           {booking.commandAffordances.includes('ACCEPT') ? <SessionRequestDecisionForm slug={slug} sessionId={sessionId} expectedVersion={booking.version} action="ACCEPT" requestKey={randomUUID()}/> : null}
           {booking.commandAffordances.includes('DECLINE') ? <SessionRequestDecisionForm slug={slug} sessionId={sessionId} expectedVersion={booking.version} action="DECLINE" requestKey={randomUUID()}/> : null}

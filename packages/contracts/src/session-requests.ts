@@ -7,7 +7,7 @@ const amount = z.string().regex(/^(?:0|[1-9][0-9]{0,14})(?:\.[0-9]{1,4})?$/);
 const currency = z.enum(['LKR', 'USD']);
 const level = z.enum(['LEVEL_1', 'LEVEL_2']);
 const type = z.enum(['IN_PERSON', 'VIRTUAL', 'INTRODUCTORY']);
-const newSessionType = z.literal('IN_PERSON');
+const newSessionType = z.enum(['IN_PERSON', 'VIRTUAL']);
 const notificationOutcome = z.strictObject({ eventId: id, recipient: z.strictObject({ role: z.enum(['MEMBER', 'TRAINER']), actorId: id }),
   gymSlug: z.string().min(1).max(80), state: z.enum(['QUEUED', 'AVAILABLE', 'FAILED']), retryable: z.boolean() });
 
@@ -33,7 +33,7 @@ export const sessionRequestOptionsSchema = z.strictObject({ trainerId: id, train
   specialisations: z.array(z.string().min(1).max(80)).max(30), shiftStart: time.nullable(), shiftEnd: time.nullable(),
   timeZone: z.string().min(1).max(100), minimumDurationMinutes: z.literal(60),
   maximumDurationMinutes: z.literal(60), currency, availableCredits: z.number().int().nonnegative(), heldCredits: z.number().int().nonnegative(), expiredCredits: z.number().int().nonnegative(),
-  activeMembershipToday: z.boolean(), asOf: z.iso.datetime({ offset: true }) });
+  activeMembershipToday: z.boolean(), offersVirtualPt: z.boolean().optional(), asOf: z.iso.datetime({ offset: true }) });
 export const trainerSessionRequestsSchema = z.strictObject({ items: z.array(z.strictObject({ id, memberId: id, memberName: z.string().min(2).max(120),
   state: z.literal('PENDING_CONFIRMATION'), requestExpiresAt: z.iso.datetime({ offset: true }), type, scheduledStartAt: z.iso.datetime({ offset: true }), scheduledEndAt: z.iso.datetime({ offset: true }),
   timeZone: z.string().min(1).max(100), durationMinutes: z.number().int().min(15).max(480), notes: z.string().max(4000).nullable(), version: z.number().int().nonnegative(),

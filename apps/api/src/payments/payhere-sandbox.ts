@@ -28,7 +28,8 @@ export function payHereSandboxMerchantConfig(): PayHereConfig {
   return { merchantId, merchantSecret };
 }
 
-export function payHereSandboxCheckoutConfig() {
+export function payHereSandboxCheckoutConfig(kind: 'MEMBERSHIP' | 'PT_PACK' | 'SUBSCRIPTION') {
+  if (process.env.GYMOS_PAYHERE_MEMBERSHIP_SANDBOX_ENABLED === '1' && kind !== 'MEMBERSHIP') unavailable();
   return {
     ...payHereSandboxMerchantConfig(),
     apiOrigin: httpsOrigin(process.env.GYMOS_PAYHERE_SANDBOX_API_ORIGIN),

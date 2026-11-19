@@ -2,11 +2,12 @@ import { createHash } from 'node:crypto';
 import type { Prisma as TenantPrisma } from './generated/tenant/client.js';
 import { canonicalJson, OperationIntegrityError, reference } from './operations/primitives.js';
 
-type NotificationEvent = 'HIRE_REQUEST' | 'SESSION_BOOKED' | 'SESSION_DECLINED' | 'SESSION_CANCELLED' | 'SESSION_MISSED' | 'SESSION_STARTED' | 'SESSION_COMPLETED' | 'SESSION_EXPIRED' | 'SESSION_RESCHEDULED' | 'SESSION_CORRECTED' | 'CREDIT_REMEDY_APPROVED' | 'CREDIT_REMEDY_REQUIRED' | 'SESSION_REMINDER_24H' | 'SESSION_REMINDER_1H' | 'GYMOS_SUBSCRIPTION_PAYMENT_DUE';
+type NotificationEvent = 'HIRE_REQUEST' | 'SESSION_BOOKED' | 'SESSION_DECLINED' | 'SESSION_CANCELLED' | 'SESSION_MISSED' | 'SESSION_STARTED' | 'SESSION_COMPLETED' | 'SESSION_EXPIRED' | 'SESSION_RESCHEDULED' | 'SESSION_CORRECTED' | 'CREDIT_REMEDY_APPROVED' | 'CREDIT_REMEDY_REQUIRED' | 'SESSION_REMINDER_24H' | 'SESSION_REMINDER_1H' | 'SESSION_NOTES_MISSING_24H' | 'GYMOS_SUBSCRIPTION_PAYMENT_DUE';
 type NotificationLink = 'OWNER_SESSIONS' | 'TRAINER_REQUESTS' | 'MEMBER_SESSIONS' | 'TRAINER_SCHEDULE' | 'OWNER_SUBSCRIPTION';
 const CONTENT: Readonly<Record<NotificationEvent, { title: string; message: string; linkKind: NotificationLink }>> = {
   SESSION_REMINDER_24H: { title: 'Upcoming PT session', message: 'Your confirmed PT session is coming up.', linkKind: 'MEMBER_SESSIONS' },
   SESSION_REMINDER_1H: { title: 'PT session starts soon', message: 'Your confirmed PT session starts in one hour or less.', linkKind: 'MEMBER_SESSIONS' },
+  SESSION_NOTES_MISSING_24H: { title: 'PT session notes missing', message: 'Please add shared notes for this completed PT session.', linkKind: 'TRAINER_SCHEDULE' },
   HIRE_REQUEST: { title: 'New session request', message: 'A member requested a personal training session.', linkKind: 'TRAINER_REQUESTS' },
   SESSION_BOOKED: { title: 'Session confirmed', message: 'Your personal training session was confirmed.', linkKind: 'MEMBER_SESSIONS' },
   SESSION_DECLINED: { title: 'Request declined', message: 'Your personal training session request was declined.', linkKind: 'MEMBER_SESSIONS' },

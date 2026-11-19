@@ -1,0 +1,1 @@
+ALTER TABLE "Trainer" ADD COLUMN "offersVirtualPt" BOOLEAN NOT NULL DEFAULT false;

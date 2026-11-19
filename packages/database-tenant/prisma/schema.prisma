@@ -156,6 +156,7 @@ model Trainer {
   shiftStart            String?
   shiftEnd              String?
   bio                   String?
+  offersVirtualPt       Boolean                  @default(false)
   sessionPayOverride    Decimal?                 @db.Decimal(19, 2)
   identityId            String?                  @unique
   registrationState     TrainerRegistrationState @default(PENDING)

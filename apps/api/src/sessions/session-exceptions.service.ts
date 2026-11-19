@@ -229,7 +229,7 @@ export class SessionExceptionsService {
             const member = members.find(row => row.actorId === plan.session.memberId); const trainer = trainers.find(row => row.actorId === plan.session.trainerId);
             if (!member || !trainer) throw new ConflictException('Replacement participant publication changed');
             const outcome = await this.bookings.bookInTransaction(tx, receipt, access, { memberId: plan.session.memberId, trainerId: plan.session.trainerId, localDate: plan.replacement.localDate,
-              localTime: plan.replacement.localTime, timeZone: plan.replacement.timeZone, offset: plan.replacement.offset, durationMinutes: 60, type: 'IN_PERSON', idempotencyKey: input.idempotencyKey }, member, trainer, replacementId);
+              localTime: plan.replacement.localTime, timeZone: plan.replacement.timeZone, offset: plan.replacement.offset, durationMinutes: 60, type: plan.session.type === 'VIRTUAL' ? 'VIRTUAL' : 'IN_PERSON', idempotencyKey: input.idempotencyKey }, member, trainer, replacementId);
             newId = outcome.resourceId; bookingAudits = outcome.audits;
             const held = await tx.sessionCreditHold.findUniqueOrThrow({ where: { sessionId: newId } });
             if (held.packId !== plan.destination!.packId || held.creditOrdinal !== plan.destination!.creditOrdinal) throw new ConflictException('Replacement allocation changed; review a fresh quote');

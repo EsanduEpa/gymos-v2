@@ -4,6 +4,7 @@ import { useActionState, useRef, useState } from 'react';
 import type { SessionReadPage } from '@gymos/contracts';
 import { ConfirmDialog } from '@/components/ui';
 import { completeSession, saveSessionNotes, startSession, type SessionLifecycleActionState } from '@/app/session-lifecycle-actions';
+import { StaffPtScan } from './pt-scan-controls';
 
 type Session = SessionReadPage['items'][number];
 const initialState: SessionLifecycleActionState = {};
@@ -19,13 +20,20 @@ function CommandForm({ slug, session, kind }: { slug: string; session: Session; 
     ? startSession.bind(null, slug, session.id, session.version, initialKey)
     : completeSession.bind(null, slug, session.id, session.version, initialKey);
   const [state, formAction, pending] = useActionState(action, initialState);
+  const [scanToken, setScanToken] = useState('');
+  const [reading, setReading] = useState(false);
   const form = useRef<HTMLFormElement>(null);
   const confirmed = useRef(false);
   const [confirming, setConfirming] = useState(false);
+  const label = kind === 'start' ? 'Start' : 'Complete';
   return <form ref={form} action={formAction} onSubmit={event => { if (kind === 'complete' && !confirmed.current) { event.preventDefault(); setConfirming(true); } }}>
     <input type="hidden" name="idempotencyKey" value={state.currentKey ?? state.nextKey ?? initialKey}/>
-    <button className="ui-button ui-button-primary" type="submit" disabled={pending}>
-      {pending ? 'Saving…' : kind === 'start' ? 'Start session' : 'Complete session'}
+    {session.type === 'IN_PERSON' ? <>
+      <input type="hidden" name="scanToken" value={scanToken}/>
+      <StaffPtScan token={scanToken} onToken={setScanToken} onReading={setReading} locked={pending || reading || !!state.outcomeUnknown}/>
+    </> : null}
+    <button className="ui-button ui-button-primary" type="submit" disabled={pending || reading}>
+      {pending ? 'Saving…' : `${label} ${scanToken ? 'with QR code' : 'session'}`}
     </button>
     <ActionNotice state={state}/>
     <ConfirmDialog open={confirming} title="Complete this session?" description="Completing this started session consumes its held credit and records the stored trainer earning." confirmLabel="Complete session" onClose={() => setConfirming(false)} onConfirm={() => { confirmed.current = true; form.current?.requestSubmit(); confirmed.current = false; setConfirming(false); }}/>

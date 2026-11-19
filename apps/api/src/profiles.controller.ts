@@ -128,11 +128,11 @@ export class GymProfileController {
       if (access.role === 'TRAINER' && access.actor?.kind === 'TRAINER') {
         const row = await tenant.trainer.findFirst({ where: { id: access.actor.id, identityId: access.identityId, registrationState: 'COMPLETE' },
           select: { id: true, fullName: true, phone: true, bio: true, specialisations: true, yearsExperience: true, version: true,
-            shiftStart: true, shiftEnd: true, shiftRequest: true, profilePhoto: { select: { id: true } } } });
+            shiftStart: true, shiftEnd: true, shiftRequest: true, offersVirtualPt: true, profilePhoto: { select: { id: true } } } });
         if (!row) throw new NotFoundException('Trainer profile not found');
         return selfTrainerProfileSchema.parse({ trainerId: row.id, fullName: row.fullName, phone: row.phone,
           biography: row.bio, specialisations: row.specialisations, yearsExperience: row.yearsExperience, version: row.version,
-          shiftStart: row.shiftStart, shiftEnd: row.shiftEnd, pendingShift: pendingTrainerShift(row.shiftRequest), hasPhoto: row.profilePhoto !== null });
+          shiftStart: row.shiftStart, shiftEnd: row.shiftEnd, offersVirtualPt: row.offersVirtualPt, pendingShift: pendingTrainerShift(row.shiftRequest), hasPhoto: row.profilePhoto !== null });
       }
       throw new ForbiddenException('Profile role does not match gym access');
     });
@@ -178,7 +178,7 @@ export class GymProfileController {
         if (!parsed.success) invalid();
         const trainerId = access.actor.id;
         const digest = requestDigest({ phone: parsed.data.phone, biography: parsed.data.biography, specialisations: parsed.data.specialisations,
-          yearsExperience: parsed.data.yearsExperience, expectedVersion: parsed.data.expectedVersion });
+          yearsExperience: parsed.data.yearsExperience, ...(parsed.data.offersVirtualPt !== undefined ? { offersVirtualPt: parsed.data.offersVirtualPt } : {}), expectedVersion: parsed.data.expectedVersion });
         return tenant.$transaction(async tx => {
           const prior = await tx.commandReceipt.findUnique({ where: { actorIdentityId_commandKind_idempotencyKey: {
             actorIdentityId: access.identityId, commandKind: 'UPDATE_SELF_TRAINER_PROFILE', idempotencyKey: parsed.data.idempotencyKey,
@@ -189,7 +189,7 @@ export class GymProfileController {
           if (trainer.version !== parsed.data.expectedVersion) throw new ConflictException('Your gym profile changed; reload before saving');
           const update = await tx.trainer.updateMany({ where: { id: trainer.id, identityId: access.identityId, version: trainer.version },
             data: { phone: parsed.data.phone, bio: parsed.data.biography, specialisations: parsed.data.specialisations,
-              yearsExperience: parsed.data.yearsExperience, version: { increment: 1 } } });
+              yearsExperience: parsed.data.yearsExperience, offersVirtualPt: parsed.data.offersVirtualPt, version: { increment: 1 } } });
           if (update.count !== 1) throw new ConflictException('Your gym profile changed; reload before saving');
           const version = trainer.version + 1;
           const receipt = await tx.commandReceipt.create({ data: { actorIdentityId: access.identityId, commandKind: 'UPDATE_SELF_TRAINER_PROFILE',

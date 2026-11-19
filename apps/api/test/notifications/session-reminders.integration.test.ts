@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { createDisposableEnvironment } from '../support/disposable-environment.js';
 import { seedTwoGymFixture } from '../fixtures/two-gym-fixture.js';
 import { processSessionReminder, sweepSessionReminders } from '../../src/sessions/session-reminders.js';
+import { sweepMissingSessionNotes } from '../../src/sessions/session-notes-reminders.js';
 
 let run: Awaited<ReturnType<typeof createDisposableEnvironment>>;
 let fixture: Awaited<ReturnType<typeof seedTwoGymFixture>>;
@@ -29,6 +30,25 @@ async function booking(confirmedAt = at(48)) {
 }
 beforeAll(async () => { run = await createDisposableEnvironment(); fixture = await seedTwoGymFixture(run); }, 120_000);
 afterAll(async () => { await fixture?.close(); if (run) console.info('[reminders-owned-cleanup]', JSON.stringify(await run.cleanup())); }, 120_000);
+
+it('reminds only the assigned trainer when a completed session has no notes at 24 hours', async () => {
+  const missing = await booking();
+  const recorded = await booking();
+  for (const [ctx, notes] of [[missing, ' \t\n'], [recorded, 'Shared training notes']] as const) {
+    await ctx.tenant.pTSession.update({ where: { id: ctx.session.id }, data: {
+      state: 'COMPLETED', startedAt: ctx.now(0), endedAt: ctx.now(-1), notes,
+    } });
+  }
+  const where = { eventCode: 'SESSION_NOTES_MISSING_24H', resourceId: { in: [missing.session.id, recorded.session.id] } };
+  const sweep = (now: Date) => sweepMissingSessionNotes(missing.tenant, fixture.master, missing.gymId, now);
+  await sweep(new Date(missing.now(-25).getTime() - 1));
+  expect(await missing.tenant.notification.count({ where })).toBe(0);
+  expect(await sweep(missing.now(-25))).toMatchObject({ sent: 1, failed: 0 });
+  await sweep(recorded.now(-25));
+  const notices = await missing.tenant.notification.findMany({ where });
+  expect(notices).toHaveLength(1);
+  expect(notices[0]).toMatchObject({ resourceId: missing.session.id, recipientIdentityId: fixture.users.trainerUser.id, linkKind: 'TRAINER_SCHEDULE' });
+});
 
 it('queues only future/exact thresholds, and notes do not create new schedule work', async () => {
   const full = await booking(); expect(full.jobs).toHaveLength(4);

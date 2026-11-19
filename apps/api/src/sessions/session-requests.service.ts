@@ -85,7 +85,7 @@ export class SessionRequestsService {
         { identityId: trainerBinding.identityId, gymId: access.gymId, role: 'TRAINER', tenantActorId: trainerId },
       ], async () => {
         const [trainer, config, clockRows, memberRow] = await Promise.all([
-          tenant.trainer.findUnique({ where: { id: trainerId }, select: { fullName: true, level: true, specialisations: true, shiftStart: true, shiftEnd: true, status: true } }),
+          tenant.trainer.findUnique({ where: { id: trainerId }, select: { fullName: true, level: true, specialisations: true, shiftStart: true, shiftEnd: true, status: true, offersVirtualPt: true } }),
           tenant.gymConfiguration.findUnique({ where: { id: 'current' }, select: { timezone: true, currency: true, minimumSessionDurationMinutes: true, masterGymId: true } }),
           tenant.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`,
           tenant.member.findUnique({ where: { id: member.actorId }, select: { identityId: true, registrationState: true, status: true } }),
@@ -98,7 +98,7 @@ export class SessionRequestsService {
         const membership = await tenant.membershipTerm.findFirst({ where: { memberId: member.actorId, startDate: { lte: new Date(`${localToday}T00:00:00.000Z`) }, endDateExclusive: { gt: new Date(`${localToday}T00:00:00.000Z`) } }, select: { id: true } });
         const totals = (await creditTotals(tenant, [member.actorId], localToday, true)).get(member.actorId);
         return sessionRequestOptionsSchema.parse({ trainerId, trainerName: trainer.fullName, level: trainer.level, specialisations: trainer.specialisations,
-          shiftStart: trainer.shiftStart, shiftEnd: trainer.shiftEnd,
+          shiftStart: trainer.shiftStart, shiftEnd: trainer.shiftEnd, offersVirtualPt: trainer.offersVirtualPt,
           timeZone: config.timezone, minimumDurationMinutes: 60, maximumDurationMinutes: 60,
           currency: config.currency, availableCredits: totals?.available ?? 0,
           heldCredits: totals?.held ?? 0, expiredCredits: totals?.expired ?? 0,
@@ -159,7 +159,9 @@ export class SessionRequestsService {
             if (input.data.timeZone !== config.timezone) throw new UnprocessableEntityException('Use the configured gym time zone');
             const start = resolveLocal(input.data.localDate, input.data.localTime, config.timezone, input.data.offset);
             const end = new Date(start.getTime() + input.data.durationMinutes * 60_000); const now = clockRows[0]!.now;
-            if (input.data.type !== 'IN_PERSON' || input.data.durationMinutes !== 60) throw new UnprocessableEntityException('New PT requests must be in-person and 60 minutes');
+            if (input.data.durationMinutes !== 60) throw new UnprocessableEntityException('New PT requests must be 60 minutes');
+            if (input.data.type === 'VIRTUAL' && !trainerRow.offersVirtualPt)
+              throw new UnprocessableEntityException('This trainer does not offer virtual PT');
             const earliest = new Date(now.getTime() + 2 * 60 * 60_000);
             const latest = new Date(now.getTime() + 14 * 24 * 60 * 60_000);
             if (start < earliest || start > latest) throw new UnprocessableEntityException('Choose a start at least 2 hours from now and within the next 14 days');
@@ -250,7 +252,9 @@ export class SessionRequestsService {
               const local = localDateAt(session.scheduledStartAt, config.timezone); const day = new Date(`${local}T00:00:00.000Z`);
               if (session.scheduledStartAt <= requestClock!.now) throw new ConflictException('This request time has passed and cannot be accepted');
               const durationMinutes = Math.round((session.scheduledEndAt.getTime() - session.scheduledStartAt.getTime()) / 60_000);
-              if (session.type !== 'IN_PERSON' || durationMinutes !== 60) throw new UnprocessableEntityException('This legacy request cannot be accepted under current PT policy');
+              if (session.type === 'INTRODUCTORY' || durationMinutes !== 60) throw new UnprocessableEntityException('This legacy request cannot be accepted under current PT policy');
+              if (session.type === 'VIRTUAL' && !session.trainer.offersVirtualPt)
+                throw new UnprocessableEntityException('Enable virtual PT in your profile before accepting this request');
               const term = await tx.membershipTerm.findFirst({ where: { memberId: session.memberId, startDate: { lte: day }, endDateExclusive: { gt: day } }, select: { id: true } });
               if (!term) throw new UnprocessableEntityException('Member has no active membership for the session date');
               const fee = session.trainer.level === 'LEVEL_2' ? config.level2SessionFee ?? config.defaultSessionFee : config.defaultSessionFee;

@@ -196,3 +196,28 @@ it('returns accurate selected-gym session credit eligibility and trainer shifts'
   expect(options).toMatchObject({ trainerId: trainer.id, shiftStart: '08:00', shiftEnd: '17:00', timeZone: 'Asia/Colombo',
     availableCredits: before.availableCredits + 3, heldCredits: before.heldCredits, expiredCredits: before.expiredCredits, activeMembershipToday: true });
 });
+
+it('offers virtual PT only with the trainer’s opt-in and confirms the same credit and fixed pay', async () => {
+  const { service, tenant, member, trainer, memberAccess, trainerAccess } = await setup();
+  await tenant.pTSession.updateMany({ where: { memberId: member.id, state: 'PENDING_CONFIRMATION' }, data: { requestExpiresAt: new Date(Date.now() - 1) } });
+  await entitlement(tenant, `${run.runId}-virtual`, 1);
+  const config = await tenant.gymConfiguration.findUniqueOrThrow({ where: { id: 'current' } });
+  expect((await service.options(memberAccess, trainer.id)).offersVirtualPt).toBe(false);
+  const draft = { ...requestBody(`${run.runId}-virtual`, trainer.id, '07:00'), type: 'VIRTUAL' as const };
+  await expect(service.request(memberAccess, draft)).rejects.toMatchObject({ status: 422 });
+  await tenant.trainer.update({ where: { id: trainer.id }, data: { offersVirtualPt: true, sessionPayOverride: '37.50', shiftStart: '08:00', shiftEnd: '17:00' } });
+  try {
+    expect((await service.options(memberAccess, trainer.id)).offersVirtualPt).toBe(true);
+    const pending = await service.request(memberAccess, draft);
+    await tenant.trainer.update({ where: { id: trainer.id }, data: { offersVirtualPt: false } });
+    const decision = { action: 'ACCEPT' as const, expectedVersion: 0, idempotencyKey: `accept-virtual-${run.runId}-0123456789` };
+    await expect(service.decide(trainerAccess, pending.session.id, decision)).rejects.toMatchObject({ status: 422 });
+    await tenant.trainer.update({ where: { id: trainer.id }, data: { offersVirtualPt: true } });
+    const accepted = await service.decide(trainerAccess, pending.session.id, decision);
+    expect(accepted).toMatchObject({ session: { type: 'VIRTUAL', state: 'SCHEDULED' }, creditReservation: { state: 'HELD' } });
+    expect((await tenant.pTSession.findUniqueOrThrow({ where: { id: pending.session.id } })).confirmedTrainerPay?.toString())
+      .toBe(config.offShiftPremium.plus(1).times('37.50').toDecimalPlaces(2).toString());
+  } finally {
+    await tenant.trainer.update({ where: { id: trainer.id }, data: { offersVirtualPt: false, sessionPayOverride: null } });
+  }
+});

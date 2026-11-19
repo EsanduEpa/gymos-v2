@@ -33,7 +33,7 @@ export function requestCanBeAccepted(now: Date, expiresAt: Date): boolean {
   return Number.isFinite(now.getTime()) && Number.isFinite(expiresAt.getTime()) && now < expiresAt;
 }
 
-const TRANSITIONS: Readonly<Record<SessionCommand, Readonly<{ from: readonly (SessionState | null)[]; roles: readonly SessionActorRole[]; to: SessionState | null }>>> = {
+const TRANSITIONS: Readonly<Record<SessionCommand, Readonly<{ from: readonly (SessionState | null)[]; roles: readonly SessionActorRole[]; to: SessionState | 'UNCHANGED' | null }>>> = {
   OWNER_BOOK: { from: [null], roles: ['OWNER'], to: 'SCHEDULED' },
   MEMBER_REQUEST: { from: [null], roles: ['MEMBER'], to: 'PENDING_CONFIRMATION' },
   TRAINER_ACCEPT: { from: ['PENDING_CONFIRMATION'], roles: ['TRAINER'], to: 'SCHEDULED' },
@@ -42,10 +42,10 @@ const TRANSITIONS: Readonly<Record<SessionCommand, Readonly<{ from: readonly (Se
   MEMBER_WITHDRAW: { from: ['PENDING_CONFIRMATION'], roles: ['MEMBER'], to: 'CANCELLED' },
   START: { from: ['SCHEDULED'], roles: ['TRAINER', 'OWNER'], to: 'ACTIVE' },
   COMPLETE: { from: ['ACTIVE'], roles: ['TRAINER', 'OWNER'], to: 'COMPLETED' },
-  NO_SHOW: { from: ['SCHEDULED'], roles: ['TRAINER', 'OWNER'], to: 'MISSED' },
+  NO_SHOW: { from: ['SCHEDULED'], roles: ['TRAINER', 'OWNER', 'SYSTEM'], to: 'MISSED' },
   CANCEL: { from: ['SCHEDULED'], roles: ['MEMBER', 'TRAINER', 'OWNER'], to: 'CANCELLED' },
   LIFECYCLE_RELEASE: { from: ['PENDING_CONFIRMATION', 'SCHEDULED'], roles: ['SYSTEM'], to: 'CANCELLED' },
-  UPDATE_NOTES: { from: ['COMPLETED'], roles: ['TRAINER', 'OWNER'], to: 'COMPLETED' },
+  UPDATE_NOTES: { from: ['ACTIVE', 'COMPLETED'], roles: ['TRAINER', 'OWNER'], to: 'UNCHANGED' },
 };
 
 /** Command-specific state machine. There is deliberately no arbitrary status setter. */
@@ -56,7 +56,7 @@ export function transitionSession(input: {
 }): SessionState | null {
   const transition = TRANSITIONS[input.command];
   if (!transition.roles.includes(input.actorRole) || !transition.from.includes(input.state)) return null;
-  return transition.to;
+  return transition.to === 'UNCHANGED' ? input.state : transition.to;
 }
 
 /** Half-open interval intersection: sessions touching at an endpoint do not collide. */
