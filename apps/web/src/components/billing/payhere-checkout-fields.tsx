@@ -29,7 +29,7 @@ export function PayHereCheckoutHandoff({ checkout, children }: {
   checkout: { action: 'https://sandbox.payhere.lk/pay/checkout'; fields: Record<string, string> };
   children?: ReactNode;
 }) {
-  return <form className="stack-form" method="post" action={checkout.action}>
+  return <form className="stack-form compact-workspace-form" method="post" action={checkout.action}>
     {Object.entries(checkout.fields).map(([name, value]) => <input key={name} type="hidden" name={name} value={value}/>)}
     <p role="status">Order for {checkout.fields.items} · {checkout.fields.currency} {checkout.fields.amount}</p>
     {children}

@@ -18,7 +18,7 @@ export function BodyMeasurementForm({ slug, today, memberId = null }: { slug: st
   const [state, action, pending] = useActionState(saveBodyReading.bind(null, slug, memberId), {});
   const [date, setDate] = useState(today);
   const [readings, setReadings] = useState<Partial<Record<(typeof readingFields)[number]['name'], string>>>({});
-  return <form action={action} className="stack-form">
+  return <form action={action} className="stack-form compact-workspace-form">
     <Field label="Measurement date" name="measuredOn" type="date" min="0001-01-01" max={today} required value={date} onChange={event => setDate(event.currentTarget.value)}/>
     {readingFields.map(({ name, label, min, max }) => <Field key={name} label={label} name={name} type="number"
       min={min} max={max} step="0.01" value={readings[name] ?? ''} hint={`${min} to ${max}`}
@@ -37,7 +37,7 @@ export function DietaryProfileForm({ slug, memberId, initial }: { slug: string; 
   const [state, action, pending] = useActionState(updateDietaryProfile.bind(null, slug, memberId, initial.version), {});
   const [allergies, setAllergies] = useState(initial.allergies.join('\n'));
   const [restrictions, setRestrictions] = useState(initial.restrictions.join('\n'));
-  return <form action={action} className="stack-form">
+  return <form action={action} className="stack-form compact-workspace-form">
     <p className="ui-field-hint">Enter one item per line. These notes are visible to the client and their assigned trainers.</p>
     <label className="ui-field"><span>Food allergies</span>
       <textarea name="allergies" rows={3} maxLength={1212} value={allergies} onChange={event => setAllergies(event.currentTarget.value)}/>

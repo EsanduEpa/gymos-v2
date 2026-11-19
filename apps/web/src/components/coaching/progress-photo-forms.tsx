@@ -9,7 +9,7 @@ export function UploadProgressPhotoForm({ slug, today }: { slug: string; today: 
   const [date, setDate] = useState(today);
   return <Card>
     <CardHeader title="Add a progress photo"/>
-    <form action={action} className="stack-form">
+    <form action={action} className="stack-form compact-workspace-form">
       <Field label="Date taken" name="takenOn" type="date" min="0001-01-01" max={today}
         required value={date} onChange={event => setDate(event.currentTarget.value)}/>
       <Field label="Progress photo" name="photo" type="file" required accept="image/jpeg,image/png,image/webp"
