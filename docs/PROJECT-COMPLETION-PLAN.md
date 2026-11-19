@@ -111,6 +111,29 @@ Use one lead and up to three workers when available and authorized. With a singl
 - **Limit.** The first unit attempt lacked loopback permission; the rerun with test permissions passed. The PayHere browser transaction and provider-delivered callback remain unverified because the browser automation host was unavailable. No live PayHere payment was sent. Full production app builds were not rerun during this check; the synthetic 3002/3003 app remains running with the temporary Quick Tunnel.
 - **Exact resume point.** Commit the tested changes on this feature branch if desired, then complete Section 03 PayHere Sandbox acceptance using the active origin and synthetic cards. Check decline/success callback, receipt/history, recurring payment and replacement subscription. Keep hosting paused and do not deploy the Render demo. If the tunnel stops, regenerate and privately update its origin first.
 
+### 18 November 2026 · PayHere preflight and PT notes reminder
+
+- PayHere Sandbox Merchant API OAuth returned HTTP 200 with a valid token. Replaced the expired Quick Tunnel and confirmed the scoped callback route returned HTTP 405 for GET. Updated the private Sandbox origin. No provider purchase or callback was verified. Docker Desktop reported running but did not expose its daemon socket, so the owned manual fixture could not restart.
+- Item 14 now includes the scheduled in-app reminder for completed PT sessions still missing notes after 24 hours. API type checking and focused lint passed. Its owned integration test could not start without Docker.
+- Resume by confirming Docker responds to `docker info`, rebinding the owned fixture with `pnpm manual:rebind`, and starting the synthetic app with the current Sandbox relay origin. Run the provider-delivered success and decline cases before recurring acceptance. Rerun the reminder integration test once Docker is available. Items 8–10 and 14 remain open.
+
+### 19 November 2026 · PayHere membership success
+
+- Docker recovered and the owned synthetic app restarted. Chrome confirmed a PayHere Sandbox payment of LKR 15,000 for the 90 Day Test Membership. One upcoming renewal appeared for 5 January through 5 April 2027, and the member receipt opened.
+- Resume with the Sandbox decline and paid PT pack cases, Owner receipt/history, then recurring authorization and installment checks. Items 8–10 remain open.
+
+### 19 November 2026 · PT upgrade and hosted membership Sandbox preparation
+
+- The product owner chose an automatic no-show cutoff 15 minutes after scheduled start and confirmed the local Sandbox decline worked. Other payment acceptance is paused while the existing membership Sandbox flow is prepared for the hosted frontend and API.
+- A membership-only Sandbox switch is available on Render and Vercel. The API validates the HTTPS callback and return origins and scopes checkout creation to memberships in this mode. The 15 focused payment tests passed. Finish the hosted checkout after the Vercel domain is approved in PayHere Sandbox and its matching secret is configured privately in Render. [Hosted configuration](manual-testing.md#hosted-membership-sandbox-checkout)
+- The 24-hour missing-notes reminder passed its owned integration rerun. The PT upgrade adds live notes, a scheduled 15-minute no-show with existing credit settlement rules, QR start and completion, trainer earnings breakdowns, and virtual PT opt-in. Virtual opt-in adds pinned tenant schema `tenant-2026-11-19.1`. If releasing the PT changes, coordinate the hosted tenant rollout and API/web deployment so the workspaces remain compatible.
+
+### 19 November 2026 · PT verification after serial rerun
+
+- Workspace type checking passed. Serial runs passed 44 owned tests across booking, availability, corrections, lifecycle, no-show, virtual requests, finance, reminders and trainer deactivation. These reruns passed the suites that timed out or failed under concurrent load. The tenant restore rehearsal verified `tenant-2026-11-19.1`.
+- Checklist item 15 is complete. For item 13, run the camera capture and elapsed-time walkthrough with a phone. For item 14, confirm whether gyms can override the existing one-credit no-show deduction. For item 21, verify virtual booking and completion in the browser.
+- For the hosted membership Sandbox checkout, confirm PayHere approves `gymos-v2-ten.vercel.app` and the matching Sandbox secret is in Render. Then release the scoped checkout switch to both services and verify a synthetic member renewal and receipt.
+
 At the end of each working chat, append one entry here. Include unfinished work even when the checklist stays unchanged.
 
 ```text

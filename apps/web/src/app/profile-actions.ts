@@ -67,12 +67,13 @@ export async function updateGymSelfProfile(slug: string, role: 'MEMBER' | 'TRAIN
     const years = value(formData, 'yearsExperience');
     const body = { expectedVersion, phone: value(formData, 'phone').trim() || null,
       biography: value(formData, 'biography').trim() || null, specialisations: raw,
-      yearsExperience: years === '' ? null : Number(years) };
+      yearsExperience: years === '' ? null : Number(years),
+      ...(formData.has('virtualPtPreferencePresent') ? { offersVirtualPt: formData.get('offersVirtualPt') === 'on' } : {}) };
     const parsed = updateSelfTrainerProfileSchema.safeParse({ ...body, idempotencyKey });
     if (!parsed.success) return { status: 'error', message: 'Correct the highlighted fields and save again.', fieldErrors: errors(parsed.error) };
     const result = await save(`/gyms/${encodeURIComponent(slug)}/me/profile`, {
       phone: parsed.data.phone, biography: parsed.data.biography, specialisations: parsed.data.specialisations,
-      yearsExperience: parsed.data.yearsExperience, expectedVersion: parsed.data.expectedVersion,
+      yearsExperience: parsed.data.yearsExperience, offersVirtualPt: parsed.data.offersVirtualPt, expectedVersion: parsed.data.expectedVersion,
     }, parsed.data.idempotencyKey);
     if (result.status === 'success') revalidatePath(`/gyms/${encodeURIComponent(slug)}`, 'layout');
     return result;

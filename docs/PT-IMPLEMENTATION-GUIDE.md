@@ -43,7 +43,7 @@ The following are implementation defaults to make the confirmed rules executable
 - All normal owner bookings use the same availability and eligibility rules. Direct confirmation does not grant an implicit off-hours, credit, membership, or timing override.
 - Pending limits are per member per gym, not global across identities/gyms. Expired pending requests must not count or block time even if a background sweep is delayed.
 - Accepting one request can leave another request without a usable credit. That second request remains unconfirmed, shows an actionable eligibility reason, and expires normally; no negative balance or automatic credit purchase is allowed.
-- Retain the existing 15-minute no-show grace and existing ordinary start/completion timing safeguards unless separately changed through an explicit decision. A 60-minute booked service is distinct from the existing minimum elapsed time for ordinary completion. Display that distinction accurately; do not automatically mark completion from a timer.
+- A confirmed session that has not started becomes eligible for automatic no-show settlement 15 minutes after its scheduled start. Ordinary start closes at that cutoff. The worker settles due sessions on its next sweep. A 60-minute booked service is distinct from the minimum elapsed time for ordinary completion. Completion requires an explicit action.
 - Show a clear warning that requests made within 24 hours of starting will already be inside the late-cancellation window if accepted.
 - For availability, no configured windows means not bookable. Do not interpret missing availability as always available.
 
@@ -339,7 +339,7 @@ Dependencies: PT-04. This milestone includes financial invariants even though pa
 1. Extend existing consequence quote/acknowledgement commands. Return current session/policy version, exact cutoff, credit consequence, and quote validity; revalidate on commit.
 2. Preserve free cancellation at exactly start − 24 hours. One millisecond later is late. Pending withdrawal/expiry/decline never consumes a credit.
 3. Distinguish member cancellation from trainer/gym cancellation by authorized actor and reason. Trainer/gym cancellation releases value regardless of member late-cancellation rules.
-4. Retain the 15-minute no-show grace and prohibit no-show on already-started sessions. Ordinary no-show marking is available to assigned trainers/owners; reversing it is owner-only.
+4. At scheduled start plus 15 minutes, the worker can mark a confirmed session missed if it has not started. Assigned trainers and Owners can also apply the same settlement manually. An Owner can reverse an incorrect no-show.
 5. Introduce an owner attention item when restored value would otherwise be unusable because the source pack expired. Show it to the member honestly as awaiting owner resolution, not immediately available.
 
 ### Steps: usable-credit remedy

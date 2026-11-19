@@ -6,10 +6,11 @@ const now = new Date('2026-11-06T10:00:00Z');
 const scheduled = { state: 'SCHEDULED', scheduledStartAt: now, scheduledEndAt: new Date(now.getTime() + 3600000), startedAt: null, requestExpiresAt: null };
 
 describe('booking detail timing and owner attention', () => {
-  it('uses the inclusive start window and no-show grace without granting member delivery access', () => {
+  it('offers start before the no-show cutoff and no-show at the cutoff without granting member delivery access', () => {
     expect(sessionCommandAffordances(scheduled, 'TRAINER', new Date(now.getTime() - 900001))).not.toContain('START');
     expect(sessionCommandAffordances(scheduled, 'TRAINER', new Date(now.getTime() - 900000))).toContain('START');
-    expect(sessionCommandAffordances(scheduled, 'TRAINER', scheduled.scheduledEndAt)).toContain('START');
+    expect(sessionCommandAffordances(scheduled, 'TRAINER', new Date(now.getTime() + 899999))).toContain('START');
+    expect(sessionCommandAffordances(scheduled, 'TRAINER', new Date(now.getTime() + 900000))).not.toContain('START');
     expect(sessionCommandAffordances(scheduled, 'TRAINER', new Date(scheduled.scheduledEndAt.getTime() + 1))).not.toContain('START');
     expect(sessionCommandAffordances(scheduled, 'MEMBER', now)).toEqual(['CANCEL']);
     expect(sessionCommandAffordances(scheduled, 'OWNER', new Date(now.getTime() + 899999))).not.toContain('NO_SHOW');
@@ -17,6 +18,8 @@ describe('booking detail timing and owner attention', () => {
   });
   it('requires start, the stored completion minimum, and trainer permission', () => {
     const active = { ...scheduled, state: 'ACTIVE', startedAt: now };
+    expect(sessionCommandAffordances(active, 'TRAINER', now)).toContain('UPDATE_NOTES');
+    expect(sessionCommandAffordances(active, 'MEMBER', now)).not.toContain('UPDATE_NOTES');
     expect(sessionCommandAffordances(active, 'TRAINER', new Date(now.getTime() + 1199999), 20)).not.toContain('COMPLETE');
     expect(sessionCommandAffordances(active, 'TRAINER', new Date(now.getTime() + 1200000), 20)).toContain('COMPLETE');
     expect(sessionCommandAffordances(active, 'TRAINER', new Date(now.getTime() + 1200000), null)).not.toContain('COMPLETE');

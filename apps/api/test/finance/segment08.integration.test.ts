@@ -59,7 +59,7 @@ it('isolates and replays expense/budget commands, reconciles P&L, and closes pay
   const sessionId = randomUUID(); const scheduled = new Date('2026-10-15T08:00:00.000Z');
   await tenant.pTSession.create({ data: { id: sessionId, memberId: memberRow.id, trainerId: trainerRow.id, state: 'COMPLETED', type: 'IN_PERSON',
     scheduledStartAt: scheduled, scheduledEndAt: new Date(scheduled.getTime() + 3_600_000), gymTimezone: 'Asia/Colombo', fee: '250.0000', currency: 'LKR',
-    confirmedAt: scheduled, confirmationRate: '0.200000', confirmationLevel: trainerRow.level ?? 'LEVEL_1', startedAt: scheduled,
+    confirmationShiftStart: '09:00', confirmationShiftEnd: '12:00', confirmedAt: scheduled, confirmationRate: '0.200000', confirmationLevel: trainerRow.level ?? 'LEVEL_1', startedAt: scheduled,
     endedAt: new Date(scheduled.getTime() + 3_600_000), configurationVersion: config.version, createdByIdentityId: fixture.users.ownerA.id } });
   await tenant.revenueRecord.create({ data: { sessionId, category: 'COMPLETED_SESSION', amount: '250.0000', currency: 'LKR', sourceKey: `session:${sessionId}:completed` } });
   const periodId = randomUUID();
@@ -142,7 +142,8 @@ it('isolates and replays expense/budget commands, reconciles P&L, and closes pay
   const foreignExpenses = await call(`/gyms/${fixture.gyms[1]!.slug}/financials/expenses?from=2026-11-01&to=2026-11-30`, otherOwner);
   expect((await foreignExpenses.json()).totalCount).toBe(0);
 
-  const earnings = await call(`/gyms/${slug}/me/earnings?${range}`, trainer); expect(earnings.status).toBe(200); expect(Number((await earnings.json()).total)).toBe(50);
+  const earnings = await call(`/gyms/${slug}/me/earnings?${range}`, trainer); expect(earnings.status).toBe(200); expect(await earnings.json()).toMatchObject({ total: '50.0000', shiftTotals: { inShift: '0.0000', offShift: '50.0000' },
+    lines: [expect.objectContaining({ sessionId, shift: 'OFF_SHIFT' })] });
   expect((await call(`/gyms/${slug}/me/earnings?${range}`, owner)).status).toBe(403);
   const closeKeys = [randomUUID(), randomUUID()];
   const competingCloses = await Promise.all(closeKeys.map(idempotencyKey => call(`/gyms/${slug}/payroll/periods/${periodId}/close`, owner, { expectedVersion: 0, idempotencyKey })));

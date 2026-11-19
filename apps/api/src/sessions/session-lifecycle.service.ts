@@ -10,7 +10,9 @@ import { TenantSchemaGateService, type TenantGateContext } from '../tenancy/tena
 import { resolveSessionCreditHold } from './credit-holds.js';
 import { retrySessionTransaction } from './session-transactions.js';
 import { derivePackCreditBalance, transitionSession, minorUnitsDecimal } from './session-state.js';
+import { noShowIsEligible, PT_NO_SHOW_GRACE_MS, settleMissedSession } from './session-no-show.js';
 import { completedTrainerPayMinor } from './trainer-pay.js';
+import { assertSessionScan, createSessionScan } from './session-scan.js';
 import {
   sessionCancelInputSchema, sessionCancelResultSchema, sessionCompleteResultSchema, sessionLifecycleCommandInputSchema,
   sessionLifecycleQuoteSchema, sessionNoShowInputSchema, sessionNoShowResultSchema, sessionNotesInputSchema,
@@ -28,7 +30,7 @@ export function confirmedCancellationPolicy<T extends { cancellationWindowMinute
 export function cancellationConsequence(now: number, scheduledStart: number, cancellationWindowMinutes: number, deductionEnabled: boolean) {
   return now > scheduledStart - cancellationWindowMinutes * 60_000 && deductionEnabled ? 'LATE_CANCELLATION' as const : 'FREE_CANCELLATION' as const;
 }
-export function noShowIsEligible(now: number, scheduledStart: number) { return now >= scheduledStart + 15 * 60_000; }
+export { noShowIsEligible } from './session-no-show.js';
 type QuoteClaims = { v: 1; gymId: string; sessionId: string; actorIdentityId: string; actorRole: string; sessionVersion: number;
   policyVersion: number; action: QuoteAction; consequence: QuoteConsequence; creditOrdinal: number | null;
   creditValueMinorUnits: string | null; currency: string | null; exp: number };
@@ -184,7 +186,7 @@ export class SessionLifecycleService {
   private buildQuote(access: Access, session: any, policy: any, hold: any, now: Date, action: QuoteAction) {
     const actorRole = parseAccessRole(access.role);
     const cancelCutoff = new Date(session.scheduledStartAt.getTime() - policy.cancellationWindowMinutes * 60_000);
-    const noShowAt = new Date(session.scheduledStartAt.getTime() + 15 * 60_000);
+    const noShowAt = new Date(session.scheduledStartAt.getTime() + PT_NO_SHOW_GRACE_MS);
     let consequence: QuoteConsequence | null = null;
     let eligible = false;
     let eligibleAt: Date | null = null;
@@ -362,28 +364,8 @@ export class SessionLifecycleService {
               currency: session.creditHold?.state === 'HELD' ? session.currency : null, exp: new Date(freshQuote.expiresAt).getTime() };
             if (!verifyQuote(parsed.data.acknowledgmentToken, claims, now.getTime())) throw new ConflictException({
               code: 'STALE_QUOTE', message: 'The no-show acknowledgment is invalid or expired; review the refreshed quote', quote: freshQuote });
-            if (!session.creditHold || session.creditHold.state !== 'HELD') throw new ConflictException('Session has no held credit');
             if (transitionSession({ state: session.state, command: 'NO_SHOW', actorRole: role }) !== 'MISSED' || session.startedAt) throw new ConflictException('Only scheduled, not-started sessions can be marked missed');
-            const localDate = localDateAt(now, session.gymTimezone);
-            const resolution = await resolveSessionCreditHold(tx, { masterGymId: access.gymId, sessionId, receiptId: receipt.id,
-              actorIdentityId: access.identityId, resolution: 'CONSUME', gymLocalDate: localDate });
-            const amount = minorUnitsDecimal(resolution.creditValueMinorUnits, 2);
-            const updated = await tx.pTSession.update({ where: { id: sessionId, version: session.version }, data: { state: 'MISSED', endedAt: now, version: { increment: 1 } } });
-            const eventCode = 'PT_SESSION_MISSED';
-            const eventKey = tenantAuditKey({ masterGymId: access.gymId, receiptId: receipt.id, eventCode, resourceType: 'PT_SESSION', resourceId: sessionId, eventOrdinal: updated.version });
-            await tx.sessionStateEvent.create({ data: { sessionId, fromState: 'SCHEDULED', toState: 'MISSED', committedVersion: updated.version,
-              actorIdentityId: access.identityId, receiptId: receipt.id, eventKey, createdAt: now } });
-            const settlement = await tx.sessionSettlement.create({ data: { sessionId, kind: 'MISSED', creditConsumed: true, creditValue: amount,
-              currency: session.currency, sourceReceiptId: receipt.id } });
-            const revenue = await tx.revenueRecord.create({ data: { sessionId, category: 'MISSED_LATE', amount, currency: session.currency,
-              sourceKey: `pt-session:${access.gymId}:${sessionId}:missed-late` } });
-            const notice = await appendTenantNotification(tx, { masterGymId: access.gymId, receiptId: receipt.id, eventCode: 'SESSION_MISSED', resourceId: sessionId,
-              recipientIdentityId: session.member.identityId!, eventOrdinal: updated.version });
-            await appendTenantNotification(tx, { masterGymId: access.gymId, receiptId: receipt.id, eventCode: 'SESSION_MISSED', resourceId: sessionId,
-              recipientIdentityId: session.trainer.identityId!, eventOrdinal: updated.version, linkKind: 'TRAINER_SCHEDULE' });
-            return { result: { resourceIds: [sessionId, settlement.id, revenue.id, notice.id], version: updated.version, notificationState: 'AVAILABLE' }, resourceType: 'PT_SESSION', resourceId: sessionId,
-              audits: [{ actorIdentityId: access.identityId, eventCode, resourceType: 'PT_SESSION', resourceId: sessionId,
-                transition: { from: 'SCHEDULED', to: 'MISSED', version: updated.version } }] };
+            return settleMissedSession(tx, { masterGymId: access.gymId, actorIdentityId: access.identityId, session, receiptId: receipt.id, now });
           }));
           return this.noShowResult(tenant, access, command.receiptId, command.result.resourceIds ?? [], command.result.version ?? 0,
             command.result.notificationState ?? 'FAILED', command.replayed);
@@ -461,9 +443,25 @@ export class SessionLifecycleService {
       creditEffect: { holdId: hold.id, packId: hold.packId, creditOrdinal: hold.creditOrdinal, resolution: 'CONSUMED',
         creditValue: minorUnitsDecimal(hold.creditValueMinorUnits, 2), balance: balance.available },
       recognizedRevenue: { recordId: revenue.id, amount: revenue.amount.toString(), currency: revenue.currency },
-      noShowAt: new Date(session.scheduledStartAt.getTime() + 15 * 60_000).toISOString(), policyVersion: session.configurationVersion,
+      noShowAt: new Date(session.scheduledStartAt.getTime() + PT_NO_SHOW_GRACE_MS).toISOString(), policyVersion: session.configurationVersion,
       notificationOutcome: { eventId: notification.id, recipient: { role: 'MEMBER', actorId: session.memberId }, gymSlug: access.slug,
         state: notificationState, retryable: false }, auditState: 'AVAILABLE' });
+  }
+
+  async scanCode(access: Access, sessionId: string) {
+    if (access.role !== 'MEMBER') throw new ForbiddenException('Member gym access is required');
+    return this.tenantGate.withVerifiedTenant(access, async tenant => {
+      const { session, targets } = await this.context(access, sessionId, tenant, true);
+      return withGymAccessFence(this.database.master, targets, async locked => {
+        if (locked.length !== targets.length) throw new ForbiddenException('Session access changed; reload and try again');
+        if (session.type !== 'IN_PERSON' || session.trainer.status !== 'ACTIVE' ||
+            (session.state !== 'SCHEDULED' && session.state !== 'ACTIVE')) {
+          throw new ConflictException('This booking does not accept a PT code');
+        }
+        const [clock] = await tenant.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS "now"`;
+        return createSessionScan({ ...session, gymId: access.gymId, command: session.state === 'SCHEDULED' ? 'START' : 'COMPLETE' }, clock!.now);
+      });
+    });
   }
 
   async start(access: Access, sessionId: string, raw: unknown) {
@@ -476,7 +474,8 @@ export class SessionLifecycleService {
         try {
           const command = await retrySessionTransaction(() => new CommandReceiptFoundationService(tenant).execute({
             masterGymId: access.gymId, actorIdentityId: access.identityId, commandKind: 'START_PT_SESSION',
-            idempotencyKey: parsed.data.idempotencyKey, normalizedIntent: { sessionId, expectedVersion: parsed.data.expectedVersion },
+            idempotencyKey: parsed.data.idempotencyKey, normalizedIntent: { sessionId, expectedVersion: parsed.data.expectedVersion,
+              ...(parsed.data.scanToken ? { scanDigest: quoteTokenDigest(parsed.data.scanToken) } : {}) },
           }, async (tx, receipt) => {
             await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${`pt-settlement:${access.gymId}`}, 0))`;
             const base = await tx.pTSession.findUnique({ where: { id: sessionId }, include: { member: true, trainer: true, creditHold: true } });
@@ -492,8 +491,11 @@ export class SessionLifecycleService {
             if (transitionSession({ state: session.state, command: 'START', actorRole: access.role as 'OWNER' | 'TRAINER' }) !== 'ACTIVE') throw new ConflictException('Only scheduled sessions can start');
             const [clock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS "now"`;
             const now = clock!.now;
-            if (now.getTime() < session.scheduledStartAt.getTime() - 15 * 60_000 || now.getTime() > session.scheduledEndAt.getTime()) {
-              throw new UnprocessableEntityException('Session can start from 15 minutes before its scheduled start through its scheduled end');
+            if (parsed.data.scanToken && session.type !== 'IN_PERSON') throw new UnprocessableEntityException('Remote sessions do not use a PT scan');
+            assertSessionScan(parsed.data.scanToken, { ...session, gymId: access.gymId, command: 'START' }, now);
+            if (now.getTime() < session.scheduledStartAt.getTime() - 15 * 60_000 || now.getTime() > session.scheduledEndAt.getTime()
+              || noShowIsEligible(now.getTime(), session.scheduledStartAt.getTime())) {
+              throw new UnprocessableEntityException('Session can start from 15 minutes before its scheduled start until the 15-minute no-show cutoff or scheduled end, whichever comes first');
             }
             const active = await tx.pTSession.count({ where: { trainerId: session.trainerId, state: 'ACTIVE', id: { not: session.id } } });
             if (active) throw new ConflictException('Trainer already has an active session');
@@ -504,6 +506,9 @@ export class SessionLifecycleService {
               actorIdentityId: access.identityId, receiptId: receipt.id, eventKey } });
             const notice = await appendTenantNotification(tx, { masterGymId: access.gymId, receiptId: receipt.id, eventCode: 'SESSION_STARTED', resourceId: session.id,
               recipientIdentityId: session.member.identityId!, eventOrdinal: updated.version });
+            if (parsed.data.scanToken) await appendTenantNotification(tx, { masterGymId: access.gymId, receiptId: receipt.id,
+              eventCode: 'SESSION_STARTED', resourceId: session.id, recipientIdentityId: session.trainer.identityId!,
+              eventOrdinal: updated.version, linkKind: 'TRAINER_SCHEDULE' });
             return { result: { resourceIds: [session.id, notice.id], version: updated.version, notificationState: 'AVAILABLE' }, resourceType: 'PT_SESSION', resourceId: session.id,
               audits: [{ actorIdentityId: access.identityId, eventCode, resourceType: 'PT_SESSION', resourceId: session.id, transition: { from: 'SCHEDULED', to: 'ACTIVE', version: updated.version } }] };
           }));
@@ -548,14 +553,14 @@ export class SessionLifecycleService {
             if (!session) throw new NotFoundException('Session not found');
             if (access.role === 'TRAINER' && (session.trainerId !== access.actor!.id || session.trainer.identityId !== access.identityId || session.trainer.status !== 'ACTIVE')) throw new ForbiddenException('Only the assigned active trainer can edit notes');
             if (session.version !== parsed.data.expectedVersion) throw new ConflictException('Session changed; refresh and try again');
-            if (transitionSession({ state: session.state, command: 'UPDATE_NOTES', actorRole: access.role as 'OWNER' | 'TRAINER' }) !== 'COMPLETED') throw new ConflictException('Notes can only be edited on completed sessions');
+            if (!transitionSession({ state: session.state, command: 'UPDATE_NOTES', actorRole: access.role as 'OWNER' | 'TRAINER' })) throw new ConflictException('Notes can only be edited on active or completed sessions');
             const updated = await tx.pTSession.update({ where: { id: session.id, version: session.version }, data: { notes, version: { increment: 1 } } });
             const eventCode = eventCodeFor('UPDATE_NOTES');
             const eventKey = tenantAuditKey({ masterGymId: access.gymId, receiptId: receipt.id, eventCode, resourceType: 'PT_SESSION', resourceId: session.id, eventOrdinal: updated.version });
-            await tx.sessionStateEvent.create({ data: { sessionId: session.id, fromState: 'COMPLETED', toState: 'COMPLETED', committedVersion: updated.version,
+            await tx.sessionStateEvent.create({ data: { sessionId: session.id, fromState: session.state, toState: session.state, committedVersion: updated.version,
               actorIdentityId: access.identityId, receiptId: receipt.id, eventKey } });
             return { result: { resourceIds: [session.id], version: updated.version, notesSnapshot: notes }, resourceType: 'PT_SESSION', resourceId: session.id,
-              audits: [{ actorIdentityId: access.identityId, eventCode, resourceType: 'PT_SESSION', resourceId: session.id, transition: { from: 'COMPLETED', to: 'COMPLETED', version: updated.version } }] };
+              audits: [{ actorIdentityId: access.identityId, eventCode, resourceType: 'PT_SESSION', resourceId: session.id, transition: { from: session.state, to: session.state, version: updated.version } }] };
           });
           return sessionNotesResultSchema.parse({ receiptId: command.receiptId, replayed: command.replayed, sessionId: command.result.resourceIds?.[0],
             notes: command.result.notesSnapshot ?? null, version: command.result.version });
@@ -574,7 +579,8 @@ export class SessionLifecycleService {
         try {
           const command = await retrySessionTransaction(() => new CommandReceiptFoundationService(tenant).execute({ masterGymId: access.gymId,
             actorIdentityId: access.identityId, commandKind: 'COMPLETE_PT_SESSION', idempotencyKey: parsed.data.idempotencyKey,
-            normalizedIntent: { sessionId, expectedVersion: parsed.data.expectedVersion } }, async (tx, receipt) => {
+            normalizedIntent: { sessionId, expectedVersion: parsed.data.expectedVersion,
+              ...(parsed.data.scanToken ? { scanDigest: quoteTokenDigest(parsed.data.scanToken) } : {}) } }, async (tx, receipt) => {
             await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${`pt-settlement:${access.gymId}`}, 0))`;
             const preflight = await tx.pTSession.findUnique({ where: { id: sessionId }, select: { scheduledStartAt: true, gymTimezone: true, configurationVersion: true } });
             if (!preflight) throw new NotFoundException('Session not found');
@@ -598,6 +604,8 @@ export class SessionLifecycleService {
             if (session.confirmationRate === null || session.confirmationLevel === null) throw new ConflictException('The confirmation pay policy snapshot is incomplete');
             const [clock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS "now"`;
             const now = clock!.now;
+            if (parsed.data.scanToken && session.type !== 'IN_PERSON') throw new UnprocessableEntityException('Remote sessions do not use a PT scan');
+            assertSessionScan(parsed.data.scanToken, { ...session, gymId: access.gymId, command: 'COMPLETE' }, now);
             if (now.getTime() - session.startedAt.getTime() < version.minimumSessionDurationMinutes * 60_000) throw new UnprocessableEntityException(`Session must run for at least ${version.minimumSessionDurationMinutes} minutes`);
             if (period.state !== 'OPEN') {
               let next = nextPeriod(originalInfo);

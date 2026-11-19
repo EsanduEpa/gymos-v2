@@ -74,7 +74,7 @@ export class GymosSubscriptionService {
   }
 
   async start(owner: Owner, input: Checkout) {
-    const gateway = payHereSandboxCheckoutConfig();
+    const gateway = payHereSandboxCheckoutConfig('SUBSCRIPTION');
     this.merchant();
     const tier = gymosSubscriptionTiers.find(candidate => candidate.id === input.tier)!;
     const order = await this.database.master.$transaction(async tx => {

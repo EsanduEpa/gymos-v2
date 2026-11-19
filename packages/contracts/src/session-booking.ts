@@ -7,7 +7,7 @@ const amount = z.string().regex(/^(?:0|[1-9][0-9]{0,14})(?:\.[0-9]{1,4})?$/);
 const currency = z.enum(['LKR', 'USD']);
 const level = z.enum(['LEVEL_1', 'LEVEL_2']);
 const sessionType = z.enum(['IN_PERSON', 'VIRTUAL', 'INTRODUCTORY']);
-const newSessionType = z.literal('IN_PERSON');
+const newSessionType = z.enum(['IN_PERSON', 'VIRTUAL']);
 const sessionState = z.enum(['PENDING_CONFIRMATION', 'SCHEDULED', 'ACTIVE', 'COMPLETED', 'MISSED', 'CANCELLED', 'DECLINED', 'EXPIRED']);
 const pageSchema = <T extends z.ZodType>(item: T) => z.strictObject({
   items: z.array(item).max(100), page: z.number().int().min(1), pageSize: z.number().int().min(1).max(100),
@@ -28,7 +28,7 @@ export const sessionBookingOptionsQuerySchema = z.strictObject({
 const memberOptionSchema = z.strictObject({ memberId: id, name: z.string().min(2).max(120), availableCredits: z.number().int().nonnegative(),
   eligibility: z.enum(['ELIGIBLE', 'NO_ACTIVE_MEMBERSHIP', 'NO_CREDIT']) });
 const trainerOptionSchema = z.strictObject({ trainerId: id, name: z.string().min(2).max(120), level: level,
-  shiftStart: time.nullable(), shiftEnd: time.nullable(), baseSessionPay: amount.optional() });
+  shiftStart: time.nullable(), shiftEnd: time.nullable(), baseSessionPay: amount.optional(), offersVirtualPt: z.boolean().optional() });
 export const sessionBookingOptionsSchema = z.strictObject({
   members: pageSchema(memberOptionSchema), trainers: pageSchema(trainerOptionSchema),
   selectedMember: memberOptionSchema.nullable(), selectedTrainer: trainerOptionSchema.nullable(),

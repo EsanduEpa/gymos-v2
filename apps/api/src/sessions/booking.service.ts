@@ -135,7 +135,7 @@ export class SessionBookingService {
         const membersAll = await tenant.member.findMany({ where: { id: { in: memberBindingIds }, status: 'ACTIVE', registrationState: 'COMPLETE', ...(query.qMembers ? { fullName: { contains: query.qMembers, mode: 'insensitive' } } : {}) },
           orderBy: [{ fullName: 'asc' }, { id: 'asc' }], select: { id: true, fullName: true } });
         const trainersAll = await tenant.trainer.findMany({ where: { id: { in: trainerBindingIds }, status: 'ACTIVE', registrationState: 'COMPLETE', level: { not: null }, ...(query.qTrainers ? { fullName: { contains: query.qTrainers, mode: 'insensitive' } } : {}) },
-          orderBy: [{ fullName: 'asc' }, { id: 'asc' }], select: { id: true, fullName: true, level: true, shiftStart: true, shiftEnd: true, sessionPayOverride: true } });
+          orderBy: [{ fullName: 'asc' }, { id: 'asc' }], select: { id: true, fullName: true, level: true, shiftStart: true, shiftEnd: true, sessionPayOverride: true, offersVirtualPt: true } });
         const memberPageRows = membersAll.slice((query.memberPage - 1) * query.memberPageSize, query.memberPage * query.memberPageSize);
         const trainerPageRows = trainersAll.slice((query.trainerPage - 1) * query.trainerPageSize, query.trainerPage * query.trainerPageSize);
         const makeMemberOption = async (member: { id: string; fullName: string }) => {
@@ -146,13 +146,13 @@ export class SessionBookingService {
         };
         const members = await Promise.all(memberPageRows.map(makeMemberOption));
         const trainerOption = (trainer: typeof trainersAll[number]) => ({ trainerId: trainer.id, name: trainer.fullName, level: trainer.level!,
-          shiftStart: trainer.shiftStart, shiftEnd: trainer.shiftEnd, baseSessionPay: trainerPayForConfirmation(config, trainer, true) });
+          shiftStart: trainer.shiftStart, shiftEnd: trainer.shiftEnd, baseSessionPay: trainerPayForConfirmation(config, trainer, true), offersVirtualPt: trainer.offersVirtualPt });
         const trainers = trainerPageRows.map(trainerOption);
         const selectedMember = query.selectedMemberId ? await (async () => {
           const member = await tenant.member.findFirst({ where: { id: { equals: query.selectedMemberId, in: memberBindingIds }, status: 'ACTIVE', registrationState: 'COMPLETE' }, select: { id: true, fullName: true } });
           return member ? makeMemberOption(member) : null;
         })() : null;
-        const selectedTrainerRow = query.selectedTrainerId ? await tenant.trainer.findFirst({ where: { id: { equals: query.selectedTrainerId, in: trainerBindingIds }, status: 'ACTIVE', registrationState: 'COMPLETE', level: { not: null } }, select: { id: true, fullName: true, level: true, shiftStart: true, shiftEnd: true, sessionPayOverride: true } }) : null;
+        const selectedTrainerRow = query.selectedTrainerId ? await tenant.trainer.findFirst({ where: { id: { equals: query.selectedTrainerId, in: trainerBindingIds }, status: 'ACTIVE', registrationState: 'COMPLETE', level: { not: null } }, select: { id: true, fullName: true, level: true, shiftStart: true, shiftEnd: true, sessionPayOverride: true, offersVirtualPt: true } }) : null;
         const result = {
           members: { items: members, page: query.memberPage, pageSize: query.memberPageSize, totalCount: membersAll.length, totalPages: totalPages(membersAll.length, query.memberPageSize), asOf: now.toISOString() },
           trainers: { items: trainers, page: query.trainerPage, pageSize: query.trainerPageSize, totalCount: trainersAll.length, totalPages: totalPages(trainersAll.length, query.trainerPageSize), asOf: now.toISOString() },
@@ -179,7 +179,7 @@ export class SessionBookingService {
             const start = resolveSessionLocalTime(input.localDate, input.localTime, config.timezone, input.offset);
             const end = new Date(start.instant.getTime() + input.durationMinutes * 60_000);
             const [clock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS now`;
-            if (input.type !== 'IN_PERSON' || input.durationMinutes !== 60) throw new UnprocessableEntityException('New PT bookings must be in-person and 60 minutes');
+            if (input.durationMinutes !== 60) throw new UnprocessableEntityException('New PT bookings must be 60 minutes');
             const earliest = new Date(clock!.now.getTime() + 2 * 60 * 60_000);
             const latest = new Date(clock!.now.getTime() + 14 * 24 * 60 * 60_000);
             if (start.instant < earliest || start.instant > latest) throw new UnprocessableEntityException('Choose a start at least 2 hours from now and within the next 14 days');
@@ -187,9 +187,12 @@ export class SessionBookingService {
               tx.member.findFirst({ where: { id: input.memberId, identityId: memberBinding.identityId, enrollmentOperationId: memberBinding.operationId,
                 registrationState: 'COMPLETE', status: 'ACTIVE' }, select: { id: true, fullName: true, identityId: true } }),
               tx.trainer.findFirst({ where: { id: input.trainerId, identityId: trainerBinding.identityId, enrollmentOperationId: trainerBinding.operationId,
-                registrationState: 'COMPLETE', status: 'ACTIVE', level: { not: null } }, select: { id: true, fullName: true, identityId: true, level: true, shiftStart: true, shiftEnd: true, sessionPayOverride: true } }),
+                registrationState: 'COMPLETE', status: 'ACTIVE', level: { not: null } }, select: { id: true, fullName: true, identityId: true, level: true, shiftStart: true, shiftEnd: true, sessionPayOverride: true, offersVirtualPt: true } }),
             ]);
             if (!member || !trainer) throw new UnprocessableEntityException('Member and trainer must be active and published in this gym');
+            // Confirmed virtual sessions retain their format when the owner reschedules them.
+            if (input.type === 'VIRTUAL' && !trainer.offersVirtualPt && !forcedSessionId)
+              throw new UnprocessableEntityException('This trainer does not offer virtual PT');
             const availability = await tx.pTAvailabilityRule.findMany({ where: { OR: [{ trainerId: trainer.id }, { kind: 'GYM_CLOSURE', localDate: new Date(`${input.localDate}T00:00:00.000Z`) }] } });
             const startParts = partsAt(start.instant, config.timezone);
             const startMinute = startParts.hour * 60 + startParts.minute;

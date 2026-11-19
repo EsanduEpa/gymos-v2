@@ -6,6 +6,8 @@ import { verifyInstalledTenant } from '../tenancy/tenant-schema-verifier.js';
 import { canonicalJson } from '../operations/primitives.js';
 import { sweepGymosSubscriptionNotice } from '../payments/gymos-subscription-notices.js';
 import { sweepSessionReminders } from './session-reminders.js';
+import { sweepMissingSessionNotes } from './session-notes-reminders.js';
+import { sweepOverdueSessions } from './session-no-show.js';
 import { expirePendingSession } from './expire-pending-session.js';
 
 const intervalMs = 30_000;
@@ -102,9 +104,15 @@ export class SessionExpiryRunner implements OnModuleInit, OnApplicationShutdown 
                 }
                 if (candidates.length < batchSize) break;
               }
+              const noShows = await sweepOverdueSessions(tenant, gym.id);
+              failures += noShows.failed; this.totalFailures += noShows.failed;
+              this.logger.log(`PT no-shows: gym=${gym.id} missed=${noShows.missed} failed=${noShows.failed}`);
               const reminders = await sweepSessionReminders(tenant, this.database.master, gym.id);
+              const notes = await sweepMissingSessionNotes(tenant, this.database.master, gym.id);
               failures += reminders.failed; this.totalFailures += reminders.failed;
+              failures += notes.failed; this.totalFailures += notes.failed;
               this.logger.log(`PT reminders: gym=${gym.id} sent=${reminders.sent} failed=${reminders.failed}`);
+              this.logger.log(`PT missing notes: gym=${gym.id} sent=${notes.sent} failed=${notes.failed}`);
               try {
                 await sweepGymosSubscriptionNotice(tenant, masterTx, gym.id);
               } catch {

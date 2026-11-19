@@ -40,11 +40,12 @@ export const selfTrainerProfileSchema = z.strictObject({
   yearsExperience: z.number().int().min(0).max(80).nullable(), version: versionSchema,
   shiftStart: z.string().nullable().optional(), shiftEnd: z.string().nullable().optional(),
   pendingShift: pendingTrainerShiftSchema.nullable().optional(),
+  offersVirtualPt: z.boolean().optional(),
   hasPhoto: z.boolean().optional(),
 });
 export const updateSelfTrainerProfileSchema = z.strictObject({
   phone: nullableText(40), biography: nullableText(2000), specialisations: z.array(z.string().trim().min(1).max(60)).max(20),
-  yearsExperience: z.number().int().min(0).max(80).nullable(), expectedVersion: versionSchema, idempotencyKey,
+  yearsExperience: z.number().int().min(0).max(80).nullable(), offersVirtualPt: z.boolean().optional(), expectedVersion: versionSchema, idempotencyKey,
 }).superRefine((value, context) => {
   const normalized = value.specialisations.map(item => item.toLocaleLowerCase('en'));
   if (new Set(normalized).size !== normalized.length) context.addIssue({ code: 'custom', message: 'Specialisations must be unique', path: ['specialisations'] });

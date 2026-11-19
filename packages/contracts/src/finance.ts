@@ -106,9 +106,9 @@ export const trainerEarningsSchema = z.strictObject({
   gymSlug: slug, trainerId: id, from: localDate, to: localDate,
   rangeStart: instant, rangeEndExclusive: instant, currency, asOf: instant,
   lines: z.array(z.strictObject({ id, sessionId: id, periodId: id,
-    scheduledStartAt: instant, amount: decimal, currency, periodState: z.enum(['OPEN', 'CLOSED', 'APPROVED']) })).max(100),
+    scheduledStartAt: instant, amount: decimal, currency, periodState: z.enum(['OPEN', 'CLOSED', 'APPROVED']), shift: z.enum(['IN_SHIFT', 'OFF_SHIFT']).optional() })).max(100),
   page: z.number().int().min(1), pageSize: z.number().int().min(1).max(100), totalCount: z.number().int().nonnegative(),
-  total: decimal, currentPeriod: z.object({ id, state: z.enum(['OPEN', 'CLOSED', 'APPROVED']), start: localDate,
+  total: decimal, shiftTotals: z.strictObject({ inShift: decimal, offShift: decimal }).optional(), currentPeriod: z.object({ id, state: z.enum(['OPEN', 'CLOSED', 'APPROVED']), start: localDate,
     endExclusive: localDate, total: decimal }).nullable(),
 });
 export type FinanceWindowQuery = z.infer<typeof financeWindowQuerySchema>;

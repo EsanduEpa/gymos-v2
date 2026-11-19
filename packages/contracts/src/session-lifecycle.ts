@@ -9,6 +9,13 @@ const version = z.number().int().nonnegative();
 export const sessionLifecycleCommandInputSchema = z.strictObject({
   expectedVersion: version,
   idempotencyKey: key,
+  scanToken: z.string().regex(/^GymOSPT1\.\d{13}\.[A-Za-z0-9_-]{43}$/).optional(),
+});
+
+export const sessionScanCodeSchema = z.strictObject({
+  token: sessionLifecycleCommandInputSchema.shape.scanToken.unwrap(),
+  expiresAt: instant,
+  command: z.enum(['START', 'COMPLETE']),
 });
 
 export const sessionNotesInputSchema = z.strictObject({
