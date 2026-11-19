@@ -28,7 +28,7 @@ export default async function OwnerSessionBookingPage({ params, searchParams }: 
   const options = response.ok ? sessionBookingOptionsSchema.safeParse(await response.json().catch(() => null)) : null;
   const brand = resolveGymBrandColors(theme.primaryColor); const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
   return <DashboardChrome identityId={session.identityId} key={`${session.identityId}:${gym.id}:${gym.role}`} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'} style={style}>
-    <div className="gym-banner"><div><h1>Book Personal Training Session</h1><p>Schedule a session with pack credit validation and trainer collision checking.</p></div><a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/owner/sessions`}>← Back to Session Oversight</a></div>
+    <div className="gym-banner"><div><h1>Book Personal Training Session</h1><p>Choose a member, trainer and available time.</p></div><a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/owner/sessions`}>← Back to Session Oversight</a></div>
     <Card className="owner-form-card"><CardHeader eyebrow="OWNER BOOKING" title="Session details"/>
       {!options?.success ? <Feedback tone="error">Booking options could not be verified. No booking was made. Reload to try again.</Feedback> :
         <OwnerSessionBookingForm slug={slug} initialKey={randomUUID()} options={options.data}/>}</Card>

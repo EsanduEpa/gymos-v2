@@ -19,7 +19,7 @@ export function MembershipCheckoutForm({ slug, kind, orderKey, offers }: {
 
   return <details>
     <summary>Start {title} sandbox checkout</summary>
-    <form action={action} className="stack-form">
+    <form action={action} className="stack-form compact-workspace-form">
       <p>Use synthetic billing details. PayHere Sandbox collects the payment details.</p>
       <label className="ui-field"><span className="ui-field-label">{kind === 'PT_PACK' ? 'PT pack offer' : 'Membership plan'}</span>
         <select name="productId" value={productId} onChange={event => setProductId(event.currentTarget.value)} required>

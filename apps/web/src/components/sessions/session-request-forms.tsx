@@ -15,8 +15,25 @@ export function SessionRequestForm({ slug, trainerId, timeZone, requestKey, minD
   // Keep the server-rendered fields disabled until their draft handlers are attached.
   const ready = useSyncExternalStore(subscribeToReadiness, clientReady, serverReady);
   const [draft, setDraft] = useState({ localDate: minDate, localTime: '', offset: '', notes: '', startAt: '' });
-  const [slotResult, setSlotResult] = useState<Awaited<ReturnType<typeof loadSessionSlots>>>({ error: 'Choose a date to load times.' }); const [loadingSlots, startSlotLoad] = useTransition();
-  useEffect(() => { startSlotLoad(async () => { const result = await loadSessionSlots(slug, trainerId, draft.localDate); setSlotResult(result); setDraft(current => ({ ...current, localTime: '', offset: '', startAt: '' })); }); }, [slug, trainerId, draft.localDate]);
+  const slotQuery = JSON.stringify([slug, trainerId, draft.localDate]);
+  const [loadedSlots, setLoadedSlots] = useState<{ query: string; result: Awaited<ReturnType<typeof loadSessionSlots>> }>();
+  const [, startSlotLoad] = useTransition();
+  const canLoadSlots = Boolean(draft.localDate);
+  const loadingSlots = canLoadSlots && loadedSlots?.query !== slotQuery;
+  const slotResult = loadedSlots?.query === slotQuery ? loadedSlots.result : undefined;
+  useEffect(() => {
+    if (!canLoadSlots) return;
+    let currentQuery = true;
+    startSlotLoad(async () => {
+      const result = await loadSessionSlots(slug, trainerId, draft.localDate);
+      if (!currentQuery) return;
+      setLoadedSlots({ query: slotQuery, result });
+      setDraft(current => ({ ...current, localTime: '', offset: '', startAt: '' }));
+    });
+    return () => { currentQuery = false; };
+  }, [slug, trainerId, draft.localDate, canLoadSlots, slotQuery]);
+  const hasSelectedSlot = !loadingSlots && Boolean(slotResult?.data?.slots.some(slot =>
+    slot.localTime === draft.localTime && slot.offset === draft.offset));
   const update = (name: keyof typeof draft, value: string) => setDraft(current => ({ ...current, [name]: value }));
   const action = createSessionRequest.bind(null, slug, trainerId, requestKey);
   const [state, formAction, pending] = useActionState<SessionCommandState, FormData>(action, {});
@@ -24,14 +41,14 @@ export function SessionRequestForm({ slug, trainerId, timeZone, requestKey, minD
     <input type="hidden" name="idempotencyKey" value={state.currentKey ?? state.nextKey ?? requestKey}/>
     <input type="hidden" name="timeZone" value={timeZone}/>
     <label className="ui-field"><span className="ui-field-label">Session date</span><input disabled={!ready} type="date" name="localDate" min={minDate} value={draft.localDate} onChange={event => update('localDate', event.currentTarget.value)} required/></label>
-    <label className="ui-field"><span className="ui-field-label">Available start time ({timeZone})</span><select disabled={!ready || loadingSlots || !slotResult.data?.slots.length} value={draft.startAt} onChange={event => { const slot = slotResult.data?.slots.find(item => item.startAt === event.currentTarget.value); setDraft(current => ({ ...current, startAt: slot?.startAt ?? '', localTime: slot?.localTime ?? '', offset: slot?.offset ?? '' })); }} required><option value="">{loadingSlots ? 'Loading times…' : slotResult.data?.slots.length ? 'Choose a time' : 'No times available'}</option>{slotResult.data?.slots.map(slot => <option key={slot.startAt} value={slot.startAt}>{slot.localTime} · UTC{slot.offset}</option>)}</select>{slotResult.error ? <small role="alert">{slotResult.error}</small> : null}{slotResult.data?.reason ? <small>{slotResult.data.reason === 'NO_AVAILABILITY' ? 'This trainer has not published bookable times for this date.' : slotResult.data.reason === 'CLOSED' ? 'The gym is closed on this date.' : 'No available times remain for this date.'}</small> : null}</label>
+    <label className="ui-field"><span className="ui-field-label">Available start time ({timeZone})</span><select disabled={!ready || loadingSlots || !slotResult?.data?.slots.length} value={draft.startAt} onChange={event => { const slot = slotResult?.data?.slots.find(item => item.startAt === event.currentTarget.value); setDraft(current => ({ ...current, startAt: slot?.startAt ?? '', localTime: slot?.localTime ?? '', offset: slot?.offset ?? '' })); }} required><option value="">{loadingSlots ? 'Loading times…' : slotResult?.data?.slots.length ? 'Choose a time' : 'No times available'}</option>{slotResult?.data?.slots.map(slot => <option key={slot.startAt} value={slot.startAt}>{slot.localTime} · UTC{slot.offset}</option>)}</select>{slotResult?.error ? <small role="alert">{slotResult.error}</small> : null}{slotResult?.data?.reason ? <small>{slotResult.data.reason === 'NO_AVAILABILITY' ? 'This trainer has not published bookable times for this date.' : slotResult.data.reason === 'CLOSED' ? 'The gym is closed on this date.' : 'No available times remain for this date.'}</small> : null}</label>
     <input type="hidden" name="localTime" value={draft.localTime}/><input type="hidden" name="offset" value={draft.offset}/>
     {offersVirtualPt ? <label className="ui-field"><span className="ui-field-label">Session format</span><select name="type" defaultValue="IN_PERSON"><option value="IN_PERSON">In-person PT</option><option value="VIRTUAL">Virtual PT</option></select></label> : <input type="hidden" name="type" value="IN_PERSON"/>}
     <input type="hidden" name="durationMinutes" value="60"/><div className="ui-feedback"> 60 minutes · 1 credit. Requests made within 24 hours of the start are already in the late-cancellation window if accepted.</div>
     <label className="ui-field"><span className="ui-field-label">Note for the trainer (optional)</span><textarea disabled={!ready} name="notes" value={draft.notes} onChange={event => update('notes', event.currentTarget.value)} maxLength={4000} rows={4}/></label>
     {state.error ? <p role="alert" className="ui-feedback ui-feedback-error">{state.error}</p> : null}
     {state.success ? <p role="status" className="ui-feedback ui-feedback-success">{state.success} {state.sessionId ? <a href={`/gyms/${encodeURIComponent(slug)}/sessions/${encodeURIComponent(state.sessionId)}`}>View booking</a> : null}</p> : null}
-    <button className="ui-button ui-button-primary" type="submit" disabled={!ready || pending}>{pending ? 'Sending request…' : 'Request session'}</button>
+    <button className="ui-button ui-button-primary" type="submit" disabled={!ready || pending || !hasSelectedSlot}>{pending ? 'Sending request…' : 'Request session'}</button>
   </form>;
 }
 

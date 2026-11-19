@@ -16,7 +16,8 @@ export async function createSessionRequest(slug: string, trainerId: string, init
   const parsed = sessionRequestInputSchema.safeParse({ trainerId, localDate: formData.get('localDate'), localTime: formData.get('localTime'),
     timeZone: formData.get('timeZone'), offset: formData.get('offset') || undefined, type: formData.get('type'),
     durationMinutes: Number(formData.get('durationMinutes')), notes: formData.get('notes') || undefined, idempotencyKey: key });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Check the session request details.', nextKey: randomUUID() };
+  if (!parsed.success) return { error: parsed.error.issues.some(issue => issue.path[0] === 'localTime' || issue.path[0] === 'offset')
+    ? 'Choose an available start time.' : 'Check the session request details.', nextKey: randomUUID() };
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) redirect('/login');
   let response: Response;

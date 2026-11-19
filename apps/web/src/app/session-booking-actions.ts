@@ -22,7 +22,8 @@ export async function createOwnerSessionBooking(slug: string, initialKey: string
     timeZone: formData.get('timeZone'), offset: formData.get('offset') || undefined, type: formData.get('type'), durationMinutes: Number(formData.get('durationMinutes')),
     notes: formData.get('notes') || undefined, idempotencyKey: key,
   });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Check the booking details.', nextKey: randomUUID() };
+  if (!parsed.success) return { error: parsed.error.issues.some(issue => issue.path[0] === 'localTime' || issue.path[0] === 'offset')
+    ? 'Choose an available start time.' : 'Check the booking details.', nextKey: randomUUID() };
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) redirect('/login');
   let response: Response;

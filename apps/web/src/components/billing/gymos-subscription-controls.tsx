@@ -19,7 +19,7 @@ export function GymosSubscriptionCheckout({ slug, requestKey, pendingTier }: {
     <CardHeader title={pendingTier ? 'Resume recurring GymOS checkout' : 'Set up recurring GymOS billing'}/>
     {state.checkout ? <PayHereCheckoutHandoff checkout={state.checkout}>
       <p>PayHere Sandbox will ask you to authorize monthly recurring charges.</p>
-    </PayHereCheckoutHandoff> : <form action={action} className="stack-form">
+    </PayHereCheckoutHandoff> : <form action={action} className="stack-form compact-workspace-form">
       <p>Use synthetic billing details. PayHere Sandbox collects the payment details.</p>
       <label className="ui-field"><span className="ui-field-label">GymOS plan</span>
         <select name="tier" required value={pendingTier ?? tier} onChange={event => setTier(event.currentTarget.value)}>
@@ -38,7 +38,7 @@ export function StopGymosRecurringBilling({ slug }: { slug: string }) {
   const [state, action, pending] = useActionState(stopGymosSubscription.bind(null, slug), {});
   return <details>
     <summary>Change plan or payment method</summary>
-    <form action={action} className="stack-form">
+    <form action={action} className="stack-form compact-workspace-form">
       <p>Stop future recurring charges before choosing a plan and authorizing a payment method in PayHere Sandbox.</p>
       <label>
         <input type="checkbox" name="confirm" value="true" required/>

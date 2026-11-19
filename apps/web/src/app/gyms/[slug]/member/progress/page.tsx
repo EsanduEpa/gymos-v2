@@ -23,11 +23,11 @@ export default async function MemberProgressPage({ params, searchParams }: { par
   if (response.status === 422 && search) redirect(path);
   const report = response.ok ? progressReportSchema.safeParse(await response.json().catch(() => null)) : null;
   return <DashboardChrome identityId={session.identityId} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'}>
-    <div className="gym-banner"><h1>Your progress</h1></div>
+    <div className="platform-page member-progress-page"><header className="platform-page-heading"><div><span className="platform-eyebrow">YOUR PROGRESS</span><h1>Track your progress</h1><p>Record measurements and photos, then see how your training adds up.</p></div></header>
     {report?.success ? <>
-      <Card><CardHeader title="Record a measurement"/><BodyMeasurementForm slug={slug} today={report.data.today}/></Card>
-      <UploadProgressPhotoForm slug={slug} today={report.data.today}/>
+      <div className="member-progress-entry-grid"><Card><CardHeader eyebrow="BODY MEASUREMENTS" title="Record a measurement"/><BodyMeasurementForm slug={slug} today={report.data.today}/></Card>
+      <UploadProgressPhotoForm slug={slug} today={report.data.today}/></div>
       <ProgressReport report={report.data} path={path} slug={slug}/>
-    </> : <Card><Feedback tone="error">Progress could not be loaded. Refresh to try again.</Feedback></Card>}
+    </> : <Card><Feedback tone="error">Progress could not be loaded. Refresh to try again.</Feedback></Card>}</div>
   </DashboardChrome>;
 }
