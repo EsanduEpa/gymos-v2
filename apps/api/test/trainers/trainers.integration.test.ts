@@ -278,6 +278,17 @@ it('allows profile edits and serves normalized photos only in the allowed gym co
   });
   expect(edit.status).toBe(200);
   expect(await (await call(`${path}/profile`, memberToken)).json()).toMatchObject({ healthNotes: notes });
+  const ownerProfile = await call(`/gyms/${fixture.gyms[0]!.slug}/members/${member.memberId}`, ownerToken);
+  expect(ownerProfile.status).toBe(200);
+  expect(await ownerProfile.json()).toMatchObject({ healthNotes: null });
+  const ownerCorrection = await fetch(`${base}/gyms/${fixture.gyms[0]!.slug}/members/${member.memberId}/profile`, {
+    method: 'PATCH',
+    headers: { authorization: `Bearer ${ownerToken}`, 'content-type': 'application/json', 'idempotency-key': randomUUID() },
+    body: JSON.stringify({ fullName: member.fullName, dateOfBirth: member.dateOfBirth, phone: member.phone,
+      emergencyContact: member.emergencyContact, healthNotes: null, expectedVersion: member.version + 1, reason: 'MEMBER_REQUEST' }),
+  });
+  expect(ownerCorrection.status).toBe(403);
+  expect(await (await call(`${path}/profile`, memberToken)).json()).toMatchObject({ healthNotes: notes });
   const latest = await tenant.commandReceipt.findFirstOrThrow({ where: { commandKind: 'UPDATE_SELF_MEMBER_PROFILE', resourceId: member.memberId } });
   expect(JSON.stringify(latest)).not.toContain(notes);
 

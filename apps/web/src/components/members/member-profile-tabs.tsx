@@ -24,7 +24,6 @@ export function MemberProfileTabs({ member, slug, requestKey, plans, initialTab 
           <div><dt>Email</dt><dd>{member.email ?? 'Not provided'}</dd></div><div><dt>Phone</dt><dd>{member.phone ?? 'Not provided'}</dd></div>
           <div><dt>Date of birth</dt><dd>{member.dateOfBirth ? <time dateTime={member.dateOfBirth}>{formatDisplayDate(member.dateOfBirth)}</time> : 'Not provided'}</dd></div><div><dt>Emergency contact</dt><dd>{member.emergencyContact ?? 'Not provided'}</dd></div>
         </dl>
-        <div><h3>Health notes</h3><p>{member.healthNotes || 'No health notes have been added.'}</p><small>Private gym information.</small></div>
         <div><h3>Current registration</h3><p><StatusBadge status={member.registrationState}/></p></div>
         {member.registrationState === 'COMPLETE' ? <MemberLifecycleForm slug={slug} memberId={member.id} status={member.status} version={member.version} initialRequestKey={requestKey}/> : null}
         {member.registrationState === 'COMPLETE' ? <OwnerMemberCorrectionForm key={`${member.id}:${member.version}`} slug={slug} member={member} requestKey={`${requestKey}-profile`}/> : null}

@@ -277,7 +277,7 @@ export class GymsController {
     return this.tenantGate.withVerifiedTenant(access, async tenant => {
       const member = await tenant.member.findFirst({ where: { id: memberId, registrationState: { in: ['BASIC', 'COMPLETE'] } },
         select: { id: true, identityId: true, createdAt: true, enrollmentOperationId: true, fullName: true, email: true, phone: true, dateOfBirth: true, emergencyContact: true,
-          healthNotes: true, status: true, registrationState: true, version: true,
+          status: true, registrationState: true, version: true,
           sessionPacks: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 100,
             include: { creditMovements: { select: { availableDelta: true, heldDelta: true, consumedDelta: true, expiredDelta: true } } } } },
       });
@@ -311,7 +311,7 @@ export class GymsController {
         joinedAt: member.createdAt.toISOString(),
         id: member.id, fullName: member.fullName, email: member.email, phone: member.phone,
         dateOfBirth: member.dateOfBirth?.toISOString().slice(0, 10) ?? null,
-        emergencyContact: member.emergencyContact, healthNotes: member.healthNotes,
+        emergencyContact: member.emergencyContact, healthNotes: null,
         status: member.status, registrationState: member.registrationState, version: member.version,
         memberships: memberships.map(term => ({ id: term.id, planName: term.planNameSnapshot,
           startDate: term.startDate.toISOString().slice(0, 10), endDateExclusive: term.endDateExclusive.toISOString().slice(0, 10),
@@ -386,6 +386,7 @@ export class GymsController {
     if (access.role !== 'OWNER') throw new ForbiddenException('Only gym owners can register members');
     const parsed = memberRegistrationInputSchema.safeParse(body);
     if (!parsed.success) throw new UnprocessableEntityException('Enter valid member details and a membership plan');
+    if (parsed.data.healthNotes != null) throw new ForbiddenException('Members enter their own health notes after enrollment');
     if (!this.memberEnrollment) throw new InternalServerErrorException('Member enrollment is unavailable');
     return this.memberEnrollment.enroll(access, parsed.data);
   }

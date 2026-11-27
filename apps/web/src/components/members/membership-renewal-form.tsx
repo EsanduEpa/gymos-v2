@@ -46,7 +46,7 @@ export function MembershipRenewalForm({ slug, member, plans, requestKey }: {
               <option value="IMMEDIATE">Today in the gym’s timezone</option>
             </select>
           </div>
-          <p>Next available queues this plan after its last covered term. Starting today requires the same plan to have no active or upcoming term. Record the membership payment and receipt in the gym cashbook.</p>
+          <p>Next available queues this plan after its last covered term. Starting today requires the same plan to have no active or upcoming term. Record the membership payment in the gym cashbook.</p>
           {state.error ? <Feedback tone="error">{state.error}</Feedback> : null}
           <Button type="submit" pending={pending} pendingLabel="Confirming renewal…" disabled={!plan && !state.retry}>
             {state.retry ? 'Retry the same renewal' : 'Confirm membership renewal'}

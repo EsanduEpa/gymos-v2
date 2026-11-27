@@ -118,7 +118,6 @@ async function fillMemberEnrollment(page: Page, input: { name: string; email: st
   await page.getByLabel('Phone').fill('+94112223346');
   await page.getByLabel('Date of birth').fill('1994-04-10');
   await page.getByLabel('Emergency contact').fill('Synthetic contact');
-  await page.getByLabel('Health notes').fill('Private recovery boundary note');
   await page.getByLabel('Initial membership plan').selectOption(input.planId);
   return key;
 }
@@ -1709,7 +1708,7 @@ test('browser recovers an unpublished tenant commit after Master activation fail
     } finally { await pendingContext.close(); }
     const repeated = await request.post(`${apiBase}/gyms/${slug}/member-registrations`, { headers, data: {
       fullName: 'Activation Recovery Member', email, phone: '+94112223346', dateOfBirth: '1994-04-10',
-      emergencyContact: 'Synthetic contact', healthNotes: 'Private recovery boundary note', membershipPlanId: plan.id, idempotencyKey: key,
+      emergencyContact: 'Synthetic contact', membershipPlanId: plan.id, idempotencyKey: key,
     } });
     expect([409, 500, 503]).toContain(repeated.status());
     expect(await fixture.master.operation.count({ where: { idempotencyKey: key, kind: 'REGISTER_MEMBER' } })).toBe(1);
@@ -1731,7 +1730,7 @@ test('browser recovers an unpublished tenant commit after Master activation fail
     expect(await fixture.tenants[1].member.count()).toBe(betaBefore);
     const replay = await request.post(`${apiBase}/gyms/${slug}/member-registrations`, { headers, data: {
       fullName: 'Activation Recovery Member', email, phone: '+94112223346', dateOfBirth: '1994-04-10',
-      emergencyContact: 'Synthetic contact', healthNotes: 'Private recovery boundary note', membershipPlanId: plan.id, idempotencyKey: key,
+      emergencyContact: 'Synthetic contact', membershipPlanId: plan.id, idempotencyKey: key,
     } });
     expect(replay.status()).toBe(201);
     expect(await replay.json()).toMatchObject({ status: 'COMPLETE', replayed: true, operationId: operation.id, memberId: member.id });
@@ -1795,7 +1794,7 @@ test('a lost browser action response recovers through the saved enrollment refer
   const bearer = (await page.context().cookies()).find(cookie => cookie.name === 'gymos_access_token')!.value;
   const replay = await request.post(`${apiBase}/gyms/${slug}/member-registrations`, { headers: { authorization: `Bearer ${bearer}` }, data: {
     fullName: details.name, email, phone: '+94112223346', dateOfBirth: '1994-04-10', emergencyContact: 'Synthetic contact',
-    healthNotes: 'Private recovery boundary note', membershipPlanId: plan.id, idempotencyKey: key,
+    membershipPlanId: plan.id, idempotencyKey: key,
   } });
   expect(replay.status()).toBe(201);
   expect(await replay.json()).toMatchObject({ replayed: true, operationId: operation.id, memberId: member.id });
@@ -1891,7 +1890,16 @@ test('member roster and profile keep role, tenant, privacy, empty, and dependenc
   await expect(page.getByText(/Renewal profile bundle renewed for LKR 15000/)).toBeVisible();
   await expect(page.locator('.session-pack-panel')).toContainText('3 PT credits included with membership');
   await expect(page.locator('.session-pack-panel')).toContainText('3 available');
-  expect(await fixture.tenants[0]!.sessionPack.count({ where: { memberId: profileMember.id } })).toBe(1);
+  const terms = await fixture.tenants[0].membershipTerm.findMany({ where: { memberId: profileMember.id } });
+  const packs = await fixture.tenants[0].sessionPack.findMany({ where: { memberId: profileMember.id } });
+  expect(terms).toHaveLength(1);
+  expect(packs).toHaveLength(1);
+  expect(packs[0]!.membershipTermId).toBe(terms[0]!.id);
+  const renewalAudit = await fixture.tenants[0].auditLog.findMany({
+    where: { resourceId: { in: [terms[0]!.id, packs[0]!.id] } },
+    select: { eventCode: true },
+  });
+  expect(renewalAudit.map(entry => entry.eventCode).sort()).toEqual(['MEMBERSHIP_RENEWED', 'MEMBER_SESSION_PACK_ISSUED']);
   await page.setViewportSize({ width: 320, height: 700 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: join(memberEvidence, 'profile-320.png'), fullPage: true, animations: 'disabled' });
@@ -1912,7 +1920,7 @@ test('member roster and profile keep role, tenant, privacy, empty, and dependenc
     fixture.master.operation.count(), fixture.master.platformAuditLog.count(), fixture.tenants[0].auditLog.count(),
     fixture.tenants[0].membershipTerm.count(), fixture.tenants[1].auditLog.count(),
   ]);
-  expect(after).toEqual([before[0], before[1], before[2] + 1, before[3], before[4]]);
+  expect(after).toEqual([before[0], before[1], before[2] + 2, before[3] + 1, before[4]]);
 });
 
 test('member roster and profile expose accessible loading states while tenant reads wait', async ({ page }) => {

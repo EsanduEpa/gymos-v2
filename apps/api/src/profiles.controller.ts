@@ -296,11 +296,11 @@ export class GymProfileController {
     const headerKey = idempotencyKeySchema.safeParse(key);
     const parsed = ownerMemberProfileCorrectionSchema.safeParse({ ...(typeof body === 'object' && body !== null ? body : {}), idempotencyKey: key });
     if (!headerKey.success || !parsed.success || parsed.data.idempotencyKey !== headerKey.data) invalid();
+    if (parsed.data.healthNotes !== undefined) throw new ForbiddenException('Members manage their own health notes');
     return this.tenantGate.withVerifiedTenant(access, async tenant => {
       const binding = await this.publishedMember(tenant, access.gymId, memberId);
       return withGymAccessFence(this.database.master, [{ identityId: access.identityId, gymId: access.gymId, role: 'OWNER' }], async () => {
-        const protectedHealthNotes = profileFingerprint(JSON.stringify(parsed.data.healthNotes === undefined ? ['absent']
-          : parsed.data.healthNotes === null ? ['null'] : ['value', parsed.data.healthNotes]),
+        const protectedHealthNotes = profileFingerprint(JSON.stringify(['absent']),
         `member-profile-note:${access.gymId}:${access.identityId}:${memberId}:${parsed.data.idempotencyKey}`,
         'gymos-member-profile-note-fingerprint-v1');
         const digest = requestDigest({ fullName: parsed.data.fullName, dateOfBirth: parsed.data.dateOfBirth, phone: parsed.data.phone,
@@ -318,7 +318,7 @@ export class GymProfileController {
             enrollmentOperationId: binding.enrollmentOperationId, version: member.version }, data: {
               fullName: parsed.data.fullName,
               dateOfBirth: parsed.data.dateOfBirth ? new Date(`${parsed.data.dateOfBirth}T00:00:00.000Z`) : null,
-              phone: parsed.data.phone, emergencyContact: parsed.data.emergencyContact, healthNotes: parsed.data.healthNotes,
+              phone: parsed.data.phone, emergencyContact: parsed.data.emergencyContact,
               version: { increment: 1 },
             } });
           if (updated.count !== 1) throw new ConflictException('Member profile changed; reload before correcting it');
