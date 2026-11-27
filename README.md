@@ -1,6 +1,6 @@
 # GymOS V2
 
-GymOS V2 is a multi-tenant web app for gym operations.
+GymOS V2 is a multi-tenant web app for gym operations
 
 ## System architecture
 
