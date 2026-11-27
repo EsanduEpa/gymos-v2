@@ -15,6 +15,7 @@ import { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js
 import { withGymAccessFence } from './identity/gym-access-fence.js';
 import { MAX_PROFILE_PHOTO_BYTES, prepareProfilePhoto, sealProfilePhoto, streamProfilePhoto } from './profile-photo.js';
 import { pendingTrainerShift } from './trainer-shift-request.js';
+import { virtualPtEnabled } from './sessions/delivery-options.js';
 
 function invalid(): never { throw new UnprocessableEntityException('Enter valid profile fields and the current profile version'); }
 function profileFingerprint(value: string, binding: string, scope: string) {
@@ -132,7 +133,8 @@ export class GymProfileController {
         if (!row) throw new NotFoundException('Trainer profile not found');
         return selfTrainerProfileSchema.parse({ trainerId: row.id, fullName: row.fullName, phone: row.phone,
           biography: row.bio, specialisations: row.specialisations, yearsExperience: row.yearsExperience, version: row.version,
-          shiftStart: row.shiftStart, shiftEnd: row.shiftEnd, offersVirtualPt: row.offersVirtualPt, pendingShift: pendingTrainerShift(row.shiftRequest), hasPhoto: row.profilePhoto !== null });
+          shiftStart: row.shiftStart, shiftEnd: row.shiftEnd, offersVirtualPt: virtualPtEnabled() ? row.offersVirtualPt : undefined,
+          pendingShift: pendingTrainerShift(row.shiftRequest), hasPhoto: row.profilePhoto !== null });
       }
       throw new ForbiddenException('Profile role does not match gym access');
     });
@@ -184,6 +186,7 @@ export class GymProfileController {
             actorIdentityId: access.identityId, commandKind: 'UPDATE_SELF_TRAINER_PROFILE', idempotencyKey: parsed.data.idempotencyKey,
           } } });
           if (prior) return replay({ requestDigest: prior.requestDigest, resourceId: prior.resourceId, safeResult: prior.safeResult }, digest, trainerId);
+          if (parsed.data.offersVirtualPt !== undefined && !virtualPtEnabled()) throw new UnprocessableEntityException('Virtual PT is unavailable');
           const trainer = await tx.trainer.findFirst({ where: { id: trainerId, identityId: access.identityId, registrationState: 'COMPLETE' } });
           if (!trainer) throw new NotFoundException('Trainer profile not found');
           if (trainer.version !== parsed.data.expectedVersion) throw new ConflictException('Your gym profile changed; reload before saving');

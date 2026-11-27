@@ -377,7 +377,9 @@ async function start() {
     GYMOS_COACHING_DATA_KEY: createHash('sha256').update('gymos-manual-coaching-data\0').update(state.jwtSecret).digest('hex') };
   const api = spawn(process.execPath, ['dist/main.js'], { cwd: `${root}apps/api`, env: apiEnv, stdio: 'inherit' });
   const web = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '-H', '127.0.0.1', '-p', String(webPort)], {
-    cwd: `${root}apps/web`, env: { ...cleanEnv, NODE_ENV: 'production', GYMOS_API_URL: `http://127.0.0.1:${apiPort}`, GYMOS_WEB_ORIGIN: `http://localhost:${webPort}`, GYMOS_COOKIE_SUFFIX: '_test', GYMOS_PAYHERE_CHECKOUT_ENABLED: payHereEnabled ? '1' : '0' }, stdio: 'inherit' });
+    cwd: `${root}apps/web`, env: { ...cleanEnv, NODE_ENV: 'production', GYMOS_API_URL: `http://127.0.0.1:${apiPort}`, GYMOS_WEB_ORIGIN: `http://localhost:${webPort}`, GYMOS_COOKIE_SUFFIX: '_test',
+      ...(payHereEnabled ? { GYMOS_PAYHERE_CHECKOUT_ENABLED: '1' } : {}),
+    }, stdio: 'inherit' });
   const stop = () => { api.kill('SIGTERM'); web?.kill('SIGTERM'); };
   process.on('SIGINT', stop); process.on('SIGTERM', stop);
   api.on('exit', () => web?.kill('SIGTERM')); web?.on('exit', () => api.kill('SIGTERM'));

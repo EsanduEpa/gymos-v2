@@ -4,11 +4,11 @@
 
 | Area | Current behavior |
 | --- | --- |
-| Booking | One-to-one, 60-minute appointments. Standard in-person delivery and virtual bookings for opted-in trainers use the same credit and settlement rules. Introductory workflows remain separate. |
+| Booking | One-to-one, 60-minute appointments. Initial release sessions are in person. Introductory workflows remain separate. |
 | Availability | Trainers and owners manage availability. Candidate starts use a 15-minute gym-local grid, accept adjacent half-open appointments, and obey an inclusive two-hour to 14-day creation window. Missing availability makes a slot unavailable. Use database time and the gym timezone. |
 | Requests | A member may have two live pending requests per gym. Each holds the slot but reserves no credit. Expiry is the earlier of creation plus 12 hours or scheduled start minus one hour. Acceptance must occur strictly before expiry and does not reapply the two-hour creation rule. |
 | Confirmation | A Trainer accepts a member request or an Owner confirms directly. Membership and pack eligibility cover the session's gym-local date. Confirmation checks the current balance, holds one credit and saves the agreed pay and configuration. |
-| Delivery | Start closes 15 minutes after scheduled start for an unstarted session. The worker can then settle an eligible no-show. Completion is explicit and requires the configured minimum elapsed time. In-person QR codes are short-lived and scoped to the booking and phase. Manual start and completion are available. |
+| Delivery | Trainers start and complete sessions manually. Start closes 15 minutes after scheduled start for an unstarted session. The worker can then settle an eligible no-show. Completion is explicit and requires the configured minimum elapsed time. |
 | Cancellation and correction | Member cancellation is free at or before the 24-hour boundary under the default policy. Late cancellation and no-show consume one credit. Withdrawing an unconfirmed request consumes none. Trainer/gym cancellation protects member value. Follow the stored policy quote. Owner corrections require a reason and preserve original facts and accounting history. |
 | Earnings | Eligible completion consumes the held credit and records earned value and snapshotted fixed trainer pay once. Approval of payroll records the obligation. Use the finance workflow for corrections. |
 
@@ -21,6 +21,8 @@ The persistent API runner sweeps request expiry, automatic no-shows, 24-hour/one
 3. During an outage, record delivery and cancellations separately. After recovery, use authorized owner correction or reschedule commands to reconcile affected bookings and let credits and earnings follow the recorded outcomes.
 
 ## Verification and rollout
+
+- Leave `GYMOS_PT_QR_ENABLED` and `GYMOS_PT_VIRTUAL_ENABLED` unset on the web and API for the initial release. A separate review environment can enable the relevant setting with `1` on both services. Virtual bookings also require trainer opt-in.
 
 - Run `GYMOS_TEST_ALLOW_DOCKER=1 pnpm test:pt:owned` for isolated PT and finance coverage. Use the [ordered browser scenarios](END-TO-END-MANUAL-SCENARIOS.md) for role, keyboard, mobile and manual-delivery acceptance.
 - Review future bookings, approved payroll and pending work before rolling out schema rules. Verify backups, matching API/web releases, current tenant manifests, and scheduled-work recovery. Use a compatible forward fix or the reviewed isolated restore process.

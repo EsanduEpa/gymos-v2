@@ -1,4 +1,5 @@
 import { noShowIsEligible } from './session-no-show.js';
+import { virtualPtEnabled } from './delivery-options.js';
 import { creditTotals, creditUnits } from './credit-unit-projection.js';
 import { ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma, type PrismaClient } from '../generated/tenant/client.js';
@@ -62,7 +63,9 @@ function item(row: SessionRow, role: string, now: Date, minimumCompletionMinutes
     createdAt: row.createdAt.toISOString(), fee: role === 'OWNER' ? row.fee?.toString() ?? null : null,
     currency: role === 'OWNER' || role === 'TRAINER' && (row.payRecord || row.payCorrections?.length) ? row.currency ?? null : null, notes: row.notes,
     trainerPay: role === 'TRAINER' && (row.payRecord || row.payCorrections?.length) ? (row.payCorrections ?? []).reduce((sum, correction) => sum.plus(correction.amount.toString()), new Prisma.Decimal(row.payRecord?.amount.toString() ?? '0')).toString() : null,
-    commandAffordances: sessionCommandAffordances(row, role, now, minimumCompletionMinutes).filter(command => row.creditHold?.state === 'HELD' || !['START', 'COMPLETE'].includes(command)),
+    commandAffordances: sessionCommandAffordances(row, role, now, minimumCompletionMinutes).filter(command =>
+      (command !== 'ACCEPT' || row.type !== 'VIRTUAL' || virtualPtEnabled()) &&
+      (row.creditHold?.state === 'HELD' || !['START', 'COMPLETE'].includes(command))),
   };
 }
 
@@ -155,7 +158,10 @@ export class SessionReadsService {
         const awaitingRemedy = row.state === 'CANCELLED' && row.creditHold?.state === 'RELEASED' && sourceUnit && !sourceUnit.held && !sourceUnit.consumed && sourceUnit.effectiveEndDateExclusive.toISOString().slice(0,10) <= today && !row.creditHold.remedies?.length;
         const latestEvent = access.role === 'OWNER' ? (await tx.sessionStateEvent.findMany({ where: { sessionId }, orderBy: { committedVersion: 'desc' }, take: 1, select: { id: true } }))[0] : null;
         const allowedKinds: string[] = [];
-        if (row.state === 'SCHEDULED' && !row.startedAt && row.creditHold?.state === 'HELD') { allowedKinds.push('CANCEL'); if (row.scheduledStartAt > now) allowedKinds.push('RESCHEDULE'); }
+        if (row.state === 'SCHEDULED' && !row.startedAt && row.creditHold?.state === 'HELD') {
+          allowedKinds.push('CANCEL');
+          if (row.scheduledStartAt > now && (row.type !== 'VIRTUAL' || virtualPtEnabled())) allowedKinds.push('RESCHEDULE');
+        }
         if (row.creditHold && ['SCHEDULED','ACTIVE','COMPLETED','MISSED','CANCELLED'].includes(row.state) && (row.state !== 'SCHEDULED' || row.scheduledEndAt <= now) && !row.adjustments?.some(adjustment => adjustment.kind === 'RESCHEDULE')) allowedKinds.push('CORRECTION');
         if (awaitingRemedy) allowedKinds.push('REMEDY');
         return sessionDetailSchema.parse({ session: projected, location: policy?.address ?? config.address, creditCost: 1,

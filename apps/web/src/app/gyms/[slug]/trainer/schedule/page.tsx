@@ -42,7 +42,7 @@ export default async function TrainerSchedulePage({ params, searchParams }: {
           <span className="ui-badge ui-badge-info">Pending</span></div>
         </div>
         <div className="trainer-schedule-request-actions">
-          <SessionRequestDecisionForm slug={slug} sessionId={item.id} expectedVersion={item.version} action="ACCEPT" requestKey={randomUUID()}/>
+          {item.type !== 'VIRTUAL' || process.env.GYMOS_PT_VIRTUAL_ENABLED === '1' ? <SessionRequestDecisionForm slug={slug} sessionId={item.id} expectedVersion={item.version} action="ACCEPT" requestKey={randomUUID()}/> : null}
           <SessionRequestDecisionForm slug={slug} sessionId={item.id} expectedVersion={item.version} action="DECLINE" requestKey={randomUUID()}/>
         </div>
       </article>)}</div>

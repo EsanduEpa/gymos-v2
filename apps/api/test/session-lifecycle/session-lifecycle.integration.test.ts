@@ -142,7 +142,15 @@ it('binds each PT scan to the member booking and phase, then settles a replayed 
     const ctx = await setup();
     const ready = await createSession(ctx, `scanned-${run.runId}`);
     const other = await createSession(ctx, `wrong-scan-${run.runId}`, new Date(Date.now() - 90 * 60_000));
+    vi.stubEnv('GYMOS_PT_QR_ENABLED', undefined);
+    await expect(ctx.service.scanCode(ctx.memberAccess, ready.session.id)).rejects.toMatchObject({ status: 404 });
+    vi.stubEnv('GYMOS_PT_QR_ENABLED', '1');
     const startCode = await ctx.service.scanCode(ctx.memberAccess, ready.session.id);
+    vi.stubEnv('GYMOS_PT_QR_ENABLED', undefined);
+    await expect(ctx.service.start(ctx.trainerAccess, ready.session.id, {
+      expectedVersion: 0, idempotencyKey: uuidKey('disabled-scan'), scanToken: startCode.token,
+    })).rejects.toMatchObject({ status: 422 });
+    vi.stubEnv('GYMOS_PT_QR_ENABLED', '1');
     const otherCode = await ctx.service.scanCode(ctx.memberAccess, other.session.id);
     await expect(ctx.service.scanCode(ctx.trainerAccess, ready.session.id)).rejects.toMatchObject({ status: 403 });
     await expect(ctx.service.start(ctx.trainerAccess, ready.session.id, {

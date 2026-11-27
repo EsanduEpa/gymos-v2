@@ -36,6 +36,7 @@ export default async function SessionDetailPage({ params, searchParams }: {
   const parsed = response.ok ? sessionDetailSchema.safeParse(await response.json().catch(() => null)) : null;
   const data = parsed?.success ? parsed.data : null;
   const booking = data?.session;
+  const qrEnabled = process.env.GYMOS_PT_QR_ENABLED === '1';
   const brand = resolveGymBrandColors(theme.primaryColor);
   const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
   const back = `/gyms/${encodeURIComponent(slug)}/${role === 'OWNER' ? 'owner/sessions' : role === 'TRAINER' ? 'trainer/schedule' : 'member/sessions'}`;
@@ -72,8 +73,8 @@ export default async function SessionDetailPage({ params, searchParams }: {
       </Card>
       <div className={styles.stack}>
         <Card><CardHeader eyebrow="SESSION ACTIONS" title={booking.state === 'ACTIVE' ? 'Training in progress' : 'Manage this booking'}/>
-          {role !== 'MEMBER' ? <SessionLifecycleControls slug={slug} session={booking}/> : null}
-          {role === 'MEMBER' && booking.type === 'IN_PERSON' && ['SCHEDULED', 'ACTIVE'].includes(booking.state)
+          {role !== 'MEMBER' ? <SessionLifecycleControls slug={slug} session={booking} qrEnabled={qrEnabled}/> : null}
+          {qrEnabled && role === 'MEMBER' && booking.type === 'IN_PERSON' && ['SCHEDULED', 'ACTIVE'].includes(booking.state)
             ? <MemberPtCode key={`${booking.id}-${booking.version}`} slug={slug} sessionId={booking.id}/> : null}
           <SessionPolicyControls slug={slug} session={booking} role={role}/>
           {booking.commandAffordances.includes('ACCEPT') ? <SessionRequestDecisionForm slug={slug} sessionId={sessionId} expectedVersion={booking.version} action="ACCEPT" requestKey={randomUUID()}/> : null}

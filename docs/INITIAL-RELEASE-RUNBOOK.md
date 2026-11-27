@@ -139,3 +139,37 @@ GO or NO-GO with reason
 Gym Owner sign-off and date
 Release lead sign-off and date
 ```
+
+### Execution record · 2026-11-27
+
+#### Phase 0 · Candidate preparation
+
+- Tested source starts at `b64789ad1524f5146c0988dcf2444d0e628cca70` plus the manual PT scope and synthetic launcher changes in this phase. The local Next.js build ID is `UQx1Pv5u79zfyxsWcvwML`. The SHA-256 of the sorted API JavaScript file checksums is `cee023ba03577f0be80443668b3bf4669cf2540e2415aa2197f16046e6999b15`.
+- Master manifest `master-2026-11-18.1` and tenant manifest `tenant-2026-11-19.1`. The owned synthetic Master and all three tenant databases synced successfully. Browser acceptance uses `http://localhost:3002` with API port 3003. Alpha is the working gym, Beta is the isolation control, and the gym-local timezone is `Asia/Colombo`.
+- The release implementation assumes a Vercel web deployment, an always-on Render API, and dedicated PostgreSQL. The hosted rehearsal instance, authorization and operator are pending. The checked-in Free demo API sleeps, so it cannot establish scheduled-worker readiness for the release.
+- The provisional plans below were selected for this candidate at the requester's direction. The existing cashbook records each payment and receipt. GymOS records the term and its credits. Manual in-person PT and in-app request notices are in scope. The approved rule consumes one PT credit for a qualifying no-show and an unstarted confirmed booking becomes eligible 15 minutes after its scheduled start. Members see the rule before submitting a PT request. QR, virtual PT, standalone top-ups, in-app cash collection and receipts, card checkout, automated GymOS billing, biometrics and attendance, native apps, wearables, AI, reviews, rewards and advanced analytics are deferred.
+- Codex is the technical reviewer for local execution. Gym Owner acceptance and release decision sign-off remain open.
+
+| Provisional plan | Total price | Term | Included PT credits |
+| --- | --- | --- | --- |
+| Monthly | LKR 5,000 | 30 days | 0 |
+| Monthly with PT | LKR 15,000 | 30 days | 6 |
+
+Use fresh synthetic records for direct enrollment, application approval, the zero-credit plan, queued renewal, credential recovery, ordinary completion, each cancellation or correction, no-show and payroll. Keep each role in a separate browser profile. Capture the actual start and exclusive end dates at enrollment. An enrollment on 27 November starts the first 30-day term on 27 November and the queued term on 27 December. Their exclusive end dates are 27 December and 26 January respectively. For the bundled plan, the opening balance for each allowance is six available, zero held and zero consumed from its start date. The legacy smoke-test member had seven credits available and zero held. The Alpha smoke-test trainer's quoted in-shift base pay was LKR 1,066 with a 10% off-shift premium. Alpha configuration showed a 24-hour cancellation window and a 21-minute minimum elapsed duration before completion. Recheck rates and balances for the fresh records before confirming bookings.
+
+| Local Phase 0 check | Observed on the rebuilt source |
+| --- | --- |
+| Frozen install, workspace graph, prepare, build, typecheck, lint | Passed. The frozen install used the workspace's existing pnpm store in offline mode after the local default store prompted to reinstall. |
+| Unit and API HTTP | Passed. Contracts 68, theme tokens 5, API units 90, pool tests 25 and API HTTP 3. The HTTP fixtures required loopback access. |
+| Owned PT, finance, application and recovery suites | Passed. PT 62, finance 3, applications 5 and recovery 1. The PT suite exercises both disabled launch controls and isolated opt-in coverage for QR and virtual PT. |
+| Browser and API on the owned test instance | Passed. Signed in with separate Alpha Owner, Member and Trainer profiles and a Beta Owner profile. The authorized membership and subscription screens rendered without purchase or recurring billing actions. Crossed roles and Beta Owner could not open the restricted Alpha pages. The chosen format was in-person on both booking entry points, the trainer profile omitted virtual opt-in, the member request page showed the no-show rule, and the scan-code API returned 404 with the disabled-feature response. |
+| Owned fixture baseline | Passed. All four role logins and credit conservation across Alpha, Beta and Gamma. A concurrent round of browser logins triggered the documented throttle on the first attempt. The baseline passed after the one-minute window reset. |
+| Isolated browser suite | Passed. 44 scenarios passed. The opt-in PayHere callback scenario was skipped with payment flags unset. |
+
+| Gate | Status | Tester and date | Scenario, expected and actual result | Evidence or blocker |
+| --- | --- | --- | --- | --- |
+| 1. Manual sales and renewals with included PT credits | Pending | | | |
+| 2. PT and payroll | Pending | | | |
+| 3. Request and decision notifications, account access and privacy | Pending | | | |
+| 4. Deployment and restore | Pending | | | Approved persistent target and operator required before hosted rehearsal. |
+| 5. Owner walkthrough | Pending | | | |
