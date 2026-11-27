@@ -7,4 +7,4 @@ Run setup and workspace checks from the repository root. The hosted API build us
 - [Local setup and architecture](../../README.md)
 - [Isolated testing environments](../../docs/manual-testing.md)
 - [Gym provisioning and workers](../../docs/PROVISIONING-RUNTIME.md)
-- [Hosted API runbook](../../docs/DEPLOY-VERCEL-RENDER-NEON.md)
+- [Hosted API runbook](../../docs/HOSTED-DEPLOYMENT.md#configure-render)

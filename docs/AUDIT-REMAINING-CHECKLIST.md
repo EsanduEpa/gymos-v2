@@ -2,7 +2,7 @@
 
 Updated 16 November 2026 after reviewing the audit, the GymOS SRS v1.0 working draft, the GymOS Role Function List v2.0 and the FitCore proposal. The application baseline for this review is commit `cced34c`. Tick a development task after its acceptance checks pass and record the commit and test result.
 
-The local build already covers the original registration and recovery fixes, membership plan editing, PT history, dated workouts and meals, exercise completion, dietary notes, basic measurements, membership expiry warnings, basic trainer performance and four PDF/Excel exports. The checklist covers the unfinished parts. [Developer review and local evidence](CLIENT-REVIEW.md)
+The local build already covers the original registration and recovery fixes, membership plan editing, PT history, dated workouts and meals, exercise completion, dietary notes, basic measurements, membership expiry warnings, basic trainer performance and four PDF/Excel exports. The checklist covers the wider backlog. Use the [release review](RELEASE-REVIEW.md) for first-release gates and local evidence.
 
 ## 1. Confirm the requirements
 
@@ -82,5 +82,4 @@ The product owner deferred items 11–12 until the entry and attendance workflow
 
 - [Original audit](../gymos_v2_qa_audit_report.pdf), particularly pages 3–7 and 17–18.
 - [Requirements review and source mapping](GYMOS-REQUIREMENTS-REVIEW.md).
-- [Developer review and recorded checks](CLIENT-REVIEW.md).
-- [Defect remediation and verification record](QA-AUDIT-PRIORITIZED-REMEDIATION-PLAN.md#12-evidence-and-completion-record).
+- [Local checks and original QA audit findings](RELEASE-REVIEW.md#local-verification-record).

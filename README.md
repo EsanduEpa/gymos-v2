@@ -92,8 +92,11 @@ The approved V2 scope is a responsive web app with four roles: Super Admin, Gym 
 
 See the [current development and release checklist](docs/AUDIT-REMAINING-CHECKLIST.md) for broader scope and remaining verification.
 
-## Hosted demo deployment
+## Project guides
 
-See [Vercel + Render + Supabase setup](docs/DEPLOY-VERCEL-RENDER-SUPABASE.md) for repository settings, private environment variables, direct-database requirements, explicit migrations and hosted acceptance gates.
-
-For the free synthetic demo, follow the [Vercel + Render Free + Neon guide](docs/DEPLOY-VERCEL-RENDER-NEON.md). The Render Blueprint selects Free; scheduled work pauses during idle sleep. Wake the API before demonstrating. Vercel Hobby eligibility depends on personal, non-commercial use.
+| Topic | Guide |
+| --- | --- |
+| Scope and delivery | [Requirements and SRS mapping](docs/GYMOS-REQUIREMENTS-REVIEW.md), [development checklist](docs/AUDIT-REMAINING-CHECKLIST.md), [release gates and QA evidence](docs/RELEASE-REVIEW.md) |
+| Local verification | [Local environments and file inventory](docs/manual-testing.md), [browser acceptance scenarios](docs/END-TO-END-MANUAL-SCENARIOS.md) |
+| Deployment and runtime | [Hosted deployment with Neon or Supabase](docs/HOSTED-DEPLOYMENT.md), [gym provisioning](docs/PROVISIONING-RUNTIME.md), [PT operations and scheduled work](docs/PT-OPERATIONS.md) |
+| Roles and privacy | [Account operations](docs/ACCOUNT-OPERATIONS.md), [security and privacy review](docs/SECURITY-REVIEW.md), [workspace design](docs/WORKSPACE-DESIGN.md) |

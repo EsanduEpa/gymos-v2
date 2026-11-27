@@ -6,4 +6,4 @@ From the repository root, `pnpm build:deploy:web` builds the web app and its sha
 
 - [Local setup and architecture](../../README.md)
 - [Manual acceptance testing on port 3002](../../docs/manual-testing.md)
-- [Vercel deployment runbook](../../docs/DEPLOY-VERCEL-RENDER-NEON.md#6-create-the-vercel-frontend)
+- [Vercel deployment runbook](../../docs/HOSTED-DEPLOYMENT.md#configure-vercel)

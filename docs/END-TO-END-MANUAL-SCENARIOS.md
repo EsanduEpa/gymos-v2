@@ -16,7 +16,7 @@ Keep the port 3002 testing web app and port 3003 API running in a background ter
 
 Run **one scenario at a time, in strict ID order**: E01, then E02, and so on. Complete and record the current scenario before opening the next one. Use a fresh browser context when switching accounts unless the scenario explicitly tests switching or logout. Keep each test identity and idempotency reference unique.
 
-If any issue occurs, record the failed step, expected and actual result, and relevant evidence in [CHROME-MANUAL-ISSUES.md](CHROME-MANUAL-ISSUES.md). Mark that scenario failed or partial. The user has asked to collect issues across a few Chrome scenarios before fixing them together. Continue to the next scenario in ID order only when the user asks to continue; do not silently treat a failed step as passed. After the collection phase, investigate and fix the logged issues, report the fixes and focused checks, and resume manual testing when the user asks.
+If any issue occurs, record the failed step, expected and actual result, and relevant evidence in the [manual issue log](RELEASE-REVIEW.md#manual-issue-log). Mark that scenario failed or partial. The user has asked to collect issues across a few Chrome scenarios before fixing them together. Continue to the next scenario in ID order only when the user asks to continue. After the collection phase, investigate and fix the logged issues, report the fixes and focused checks, and resume manual testing when the user asks.
 
 While fixing an issue, run only the checks needed to confirm that specific fix. Avoid repeated browser attempts, broad suites and unrelated retries. Leave the end-to-end acceptance decision to the resumed manual run on port 3002.
 
@@ -70,4 +70,4 @@ While fixing an issue, run only the checks needed to confirm that specific fix. 
 
 Revisit Alpha and Beta after the journeys and compare membership, sessions, credits, financials and notifications for unexpected cross-gym changes. Confirm the created disposable records and any irreversible state changes are listed in the run log. Record every failed or blocked scenario with the exact screen, action, expected result, actual result and reproduction steps. A complete run requires every applicable E01–E26 scenario to have a recorded outcome; do not report the system as fully accepted while any critical journey is failed or untested.
 
-The product feature inventory behind this runbook is [CLIENT-DEMO-PLAN.md](CLIENT-DEMO-PLAN.md), especially D01–D27. The PT timing and credit rules are in [PT-IMPLEMENTATION-GUIDE.md](PT-IMPLEMENTATION-GUIDE.md). Follow those documents when a scenario's expected result needs more precision.
+Use the [requirements review](GYMOS-REQUIREMENTS-REVIEW.md) and [PT timing and credit rules](PT-OPERATIONS.md#booking-and-settlement-rules) when a scenario's expected result needs more precision.
