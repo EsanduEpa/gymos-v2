@@ -1,3 +1,4 @@
+import { isPayHereCheckoutEnabled } from '@/lib/payhere-checkout';
 import type { CSSProperties } from 'react';
 import { randomUUID } from 'node:crypto';
 import { notFound, redirect } from 'next/navigation';
@@ -31,7 +32,7 @@ export default async function OwnerSubscriptionPage({ params }: { params: Promis
   if (response?.status === 403) notFound();
   const result = response?.ok ? gymosSubscriptionStatusSchema.safeParse(await response.json().catch(() => null)) : null;
   const subscription = result?.success ? result.data : null;
-  const checkoutEnabled = process.env.GYMOS_PAYHERE_CHECKOUT_ENABLED === '1';
+  const checkoutEnabled = isPayHereCheckoutEnabled('SUBSCRIPTION');
   const brand = resolveGymBrandColors(theme.primaryColor);
   const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
   return <DashboardChrome identityId={session.identityId} key={`${session.identityId}:${gym.id}:${gym.role}`} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'} style={style}>

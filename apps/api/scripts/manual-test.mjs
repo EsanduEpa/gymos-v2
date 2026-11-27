@@ -371,9 +371,9 @@ async function start() {
     'GYMOS_PAYHERE_SANDBOX_MERCHANT_ID', 'GYMOS_PAYHERE_SANDBOX_MERCHANT_SECRET', 'GYMOS_PAYHERE_SANDBOX_API_ORIGIN',
     'GYMOS_PAYHERE_SANDBOX_APP_ID', 'GYMOS_PAYHERE_SANDBOX_APP_SECRET',
   ].filter(key => payHereEnabled && process.env[key]).map(key => [key, process.env[key]]));
-  const apiEnv = { ...cleanEnv, PORT: String(apiPort), MASTER_DATABASE_URL: state.masterUrl, TENANT_DATABASE_URL: state.masterUrl,
+  const apiEnv = { ...cleanEnv, PORT: String(apiPort), GYMOS_API_HOST: '127.0.0.1', MASTER_DATABASE_URL: state.masterUrl, TENANT_DATABASE_URL: state.masterUrl,
     PROVISION_DATABASE_URL: state.provisionUrl, PROVISIONING_RUNNER_ENABLED: 'true', JWT_SECRET: state.jwtSecret,
-    ...payHereConfig, ...(payHereEnabled ? { GYMOS_PAYHERE_SANDBOX_WEB_ORIGIN: `http://localhost:${webPort}` } : {}),
+    ...payHereConfig, ...(payHereEnabled ? { GYMOS_PAYHERE_CHECKOUT_ENABLED: '1', GYMOS_PAYHERE_SANDBOX_WEB_ORIGIN: `http://localhost:${webPort}` } : {}),
     GYMOS_COACHING_DATA_KEY: createHash('sha256').update('gymos-manual-coaching-data\0').update(state.jwtSecret).digest('hex') };
   const api = spawn(process.execPath, ['dist/main.js'], { cwd: `${root}apps/api`, env: apiEnv, stdio: 'inherit' });
   const web = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '-H', '127.0.0.1', '-p', String(webPort)], {

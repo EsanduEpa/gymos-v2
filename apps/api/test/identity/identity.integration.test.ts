@@ -7,7 +7,6 @@ import { ConflictException, type ExecutionContext } from '@nestjs/common';
 import type { Request } from 'express';
 import { PrismaPg } from '@prisma/adapter-pg';
 import argon2 from 'argon2';
-import { SignJWT } from 'jose';
 import { PrismaClient as MasterClient } from '../../src/generated/master/client.js';
 import { PrismaClient as TenantClient } from '../../src/generated/tenant/client.js';
 import { IdentityFoundationService } from '../../src/identity/identity.service.js';

@@ -15,6 +15,9 @@ async function bootstrap() {
     next();
   });
   app.enableShutdownHooks(['SIGTERM', 'SIGINT']);
-  await app.listen(process.env.PORT ?? 3000);
+  const port = process.env.PORT ?? 3000;
+  const host = process.env.GYMOS_API_HOST;
+  if (host) await app.listen(port, host);
+  else await app.listen(port);
 }
 await bootstrap();

@@ -1,5 +1,7 @@
 'use server';
 
+import { isPayHereCheckoutEnabled } from '@/lib/payhere-checkout';
+
 import { gymosSubscriptionCheckoutInputSchema, gymosSubscriptionCheckoutSchema } from '@gymos/contracts';
 import { revalidatePath } from 'next/cache';
 import { notFound, redirect } from 'next/navigation';
@@ -23,7 +25,7 @@ function requestSubscriptionUpdate(slug: string, operation: 'checkout' | 'stop',
 export async function prepareGymosSubscriptionCheckout(
   slug: string, idempotencyKey: string, _previous: CheckoutState, form: FormData,
 ): Promise<CheckoutState> {
-  if (process.env.GYMOS_PAYHERE_CHECKOUT_ENABLED !== '1') return { error: 'Sandbox checkout is currently unavailable.' };
+  if (!isPayHereCheckoutEnabled('SUBSCRIPTION')) return { error: 'Sandbox checkout is currently unavailable.' };
   const { token } = await requireGymContext(slug, 'OWNER');
   const input = gymosSubscriptionCheckoutInputSchema.safeParse({
     tier: form.get('tier'),
@@ -49,7 +51,7 @@ export async function prepareGymosSubscriptionCheckout(
 }
 
 export async function stopGymosSubscription(slug: string, _previous: StopState, form: FormData): Promise<StopState> {
-  if (process.env.GYMOS_PAYHERE_CHECKOUT_ENABLED !== '1') return { error: 'Sandbox subscription changes are currently unavailable.' };
+  if (!isPayHereCheckoutEnabled('SUBSCRIPTION')) return { error: 'Sandbox subscription changes are currently unavailable.' };
   if (form.get('confirm') !== 'true') return { error: 'Confirm that future recurring charges should stop.' };
   const { token } = await requireGymContext(slug, 'OWNER');
   const response = await requestSubscriptionUpdate(slug, 'stop', token);

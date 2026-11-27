@@ -19,6 +19,7 @@ const webDirectory = join(root, 'apps/web');
 const evidenceDirectory = join(webDirectory, 'test-results/ui-transformation/member');
 const payHereUi = process.env.GYMOS_TEST_PAYHERE_UI === '1';
 const syntheticMerchant = {
+  GYMOS_PAYHERE_CHECKOUT_ENABLED: '1',
   GYMOS_PAYHERE_SANDBOX_MERCHANT_ID: '1234567',
   GYMOS_PAYHERE_SANDBOX_MERCHANT_SECRET: 'synthetic-browser-only-secret',
   GYMOS_PAYHERE_SANDBOX_API_ORIGIN: 'https://payment-callback.example.test',

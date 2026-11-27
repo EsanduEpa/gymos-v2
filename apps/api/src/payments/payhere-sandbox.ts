@@ -29,7 +29,10 @@ export function payHereSandboxMerchantConfig(): PayHereConfig {
 }
 
 export function payHereSandboxCheckoutConfig(kind: 'MEMBERSHIP' | 'PT_PACK' | 'SUBSCRIPTION') {
-  if (process.env.GYMOS_PAYHERE_MEMBERSHIP_SANDBOX_ENABLED === '1' && kind !== 'MEMBERSHIP') unavailable();
+  const enabled = process.env.GYMOS_PAYHERE_MEMBERSHIP_SANDBOX_ENABLED === '1'
+    ? kind === 'MEMBERSHIP'
+    : process.env.GYMOS_PAYHERE_CHECKOUT_ENABLED === '1';
+  if (!enabled) unavailable();
   return {
     ...payHereSandboxMerchantConfig(),
     apiOrigin: httpsOrigin(process.env.GYMOS_PAYHERE_SANDBOX_API_ORIGIN),

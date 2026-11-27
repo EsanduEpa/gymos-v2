@@ -12,7 +12,7 @@ Both run the same repository code. The test web server uses a build of that code
 To run development, keep the existing private `.env` and start these in separate terminals from the project root:
 
 ```sh
-set -a; source .env; set +a; PORT=3001 pnpm dev:api
+set -a; source .env; set +a; PORT=3001 GYMOS_API_HOST=127.0.0.1 pnpm dev:api
 ```
 
 ```sh
@@ -23,7 +23,7 @@ The separate Next.js build directories let development and testing run together.
 
 The fresh development master has the same current schema as the testing master. Its admin email and generated password are in the ignored `.env.development-account.json`. It has no gyms yet; new gyms created from port 3000 receive the current tenant schema. The old development databases, including `gym-a` and `gym-b`, were removed from Docker on 2026-11-07 after verified backups were saved in the Git-ignored `.local-backups/gymos-db-cleanup-20261107/`. The old manual testing container and its anonymous volume were also removed; the active port 3002 fixture was untouched. The app's controlled rollout had rejected those old gyms because their original ownership proof was missing. Restore old data only after a separate recovery review.
 
-This sandbox uses a separate PostgreSQL 17 container, bound to a random loopback port, with its own master database and three gym databases. It never loads the project's `.env` or copies live member data. PostgreSQL data survives app shutdown and container restart; removing its container/volume deletes the test data.
+The test web and API listen on loopback. The sandbox uses a separate PostgreSQL 17 container, bound to a random loopback port, with its own master database and three gym databases. It never loads the project's `.env` or copies live member data. PostgreSQL data survives app shutdown and container restart.
 
 The setup contains three gyms (`test-alpha`, `test-beta`, `test-gamma`), 20 members per gym, a trainer in each gym, active memberships and 12-credit PT packs. Each gym has 40 PT sessions: 12 completed, 4 missed, 4 cancelled, 16 scheduled and 4 pending requests. Dates are relative to the setup date in Asia/Colombo. Historical sessions include settlements, credit movements, revenue and trainer pay. The main member also has workout and meal plans.
 

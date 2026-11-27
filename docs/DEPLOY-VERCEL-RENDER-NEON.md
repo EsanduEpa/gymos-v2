@@ -106,10 +106,8 @@ For a beginner, GitHub Desktop is convenient: add the existing repository, revie
 | GYMOS_WEB_ORIGIN | `https://example.invalid` for the initial boot only |
 
 5. Blueprint supplies NODE_VERSION, NODE_ENV, both worker flags and generates JWT_SECRET. In Environment, replace the generated JWT_SECRET with the private stable value from `.env.deploy.neon`, then save/redeploy. Never put JWT_SECRET on Vercel.
-6. Apply/create the Blueprint after confirming no paid resources are selected. If Render asks for build/start settings, they are `corepack enable && pnpm install --frozen-lockfile && pnpm build:deploy:api` and `pnpm start:deploy:api`.
-7. Watch Events/Logs until deployment succeeds. Copy the actual public `https://...onrender.com` address. Render's health check uses `/readyz`; update the health check path in the service settings if the service was set up manually.
 6. Apply/create the Blueprint after confirming no paid resources are selected. If Render asks for build/start settings, they are `corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm build:deploy:api` and `node --max-old-space-size=256 --max-semi-space-size=16 infrastructure/deployment/start-api.mjs`.
-7. Watch Events/Logs until deployment succeeds. Copy the actual public `https://...onrender.com` address. Open it: the root response confirms the API process is listening, not complete database/worker readiness.
+7. Watch Events/Logs until deployment succeeds. Copy the actual public `https://...onrender.com` address. Set the health check path to `/readyz` if the service was set up manually. Verify scheduled workers separately.
 8. Confirm logs include provisioning runner enabled and PT scheduled-work runner enabled. Zero gyms is expected before creating the first gym.
 
 Build installation explicitly includes development dependencies (`--prod=false`) because Prisma, TypeScript and the Nest CLI are build tools. Keep NODE_ENV=production for runtime. When creating a Web Service manually, copy this same build command into Render Settings → Build & Deploy; changes to render.yaml do not update a manually configured service.
@@ -120,7 +118,7 @@ PORT is provided by Render; do not copy local ports 3001/3003. Automatic redeplo
 
 1. Open Vercel, Add New → Project, connect GitHub, and import the same repository.
 2. Select the branch pushed in step 4 as the Production branch (under Git settings if necessary).
-3. Framework: Next.js. Root Directory: `apps/web`. Node: 24.x. Include files outside the root directory in the build if this setting is shown; workspace packages and current API test types are needed.
+3. Framework: Next.js. Root Directory: `apps/web`. Node: 24.x. Include files outside the root directory in the build if this setting is shown so the build can read shared contracts and theme tokens.
 4. Use the checked-in `apps/web/vercel.json`. It runs install/build from the monorepo root and outputs `.next`; do not set Output Directory to `dist` or `out`.
 5. Set Production environment variables:
 

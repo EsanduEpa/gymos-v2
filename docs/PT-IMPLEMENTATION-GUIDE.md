@@ -119,7 +119,7 @@ Paths below were inspected when preparing this guide. Re-read current source bef
 | Tenant schema compatibility | `apps/api/src/tenancy/tenant-template-manifest.ts`, `tenant-schema-gate.service.ts`, `tenant-schema-verifier.ts` |
 | Booking/request contracts | `packages/contracts/src/session-booking.ts`, `session-requests.ts` |
 | Reads/lifecycle/notifications contracts | `packages/contracts/src/session-reads.ts`, `session-lifecycle.ts`, `notifications.ts` |
-| Client transport | matching files under `packages/api-client/src/` |
+| Web transport | `apps/web/src/lib/gymos.ts`, `apps/web/src/lib/session-transport.ts`, and the corresponding server actions |
 | Owner booking | `apps/api/src/sessions/booking.controller.ts`, `booking.service.ts` |
 | Member request and trainer decision | `apps/api/src/sessions/session-requests.controller.ts`, `session-requests.service.ts` |
 | State, commands, holds, retries | `apps/api/src/sessions/session-state.ts`, `session-commands.ts`, `credit-holds.ts`, `session-transactions.ts` |

@@ -7,7 +7,7 @@ import { Card, CardHeader, Feedback } from '@/components/ui';
 import { formatDisplayDate } from '@/lib/display-date';
 import { requireGymContext } from '@/lib/gym-context';
 import { apiUrl } from '@/lib/gymos';
-import { isPayHereMemberCheckoutEnabled } from '@/lib/payhere-member-checkout';
+import { isPayHereCheckoutEnabled } from '@/lib/payhere-checkout';
 
 function MembershipDate({ value }: { value: string }) {
   return <time dateTime={value}>{formatDisplayDate(value)}</time>;
@@ -57,8 +57,8 @@ export default async function MemberMembershipPage({ params, searchParams }: {
   const checkoutAllowed =
     order?.status !== 'PENDING' && order?.status !== 'REVIEW_REQUIRED';
 
-  const showPackCheckout = checkoutAllowed && isPayHereMemberCheckoutEnabled('PT_PACK');
-  const showMembershipCheckout = checkoutAllowed && isPayHereMemberCheckoutEnabled('MEMBERSHIP');
+  const showPackCheckout = checkoutAllowed && isPayHereCheckoutEnabled('PT_PACK');
+  const showMembershipCheckout = checkoutAllowed && isPayHereCheckoutEnabled('MEMBERSHIP');
 
   return <DashboardChrome identityId={session.identityId} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'}>
     <div className="platform-page">

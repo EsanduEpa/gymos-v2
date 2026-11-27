@@ -267,6 +267,7 @@ it('fulfills a signed PayHere Sandbox membership checkout exactly once', async (
 
   const merchantId = '1234567';
   const merchantSecret = 'synthetic-membership-test-secret';
+  vi.stubEnv('GYMOS_PAYHERE_CHECKOUT_ENABLED', '1');
   vi.stubEnv('GYMOS_PAYHERE_SANDBOX_MERCHANT_ID', merchantId);
   vi.stubEnv('GYMOS_PAYHERE_SANDBOX_MERCHANT_SECRET', merchantSecret);
   vi.stubEnv('GYMOS_PAYHERE_SANDBOX_API_ORIGIN', 'https://payment-callback.example.test');
@@ -347,6 +348,7 @@ it('fulfills a paid PT pack once from its offer snapshot and scopes payment hist
   const checkoutPath = `${rootPath}/me/pt-pack-checkouts`;
   const merchantId = '1234567';
   const merchantSecret = 'synthetic-pack-testing-secret';
+  vi.stubEnv('GYMOS_PAYHERE_CHECKOUT_ENABLED', '1');
   vi.stubEnv('GYMOS_PAYHERE_SANDBOX_MERCHANT_ID', merchantId);
   vi.stubEnv('GYMOS_PAYHERE_SANDBOX_MERCHANT_SECRET', merchantSecret);
   vi.stubEnv('GYMOS_PAYHERE_SANDBOX_API_ORIGIN', 'https://payment-callback.example.test');
@@ -421,6 +423,7 @@ it('reconciles GymOS recurring billing and recovers in the seven-day window with
   const otherRoute = `/gyms/${gymB.slug}/gymos-subscription`;
   const merchantId = '1234567';
   const merchantSecret = 'synthetic-gymos-subscription-secret';
+  vi.stubEnv('GYMOS_PAYHERE_CHECKOUT_ENABLED', '1');
   vi.stubEnv('GYMOS_PAYHERE_SANDBOX_MERCHANT_ID', merchantId);
   vi.stubEnv('GYMOS_PAYHERE_SANDBOX_MERCHANT_SECRET', merchantSecret);
   vi.stubEnv('GYMOS_PAYHERE_SANDBOX_API_ORIGIN', 'https://payment-callback.example.test');

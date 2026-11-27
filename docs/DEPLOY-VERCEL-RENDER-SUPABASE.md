@@ -46,7 +46,7 @@ node --max-old-space-size=256 --max-semi-space-size=16 infrastructure/deployment
 
 Set the prompted private environment values from `infrastructure/deployment/.env.example`. The Blueprint generates JWT_SECRET; retain it across normal redeploys and never copy it to Vercel. Use one stable Vercel HTTPS production URL for GYMOS_WEB_ORIGIN. It must have no trailing slash or path. If this URL is not known yet, reserve the Vercel project first, then return to Render.
 
-Render supplies PORT. Both workers are enabled in the blueprint. The API listens on the assigned port. Its `/` health check is HTTP liveness, not proof of database initialization or worker health.
+Render supplies PORT. Both workers are enabled in the Blueprint. The API listens on the assigned port. Render checks `/readyz` for Master database connectivity. Verify database initialization and worker health separately.
 
 The first boot may fail until environment values and the dedicated database exist. Complete the database step before directing users to it. **Do not configure migrations as part of every build.**
 
@@ -84,9 +84,9 @@ Import the same Git repository and configure:
 | Root Directory | `apps/web` |
 | Node.js | 24.x |
 | Install/build/output | Use the checked-in `apps/web/vercel.json` |
-| Include files outside Root Directory | Enable if shown, for workspace packages and API test types |
+| Include files outside Root Directory | Enable if shown, for shared contracts and theme tokens |
 
-The frontend build also generates Prisma clients and compiles API modules because the current web TypeScript project includes browser fixtures importing API types. These build artifacts are not database credentials or a backend deployment on Vercel.
+The frontend deployment build compiles Next.js, shared contracts and theme tokens. The separate CI type check covers browser fixtures that import built API modules.
 
 Set Vercel Production environment variables:
 
