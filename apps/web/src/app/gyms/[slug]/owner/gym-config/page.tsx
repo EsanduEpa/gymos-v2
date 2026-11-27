@@ -10,7 +10,9 @@ import { loadPtPackOffers } from '@/app/pt-pack-offer-actions';
 export default async function GymConfigurationPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const { session, gym, theme } = await requireGymContext(slug, 'OWNER');
-  const [result, ptPackOffers] = await Promise.all([loadGymConfiguration(slug), loadPtPackOffers(slug)]);
+  const [result, ptPackOffers] = await Promise.all([
+    loadGymConfiguration(slug), process.env.GYMOS_STANDALONE_PT_PACKS_ENABLED === '1' ? loadPtPackOffers(slug) : undefined,
+  ]);
   const brand = resolveGymBrandColors(theme.primaryColor);
   const style = { '--gym-color': brand.primary, '--gym-on-color': brand.onPrimary } as CSSProperties;
   return <DashboardChrome identityId={session.identityId} key={`${session.identityId}:${gym.id}:${gym.role}`} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'} style={style}>

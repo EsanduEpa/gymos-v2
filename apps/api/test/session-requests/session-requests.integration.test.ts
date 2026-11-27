@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import { PrismaClient as TenantClient } from '../../src/generated/tenant/client.js';
 import { SessionRequestsService } from '../../src/sessions/session-requests.service.js';
 import { TenantSchemaGateService } from '../../src/tenancy/tenant-schema-gate.service.js';
@@ -207,6 +208,10 @@ it('offers virtual PT only with the trainer’s opt-in and confirms the same cre
   await expect(service.request(memberAccess, draft)).rejects.toMatchObject({ status: 422 });
   await tenant.trainer.update({ where: { id: trainer.id }, data: { offersVirtualPt: true, sessionPayOverride: '37.50', shiftStart: '08:00', shiftEnd: '17:00' } });
   try {
+    vi.stubEnv('GYMOS_PT_VIRTUAL_ENABLED', undefined);
+    expect((await service.options(memberAccess, trainer.id)).offersVirtualPt).toBe(false);
+    await expect(service.request(memberAccess, draft)).rejects.toMatchObject({ status: 422 });
+    vi.stubEnv('GYMOS_PT_VIRTUAL_ENABLED', '1');
     expect((await service.options(memberAccess, trainer.id)).offersVirtualPt).toBe(true);
     const pending = await service.request(memberAccess, draft);
     await tenant.trainer.update({ where: { id: trainer.id }, data: { offersVirtualPt: false } });
@@ -218,6 +223,7 @@ it('offers virtual PT only with the trainer’s opt-in and confirms the same cre
     expect((await tenant.pTSession.findUniqueOrThrow({ where: { id: pending.session.id } })).confirmedTrainerPay?.toString())
       .toBe(config.offShiftPremium.plus(1).times('37.50').toDecimalPlaces(2).toString());
   } finally {
+    vi.unstubAllEnvs();
     await tenant.trainer.update({ where: { id: trainer.id }, data: { offersVirtualPt: false, sessionPayOverride: null } });
   }
 });

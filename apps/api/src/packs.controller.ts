@@ -22,6 +22,7 @@ export class PacksController {
   async issue(@Req() request: GymRequest, @Param('memberId') memberId: string, @Body() body: unknown) {
     const access = request.gymAccess;
     if (!access || access.role !== 'OWNER') throw new ForbiddenException('Only gym owners can issue session packs');
+    if (process.env.GYMOS_STANDALONE_PT_PACKS_ENABLED !== '1') throw new ForbiddenException('PT credits are included with membership');
     const parsed = issueSessionPackInputSchema.safeParse(body);
     if (!parsed.success) throw new UnprocessableEntityException('Enter a valid credit count, validity, price and currency');
     const input = parsed.data;

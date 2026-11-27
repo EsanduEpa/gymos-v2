@@ -50,6 +50,9 @@ it('issues an owner-only zero-price entitlement once, projects the ledger, and l
   const body = { credits: 3, validityDays: 90, price: '0.00', currency: 'LKR', idempotencyKey: `pack-issue-${run.runId}-0001` };
   const path = `/gyms/${gymA.slug}/members/${member.id}/session-packs`;
 
+  vi.stubEnv('GYMOS_STANDALONE_PT_PACKS_ENABLED', undefined);
+  expect((await call(path, owner, body, body.idempotencyKey)).status).toBe(403);
+  vi.stubEnv('GYMOS_STANDALONE_PT_PACKS_ENABLED', '1');
   const nonOwner = await call(path, memberToken, body, body.idempotencyKey);
   expect(nonOwner.status).toBe(403);
   const invalid = await call(path, owner, { ...body, credits: 1.5 }, `pack-invalid-${run.runId}-0001`);

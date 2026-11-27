@@ -7,7 +7,7 @@ import { Card, CardHeader, Feedback } from '@/components/ui';
 import { formatDisplayDate } from '@/lib/display-date';
 import { requireGymContext } from '@/lib/gym-context';
 import { apiUrl } from '@/lib/gymos';
-import { isPayHereMemberCheckoutEnabled } from '@/lib/payhere-member-checkout';
+import { isPayHereCheckoutEnabled } from '@/lib/payhere-checkout';
 
 function MembershipDate({ value }: { value: string }) {
   return <time dateTime={value}>{formatDisplayDate(value)}</time>;
@@ -37,28 +37,29 @@ export default async function MemberMembershipPage({ params, searchParams }: {
   const orderId = typeof paymentOrder === 'string' &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(paymentOrder) ? paymentOrder : null;
   const base = `/gyms/${encodeURIComponent(slug)}`;
+  const packCheckoutEnabled = isPayHereCheckoutEnabled('PT_PACK');
   const read = (resource: string) => fetch(apiUrl(`${base}/me/${resource}`), {
     headers: { authorization: `Bearer ${token}` }, cache: 'no-store', redirect: 'error',
   }).catch(() => new Response(null, { status: 503 }));
   const [response, ptPackResponse, paymentResponse] = await Promise.all([
     read('memberships'),
-    read('pt-pack-offers'),
+    packCheckoutEnabled ? read('pt-pack-offers') : null,
     orderId ? read(`${ptPackOrder ? 'pt-pack-checkouts' : 'membership-checkouts'}/${encodeURIComponent(orderId)}`) : null,
   ]);
-  if (response.status === 401 || ptPackResponse.status === 401 || paymentResponse?.status === 401) redirect('/login?error=expired');
+  if (response.status === 401 || ptPackResponse?.status === 401 || paymentResponse?.status === 401) redirect('/login?error=expired');
   if (response.status === 403 || response.status === 404) notFound();
   const parsed = response.ok ? memberMembershipOverviewSchema.safeParse(await response.json().catch(() => null)) : null;
   const overview = parsed?.success ? parsed.data : null;
   const payment = paymentResponse?.ok ? membershipCheckoutStatusSchema.safeParse(await paymentResponse.json().catch(() => null)) : null;
   const order = payment?.success && payment.data.orderId === orderId ? payment.data : null;
-  const ptPacks = ptPackResponse.ok ? ptPackOffersSchema.safeParse(await ptPackResponse.json().catch(() => null)) : null;
+  const ptPacks = ptPackResponse?.ok ? ptPackOffersSchema.safeParse(await ptPackResponse.json().catch(() => null)) : null;
   const packOffers = ptPacks?.success ? ptPacks.data.offers : null;
   const checkoutPlans = overview?.availablePlans.filter(plan => Number(plan.price) > 0) ?? [];
   const checkoutAllowed =
     order?.status !== 'PENDING' && order?.status !== 'REVIEW_REQUIRED';
 
-  const showPackCheckout = checkoutAllowed && isPayHereMemberCheckoutEnabled('PT_PACK');
-  const showMembershipCheckout = checkoutAllowed && isPayHereMemberCheckoutEnabled('MEMBERSHIP');
+  const showPackCheckout = checkoutAllowed && packCheckoutEnabled;
+  const showMembershipCheckout = checkoutAllowed && isPayHereCheckoutEnabled('MEMBERSHIP');
 
   return <DashboardChrome identityId={session.identityId} gym={gym} gyms={session.gyms} displayName={session.displayName ?? 'GymOS user'}>
     <div className="platform-page">
@@ -111,7 +112,7 @@ export default async function MemberMembershipPage({ params, searchParams }: {
           </ul> : <p>No upcoming terms.</p>}
         </Card>
         <section className="member-credit-panel" aria-labelledby="membership-credits">
-          <h2 id="membership-credits">PT pack balances</h2>
+          <h2 id="membership-credits">PT credit balances</h2>
           <dl>
             <div><dt>Available today</dt><dd>{overview.credits.available}</dd></div>
             <div><dt>Held for sessions</dt><dd>{overview.credits.held}</dd></div>
@@ -129,7 +130,7 @@ export default async function MemberMembershipPage({ params, searchParams }: {
             slug={slug} kind="MEMBERSHIP" orderKey={randomUUID()} offers={checkoutPlans}/> : null}
         </Card>
       </> : <Card><Feedback tone="error">Your membership could not be loaded. Refresh to try again.</Feedback></Card>}
-      <Card>
+      {packCheckoutEnabled ? <Card>
         <CardHeader title="Available PT packs"/>
         {packOffers === null ? <Feedback tone="error">PT pack offers could not be loaded. Refresh to try again.</Feedback> :
           packOffers.length ? <ul className="stack-form">
@@ -140,7 +141,7 @@ export default async function MemberMembershipPage({ params, searchParams }: {
           </ul> : <p>No PT packs are currently available.</p>}
         {showPackCheckout && packOffers?.length ? <MembershipCheckoutForm
           slug={slug} kind="PT_PACK" orderKey={randomUUID()} offers={packOffers}/> : null}
-      </Card>
+      </Card> : null}
     </div>
   </DashboardChrome>;
 }

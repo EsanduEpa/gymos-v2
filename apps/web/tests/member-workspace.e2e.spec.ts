@@ -19,6 +19,7 @@ const webDirectory = join(root, 'apps/web');
 const evidenceDirectory = join(webDirectory, 'test-results/ui-transformation/member');
 const payHereUi = process.env.GYMOS_TEST_PAYHERE_UI === '1';
 const syntheticMerchant = {
+  GYMOS_PAYHERE_CHECKOUT_ENABLED: '1',
   GYMOS_PAYHERE_SANDBOX_MERCHANT_ID: '1234567',
   GYMOS_PAYHERE_SANDBOX_MERCHANT_SECRET: 'synthetic-browser-only-secret',
   GYMOS_PAYHERE_SANDBOX_API_ORIGIN: 'https://payment-callback.example.test',
@@ -213,7 +214,7 @@ test('membership and GymOS subscription show role-scoped prices', async ({ page 
   await expect(workspace.getByRole('heading', { name: 'Membership', exact: true })).toBeVisible();
   await expect(workspace.getByRole('heading', { name: 'Active plans' })).toBeVisible();
   await expect(workspace.getByText('No renewal scheduled')).toBeVisible();
-  await expect(workspace.getByRole('region', { name: 'PT pack balances' }).locator('dd')).toHaveText(['3', '2']);
+  await expect(workspace.getByRole('region', { name: 'PT credit balances' }).locator('dd')).toHaveText(['3', '2']);
   const offer = workspace.getByRole('listitem').filter({ hasText: '90 days' });
   await expect(offer).toContainText('Trainer browser membership · LKR 0');
   await expect(offer).toContainText('90 days · 0 PT credits included');

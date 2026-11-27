@@ -15,7 +15,6 @@ type Access = TenantGateContext & { identityId: string; role: string; slug: stri
 const utcDate = (value: string | Date) => new Date(typeof value === 'string' ? `${value}T00:00:00.000Z` : `${value.toISOString().slice(0, 10)}T00:00:00.000Z`);
 const localParts = (date: Date, zone: string) => Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', weekday: 'short', hourCycle: 'h23' }).formatToParts(date).map(p => [p.type, p.value]));
 const weekdayNumber = (date: string) => new Date(`${date}T00:00:00Z`).getUTCDay();
-const weekdayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 @Injectable()
 export class SessionAvailabilityService {

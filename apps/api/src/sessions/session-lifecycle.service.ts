@@ -13,6 +13,7 @@ import { derivePackCreditBalance, transitionSession, minorUnitsDecimal } from '.
 import { noShowIsEligible, PT_NO_SHOW_GRACE_MS, settleMissedSession } from './session-no-show.js';
 import { completedTrainerPayMinor } from './trainer-pay.js';
 import { assertSessionScan, createSessionScan } from './session-scan.js';
+import { ptQrEnabled } from './delivery-options.js';
 import {
   sessionCancelInputSchema, sessionCancelResultSchema, sessionCompleteResultSchema, sessionLifecycleCommandInputSchema,
   sessionLifecycleQuoteSchema, sessionNoShowInputSchema, sessionNoShowResultSchema, sessionNotesInputSchema,
@@ -450,6 +451,7 @@ export class SessionLifecycleService {
 
   async scanCode(access: Access, sessionId: string) {
     if (access.role !== 'MEMBER') throw new ForbiddenException('Member gym access is required');
+    if (!ptQrEnabled()) throw new NotFoundException('PT QR codes are unavailable');
     return this.tenantGate.withVerifiedTenant(access, async tenant => {
       const { session, targets } = await this.context(access, sessionId, tenant, true);
       return withGymAccessFence(this.database.master, targets, async locked => {
@@ -491,7 +493,7 @@ export class SessionLifecycleService {
             if (transitionSession({ state: session.state, command: 'START', actorRole: access.role as 'OWNER' | 'TRAINER' }) !== 'ACTIVE') throw new ConflictException('Only scheduled sessions can start');
             const [clock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS "now"`;
             const now = clock!.now;
-            if (parsed.data.scanToken && session.type !== 'IN_PERSON') throw new UnprocessableEntityException('Remote sessions do not use a PT scan');
+            if (parsed.data.scanToken && (!ptQrEnabled() || session.type !== 'IN_PERSON')) throw new UnprocessableEntityException('PT QR codes are unavailable for this session');
             assertSessionScan(parsed.data.scanToken, { ...session, gymId: access.gymId, command: 'START' }, now);
             if (now.getTime() < session.scheduledStartAt.getTime() - 15 * 60_000 || now.getTime() > session.scheduledEndAt.getTime()
               || noShowIsEligible(now.getTime(), session.scheduledStartAt.getTime())) {
@@ -604,7 +606,7 @@ export class SessionLifecycleService {
             if (session.confirmationRate === null || session.confirmationLevel === null) throw new ConflictException('The confirmation pay policy snapshot is incomplete');
             const [clock] = await tx.$queryRaw<{ now: Date }[]>`SELECT clock_timestamp() AS "now"`;
             const now = clock!.now;
-            if (parsed.data.scanToken && session.type !== 'IN_PERSON') throw new UnprocessableEntityException('Remote sessions do not use a PT scan');
+            if (parsed.data.scanToken && (!ptQrEnabled() || session.type !== 'IN_PERSON')) throw new UnprocessableEntityException('PT QR codes are unavailable for this session');
             assertSessionScan(parsed.data.scanToken, { ...session, gymId: access.gymId, command: 'COMPLETE' }, now);
             if (now.getTime() - session.startedAt.getTime() < version.minimumSessionDurationMinutes * 60_000) throw new UnprocessableEntityException(`Session must run for at least ${version.minimumSessionDurationMinutes} minutes`);
             if (period.state !== 'OPEN') {

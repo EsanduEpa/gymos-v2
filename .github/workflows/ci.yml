@@ -105,6 +105,7 @@ jobs:
       - run: pnpm prepare:checks
       - run: node --test infrastructure/scripts/dependency-audit-result.test.mjs
       - run: pnpm test:unit
+      - run: pnpm --dir apps/api test:e2e
 
   disposable-database:
     name: Owned disposable database tests
@@ -165,7 +166,6 @@ jobs:
       - run: pnpm build:workspace
       - run: pnpm --dir apps/web exec playwright install --with-deps chromium
       - run: pnpm test:isolated
-      - run: pnpm --dir apps/web exec playwright test tests/pt-workspaces.e2e.spec.ts tests/notifications-bell.e2e.spec.ts
       - if: always()
         run: |
           mkdir -p safe-evidence

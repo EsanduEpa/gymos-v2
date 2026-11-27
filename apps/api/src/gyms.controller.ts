@@ -277,7 +277,7 @@ export class GymsController {
     return this.tenantGate.withVerifiedTenant(access, async tenant => {
       const member = await tenant.member.findFirst({ where: { id: memberId, registrationState: { in: ['BASIC', 'COMPLETE'] } },
         select: { id: true, identityId: true, createdAt: true, enrollmentOperationId: true, fullName: true, email: true, phone: true, dateOfBirth: true, emergencyContact: true,
-          healthNotes: true, status: true, registrationState: true, version: true,
+          status: true, registrationState: true, version: true,
           sessionPacks: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 100,
             include: { creditMovements: { select: { availableDelta: true, heldDelta: true, consumedDelta: true, expiredDelta: true } } } } },
       });
@@ -291,13 +291,14 @@ export class GymsController {
       const config = await tenant.gymConfiguration.findUnique({ where: { id: 'current' }, select: { timezone: true, currency: true } });
       if (!config?.timezone) throw new ServiceUnavailableException('Gym timezone is unavailable');
       const asOf = new Date();
+      const today = gymLocalDate(config.timezone, asOf);
       const membershipTotalCount = await tenant.membershipTerm.count({ where: { memberId } });
       const membershipTotalPages = Math.ceil(membershipTotalCount / parsedPage.data.pageSize);
       const membershipPage = Math.min(parsedPage.data.page, Math.max(1, membershipTotalPages));
       const memberships = await tenant.membershipTerm.findMany({ where: { memberId },
         orderBy: [{ startDate: 'desc' }, { id: 'desc' }], skip: (membershipPage - 1) * parsedPage.data.pageSize,
         take: parsedPage.data.pageSize,
-        select: { id: true, planNameSnapshot: true, startDate: true, endDateExclusive: true, agreedPrice: true, currency: true } });
+        select: { id: true, planNameSnapshot: true, startDate: true, endDateExclusive: true, agreedPrice: true, currency: true, includedPtCredits: true } });
       const units = await creditUnits(tenant, member.id);
       const recentSessions = await tenant.pTSession.findMany({
         where: { memberId: member.id, state: { in: ['SCHEDULED', 'ACTIVE', 'COMPLETED', 'MISSED', 'CANCELLED'] } },
@@ -310,24 +311,25 @@ export class GymsController {
         joinedAt: member.createdAt.toISOString(),
         id: member.id, fullName: member.fullName, email: member.email, phone: member.phone,
         dateOfBirth: member.dateOfBirth?.toISOString().slice(0, 10) ?? null,
-        emergencyContact: member.emergencyContact, healthNotes: member.healthNotes,
+        emergencyContact: member.emergencyContact, healthNotes: null,
         status: member.status, registrationState: member.registrationState, version: member.version,
         memberships: memberships.map(term => ({ id: term.id, planName: term.planNameSnapshot,
           startDate: term.startDate.toISOString().slice(0, 10), endDateExclusive: term.endDateExclusive.toISOString().slice(0, 10),
-          agreedPrice: term.agreedPrice.toString(), currency: term.currency })),
+          agreedPrice: term.agreedPrice.toString(), currency: term.currency, includedPtCredits: term.includedPtCredits })),
         membershipPage, membershipPageSize: parsedPage.data.pageSize, membershipTotalCount, membershipTotalPages,
         sessionPacks: member.sessionPacks.map(pack => {
           const unitRows = units.filter(unit => unit.packId === pack.id);
-          const today = gymLocalDate(config.timezone!, asOf);
+          const startDate = pack.startDate.toISOString().slice(0, 10);
+          const upcoming = startDate > today;
           const balance = unitRows.reduce((total, unit) => ({ available: total.available + (unit.effectiveEndDateExclusive.toISOString().slice(0,10) > today ? unit.available : 0),
             held: total.held + unit.held, consumed: total.consumed + unit.consumed,
             expired: total.expired + unit.expired + (unit.effectiveEndDateExclusive.toISOString().slice(0,10) <= today ? unit.available : 0) }), { available: 0, held: 0, consumed: 0, expired: 0 });
-          const status = balance.available + balance.held > 0 ? 'ACTIVE' : balance.expired > 0 ? 'EXPIRED' : 'DEPLETED';
-          return { id: pack.id, issuedCredits: pack.issuedCredits, availableCredits: balance.available,
+          const status = upcoming ? 'UPCOMING' : balance.available + balance.held > 0 ? 'ACTIVE' : balance.expired > 0 ? 'EXPIRED' : 'DEPLETED';
+          return { id: pack.id, membershipTermId: pack.membershipTermId, issuedCredits: pack.issuedCredits, availableCredits: upcoming ? 0 : balance.available,
             expiryAdjustments: unitRows.filter(unit => unit.effectiveEndDateExclusive > unit.endDateExclusive).map(unit => ({ creditOrdinal: unit.creditOrdinal, endDateExclusive: unit.effectiveEndDateExclusive.toISOString().slice(0,10), state: unit.held ? 'HELD' : unit.consumed ? 'CONSUMED' : unit.expired || unit.effectiveEndDateExclusive.toISOString().slice(0,10) <= today ? 'EXPIRED' : 'UNHELD' })),
             heldCredits: balance.held, consumedCredits: balance.consumed, expiredCredits: balance.expired,
             validityDays: pack.validityDays, price: pack.price.toString(), currency: pack.currency,
-            startDate: pack.startDate.toISOString().slice(0, 10), endDateExclusive: pack.endDateExclusive.toISOString().slice(0, 10), status };
+            startDate, endDateExclusive: pack.endDateExclusive.toISOString().slice(0, 10), status };
         }), recentSessions: recentSessions.map(({ id, scheduledStartAt, state }) => ({ id, scheduledStart: scheduledStartAt.toISOString(), state })),
         timeZone: config.timezone, asOf: asOf.toISOString(),
       });
@@ -384,6 +386,7 @@ export class GymsController {
     if (access.role !== 'OWNER') throw new ForbiddenException('Only gym owners can register members');
     const parsed = memberRegistrationInputSchema.safeParse(body);
     if (!parsed.success) throw new UnprocessableEntityException('Enter valid member details and a membership plan');
+    if (parsed.data.healthNotes != null) throw new ForbiddenException('Members enter their own health notes after enrollment');
     if (!this.memberEnrollment) throw new InternalServerErrorException('Member enrollment is unavailable');
     return this.memberEnrollment.enroll(access, parsed.data);
   }

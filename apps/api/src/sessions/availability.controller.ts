@@ -1,4 +1,4 @@
-import { Body, ConflictException, Controller, ForbiddenException, Get, Param, Put, Query, Req, UnprocessableEntityException, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Put, Query, Req, UnprocessableEntityException, UseGuards } from '@nestjs/common';
 import { availabilityQuerySchema, availabilitySlotsQuerySchema, availabilityUpdateSchema } from '@gymos/contracts';
 import { GymAccessGuard, type GymRequest } from '../gym-access.guard.js';
 import { SessionAvailabilityService } from './availability.service.js';

@@ -14,7 +14,7 @@ function ActionNotice({ state }: { state: SessionLifecycleActionState }) {
   return <p className={`ui-feedback ${state.error ? 'ui-feedback-error' : 'ui-feedback-success'}`} role={state.error ? 'alert' : 'status'} aria-live="polite">{state.error ?? state.success}</p>;
 }
 
-function CommandForm({ slug, session, kind }: { slug: string; session: Session; kind: 'start' | 'complete' }) {
+function CommandForm({ slug, session, kind, qrEnabled }: { slug: string; session: Session; kind: 'start' | 'complete'; qrEnabled: boolean }) {
   const initialKey = useState(() => globalThis.crypto.randomUUID())[0];
   const action = kind === 'start'
     ? startSession.bind(null, slug, session.id, session.version, initialKey)
@@ -28,7 +28,7 @@ function CommandForm({ slug, session, kind }: { slug: string; session: Session; 
   const label = kind === 'start' ? 'Start' : 'Complete';
   return <form ref={form} action={formAction} onSubmit={event => { if (kind === 'complete' && !confirmed.current) { event.preventDefault(); setConfirming(true); } }}>
     <input type="hidden" name="idempotencyKey" value={state.currentKey ?? state.nextKey ?? initialKey}/>
-    {session.type === 'IN_PERSON' ? <>
+    {qrEnabled && session.type === 'IN_PERSON' ? <>
       <input type="hidden" name="scanToken" value={scanToken}/>
       <StaffPtScan token={scanToken} onToken={setScanToken} onReading={setReading} locked={pending || reading || !!state.outcomeUnknown}/>
     </> : null}
@@ -56,11 +56,11 @@ function NotesForm({ slug, session }: { slug: string; session: Session }) {
   </form>;
 }
 
-export function SessionLifecycleControls({ slug, session }: { slug: string; session: Session }) {
+export function SessionLifecycleControls({ slug, session, qrEnabled }: { slug: string; session: Session; qrEnabled: boolean }) {
   if (!slug) return null;
   return <div className="session-lifecycle-controls" data-session-lifecycle={session.id}>
-    {session.commandAffordances.includes('START') ? <CommandForm key={`start-${session.id}-${session.version}`} slug={slug} session={session} kind="start"/> : null}
-    {session.commandAffordances.includes('COMPLETE') ? <CommandForm key={`complete-${session.id}-${session.version}`} slug={slug} session={session} kind="complete"/> : null}
+    {session.commandAffordances.includes('START') ? <CommandForm key={`start-${session.id}-${session.version}`} slug={slug} session={session} kind="start" qrEnabled={qrEnabled}/> : null}
+    {session.commandAffordances.includes('COMPLETE') ? <CommandForm key={`complete-${session.id}-${session.version}`} slug={slug} session={session} kind="complete" qrEnabled={qrEnabled}/> : null}
     {session.commandAffordances.includes('UPDATE_NOTES') ? <details className="trainer-notes-editor"><summary>Edit Notes</summary><NotesForm key={`notes-${session.id}`} slug={slug} session={session}/></details> : null}
   </div>;
 }

@@ -127,6 +127,7 @@ it('isolates owner settings, preserves exact values, versions themes, and derive
   const queued = await concurrent.find(response => response.status === 201)!.json();
   expect(queued).toMatchObject({ startDate: renewed.endDateExclusive, planName: 'Day plan renewed', agreedPrice: '8.25' });
 
+  vi.stubEnv('GYMOS_STANDALONE_PT_PACKS_ENABLED', '1');
   for (const [credits, future] of [[3, false], [5, true]] as const) {
     const issued = await call(`/gyms/${slugA}/members/${memberA.id}/session-packs`, ownerA,
       { credits, price: '0', currency: 'LKR', validityDays: 30, idempotencyKey: randomUUID() });
@@ -139,6 +140,7 @@ it('isolates owner settings, preserves exact values, versions themes, and derive
       } });
     }
   }
+  vi.stubEnv('GYMOS_STANDALONE_PT_PACKS_ENABLED', undefined);
   const overviewPath = `/gyms/${slugA}/me/memberships`;
   await fixture.tenants[0]!.membershipPlan.create({ data: {
     name: 'Archived plan', price: '5', currency: 'LKR', durationDays: 7, status: 'INACTIVE',
@@ -218,8 +220,9 @@ it('issues the snapshotted zero-value PT allowance once on enrollment and once o
   expect(edited.status).toBe(201);
   expect((await edited.json()).plan.includedPtCredits).toBe(5);
   const member = await tenant.member.findUniqueOrThrow({ where: { id: memberId } });
-  const renewalInput = { planId: plan.id, expectedMemberVersion: member.version, idempotencyKey: randomUUID(), startPolicy: 'NEXT_AVAILABLE' };
+  const renewalInput = { planId: plan.id, expectedPlanVersion: plan.version + 1, expectedMemberVersion: member.version, idempotencyKey: randomUUID(), startPolicy: 'NEXT_AVAILABLE' };
   const renewalPath = `${prefix}/members/${memberId}/memberships`;
+  expect((await call(renewalPath, owner, { ...renewalInput, expectedPlanVersion: plan.version })).status).toBe(409);
   const renewal = await call(renewalPath, owner, renewalInput);
   expect(renewal.status).toBe(201);
   const renewedTerm = await renewal.json();
@@ -242,6 +245,9 @@ it('issues the snapshotted zero-value PT allowance once on enrollment and once o
     expect(await tenant.auditLog.count({ where: { eventCode: 'MEMBER_SESSION_PACK_ISSUED', receiptId: pack.commandReceiptId, resourceId: pack.id } })).toBe(1);
   }
   expect(await tenant.sessionPack.count({ where: { memberId } })).toBe(2);
+  const profile = await (await call(`${prefix}/members/${memberId}`, owner)).json();
+  expect(profile.sessionPacks).toContainEqual(expect.objectContaining({ membershipTermId: renewedTerm.termId,
+    issuedCredits: 5, availableCredits: 0, heldCredits: 0, consumedCredits: 0, status: 'UPCOMING' }));
 });
 
 it('fulfills a signed PayHere Sandbox membership checkout exactly once', async () => {
@@ -267,6 +273,7 @@ it('fulfills a signed PayHere Sandbox membership checkout exactly once', async (
 
   const merchantId = '1234567';
   const merchantSecret = 'synthetic-membership-test-secret';
+  vi.stubEnv('GYMOS_PAYHERE_CHECKOUT_ENABLED', '1');
   vi.stubEnv('GYMOS_PAYHERE_SANDBOX_MERCHANT_ID', merchantId);
   vi.stubEnv('GYMOS_PAYHERE_SANDBOX_MERCHANT_SECRET', merchantSecret);
   vi.stubEnv('GYMOS_PAYHERE_SANDBOX_API_ORIGIN', 'https://payment-callback.example.test');
@@ -347,12 +354,16 @@ it('fulfills a paid PT pack once from its offer snapshot and scopes payment hist
   const checkoutPath = `${rootPath}/me/pt-pack-checkouts`;
   const merchantId = '1234567';
   const merchantSecret = 'synthetic-pack-testing-secret';
+  vi.stubEnv('GYMOS_PAYHERE_CHECKOUT_ENABLED', '1');
   vi.stubEnv('GYMOS_PAYHERE_SANDBOX_MERCHANT_ID', merchantId);
   vi.stubEnv('GYMOS_PAYHERE_SANDBOX_MERCHANT_SECRET', merchantSecret);
   vi.stubEnv('GYMOS_PAYHERE_SANDBOX_API_ORIGIN', 'https://payment-callback.example.test');
   vi.stubEnv('GYMOS_PAYHERE_SANDBOX_WEB_ORIGIN', 'http://localhost:3002');
 
   const offerInput = { name: 'Five sessions', credits: 5, price: '901.01', validityDays: 60, idempotencyKey: randomUUID() };
+  vi.stubEnv('GYMOS_STANDALONE_PT_PACKS_ENABLED', undefined);
+  expect((await call(offersPath, owner, offerInput)).status).toBe(403);
+  vi.stubEnv('GYMOS_STANDALONE_PT_PACKS_ENABLED', '1');
   expect((await call(offersPath, memberToken, offerInput)).status).toBe(403);
   const createOffer = await call(offersPath, owner, offerInput);
   expect(createOffer.status).toBe(201);
@@ -364,6 +375,9 @@ it('fulfills a paid PT pack once from its offer snapshot and scopes payment hist
 
   const checkoutInput = { offerId: offer.id, idempotencyKey: randomUUID(), firstName: 'Synthetic', lastName: 'Buyer',
     email: 'packs@example.test', phone: '+94770000500', address: 'Synthetic address', city: 'Colombo', country: 'Sri Lanka' };
+  vi.stubEnv('GYMOS_STANDALONE_PT_PACKS_ENABLED', undefined);
+  expect((await call(checkoutPath, memberToken, checkoutInput)).status).toBe(403);
+  vi.stubEnv('GYMOS_STANDALONE_PT_PACKS_ENABLED', '1');
   const checkout = await call(checkoutPath, memberToken, checkoutInput);
   expect(checkout.status).toBe(201);
   const fields = (await checkout.json()).fields;
@@ -384,6 +398,9 @@ it('fulfills a paid PT pack once from its offer snapshot and scopes payment hist
     return fetch(`${base}${rootPath}/payments/payhere/${route}`, { method: 'POST', body });
   };
   expect((await notify('2', 'membership-notify')).status).toBe(404);
+  vi.stubEnv('GYMOS_STANDALONE_PT_PACKS_ENABLED', undefined);
+  expect((await notify('2')).status).toBe(403);
+  vi.stubEnv('GYMOS_STANDALONE_PT_PACKS_ENABLED', '1');
   expect((await notify('-2')).status).toBe(204);
   expect(await memberDb.memberPaymentOrder.findUniqueOrThrow({ where: { id: orderId } })).toMatchObject({ status: 'FAILED', packId: null });
   const confirmed = await Promise.all([notify('2'), notify('2')]);
@@ -409,6 +426,7 @@ it('fulfills a paid PT pack once from its offer snapshot and scopes payment hist
   expect((await call(`/gyms/${otherGym.slug}/payments/${orderId}/receipt`, otherOwner)).status).toBe(404);
   expect((await notify('-3')).status).toBe(204);
   expect(await (await call(`${rootPath}/payments/${orderId}/receipt`, owner)).json()).toMatchObject({ orderId, status: 'CHARGEBACK' });
+  vi.stubEnv('GYMOS_STANDALONE_PT_PACKS_ENABLED', undefined);
 }, 60_000);
 
 it('reconciles GymOS recurring billing and recovers in the seven-day window without affecting the other gym', async () => {
@@ -421,6 +439,7 @@ it('reconciles GymOS recurring billing and recovers in the seven-day window with
   const otherRoute = `/gyms/${gymB.slug}/gymos-subscription`;
   const merchantId = '1234567';
   const merchantSecret = 'synthetic-gymos-subscription-secret';
+  vi.stubEnv('GYMOS_PAYHERE_CHECKOUT_ENABLED', '1');
   vi.stubEnv('GYMOS_PAYHERE_SANDBOX_MERCHANT_ID', merchantId);
   vi.stubEnv('GYMOS_PAYHERE_SANDBOX_MERCHANT_SECRET', merchantSecret);
   vi.stubEnv('GYMOS_PAYHERE_SANDBOX_API_ORIGIN', 'https://payment-callback.example.test');

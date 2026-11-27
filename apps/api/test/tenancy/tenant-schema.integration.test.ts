@@ -514,7 +514,7 @@ it('commits a full owner enrollment once and requires authenticated explicit con
   expect(await tenants[1].member.count()).toBe(otherGymCount);
   const controller = new GymsController({ master } as DatabaseService, gateFor());
   const profile = await controller.memberDetail({ gymAccess: access } as GymRequest, first.memberId);
-  expect(profile.healthNotes).toBe('Synthetic private note');
+  expect(profile.healthNotes).toBeNull();
   await tenants[0].membershipTerm.createMany({ data: Array.from({ length: 124 }, (_, index) => ({
     memberId: first.memberId, planId: plan.id, startDate: new Date(Date.UTC(2020, 0, 1 + index)),
     endDateExclusive: new Date(Date.UTC(2020, 0, 2 + index)), agreedPrice: '1234.50', currency: 'LKR',
@@ -1115,7 +1115,7 @@ it('projects only published members with filtered totals and denies foreign or n
   await expect(controller.members(request, { page: '-1' })).rejects.toBeInstanceOf(UnprocessableEntityException);
   await expect(controller.memberDetail(request, enrolled.id, { pageSize: '1000' })).rejects.toBeInstanceOf(UnprocessableEntityException);
   const ownerDetail = await controller.memberDetail(request, enrolled.id);
-  expect(ownerDetail.healthNotes).toBe('Synthetic private note');
+  expect(ownerDetail.healthNotes).toBeNull();
   expect(JSON.stringify(await controller.members(request, {}))).not.toContain('Synthetic private note');
   const after = await Promise.all([
     master.platformAuditLog.count(), master.operation.count(), tenants[0].auditLog.count(),
@@ -1175,23 +1175,25 @@ it('keeps global and gym profiles separate, fences self edits, versions and repl
   const owner = { ...context0, slug: `schema-0-${run.runId}`, role: 'OWNER', identityId: actorId,
     identityVersion: 0, accessVersion: ownerLink.version, actor: null } as const;
   const correctionBody = { fullName: 'Synthetic Corrected Official Name', dateOfBirth: '1992-03-04', phone: '+94770002233',
-    emergencyContact: 'Synthetic Correction Contact', healthNotes: 'Synthetic updated health note',
+    emergencyContact: 'Synthetic Correction Contact',
     expectedVersion: self.version + 2, reason: 'MEMBER_REQUEST' };
+  await expect(profileController.correctMember({ gymAccess: owner } as GymRequest, member.id, 'profile-owner-note-0001',
+    { ...correctionBody, healthNotes: 'Synthetic owner edit' })).rejects.toBeInstanceOf(ForbiddenException);
   const correction = await profileController.correctMember({ gymAccess: owner } as GymRequest, member.id, 'profile-owner-correct-0001', correctionBody);
   expect(correction).toMatchObject({ version: self.version + 3, replayed: false });
   expect(await profileController.correctMember({ gymAccess: owner } as GymRequest, member.id, 'profile-owner-correct-0001', correctionBody))
     .toMatchObject({ version: self.version + 3, replayed: true });
   const changedMember = await tenant.member.findUniqueOrThrow({ where: { id: member.id } });
   expect(changedMember).toMatchObject({ fullName: correctionBody.fullName, phone: correctionBody.phone,
-    emergencyContact: correctionBody.emergencyContact, healthNotes: correctionBody.healthNotes });
+    emergencyContact: correctionBody.emergencyContact, healthNotes: selfBody.healthNotes });
   expect(changedMember.dateOfBirth?.toISOString().slice(0, 10)).toBe(correctionBody.dateOfBirth);
   const ownerAudit = await tenant.auditLog.findFirstOrThrow({ where: { eventCode: 'OWNER_MEMBER_PROFILE_CORRECTED', resourceId: member.id } });
   expect(ownerAudit.transition).toEqual({ from: String(self.version + 2), to: String(self.version + 3), version: self.version + 3, reasonCode: 'MEMBER_REQUEST' });
-  expect(JSON.stringify(ownerAudit.transition)).not.toContain(correctionBody.healthNotes);
+  expect(JSON.stringify(ownerAudit.transition)).not.toContain(selfBody.healthNotes);
   const profileNotice = await tenant.notification.findFirstOrThrow({ where: { recipientIdentityId: member.identityId!, eventCode: 'MEMBER_PROFILE_CORRECTED' } });
   expect(profileNotice).toMatchObject({ title: 'Membership profile updated', message: 'A gym owner updated your membership profile. Review your profile details.', linkKind: 'MEMBER_PROFILE', resourceId: member.id });
   expect(profileNotice.message).not.toMatch(/Synthetic|1992|9477|MEMBER_REQUEST/);
-  expect(profileNotice.message).not.toContain(correctionBody.healthNotes);
+  expect(profileNotice.message).not.toContain(selfBody.healthNotes);
   await expect(profileController.correctMember({ gymAccess: owner } as GymRequest, member.id, 'profile-owner-correct-0002',
     { ...correctionBody, expectedVersion: self.version + 3, status: 'SUSPENDED' })).rejects.toBeInstanceOf(UnprocessableEntityException);
   expect((await tenant.member.findUniqueOrThrow({ where: { id: member.id } })).status).toBe(member.status);

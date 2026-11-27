@@ -37,7 +37,7 @@ export default async function TrainerRequestsPage({ params }: { params: Promise<
             <span className="ui-badge ui-badge-info">Pending</span>
           </div>
           <div className="session-request-actions">
-            <SessionRequestDecisionForm slug={slug} sessionId={item.id} expectedVersion={item.version} action="ACCEPT" requestKey={randomUUID()}/>
+            {item.type !== 'VIRTUAL' || process.env.GYMOS_PT_VIRTUAL_ENABLED === '1' ? <SessionRequestDecisionForm slug={slug} sessionId={item.id} expectedVersion={item.version} action="ACCEPT" requestKey={randomUUID()}/> : null}
             <SessionRequestDecisionForm slug={slug} sessionId={item.id} expectedVersion={item.version} action="DECLINE" requestKey={randomUUID()}/>
           </div>
         </article>)}</div>}

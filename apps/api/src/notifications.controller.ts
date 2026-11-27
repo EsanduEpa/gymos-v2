@@ -1,7 +1,7 @@
 import { Body, Controller, ForbiddenException, Get, NotFoundException, Param, Post, Query, Req, UnprocessableEntityException, UseGuards } from '@nestjs/common';
 import { auditQuerySchema, auditPageSchema, notificationListQuerySchema, notificationListSchema,
   ptScheduledWorkHealthSchema, notificationReadAllInputSchema, notificationReadAllSchema, notificationReadSchema } from '@gymos/contracts';
-import type { Prisma } from './generated/tenant/client.js';
+import type { NotificationLinkKind, Prisma } from './generated/tenant/client.js';
 import { notificationHistoryQuerySchema, notificationHistorySchema } from '@gymos/contracts';
 import { GymAccessGuard, type GymRequest } from './gym-access.guard.js';
 import { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js';
@@ -17,8 +17,10 @@ const AVAILABLE_ACTION_TYPES = [
 
 function invalid(message: string): never { throw new UnprocessableEntityException(message); }
 function recipientScope(access: NonNullable<GymRequest['gymAccess']>): Prisma.NotificationWhereInput {
-  return { recipientIdentityId: access.identityId,
-    ...(access.role !== 'OWNER' ? { linkKind: { not: 'OWNER_SUBSCRIPTION' } } : {}) };
+  const excluded: NotificationLinkKind[] = [];
+  if (access.role !== 'OWNER') excluded.push('OWNER_SUBSCRIPTION', 'OWNER_TRAINER_SHIFT_REVIEW');
+  if (access.role !== 'TRAINER') excluded.push('TRAINER_SHIFT_DETAILS');
+  return { recipientIdentityId: access.identityId, linkKind: { notIn: excluded } };
 }
 function safeTransition(value: Prisma.JsonValue) {
   if (!value || Array.isArray(value) || typeof value !== 'object') return {};

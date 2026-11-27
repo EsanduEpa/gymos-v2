@@ -5,7 +5,6 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller.js';
-import { AppService } from './app.service.js';
 import { AdminController } from './admin.controller.js';
 import { AuthController } from './auth.controller.js';
 import { AccountProfileController, GymProfileController } from './profiles.controller.js';
@@ -78,7 +77,6 @@ import { GymosSubscriptionService } from './payments/gymos-subscription.service.
   ],
   controllers: [SessionExceptionsController, AppController, AdminController, AuthController, AccountProfileController, GymProfileController, EmailCorrectionController, AdminEmailCorrectionController, AccountNotificationsController, CredentialsController, CredentialReissueController, AccountRecoveryController, OperatorRecoveryController, GymsController, MemberApplicationsController, MembershipCheckoutController, PayHereMembershipNotificationController, PtPackOffersController, MemberPaymentHistoryController, TrainersController, PacksController, NotificationsController, ConfigurationController, ProvisioningOwnerController, SupportSessionController, GymLifecycleController, SessionBookingController, SessionReadsController, SessionRequestsController, MemberSessionOverviewController, CoachingController, MemberLifecycleController, SessionLifecycleController, FinanceController, DashboardController, AnalyticsController, SessionAvailabilityController, GymosSubscriptionController, PayHereSubscriptionNotificationController],
   providers: [SessionExceptionsService,
-    AppService,
     DatabaseService,
     MemberEnrollmentService,
     MemberApplicationsService,

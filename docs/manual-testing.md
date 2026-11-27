@@ -1,5 +1,19 @@
 # Local development and manual testing
 
+## Environment file inventory
+
+| File | When it is needed |
+| --- | --- |
+| Root `.env` | Private local development database and API configuration. Compose and the development setup use it. |
+| `.env.development-account.json` | Private record of this workspace's development admin login. Keep it for developer access. |
+| `.env.manual-test.json` | Private sandbox state read by the manual launcher. It ties the synthetic logins and encryption key derivation to the owned test database. |
+| `.env.payhere-sandbox` | Optional local PayHere Sandbox settings for the callback exercise below. |
+| `.env.deploy.neon` | Optional private operator settings for the hosted Neon demo. [Hosted deployment](HOSTED-DEPLOYMENT.md) |
+| `.env.demo-accounts.json` | Optional synthetic hosted-demo sign-ins. This is separate from local development and manual-test accounts. |
+| Root `.env.example`, `apps/web/.env.example`, `infrastructure/deployment/.env.example` | Tracked placeholder templates for development data/API, web transport, and hosted deployment respectively. |
+
+Old one-off demo scripts and schema rollout inputs from this workspace are in the ignored, private `.local-backups/env-cleanup-20261127/` directory. The archive preserves original relative paths, including `apps/web/`. Restore a needed file to its original path only after reviewing its target and intended use.
+
 ## Permanent environment split
 
 | Purpose | Web | API | Database | Accounts |
@@ -12,7 +26,7 @@ Both run the same repository code. The test web server uses a build of that code
 To run development, keep the existing private `.env` and start these in separate terminals from the project root:
 
 ```sh
-set -a; source .env; set +a; PORT=3001 pnpm dev:api
+set -a; source .env; set +a; PORT=3001 GYMOS_API_HOST=127.0.0.1 pnpm dev:api
 ```
 
 ```sh
@@ -23,7 +37,7 @@ The separate Next.js build directories let development and testing run together.
 
 The fresh development master has the same current schema as the testing master. Its admin email and generated password are in the ignored `.env.development-account.json`. It has no gyms yet; new gyms created from port 3000 receive the current tenant schema. The old development databases, including `gym-a` and `gym-b`, were removed from Docker on 2026-11-07 after verified backups were saved in the Git-ignored `.local-backups/gymos-db-cleanup-20261107/`. The old manual testing container and its anonymous volume were also removed; the active port 3002 fixture was untouched. The app's controlled rollout had rejected those old gyms because their original ownership proof was missing. Restore old data only after a separate recovery review.
 
-This sandbox uses a separate PostgreSQL 17 container, bound to a random loopback port, with its own master database and three gym databases. It never loads the project's `.env` or copies live member data. PostgreSQL data survives app shutdown and container restart; removing its container/volume deletes the test data.
+The test web and API listen on loopback. The sandbox uses a separate PostgreSQL 17 container, bound to a random loopback port, with its own master database and three gym databases. It never loads the project's `.env` or copies live member data. PostgreSQL data survives app shutdown and container restart.
 
 The setup contains three gyms (`test-alpha`, `test-beta`, `test-gamma`), 20 members per gym, a trainer in each gym, active memberships and 12-credit PT packs. Each gym has 40 PT sessions: 12 completed, 4 missed, 4 cancelled, 16 scheduled and 4 pending requests. Dates are relative to the setup date in Asia/Colombo. Historical sessions include settlements, credit movements, revenue and trainer pay. The main member also has workout and meal plans.
 
@@ -71,7 +85,7 @@ For a fresh installation, build the clients, packages and API, then run `pnpm ma
 
 ## PayHere Sandbox callbacks
 
-Ordinary manual testing keeps checkout disabled. To exercise PayHere Sandbox, configure a private, Git-ignored `.env.payhere-sandbox` with these values.
+Ordinary manual testing keeps checkout disabled. To exercise PayHere Sandbox, configure a private, Git-ignored `.env.payhere-sandbox` with these values. A separate synthetic PT-pack review also needs `GYMOS_STANDALONE_PT_PACKS_ENABLED=1`. Leave that setting unset for release acceptance.
 
 ```dotenv
 GYMOS_PAYHERE_CHECKOUT_ENABLED=1
@@ -130,6 +144,6 @@ For PT checks independent of the persistent manual sandbox, prepare/build the cu
 GYMOS_TEST_ALLOW_DOCKER=1 pnpm --dir apps/api exec vitest run --config vitest.config.pt-visible.ts --disableConsoleIntercept
 ```
 
-This opt-in holding fixture creates its own owned two-gym databases, synthetic logins, membership and eight-credit pack, plus a separately prepared active appointment eligible for ordinary completion. It prints the loopback URL, temporary logins and a unique stop-file path. Open the printed URL in Chrome. Never save/share those credentials or commit captured logs. The fixture does not use `.env` or the persistent manual sandbox. New bookings still obey notice/availability rules; the active appointment is a separate historical delivery fixture. Notes follow the existing completed-only rule.
+This opt-in holding fixture creates its own owned two-gym databases, synthetic logins, membership and eight-credit pack, plus a separately prepared active appointment eligible for ordinary completion. It prints the loopback URL, temporary logins and a unique stop-file path. Open the printed URL in Chrome. Never save/share those credentials or commit captured logs. The fixture does not use `.env` or the persistent manual sandbox. New bookings still obey notice/availability rules. The active appointment is a separate historical delivery fixture. See [PT operations](PT-OPERATIONS.md) for the current delivery rules.
 
 To stop normally, create **only the exact stop file printed by this run** in another terminal (`touch /tmp/<printed-name>`); the fixture stops its servers and verifies owned database/container cleanup. Its one-hour timeout is for interactive review, not a relaxed business/test timeout. A passing fixture confirms setup/teardown; document the actual browser observations separately. No full automated journey or real pilot follows from that pass.

@@ -302,7 +302,10 @@ export class ConfigurationController {
         await tx.$queryRaw`SELECT "id" FROM "Member" WHERE "id" = ${memberId} FOR UPDATE`;
         const member = await tx.member.findUnique({ where: { id: memberId }, select: { id: true, status: true, version: true } });
         if (!member) throw new NotFoundException('Member not found');
-        const digest = createHash('sha256').update(JSON.stringify([parsed.data.planId, parsed.data.expectedMemberVersion, parsed.data.startPolicy])).digest('hex');
+        const { planId, expectedMemberVersion, expectedPlanVersion, startPolicy } = parsed.data;
+        const intent = [planId, expectedMemberVersion, startPolicy];
+        if (expectedPlanVersion !== undefined) intent.push(expectedPlanVersion);
+        const digest = createHash('sha256').update(JSON.stringify(intent)).digest('hex');
         const replay = await tx.membershipTerm.findUnique({ where: { actorIdentityId_idempotencyKey: { actorIdentityId: access.identityId, idempotencyKey: parsed.data.idempotencyKey } } });
         if (replay) {
           if (replay.memberId !== memberId || replay.requestDigest !== digest) throw new ConflictException('Idempotency key was already used for a different renewal');
@@ -322,6 +325,7 @@ export class ConfigurationController {
           }),
         ]);
         if (!plan || plan.status !== 'ACTIVE') throw new NotFoundException('Membership plan not found');
+        if (expectedPlanVersion !== undefined && plan.version !== expectedPlanVersion) throw new ConflictException('Plan terms changed; reload before renewing');
         if (!config?.currency || !config.timezone || plan.currency !== config.currency) throw new ConflictException('Plan configuration is unavailable');
         const today = gymLocalDate(config.timezone);
         const latestEnd = latestTerm ? dateOnly(latestTerm.endDateExclusive) : null;

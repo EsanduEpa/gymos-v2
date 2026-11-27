@@ -5,6 +5,7 @@ import type { Prisma as TP, PrismaClient } from '../generated/tenant/client.js';
 import { DatabaseService } from '../database.service.js';
 import { withGymAccessFence } from '../identity/gym-access-fence.js';
 import { appendTenantNotification } from '../notifications.service.js';
+import { virtualPtEnabled } from './delivery-options.js';
 import { CommandReceiptFoundationService } from '../operations/receipt.service.js';
 import { tenantAuditKey, OperationConflictError } from '../operations/primitives.js';
 import { TenantSchemaGateService, type TenantGateContext } from '../tenancy/tenant-schema-gate.service.js';
@@ -98,7 +99,7 @@ export class SessionRequestsService {
         const membership = await tenant.membershipTerm.findFirst({ where: { memberId: member.actorId, startDate: { lte: new Date(`${localToday}T00:00:00.000Z`) }, endDateExclusive: { gt: new Date(`${localToday}T00:00:00.000Z`) } }, select: { id: true } });
         const totals = (await creditTotals(tenant, [member.actorId], localToday, true)).get(member.actorId);
         return sessionRequestOptionsSchema.parse({ trainerId, trainerName: trainer.fullName, level: trainer.level, specialisations: trainer.specialisations,
-          shiftStart: trainer.shiftStart, shiftEnd: trainer.shiftEnd, offersVirtualPt: trainer.offersVirtualPt,
+          shiftStart: trainer.shiftStart, shiftEnd: trainer.shiftEnd, offersVirtualPt: virtualPtEnabled() && trainer.offersVirtualPt,
           timeZone: config.timezone, minimumDurationMinutes: 60, maximumDurationMinutes: 60,
           currency: config.currency, availableCredits: totals?.available ?? 0,
           heldCredits: totals?.held ?? 0, expiredCredits: totals?.expired ?? 0,
@@ -160,6 +161,7 @@ export class SessionRequestsService {
             const start = resolveLocal(input.data.localDate, input.data.localTime, config.timezone, input.data.offset);
             const end = new Date(start.getTime() + input.data.durationMinutes * 60_000); const now = clockRows[0]!.now;
             if (input.data.durationMinutes !== 60) throw new UnprocessableEntityException('New PT requests must be 60 minutes');
+            if (input.data.type === 'VIRTUAL' && !virtualPtEnabled()) throw new UnprocessableEntityException('Virtual PT is unavailable');
             if (input.data.type === 'VIRTUAL' && !trainerRow.offersVirtualPt)
               throw new UnprocessableEntityException('This trainer does not offer virtual PT');
             const earliest = new Date(now.getTime() + 2 * 60 * 60_000);
@@ -253,6 +255,7 @@ export class SessionRequestsService {
               if (session.scheduledStartAt <= requestClock!.now) throw new ConflictException('This request time has passed and cannot be accepted');
               const durationMinutes = Math.round((session.scheduledEndAt.getTime() - session.scheduledStartAt.getTime()) / 60_000);
               if (session.type === 'INTRODUCTORY' || durationMinutes !== 60) throw new UnprocessableEntityException('This legacy request cannot be accepted under current PT policy');
+              if (session.type === 'VIRTUAL' && !virtualPtEnabled()) throw new UnprocessableEntityException('Virtual PT is unavailable');
               if (session.type === 'VIRTUAL' && !session.trainer.offersVirtualPt)
                 throw new UnprocessableEntityException('Enable virtual PT in your profile before accepting this request');
               const term = await tx.membershipTerm.findFirst({ where: { memberId: session.memberId, startDate: { lte: day }, endDateExclusive: { gt: day } }, select: { id: true } });

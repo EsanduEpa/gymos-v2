@@ -13,7 +13,7 @@ export function MemberRegistrationForm({ slug, plans, initialRequestKey }: { slu
   const submitting = useRef(false);
   useEffect(() => { submitting.current = false; }, [state]);
   const [requestKey, setRequestKey] = useState(initialRequestKey);
-  const [draft, setDraft] = useState({ fullName: '', email: '', phone: '', dateOfBirth: '', emergencyContact: '', healthNotes: '', membershipPlanId: '' });
+  const [draft, setDraft] = useState({ fullName: '', email: '', phone: '', dateOfBirth: '', emergencyContact: '', membershipPlanId: '' });
   const [replacement, setReplacement] = useState<{ password?: string; version: number } | null>(null);
   const [handoffComplete, setHandoffComplete] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -85,7 +85,6 @@ export function MemberRegistrationForm({ slug, plans, initialRequestKey }: { slu
         phone: String(submitted.get('phone') ?? ''),
         dateOfBirth: String(submitted.get('dateOfBirth') ?? ''),
         emergencyContact: String(submitted.get('emergencyContact') ?? ''),
-        healthNotes: String(submitted.get('healthNotes') ?? ''),
         membershipPlanId: String(submitted.get('membershipPlanId') ?? ''),
       });
     }}>
@@ -95,7 +94,6 @@ export function MemberRegistrationForm({ slug, plans, initialRequestKey }: { slu
       <label className="ui-field member-field-half"><span className="ui-field-label">Phone</span><input name="phone" type="tel" autoComplete="tel" maxLength={40} required value={draft.phone} onChange={event => updateDraft('phone', event.currentTarget.value)} /></label>
       <label className="ui-field member-field-half"><span className="ui-field-label">Date of birth</span><input name="dateOfBirth" type="date" required value={draft.dateOfBirth} onChange={event => updateDraft('dateOfBirth', event.currentTarget.value)} /></label>
       <label className="ui-field member-field-half"><span className="ui-field-label">Emergency contact <small>optional</small></span><input name="emergencyContact" maxLength={240} value={draft.emergencyContact} onChange={event => updateDraft('emergencyContact', event.currentTarget.value)} /></label>
-      <label className="ui-field member-field-full"><span className="ui-field-label">Health notes <small>owner and confirmed trainer only</small></span><textarea name="healthNotes" maxLength={4000} rows={5} value={draft.healthNotes} onChange={event => updateDraft('healthNotes', event.currentTarget.value)} /></label>
       <label className="ui-field member-field-full"><span className="ui-field-label">Initial membership plan</span><select key={`${state.attempt ?? 0}:${state.result?.status ?? 'draft'}`} name="membershipPlanId" required value={draft.membershipPlanId} onChange={event => updateDraft('membershipPlanId', event.currentTarget.value)}>
         <option value="" disabled>Select a plan</option>{plans.map(plan => <option key={plan.id} value={plan.id}>{plan.name} · {plan.price} {plan.currency} · {plan.durationDays} days</option>)}
       </select></label>

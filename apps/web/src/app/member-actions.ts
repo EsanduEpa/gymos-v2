@@ -52,7 +52,7 @@ export async function registerMemberAction(slug: string, previous: MemberRegistr
   const parsed = memberRegistrationInputSchema.safeParse({
     fullName: formData.get('fullName'), email: formData.get('email'), phone: formData.get('phone'),
     dateOfBirth: formData.get('dateOfBirth'), emergencyContact: formData.get('emergencyContact') || null,
-    healthNotes: formData.get('healthNotes') || null, membershipPlanId: formData.get('membershipPlanId'), idempotencyKey,
+    membershipPlanId: formData.get('membershipPlanId'), idempotencyKey,
   });
   if (!parsed.success) return { ...reply, error: parsed.error.issues[0]?.message ?? 'Check the member details and try again.' };
   const token = (await cookies()).get(SESSION_COOKIE)?.value;

@@ -4,7 +4,7 @@ import { membershipCheckoutInputSchema, membershipCheckoutSchema, ptPackCheckout
 import { notFound, redirect } from 'next/navigation';
 import { requireGymContext } from '@/lib/gym-context';
 import { apiUrl } from '@/lib/gymos';
-import { isPayHereMemberCheckoutEnabled } from '@/lib/payhere-member-checkout';
+import { isPayHereCheckoutEnabled } from '@/lib/payhere-checkout';
 
 type CheckoutState = {
   checkout?: ReturnType<typeof membershipCheckoutSchema.parse>;
@@ -15,7 +15,7 @@ export type MemberCheckoutKind = 'MEMBERSHIP' | 'PT_PACK';
 export async function prepareMembershipCheckout(
   slug: string, kind: MemberCheckoutKind, idempotencyKey: string, _previous: CheckoutState, form: FormData,
 ): Promise<CheckoutState> {
-  if (!isPayHereMemberCheckoutEnabled(kind)) {
+  if (!isPayHereCheckoutEnabled(kind)) {
     return { error: 'Sandbox checkout is currently unavailable.' };
   }
   const { token } = await requireGymContext(slug, 'MEMBER');

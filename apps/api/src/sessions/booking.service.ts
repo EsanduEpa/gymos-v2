@@ -7,6 +7,7 @@ import { OperationConflictError, tenantAuditKey } from '../operations/primitives
 import { DatabaseService } from '../database.service.js';
 import { withGymAccessFence } from '../identity/gym-access-fence.js';
 import { appendTenantNotification } from '../notifications.service.js';
+import { virtualPtEnabled } from './delivery-options.js';
 import { TenantSchemaGateService, type TenantGateContext } from '../tenancy/tenant-schema-gate.service.js';
 import { reserveSessionCredit } from './credit-holds.js';
 import { allowedStartMinutes, type AvailabilityRule } from './availability-policy.js';
@@ -146,7 +147,7 @@ export class SessionBookingService {
         };
         const members = await Promise.all(memberPageRows.map(makeMemberOption));
         const trainerOption = (trainer: typeof trainersAll[number]) => ({ trainerId: trainer.id, name: trainer.fullName, level: trainer.level!,
-          shiftStart: trainer.shiftStart, shiftEnd: trainer.shiftEnd, baseSessionPay: trainerPayForConfirmation(config, trainer, true), offersVirtualPt: trainer.offersVirtualPt });
+          shiftStart: trainer.shiftStart, shiftEnd: trainer.shiftEnd, baseSessionPay: trainerPayForConfirmation(config, trainer, true), offersVirtualPt: virtualPtEnabled() && trainer.offersVirtualPt });
         const trainers = trainerPageRows.map(trainerOption);
         const selectedMember = query.selectedMemberId ? await (async () => {
           const member = await tenant.member.findFirst({ where: { id: { equals: query.selectedMemberId, in: memberBindingIds }, status: 'ACTIVE', registrationState: 'COMPLETE' }, select: { id: true, fullName: true } });
@@ -171,6 +172,7 @@ export class SessionBookingService {
   async bookInTransaction(tx: import('../generated/tenant/client.js').Prisma.TransactionClient, receipt: { id: string }, access: Access,
     input: import('@gymos/contracts').SessionBookingInput,
     memberBinding: { identityId: string; operationId: string; actorId: string }, trainerBinding: { identityId: string; operationId: string; actorId: string }, forcedSessionId?: string) {
+            if (input.type === 'VIRTUAL' && !virtualPtEnabled()) throw new UnprocessableEntityException('Virtual PT is unavailable');
             await tx.$queryRaw`SELECT "id" FROM "Member" WHERE "id" = ${input.memberId} FOR UPDATE`;
             await tx.$queryRaw`SELECT "id" FROM "Trainer" WHERE "id" = ${input.trainerId} FOR UPDATE`;
             const config = await tx.gymConfiguration.findUnique({ where: { id: 'current' } });

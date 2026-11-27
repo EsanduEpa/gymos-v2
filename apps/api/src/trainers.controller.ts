@@ -8,7 +8,8 @@ import { requestDigest } from './operations/primitives.js';
 import { DatabaseService } from './database.service.js';
 import { GymAccessGuard, type GymRequest } from './gym-access.guard.js';
 import { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js';
-import { withGymAccessFence } from './identity/gym-access-fence.js';
+import { withGymAccessFence, type GymAccessFenceTarget } from './identity/gym-access-fence.js';
+import { appendTenantNotification } from './notifications.service.js';
 import { TrainerLifecycleService } from './trainer-lifecycle.service.js';
 import { streamProfilePhoto } from './profile-photo.js';
 import { pendingTrainerShift, shiftIsValid } from './trainer-shift-request.js';
@@ -180,9 +181,15 @@ export class TrainersController {
     const { requestId, expectedVersion, ...hours } = parsed.data;
     shiftIsValid(hours);
     const { id: trainerId, registrationOperationId } = access.actor;
-    return this.tenantGate.withVerifiedTenant(access, tenant => withGymAccessFence(this.database.master, [
-      { identityId: access.identityId, gymId: access.gymId, role: 'TRAINER', tenantActorId: trainerId },
-    ], () => tenant.$transaction(async tx => {
+    return this.tenantGate.withVerifiedTenant(access, async tenant => {
+      const owners = await this.database.master.gymAccess.findMany({
+        where: { gymId: access.gymId, role: 'OWNER', linkStatus: 'ACTIVE' }, select: { userId: true },
+      });
+      const targets: GymAccessFenceTarget[] = [
+        { identityId: access.identityId, gymId: access.gymId, role: 'TRAINER', tenantActorId: trainerId },
+        ...owners.map(owner => ({ identityId: owner.userId, gymId: access.gymId, role: 'OWNER' as const })),
+      ];
+      return withGymAccessFence(this.database.master, targets, () => tenant.$transaction(async tx => {
       await tx.$queryRaw`SELECT id FROM "Trainer" WHERE id = ${trainerId} FOR UPDATE`;
       const trainer = await tx.trainer.findFirst({ where: { id: trainerId, identityId: access.identityId,
         enrollmentOperationId: registrationOperationId, registrationState: 'COMPLETE', status: 'ACTIVE' } });
@@ -206,8 +213,13 @@ export class TrainersController {
         state: 'COMMITTED', safeResult: result, committedAt: new Date() } });
       await appendTenantAudit(tx, { masterGymId: access.gymId, receiptId: receipt.id, actorIdentityId: access.identityId,
         eventCode: 'TRAINER_SHIFT_REQUESTED', resourceType: 'TRAINER', resourceId: trainerId, transition: { to: 'PENDING', version: updated.version } });
+      for (const owner of owners) {
+        await appendTenantNotification(tx, { masterGymId: access.gymId, receiptId: receipt.id,
+          eventCode: 'TRAINER_SHIFT_REQUESTED', resourceId: trainerId, recipientIdentityId: owner.userId });
+      }
       return result;
-    })));
+      }));
+    });
   }
 
   @Put('trainers/:trainerId/shift')
@@ -260,6 +272,10 @@ export class TrainersController {
       await appendTenantAudit(tx, { masterGymId: access.gymId, receiptId: receipt.id, actorIdentityId: access.identityId,
         eventCode: declined ? 'TRAINER_SHIFT_DECLINED' : 'TRAINER_SHIFT_APPROVED', resourceType: 'TRAINER', resourceId: trainerId,
         transition: { from: String(trainer.version), to: String(updated.version), version: updated.version } });
+      if (review) {
+        await appendTenantNotification(tx, { masterGymId: access.gymId, receiptId: receipt.id,
+          eventCode: declined ? 'TRAINER_SHIFT_DECLINED' : 'TRAINER_SHIFT_APPROVED', resourceId: trainerId, recipientIdentityId: binding.identityId });
+      }
       return result;
       }));
     });

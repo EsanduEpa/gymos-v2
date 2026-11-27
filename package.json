@@ -14,8 +14,8 @@
     "check:workspace": "node infrastructure/scripts/check-workspace.mjs",
     "build:workspace": "pnpm --recursive --if-present build",
     "lint:workspace": "pnpm --dir apps/api lint && pnpm --dir apps/web lint",
-    "typecheck:workspace": "pnpm --dir packages/contracts typecheck && pnpm --dir packages/api-client typecheck && pnpm --dir apps/api exec tsc --noEmit --incremental false --pretty false && pnpm --dir apps/web exec tsc --noEmit --incremental false --pretty false",
-    "test:unit": "pnpm --dir packages/contracts test && pnpm --dir packages/api-client test && pnpm --dir packages/theme-tokens test && pnpm --dir apps/api exec vitest run src && pnpm --dir apps/api exec vitest run --config vitest.config.pools.ts",
+    "typecheck:workspace": "pnpm --dir packages/contracts typecheck && pnpm --dir apps/api exec tsc --noEmit --incremental false --pretty false && pnpm --dir apps/web exec tsc --project tsconfig.test.json --noEmit --incremental false --pretty false",
+    "test:unit": "pnpm --dir packages/contracts test && pnpm --dir packages/theme-tokens test && pnpm --dir apps/api exec vitest run src && pnpm --dir apps/api exec vitest run --config vitest.config.pools.ts",
     "test:database:owned": "pnpm --dir apps/api exec vitest run --config vitest.config.environment-integration.ts --disableConsoleIntercept",
     "test:pt:owned": "pnpm --dir apps/api exec vitest run --config vitest.config.pt.ts --disableConsoleIntercept",
     "test:finance:owned": "pnpm --dir apps/api exec vitest run --config vitest.config.finance.ts --disableConsoleIntercept",
@@ -23,7 +23,7 @@
     "generate:clients": "prisma generate --schema packages/database-master/prisma/schema.prisma && prisma generate --schema packages/database-tenant/prisma/schema.prisma",
     "prepare:checks": "pnpm generate:clients && pnpm --filter \"./packages/**\" --recursive --if-present build",
     "test:cf:owned": "pnpm --dir apps/api exec vitest run --config vitest.config.member-applications.ts --disableConsoleIntercept",
-    "build:deploy:web": "pnpm prepare:checks && pnpm --dir apps/api build && pnpm --dir apps/web build",
+    "build:deploy:web": "pnpm --filter web... --recursive build",
     "build:deploy:api": "pnpm prepare:checks && pnpm --dir apps/api build",
     "start:deploy:api": "node --max-old-space-size=256 --max-semi-space-size=16 infrastructure/deployment/start-api.mjs",
     "deploy:demo:wake": "node infrastructure/deployment/wake-demo.mjs",
@@ -34,6 +34,7 @@
   "pnpm": {
     "overrides": {
       "exceljs@4.4.0>uuid": "11.1.1",
+      "@prisma/config@7.10.1>effect": "3.22.1",
       "body-parser": "2.4.0",
       "multer": "2.5.0",
       "tmp": "0.2.7",

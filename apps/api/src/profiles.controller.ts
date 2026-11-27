@@ -15,6 +15,7 @@ import { TenantSchemaGateService } from './tenancy/tenant-schema-gate.service.js
 import { withGymAccessFence } from './identity/gym-access-fence.js';
 import { MAX_PROFILE_PHOTO_BYTES, prepareProfilePhoto, sealProfilePhoto, streamProfilePhoto } from './profile-photo.js';
 import { pendingTrainerShift } from './trainer-shift-request.js';
+import { virtualPtEnabled } from './sessions/delivery-options.js';
 
 function invalid(): never { throw new UnprocessableEntityException('Enter valid profile fields and the current profile version'); }
 function profileFingerprint(value: string, binding: string, scope: string) {
@@ -132,7 +133,8 @@ export class GymProfileController {
         if (!row) throw new NotFoundException('Trainer profile not found');
         return selfTrainerProfileSchema.parse({ trainerId: row.id, fullName: row.fullName, phone: row.phone,
           biography: row.bio, specialisations: row.specialisations, yearsExperience: row.yearsExperience, version: row.version,
-          shiftStart: row.shiftStart, shiftEnd: row.shiftEnd, offersVirtualPt: row.offersVirtualPt, pendingShift: pendingTrainerShift(row.shiftRequest), hasPhoto: row.profilePhoto !== null });
+          shiftStart: row.shiftStart, shiftEnd: row.shiftEnd, offersVirtualPt: virtualPtEnabled() ? row.offersVirtualPt : undefined,
+          pendingShift: pendingTrainerShift(row.shiftRequest), hasPhoto: row.profilePhoto !== null });
       }
       throw new ForbiddenException('Profile role does not match gym access');
     });
@@ -184,6 +186,7 @@ export class GymProfileController {
             actorIdentityId: access.identityId, commandKind: 'UPDATE_SELF_TRAINER_PROFILE', idempotencyKey: parsed.data.idempotencyKey,
           } } });
           if (prior) return replay({ requestDigest: prior.requestDigest, resourceId: prior.resourceId, safeResult: prior.safeResult }, digest, trainerId);
+          if (parsed.data.offersVirtualPt !== undefined && !virtualPtEnabled()) throw new UnprocessableEntityException('Virtual PT is unavailable');
           const trainer = await tx.trainer.findFirst({ where: { id: trainerId, identityId: access.identityId, registrationState: 'COMPLETE' } });
           if (!trainer) throw new NotFoundException('Trainer profile not found');
           if (trainer.version !== parsed.data.expectedVersion) throw new ConflictException('Your gym profile changed; reload before saving');
@@ -293,11 +296,11 @@ export class GymProfileController {
     const headerKey = idempotencyKeySchema.safeParse(key);
     const parsed = ownerMemberProfileCorrectionSchema.safeParse({ ...(typeof body === 'object' && body !== null ? body : {}), idempotencyKey: key });
     if (!headerKey.success || !parsed.success || parsed.data.idempotencyKey !== headerKey.data) invalid();
+    if (parsed.data.healthNotes !== undefined) throw new ForbiddenException('Members manage their own health notes');
     return this.tenantGate.withVerifiedTenant(access, async tenant => {
       const binding = await this.publishedMember(tenant, access.gymId, memberId);
       return withGymAccessFence(this.database.master, [{ identityId: access.identityId, gymId: access.gymId, role: 'OWNER' }], async () => {
-        const protectedHealthNotes = profileFingerprint(JSON.stringify(parsed.data.healthNotes === undefined ? ['absent']
-          : parsed.data.healthNotes === null ? ['null'] : ['value', parsed.data.healthNotes]),
+        const protectedHealthNotes = profileFingerprint(JSON.stringify(['absent']),
         `member-profile-note:${access.gymId}:${access.identityId}:${memberId}:${parsed.data.idempotencyKey}`,
         'gymos-member-profile-note-fingerprint-v1');
         const digest = requestDigest({ fullName: parsed.data.fullName, dateOfBirth: parsed.data.dateOfBirth, phone: parsed.data.phone,
@@ -315,7 +318,7 @@ export class GymProfileController {
             enrollmentOperationId: binding.enrollmentOperationId, version: member.version }, data: {
               fullName: parsed.data.fullName,
               dateOfBirth: parsed.data.dateOfBirth ? new Date(`${parsed.data.dateOfBirth}T00:00:00.000Z`) : null,
-              phone: parsed.data.phone, emergencyContact: parsed.data.emergencyContact, healthNotes: parsed.data.healthNotes,
+              phone: parsed.data.phone, emergencyContact: parsed.data.emergencyContact,
               version: { increment: 1 },
             } });
           if (updated.count !== 1) throw new ConflictException('Member profile changed; reload before correcting it');
