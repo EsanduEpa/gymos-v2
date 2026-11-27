@@ -85,7 +85,7 @@ For a fresh installation, build the clients, packages and API, then run `pnpm ma
 
 ## PayHere Sandbox callbacks
 
-Ordinary manual testing keeps checkout disabled. To exercise PayHere Sandbox, configure a private, Git-ignored `.env.payhere-sandbox` with these values.
+Ordinary manual testing keeps checkout disabled. To exercise PayHere Sandbox, configure a private, Git-ignored `.env.payhere-sandbox` with these values. A separate synthetic PT-pack review also needs `GYMOS_STANDALONE_PT_PACKS_ENABLED=1`. Leave that setting unset for release acceptance.
 
 ```dotenv
 GYMOS_PAYHERE_CHECKOUT_ENABLED=1

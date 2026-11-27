@@ -206,16 +206,24 @@ it('serves role-safe, Master-published trainer pages and versioned/audited shift
   expect(existingAccess.linkStatus).toBe('ACTIVE');
 });
 
-it('keeps submitted trainer hours pending until the same gym owner approves them', async () => {
+it('notifies the gym owner and requesting trainer once per committed shift event', async () => {
   const owner = await bearer(fixture.users.ownerA.id);
   const otherOwner = await bearer(fixture.users.ownerB.id, fixture.gyms[1]!.id);
   const trainerToken = await bearer(fixture.users.trainerUser.id);
   const tenant = fixture.tenants[0]!;
   const trainer = await tenant.trainer.findFirstOrThrow({ where: { identityId: fixture.users.trainerUser.id } });
   const path = `/gyms/${fixture.gyms[0]!.slug}`;
+  const notices = async (token: string, scope = path) => (await call(`${scope}/me/notifications?limit=100`, token)).json();
+  const before = await notices(owner);
   const submit = { start: '08:15', end: '16:15', overnight: false, expectedVersion: trainer.version, requestId: randomUUID() };
   expect((await call(`${path}/me/shift-request`, trainerToken, submit, 'PUT')).status).toBe(200);
   expect(await (await call(`${path}/me/shift-request`, trainerToken, submit, 'PUT')).json()).toMatchObject({ replayed: true });
+  const submission = await notices(owner);
+  expect(submission.unreadCount).toBe(before.unreadCount + 1);
+  const notice = submission.items.find((item: { eventCode: string }) => item.eventCode === 'TRAINER_SHIFT_REQUESTED');
+  expect(notice).toMatchObject({ linkKind: 'OWNER_TRAINER_SHIFT_REVIEW', resourceId: trainer.id, readAt: null });
+  expect((await call(`${path}/me/notifications/${notice.id}/read`, trainerToken, undefined, 'POST')).status).toBe(404);
+  expect(await (await call(`${path}/me/notifications/${notice.id}/read`, owner, undefined, 'POST')).json()).toMatchObject({ isRead: true, unreadCount: before.unreadCount });
   const view = await (await call(`${path}/me/profile`, trainerToken)).json();
   expect(view).toMatchObject({ shiftStart: trainer.shiftStart, shiftEnd: trainer.shiftEnd,
     pendingShift: { id: submit.requestId, start: submit.start, end: submit.end } });
@@ -237,10 +245,21 @@ it('keeps submitted trainer hours pending until the same gym owner approves them
   });
   const decline = { ...submit, requestId: randomUUID(), expectedVersion: view.version + 2 };
   expect((await call(`${path}/me/shift-request`, trainerToken, decline, 'PUT')).status).toBe(200);
-  expect((await call(ownerPath, owner, { requestId: decline.requestId, expectedVersion: view.version + 3, decision: 'DECLINE' }, 'PUT')).status).toBe(200);
+  const declineDecision = { requestId: decline.requestId, expectedVersion: view.version + 3, decision: 'DECLINE' };
+  expect((await call(ownerPath, owner, declineDecision, 'PUT')).status).toBe(200);
+  expect((await call(ownerPath, owner, declineDecision, 'PUT')).status).toBe(200);
   expect(await (await call(`${path}/me/profile`, trainerToken)).json()).toMatchObject({
     shiftStart: '09:00', shiftEnd: '17:00', pendingShift: null,
   });
+  const trainerNotices = await notices(trainerToken);
+  expect(trainerNotices.items.filter((item: { eventCode: string }) => item.eventCode.startsWith('TRAINER_SHIFT_'))).toMatchObject([
+    { eventCode: 'TRAINER_SHIFT_DECLINED', linkKind: 'TRAINER_SHIFT_DETAILS', resourceId: trainer.id },
+    { eventCode: 'TRAINER_SHIFT_APPROVED', linkKind: 'TRAINER_SHIFT_DETAILS', resourceId: trainer.id },
+  ]);
+  expect(await tenant.notification.count({ where: { recipientIdentityId: fixture.users.ownerA.id,
+    eventCode: 'TRAINER_SHIFT_REQUESTED', resourceId: trainer.id } })).toBe(3);
+  expect((await call(`${path}/me/notifications`, otherOwner)).status).toBe(403);
+  expect((await notices(otherOwner, `/gyms/${fixture.gyms[1]!.slug}`)).items).toEqual([]);
 });
 
 it('allows profile edits and serves normalized photos only in the allowed gym context', async () => {

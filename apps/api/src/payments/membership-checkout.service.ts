@@ -43,6 +43,7 @@ export class MembershipCheckoutService {
   constructor(private readonly database: DatabaseService, private readonly tenantGate: TenantSchemaGateService) {}
 
   async start(access: MemberCheckoutAccess, item: CheckoutItem, input: CheckoutDetails) {
+    if (item.kind === 'PT_PACK' && process.env.GYMOS_STANDALONE_PT_PACKS_ENABLED !== '1') throw new ForbiddenException('PT credits are included with membership');
     const gateway = payHereSandboxCheckoutConfig(item.kind);
     const order = await this.tenantGate.withVerifiedTenant(access, tenant => withGymAccessFence(this.database.master, [{
       identityId: access.identityId, gymId: access.gymId, role: 'MEMBER', tenantActorId: access.actor.id,
@@ -110,6 +111,7 @@ export class MembershipCheckoutService {
   }
 
   async acceptNotification(slug: string, kind: MemberPaymentKind, notification: PayHereNotification) {
+    if (kind === 'PT_PACK' && process.env.GYMOS_STANDALONE_PT_PACKS_ENABLED !== '1') throw new ForbiddenException('PT credits are included with membership');
     const gym = await this.database.master.gym.findUnique({ where: { slug }, include: { expectedTenantOperation: true } });
     if (!gym) throw new NotFoundException('Membership checkout not found');
     return this.tenantGate.withVerifiedTenant({

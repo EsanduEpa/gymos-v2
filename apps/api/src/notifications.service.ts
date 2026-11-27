@@ -2,8 +2,10 @@ import { createHash } from 'node:crypto';
 import type { Prisma as TenantPrisma } from './generated/tenant/client.js';
 import { canonicalJson, OperationIntegrityError, reference } from './operations/primitives.js';
 
-type NotificationEvent = 'HIRE_REQUEST' | 'SESSION_BOOKED' | 'SESSION_DECLINED' | 'SESSION_CANCELLED' | 'SESSION_MISSED' | 'SESSION_STARTED' | 'SESSION_COMPLETED' | 'SESSION_EXPIRED' | 'SESSION_RESCHEDULED' | 'SESSION_CORRECTED' | 'CREDIT_REMEDY_APPROVED' | 'CREDIT_REMEDY_REQUIRED' | 'SESSION_REMINDER_24H' | 'SESSION_REMINDER_1H' | 'SESSION_NOTES_MISSING_24H' | 'GYMOS_SUBSCRIPTION_PAYMENT_DUE';
-type NotificationLink = 'OWNER_SESSIONS' | 'TRAINER_REQUESTS' | 'MEMBER_SESSIONS' | 'TRAINER_SCHEDULE' | 'OWNER_SUBSCRIPTION';
+type NotificationEvent = 'HIRE_REQUEST' | 'SESSION_BOOKED' | 'SESSION_DECLINED' | 'SESSION_CANCELLED' | 'SESSION_MISSED' | 'SESSION_STARTED' | 'SESSION_COMPLETED' | 'SESSION_EXPIRED' | 'SESSION_RESCHEDULED' | 'SESSION_CORRECTED' | 'CREDIT_REMEDY_APPROVED' | 'CREDIT_REMEDY_REQUIRED' | 'SESSION_REMINDER_24H' | 'SESSION_REMINDER_1H' | 'SESSION_NOTES_MISSING_24H' | 'GYMOS_SUBSCRIPTION_PAYMENT_DUE'
+  | 'TRAINER_SHIFT_REQUESTED' | 'TRAINER_SHIFT_APPROVED' | 'TRAINER_SHIFT_DECLINED';
+type NotificationLink = 'OWNER_SESSIONS' | 'TRAINER_REQUESTS' | 'MEMBER_SESSIONS' | 'TRAINER_SCHEDULE' | 'OWNER_SUBSCRIPTION'
+  | 'OWNER_TRAINER_SHIFT_REVIEW' | 'TRAINER_SHIFT_DETAILS';
 const CONTENT: Readonly<Record<NotificationEvent, { title: string; message: string; linkKind: NotificationLink }>> = {
   SESSION_REMINDER_24H: { title: 'Upcoming PT session', message: 'Your confirmed PT session is coming up.', linkKind: 'MEMBER_SESSIONS' },
   SESSION_REMINDER_1H: { title: 'PT session starts soon', message: 'Your confirmed PT session starts in one hour or less.', linkKind: 'MEMBER_SESSIONS' },
@@ -21,6 +23,9 @@ const CONTENT: Readonly<Record<NotificationEvent, { title: string; message: stri
   CREDIT_REMEDY_REQUIRED: { title: 'PT credit needs owner review', message: 'The released credit has expired. Owner approval is needed before it can be used again.', linkKind: 'OWNER_SESSIONS' },
   SESSION_EXPIRED: { title: 'Session request expired', message: 'A personal training session request expired before confirmation.', linkKind: 'MEMBER_SESSIONS' },
   GYMOS_SUBSCRIPTION_PAYMENT_DUE: { title: 'GymOS payment overdue', message: 'The paid billing period ended. Open your GymOS subscription to check billing and the seven-day grace period.', linkKind: 'OWNER_SUBSCRIPTION' },
+  TRAINER_SHIFT_REQUESTED: { title: 'New trainer shift request', message: 'A trainer requested a change to their recurring shift. Open the trainer profile to review the request.', linkKind: 'OWNER_TRAINER_SHIFT_REVIEW' },
+  TRAINER_SHIFT_APPROVED: { title: 'Shift request approved', message: 'Your recurring shift has been updated. Open your shift details to see the approved hours.', linkKind: 'TRAINER_SHIFT_DETAILS' },
+  TRAINER_SHIFT_DECLINED: { title: 'Shift request declined', message: 'Your existing shift hours stay in effect. Open your shift details to see your current hours.', linkKind: 'TRAINER_SHIFT_DETAILS' },
 };
 
 export type AppendNotificationInput = {
@@ -33,10 +38,16 @@ export type AppendNotificationInput = {
   linkKind?: NotificationLink;
 };
 
+function notificationResourceType(eventCode: NotificationEvent) {
+  if (eventCode === 'GYMOS_SUBSCRIPTION_PAYMENT_DUE') return 'GYMOS_SUBSCRIPTION';
+  if (eventCode.startsWith('TRAINER_SHIFT_')) return 'TRAINER';
+  return 'PT_SESSION';
+}
+
 export function notificationSourceEventKey(input: AppendNotificationInput): string {
   const event = CONTENT[input.eventCode];
   const linkKind = input.linkKind ?? event.linkKind;
-  const resourceType = input.eventCode === 'GYMOS_SUBSCRIPTION_PAYMENT_DUE' ? 'GYMOS_SUBSCRIPTION' : 'PT_SESSION';
+  const resourceType = notificationResourceType(input.eventCode);
   const canonical = canonicalJson([reference(input.masterGymId), reference(input.receiptId), input.eventCode,
     resourceType, reference(input.resourceId), input.eventOrdinal ?? 0, reference(input.recipientIdentityId), linkKind]);
   return `tn1:${createHash('sha256').update(canonical).digest('hex')}`;
@@ -53,7 +64,7 @@ export async function appendTenantNotification(tx: TenantPrisma.TransactionClien
   const sourceEventKey = notificationSourceEventKey(input);
   const where = { recipientIdentityId_sourceEventKey: { recipientIdentityId: reference(input.recipientIdentityId), sourceEventKey } };
   await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${sourceEventKey}, 0))`;
-  const session = input.eventCode === 'GYMOS_SUBSCRIPTION_PAYMENT_DUE' ? null :
+  const session = notificationResourceType(input.eventCode) !== 'PT_SESSION' ? null :
     await tx.pTSession.findUnique({ where: { id: input.resourceId }, select: { scheduledStartAt: true, gymTimezone: true } });
   if (session) {
     const time = new Intl.DateTimeFormat('en-GB', { timeZone: session.gymTimezone, dateStyle: 'medium', timeStyle: 'short' }).format(session.scheduledStartAt);

@@ -2,15 +2,16 @@
 
 import { formatDisplayDate, formatDisplayDateTime } from '@/lib/display-date';
 import { useState } from 'react';
-import type { MemberDetail } from '@gymos/contracts';
+import type { MemberDetail, MembershipPlan } from '@gymos/contracts';
 import { Card, EmptyState, StatusBadge, Tabs } from '@/components/ui';
 import { SessionPackPanel } from '@/components/members/session-pack-panel';
+import { MembershipRenewalForm } from '@/components/members/membership-renewal-form';
 import { MemberLifecycleForm } from '@/components/members/member-lifecycle-form';
 import { OwnerMemberCorrectionForm } from '@/components/profile/profile-forms';
 
 const items = [{ id: 'overview', label: 'Overview' }, { id: 'sessions', label: 'PT Session History' }, { id: 'history', label: 'Membership & Packs' }];
 
-export function MemberProfileTabs({ member, slug, requestKey, initialTab = 'overview' }: { member: MemberDetail; slug: string; requestKey: string; initialTab?: 'overview' | 'history' }) {
+export function MemberProfileTabs({ member, slug, requestKey, plans, initialTab = 'overview' }: { member: MemberDetail; slug: string; requestKey: string; plans: MembershipPlan[] | null; initialTab?: 'overview' | 'history' }) {
   const [active, setActive] = useState<string>(initialTab);
   return <section className="member-profile-tabs">
     <Card>
@@ -34,20 +35,21 @@ export function MemberProfileTabs({ member, slug, requestKey, initialTab = 'over
           : <EmptyState title="No PT sessions recorded yet." hint="Scheduled sessions and their outcomes will appear here."/>}
         <a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/owner/sessions?view=list&mode=month&memberId=${encodeURIComponent(member.id)}`}>Browse this member’s PT sessions</a>
       </div> : null}
-      {active === 'history' ? <div id="panel-history" role="tabpanel" aria-labelledby="tab-history" tabIndex={0} className="member-profile-panel">
+      <div id="panel-history" role="tabpanel" aria-labelledby="tab-history" tabIndex={0} className="member-profile-panel" hidden={active !== 'history'}>
+        {member.status === 'ACTIVE' ? <MembershipRenewalForm slug={slug} member={member} plans={plans} requestKey={`${requestKey}-renewal`}/> : null}
         <h3>Membership history</h3>
         {member.memberships.length ? <div className="member-history-list">{member.memberships.map(term => <article key={term.id}>
-          <div><strong>{term.planName}</strong><small>{formatDisplayDate(term.startDate)} to the day before {formatDisplayDate(term.endDateExclusive)}</small></div>
-          <span>{term.agreedPrice} {term.currency}<small>agreed value · no payment recorded</small></span>
+          <div><strong>{term.planName}</strong><small>{formatDisplayDate(term.startDate)} to the day before {formatDisplayDate(term.endDateExclusive)}</small>
+            {term.includedPtCredits !== undefined ? <small>{term.includedPtCredits} PT credits included</small> : null}</div>
+          <span>{term.agreedPrice} {term.currency}<small>Membership value</small></span>
         </article>)}</div> : <EmptyState title="No membership history."/>}
         {member.membershipTotalCount > member.membershipPageSize ? <nav aria-label="Membership history pages" className="member-history-pagination">
           <p>Page {member.membershipPage} of {member.membershipTotalPages} · {member.membershipTotalCount} membership terms</p>
           {member.membershipPage > 1 ? <a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/owner/members/${encodeURIComponent(member.id)}?membershipPage=${member.membershipPage - 1}&membershipPageSize=${member.membershipPageSize}#history`}>Previous membership page</a> : null}
           {member.membershipPage < member.membershipTotalPages ? <a className="ui-button ui-button-secondary" href={`/gyms/${encodeURIComponent(slug)}/owner/members/${encodeURIComponent(member.id)}?membershipPage=${member.membershipPage + 1}&membershipPageSize=${member.membershipPageSize}#history`}>Next membership page</a> : null}
         </nav> : null}
-        <SessionPackPanel slug={slug} memberId={member.id} status={member.status} currency={member.gymCurrency}
-          packs={member.sessionPacks} requestKey={requestKey}/>
-      </div> : null}
+        <SessionPackPanel packs={member.sessionPacks}/>
+      </div>
     </Card>
   </section>;
 }

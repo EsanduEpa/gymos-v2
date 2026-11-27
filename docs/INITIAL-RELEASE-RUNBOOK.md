@@ -130,6 +130,22 @@ Copy this table for each candidate. Use **Pending**, **Pass**, **Fail**, or **Bl
 | 4. Deployment and restore | Pending | | | |
 | 5. Owner walkthrough | Pending | | | |
 
+#### Follow-up implementation and focused verification · 2026-11-27
+
+The Phase 0 preparation commit is `caf2e7881263a528539ad1163bf48821e57c28b0`. The follow-up source includes Owner renewals, membership-only PT issuance and trainer shift notices. Its target schema is Master `master-2026-11-18.1` and tenant `tenant-2026-11-27.1`. At the requester's direction, the full regression suites on the follow-up source are deferred to the final verification pass.
+
+The follow-up browser checks ran on the rebuilt and synced synthetic instance at port 3002. Web build ID `BMBh7XZzVMeOKxf6NCyFO`. API build checksum `1b74b7c9050fe0208c5fdf1570cde958b9f82feea191cae64246d4da9f13ed26`, calculated from the sorted JavaScript file checksums. This build includes uncommitted follow-up source.
+
+| Gate | Status | Tester and date | Scenario, expected and actual result | Evidence or blocker |
+| --- | --- | --- | --- | --- |
+| 1. Manual sales and renewals with included PT credits | Pending | Codex, 2026-11-27 | Focused owned API test passed. Enrollment and renewal each issued one zero-value linked allowance. The stale reviewed plan version was rejected and replay returned the existing term. On port 3002, the Owner renewed a fresh synthetic member in the browser. The initial term started 27 November, the renewal started 27 December and expired 26 January. The queued six-credit allowance showed zero available before its start. After the browser lost a committed renewal response, retrying added exactly one term and one allowance in total. The Issue pack control was absent and standalone API issuance returned 403. | Cashbook reconciliation and gym Owner acceptance remain open. |
+| 2. PT and payroll | Pending | Codex, 2026-11-27 | Focused owned completion passed for a membership-linked allowance. The fixture consumed one credit, recognized zero additional PT revenue, and recorded the saved LKR 34.50 trainer pay. | Full booking, exception, export and approval walkthrough remains open. |
+| 3. Request and decision notifications, account access and privacy | Pending | Codex, 2026-11-27 | Focused API coverage passed for per-recipient counts, replay, stale decisions, mark-as-read, and foreign gym denial. On port 3002, the Owner opened both shift requests from history and the trainer opened both decision notices at the shift section. Declining the second request preserved the approved 10:00–18:00 hours. Member applications use the existing notification flow. | Application notice, account and privacy acceptance on this build remain open. A privacy decision owner must confirm health-note access, retention, deletion after restore and key custody. |
+| 4. Deployment and restore | Blocked | Codex, 2026-11-27 | The Phase 0 disposable recovery test passed locally. Hosted provisioning, worker interruption and an actual hosted backup restore remain required. | The approved persistent target, operator authorization, access, backup schedule, and restore limits are missing. |
+| 5. Owner walkthrough | Blocked | Codex, 2026-11-27 | Requires Owner walkthrough and release lead review on a pinned, verified candidate. | Actual gym Owner acceptance and release-lead sign-off are missing. |
+
+Release decision **NO-GO**. The Phase 0 commit is the last verified preparation revision. No final release candidate or hosted build has been signed off. Later phase commits are pending their gate results.
+
 ```text
 Candidate Git revision and web/API deployment IDs
 Master schema and tenant manifest versions

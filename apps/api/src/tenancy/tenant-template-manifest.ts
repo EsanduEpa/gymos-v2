@@ -445,7 +445,7 @@ const TENANT_TEMPLATE_V22: TenantTemplateManifest = Object.freeze({
   version: 'tenant-2026-11-18.4',
   migrations: [...TENANT_TEMPLATE_V21.migrations, { name: '20261118124000_owner_subscription_notice', checksum: '99e6f8c3f06b140421b1e3fc3b34ee59f4ecb24fea6fa2eb7e46bb7f1e9d29fb' }],
 });
-export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
+const TENANT_TEMPLATE_V23: TenantTemplateManifest = Object.freeze({
   ...TENANT_TEMPLATE_V22,
   version: 'tenant-2026-11-19.1',
   migrations: [...TENANT_TEMPLATE_V22.migrations, { name: '20261119120000_trainer_virtual_sessions', checksum: 'c3dd4da3347d81c3a78efb42aee34fd66cad6c023c0e9c1fecf7a81ea8c6d83c' }],
@@ -457,7 +457,12 @@ export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
     },
   },
 });
-export const TENANT_MANIFESTS: readonly TenantTemplateManifest[] = [TENANT_TEMPLATE_V1, TENANT_TEMPLATE_V2, TENANT_TEMPLATE_V3, TENANT_TEMPLATE_V4, TENANT_TEMPLATE_V5, TENANT_TEMPLATE_V6, TENANT_TEMPLATE_V7, TENANT_TEMPLATE_V8, TENANT_TEMPLATE_V9, TENANT_TEMPLATE_V10, TENANT_TEMPLATE_V11, TENANT_TEMPLATE_V12, TENANT_TEMPLATE_V13, TENANT_TEMPLATE_V14, TENANT_TEMPLATE_V15, TENANT_TEMPLATE_V16, TENANT_TEMPLATE_V17, TENANT_TEMPLATE_V18, TENANT_TEMPLATE_V19, TENANT_TEMPLATE_V20, TENANT_TEMPLATE_V21, TENANT_TEMPLATE_V22, TENANT_TEMPLATE_MANIFEST];
+export const TENANT_TEMPLATE_MANIFEST: TenantTemplateManifest = Object.freeze({
+  ...TENANT_TEMPLATE_V23,
+  version: 'tenant-2026-11-27.1',
+  migrations: [...TENANT_TEMPLATE_V23.migrations, { name: '20261127100000_trainer_shift_notices', checksum: 'f790232ff5e37bf3eb745ec688018f799abc3e625fb424a17d90765b90d5d41c' }],
+});
+export const TENANT_MANIFESTS: readonly TenantTemplateManifest[] = [TENANT_TEMPLATE_V1, TENANT_TEMPLATE_V2, TENANT_TEMPLATE_V3, TENANT_TEMPLATE_V4, TENANT_TEMPLATE_V5, TENANT_TEMPLATE_V6, TENANT_TEMPLATE_V7, TENANT_TEMPLATE_V8, TENANT_TEMPLATE_V9, TENANT_TEMPLATE_V10, TENANT_TEMPLATE_V11, TENANT_TEMPLATE_V12, TENANT_TEMPLATE_V13, TENANT_TEMPLATE_V14, TENANT_TEMPLATE_V15, TENANT_TEMPLATE_V16, TENANT_TEMPLATE_V17, TENANT_TEMPLATE_V18, TENANT_TEMPLATE_V19, TENANT_TEMPLATE_V20, TENANT_TEMPLATE_V21, TENANT_TEMPLATE_V22, TENANT_TEMPLATE_V23, TENANT_TEMPLATE_MANIFEST];
 export function reviewedTenantManifest(version: string | null, digest: string | null) {
   return TENANT_MANIFESTS.find(manifest => manifest.version === version && tenantManifestDigest(manifest) === digest);
 }

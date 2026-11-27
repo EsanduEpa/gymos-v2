@@ -1881,12 +1881,15 @@ test('member roster and profile keep role, tenant, privacy, empty, and dependenc
   await expect(overview).toBeFocused();
   await expect(page.getByRole('tabpanel')).toHaveAttribute('tabindex', '0');
   await tabs.getByRole('tab', { name: 'Membership & Packs' }).click();
-  await page.getByLabel('Session credits').fill('3');
-  await page.getByLabel('Validity in days').fill('90');
-  await page.getByLabel('Agreed pack price').fill('0');
-  await page.getByRole('button', { name: 'Issue pack' }).click();
-  await expect(page.getByText('Issued 3 session credits. No payment was recorded.')).toBeVisible();
-  await expect(page.locator('.session-pack-panel')).toContainText('3 sessions issued');
+  expect(await page.getByRole('button', { name: 'Issue pack' }).count()).toBe(0);
+  const plan = await fixture.tenants[0].membershipPlan.create({ data: {
+    name: 'Renewal profile bundle', price: '15000', currency: 'LKR', durationDays: 30, includedPtCredits: 3,
+  } });
+  await page.goto(`${webBase}/gyms/${alpha}/owner/members/${profileMember.id}?membershipPage=1`);
+  await page.getByLabel('Membership plan').selectOption(plan.id);
+  await page.getByRole('button', { name: 'Confirm membership renewal' }).click();
+  await expect(page.getByText(/Renewal profile bundle renewed for LKR 15000/)).toBeVisible();
+  await expect(page.locator('.session-pack-panel')).toContainText('3 PT credits included with membership');
   await expect(page.locator('.session-pack-panel')).toContainText('3 available');
   expect(await fixture.tenants[0]!.sessionPack.count({ where: { memberId: profileMember.id } })).toBe(1);
   await page.setViewportSize({ width: 320, height: 700 });

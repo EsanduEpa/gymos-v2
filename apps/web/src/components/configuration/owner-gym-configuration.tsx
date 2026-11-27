@@ -36,7 +36,7 @@ function FormCard({ eyebrow, title, feedback, children }: { eyebrow: string; tit
   return <Card className="config-card"><CardHeader eyebrow={eyebrow} title={title} />{feedback ? <Feedback tone={feedback.tone}>{feedback.message}</Feedback> : null}{children}</Card>;
 }
 
-export function OwnerGymConfiguration({ slug, initial, ptPackOffers }: { slug: string; initial: InitialSettings; ptPackOffers: PtPackOffer[] | null }) {
+export function OwnerGymConfiguration({ slug, initial, ptPackOffers }: { slug: string; initial: InitialSettings; ptPackOffers?: PtPackOffer[] | null }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('profile');
   const [configuration, setConfiguration] = useState(initial.configuration);
@@ -108,7 +108,7 @@ export function OwnerGymConfiguration({ slug, initial, ptPackOffers }: { slug: s
   }
 
   return <div className="gym-config-workspace">
-    <Tabs label="Gym configuration" items={tabs} value={activeTab} onChange={id => { setActiveTab(id); setFeedback({}); }} />
+    <Tabs label="Gym configuration" items={ptPackOffers === undefined ? tabs.filter(tab => tab.id !== 'pt-packs') : tabs} value={activeTab} onChange={id => { setActiveTab(id); setFeedback({}); }} />
     {activeTab === 'profile' ? <section role="tabpanel" id="panel-profile" aria-labelledby="tab-profile" className="config-panel">
       <div className="config-grid">
         <FormCard eyebrow="OPERATIONAL SETTINGS" title="Gym Profile" feedback={feedback.operational}>
@@ -165,9 +165,9 @@ export function OwnerGymConfiguration({ slug, initial, ptPackOffers }: { slug: s
           error={planConfirmation && feedback.plan?.tone === 'error' ? feedback.plan.message : undefined} onClose={() => setPlanConfirmation(null)} onConfirm={() => void confirmPlanChange()}/>
       </FormCard>
     </section> : null}
-    <section role="tabpanel" id="panel-pt-packs" aria-labelledby="tab-pt-packs" hidden={activeTab !== 'pt-packs'}>
+    {ptPackOffers !== undefined ? <section role="tabpanel" id="panel-pt-packs" aria-labelledby="tab-pt-packs" hidden={activeTab !== 'pt-packs'}>
       <OwnerPtPackOffers slug={slug} currency={configuration.configuration.currency} initial={ptPackOffers}/>
-    </section>
+    </section> : null}
     {activeTab === 'fees' ? <section role="tabpanel" id="panel-fees" aria-labelledby="tab-fees" className="config-panel"><FormCard eyebrow="PT SESSION RATES" title="Session Fee Card" feedback={feedback.fees}>
       <div className="config-notice">These prices apply to future confirmations. Existing session and payroll snapshots keep their saved amounts and policy versions.</div>
       <form className="config-form" onSubmit={event => submit(event, 'fees', 'Session rates saved for future confirmations.', data => ({ expectedVersion: configuration.configuration.version, defaultSessionFee: data.get('defaultSessionFee'), level2SessionFee: data.get('level2SessionFee') || '', introSessionFee: data.get('introSessionFee') || '' }), payload => saveOperationalConfiguration(slug, payload), setConfig)}>

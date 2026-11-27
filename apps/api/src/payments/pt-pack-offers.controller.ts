@@ -48,6 +48,7 @@ export class PtPackOffersController {
   @Post('pt-pack-offers')
   async create(@Req() request: GymRequest, @Body() body: unknown) {
     const access = accessFor(request, 'OWNER');
+    if (process.env.GYMOS_STANDALONE_PT_PACKS_ENABLED !== '1') throw new ForbiddenException('PT credits are included with membership');
     const parsed = createPtPackOfferSchema.safeParse(body);
     if (!parsed.success) throw new UnprocessableEntityException('Enter a name, positive price, credit count and validity period');
     const { idempotencyKey, ...details } = parsed.data;
@@ -79,6 +80,7 @@ export class PtPackOffersController {
   @Post('pt-pack-offers/:offerId')
   manage(@Req() request: GymRequest, @Param('offerId') offerId: string, @Body() body: unknown) {
     const access = accessFor(request, 'OWNER');
+    if (process.env.GYMOS_STANDALONE_PT_PACKS_ENABLED !== '1') throw new ForbiddenException('PT credits are included with membership');
     if (!idSchema.safeParse(offerId).success) throw new NotFoundException('PT pack offer not found');
     const parsed = managePtPackOfferSchema.safeParse(body);
     if (!parsed.success) throw new UnprocessableEntityException('Check the PT pack offer details');

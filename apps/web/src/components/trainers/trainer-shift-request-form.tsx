@@ -9,7 +9,7 @@ import { initialProfileActionState } from '@/lib/profile-action-state';
 export function TrainerShiftRequestForm({ slug, profile, requestKey }: { slug: string; profile: SelfTrainerProfile; requestKey: string }) {
   const [state, action, pending] = useActionState(requestTrainerShift.bind(null, slug, profile.version, requestKey), initialProfileActionState);
   const proposal = profile.pendingShift;
-  return <Card><CardHeader title="Recurring shift"/>
+  return <Card id="recurring-shift"><CardHeader title="Recurring shift"/>
     <p>Approved hours {profile.shiftStart && profile.shiftEnd ? `${profile.shiftStart}–${profile.shiftEnd} gym local time` : 'have not been set.'}</p>
     {proposal ? <p>Pending owner approval <strong>{proposal.start}–{proposal.end}{proposal.overnight ? ' overnight' : ''}</strong></p> : null}
     <form action={action} className="stack-form">

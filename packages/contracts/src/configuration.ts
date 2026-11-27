@@ -77,6 +77,7 @@ export const memberMembershipOverviewSchema = z.strictObject({
 });
 export const renewMembershipSchema = z.strictObject({
   planId: idSchema, expectedMemberVersion: versionSchema, idempotencyKey: z.string().min(16).max(128).regex(/^[\x21-\x7e]+$/),
+  expectedPlanVersion: versionSchema.optional(),
   startPolicy: z.enum(['IMMEDIATE', 'NEXT_AVAILABLE']),
 });
 export const gymThemeSettingsSchema = z.strictObject({
