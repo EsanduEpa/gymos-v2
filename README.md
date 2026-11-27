@@ -96,7 +96,7 @@ See the [current development and release checklist](docs/AUDIT-REMAINING-CHECKLI
 
 | Topic | Guide |
 | --- | --- |
-| Scope and delivery | [Requirements and SRS mapping](docs/GYMOS-REQUIREMENTS-REVIEW.md), [development checklist](docs/AUDIT-REMAINING-CHECKLIST.md), [release gates and QA evidence](docs/RELEASE-REVIEW.md) |
+| Scope and delivery | [Initial release runbook](docs/INITIAL-RELEASE-RUNBOOK.md), [requirements and SRS mapping](docs/GYMOS-REQUIREMENTS-REVIEW.md), [development checklist](docs/AUDIT-REMAINING-CHECKLIST.md), [QA evidence](docs/RELEASE-REVIEW.md) |
 | Local verification | [Local environments and file inventory](docs/manual-testing.md), [browser acceptance scenarios](docs/END-TO-END-MANUAL-SCENARIOS.md) |
 | Deployment and runtime | [Hosted deployment with Neon or Supabase](docs/HOSTED-DEPLOYMENT.md), [gym provisioning](docs/PROVISIONING-RUNTIME.md), [PT operations and scheduled work](docs/PT-OPERATIONS.md) |
 | Roles and privacy | [Account operations](docs/ACCOUNT-OPERATIONS.md), [security and privacy review](docs/SECURITY-REVIEW.md), [workspace design](docs/WORKSPACE-DESIGN.md) |

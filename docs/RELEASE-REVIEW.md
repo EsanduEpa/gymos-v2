@@ -1,6 +1,6 @@
 # GymOS release review
 
-Use the [release scope](../README.md#initial-web-release-scope) to decide what ships and the [requirements review](GYMOS-REQUIREMENTS-REVIEW.md) for SRS and audit traceability. The [development checklist](AUDIT-REMAINING-CHECKLIST.md) tracks the wider backlog. This review records release gates, observed results and open acceptance work.
+Use the [initial release runbook](INITIAL-RELEASE-RUNBOOK.md) to execute the release gates, the [release scope](../README.md#initial-web-release-scope) to decide what ships, and the [requirements review](GYMOS-REQUIREMENTS-REVIEW.md) for SRS and audit traceability. The [development checklist](AUDIT-REMAINING-CHECKLIST.md) tracks the wider backlog. This review records observed results and open acceptance work.
 
 ## Initial web release gates
 
